@@ -330,18 +330,30 @@ jobs:
           format: spdx-json
           output-file: dist/security/${{ matrix.component }}.sbom.spdx.json
 
-      - name: Vulnerability Gate (Trivy)
+      - name: Install Trivy
         if: steps.meta.outputs.push_images == 'true'
-        uses: aquasecurity/trivy-action@0.33.1
-        with:
-          image-ref: ${{ steps.meta.outputs.image_repo }}@${{ steps.build.outputs.digest }}
-          format: json
-          output: dist/security/${{ matrix.component }}.trivy.json
-          severity: ${{ steps.meta.outputs.vuln_fail_severities }}
-          ignore-unfixed: ${{ steps.meta.outputs.vuln_ignore_unfixed }}
-          scanners: vuln
-          vuln-type: os,library
-          exit-code: 1
+        uses: aquasecurity/setup-trivy@e6c2c5e321ed9123bda567646e2f96565e34abe1
+
+      - name: Vulnerability Gate (Trivy CLI)
+        if: steps.meta.outputs.push_images == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          image_ref="${{ steps.meta.outputs.image_repo }}@${{ steps.build.outputs.digest }}"
+          ignore_unfixed_flag=""
+          if [ "${{ steps.meta.outputs.vuln_ignore_unfixed }}" = "true" ]; then
+            ignore_unfixed_flag="--ignore-unfixed"
+          fi
+
+          trivy image \
+            --format json \
+            --output "dist/security/${{ matrix.component }}.trivy.json" \
+            --scanners vuln \
+            --vuln-type os,library \
+            --severity "${{ steps.meta.outputs.vuln_fail_severities }}" \
+            --exit-code 1 \
+            ${ignore_unfixed_flag} \
+            "${image_ref}"
 
       - name: Publish component digest artifact
         shell: bash
