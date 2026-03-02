@@ -25,6 +25,8 @@ RUN_M9_AUDIT_READ="${RUN_M9_AUDIT_READ:-}"
 RUN_M9_POLICY_LIFECYCLE="${RUN_M9_POLICY_LIFECYCLE:-}"
 RUN_M10_PROVIDER_CONFORMANCE="${RUN_M10_PROVIDER_CONFORMANCE:-}"
 RUN_M10_POLICY_GRANT_ENFORCEMENT="${RUN_M10_POLICY_GRANT_ENFORCEMENT:-}"
+RUN_M10_DEPLOYMENT_MODES="${RUN_M10_DEPLOYMENT_MODES:-}"
+RUN_M10_NO_EGRESS_LOCAL_AIMXS="${RUN_M10_NO_EGRESS_LOCAL_AIMXS:-}"
 RUN_M10_AIMXS_PRIVATE_RELEASE="${RUN_M10_AIMXS_PRIVATE_RELEASE:-}"
 RUN_M7_INTEGRATION="${RUN_M7_INTEGRATION:-}"
 RUN_M7_BACKUP_RESTORE="${RUN_M7_BACKUP_RESTORE:-}"
@@ -83,6 +85,8 @@ apply_gate_mode_defaults() {
       set_default_if_unset RUN_M9_POLICY_LIFECYCLE 1
       set_default_if_unset RUN_M10_PROVIDER_CONFORMANCE 1
       set_default_if_unset RUN_M10_POLICY_GRANT_ENFORCEMENT 1
+      set_default_if_unset RUN_M10_DEPLOYMENT_MODES 1
+      set_default_if_unset RUN_M10_NO_EGRESS_LOCAL_AIMXS 1
       set_default_if_unset RUN_M10_AIMXS_PRIVATE_RELEASE 1
       set_default_if_unset RUN_M7_INTEGRATION 1
       set_default_if_unset RUN_M7_BACKUP_RESTORE 1
@@ -129,6 +133,8 @@ apply_gate_mode_defaults() {
       set_default_if_unset RUN_M9_POLICY_LIFECYCLE 0
       set_default_if_unset RUN_M10_PROVIDER_CONFORMANCE 0
       set_default_if_unset RUN_M10_POLICY_GRANT_ENFORCEMENT 0
+      set_default_if_unset RUN_M10_DEPLOYMENT_MODES 0
+      set_default_if_unset RUN_M10_NO_EGRESS_LOCAL_AIMXS 0
       set_default_if_unset RUN_M10_AIMXS_PRIVATE_RELEASE 0
       set_default_if_unset RUN_M7_INTEGRATION 0
       set_default_if_unset RUN_M7_BACKUP_RESTORE 0
@@ -189,6 +195,8 @@ enforce_full_mode_contract() {
   check_required RUN_M9_POLICY_LIFECYCLE 1
   check_required RUN_M10_PROVIDER_CONFORMANCE 1
   check_required RUN_M10_POLICY_GRANT_ENFORCEMENT 1
+  check_required RUN_M10_DEPLOYMENT_MODES 1
+  check_required RUN_M10_NO_EGRESS_LOCAL_AIMXS 1
   check_required RUN_M10_AIMXS_PRIVATE_RELEASE 1
   check_required RUN_M7_INTEGRATION 1
   check_required RUN_M7_BACKUP_RESTORE 1
@@ -267,6 +275,8 @@ ensure_cluster() {
 
 main() {
   local m10_3_gate_executed=0
+  local m10_4_gate_executed=0
+  local m10_5_gate_executed=0
   trap dump_cluster_state ERR
   trap on_gate_exit EXIT
 
@@ -486,9 +496,43 @@ main() {
     m10_3_gate_executed=1
   fi
 
+  if [ "${RUN_M10_DEPLOYMENT_MODES}" = "1" ]; then
+    echo "Running M10.4 gate (three deployment modes on a single provider contract)..."
+    local run_m5_baseline_for_m10_modes=1
+    if [ "${RUN_M7_INTEGRATION}" = "1" ] || [ "${RUN_PHASE_RUNTIME}" = "1" ] || [ "${RUN_M9_AUTHN_AUTHZ}" = "1" ] || [ "${RUN_M9_AUTHZ_TENANCY}" = "1" ] || [ "${RUN_M9_RBAC_MATRIX}" = "1" ] || [ "${RUN_M10_PROVIDER_CONFORMANCE}" = "1" ] || [ "${RUN_M10_POLICY_GRANT_ENFORCEMENT}" = "1" ]; then
+      run_m5_baseline_for_m10_modes=0
+    fi
+    RUNTIME=kind \
+    CLUSTER_NAME="${CLUSTER_NAME}" \
+    NAMESPACE=epydios-system \
+    RUN_M5_BASELINE="${run_m5_baseline_for_m10_modes}" \
+    RUN_M5_BOOTSTRAP="${RUN_PHASE_RUNTIME_BOOTSTRAP}" \
+    RUN_M5_IMAGE_PREP="${RUN_PHASE_RUNTIME_IMAGE_PREP}" \
+      "${REPO_ROOT}/platform/local/bin/verify-m10-deployment-modes.sh"
+    m10_4_gate_executed=1
+  fi
+
+  if [ "${RUN_M10_NO_EGRESS_LOCAL_AIMXS}" = "1" ]; then
+    echo "Running M10.5 gate (customer-hosted local AIMXS no-egress proof)..."
+    local run_m5_baseline_for_m10_no_egress=1
+    if [ "${RUN_M7_INTEGRATION}" = "1" ] || [ "${RUN_PHASE_RUNTIME}" = "1" ] || [ "${RUN_M9_AUTHN_AUTHZ}" = "1" ] || [ "${RUN_M9_AUTHZ_TENANCY}" = "1" ] || [ "${RUN_M9_RBAC_MATRIX}" = "1" ] || [ "${RUN_M10_PROVIDER_CONFORMANCE}" = "1" ] || [ "${RUN_M10_POLICY_GRANT_ENFORCEMENT}" = "1" ] || [ "${RUN_M10_DEPLOYMENT_MODES}" = "1" ]; then
+      run_m5_baseline_for_m10_no_egress=0
+    fi
+    RUNTIME=kind \
+    CLUSTER_NAME="${CLUSTER_NAME}" \
+    NAMESPACE=epydios-system \
+    RUN_M5_BASELINE="${run_m5_baseline_for_m10_no_egress}" \
+    RUN_M5_BOOTSTRAP="${RUN_PHASE_RUNTIME_BOOTSTRAP}" \
+    RUN_M5_IMAGE_PREP="${RUN_PHASE_RUNTIME_IMAGE_PREP}" \
+      "${REPO_ROOT}/platform/local/bin/verify-m10-no-egress-local-aimxs.sh"
+    m10_5_gate_executed=1
+  fi
+
   if [ "${RUN_M10_AIMXS_PRIVATE_RELEASE}" = "1" ]; then
     echo "Running M10.2 gate (AIMXS first private release evidence + staging strict proof)..."
     M10_3_GATE_EXECUTED="${m10_3_gate_executed}" \
+    M10_4_GATE_EXECUTED="${m10_4_gate_executed}" \
+    M10_5_GATE_EXECUTED="${m10_5_gate_executed}" \
       "${REPO_ROOT}/platform/local/bin/verify-m10-aimxs-private-release.sh"
   fi
 
