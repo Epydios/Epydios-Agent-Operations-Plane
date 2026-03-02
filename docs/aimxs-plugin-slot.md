@@ -26,6 +26,14 @@ This package defines:
 - Use HTTPS endpoint URLs for all mTLS modes.
 - Keep AIMXS credentials/material in Kubernetes secrets referenced by `ExtensionProvider` auth fields.
 
+## Local Development Mode (Non-Production)
+
+- A local bootstrap path is allowed before private AIMXS is deployed:
+  - `examples/aimxs/extensionprovider-policy-local-dev.yaml`
+- This dev profile is intentionally `auth.mode=None` and `selection.enabled=false` by default.
+- Use it only to validate contract compatibility and routing behavior in local clusters.
+- Staging/prod must switch to HTTPS with `MTLS` or `MTLSAndBearerTokenSecret`.
+
 ## Operational Contract
 
 - AIMXS providers advertise capabilities through `/v1alpha1/capabilities`.

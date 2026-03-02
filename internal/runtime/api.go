@@ -3,9 +3,11 @@ package runtime
 import (
 	"context"
 	"database/sql"
+	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"strconv"
@@ -34,6 +36,8 @@ func (s *APIServer) Routes() http.Handler {
 	mux.HandleFunc("/healthz", s.handleHealthz)
 	mux.Handle("/metrics", promhttp.Handler())
 	mux.HandleFunc("/v1alpha1/runtime/runs", s.handleRuns)
+	mux.HandleFunc("/v1alpha1/runtime/runs/export", s.handleRunExport)
+	mux.HandleFunc("/v1alpha1/runtime/runs/retention/prune", s.handleRunRetentionPrune)
 	mux.HandleFunc("/v1alpha1/runtime/runs/", s.handleRunByID)
 	mux.HandleFunc("/v1alpha1/runtime/audit/events", s.handleAuditEvents)
 	return loggingMiddleware(mux)
@@ -157,37 +161,223 @@ func (s *APIServer) handleCreateRun(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *APIServer) handleListRuns(w http.ResponseWriter, r *http.Request) {
-	limit := 25
-	if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
-		parsed, err := strconv.Atoi(raw)
-		if err != nil {
-			writeAPIError(w, http.StatusBadRequest, "INVALID_LIMIT", "limit must be an integer", false, map[string]interface{}{"limit": raw})
-			return
-		}
-		limit = parsed
+	query, err := parseRunListQuery(r)
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, "INVALID_QUERY", err.Error(), false, nil)
+		return
 	}
-
-	items, err := s.store.ListRuns(r.Context(), limit)
+	items, err := s.store.ListRuns(r.Context(), query)
 	if err != nil {
 		writeAPIError(w, http.StatusInternalServerError, "STORE_QUERY_FAILED", "failed to list runs", true, map[string]interface{}{"error": err.Error()})
 		return
 	}
-
 	identity, _ := RuntimeIdentityFromContext(r.Context())
 	filtered, deniedByAuthz := filterRunSummariesByAuthorization(items, identity, s.auth, PermissionRunRead)
 	emitAuditEvent(r.Context(), "runtime.run.list", map[string]interface{}{
 		"path":            r.URL.Path,
 		"method":          r.Method,
-		"requestedLimit":  limit,
+		"requestedLimit":  query.Limit,
+		"requestedOffset": query.Offset,
+		"filters": map[string]interface{}{
+			"tenantId":       query.TenantID,
+			"projectId":      query.ProjectID,
+			"environment":    query.Environment,
+			"status":         query.Status,
+			"policyDecision": query.PolicyDecision,
+			"providerId":     query.ProviderID,
+			"retentionClass": query.RetentionClass,
+			"search":         query.Search,
+			"includeExpired": query.IncludeExpired,
+		},
 		"returnedCount":   len(filtered),
 		"unfilteredCount": len(items),
 		"filteredDenied":  deniedByAuthz,
 	})
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"count": len(filtered),
-		"items": filtered,
+		"count":          len(filtered),
+		"offset":         query.Offset,
+		"limit":          query.Limit,
+		"includeExpired": query.IncludeExpired,
+		"items":          filtered,
 	})
+}
+
+func (s *APIServer) handleRunExport(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeAPIError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "method not allowed", false, nil)
+		return
+	}
+	ctx, ok := s.authorizeRequest(w, r, PermissionRunRead)
+	if !ok {
+		return
+	}
+	r = r.WithContext(ctx)
+
+	query, err := parseRunListQuery(r)
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, "INVALID_QUERY", err.Error(), false, nil)
+		return
+	}
+
+	format := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("format")))
+	if format == "" {
+		format = "jsonl"
+	}
+	if format != "jsonl" && format != "csv" {
+		writeAPIError(w, http.StatusBadRequest, "INVALID_FORMAT", "format must be one of: jsonl,csv", false, map[string]interface{}{"format": format})
+		return
+	}
+
+	items, err := s.store.ListRuns(r.Context(), query)
+	if err != nil {
+		writeAPIError(w, http.StatusInternalServerError, "STORE_QUERY_FAILED", "failed to list runs for export", true, map[string]interface{}{"error": err.Error()})
+		return
+	}
+	identity, _ := RuntimeIdentityFromContext(r.Context())
+	filtered, deniedByAuthz := filterRunSummariesByAuthorization(items, identity, s.auth, PermissionRunRead)
+
+	emitAuditEvent(r.Context(), "runtime.run.export", map[string]interface{}{
+		"path":            r.URL.Path,
+		"method":          r.Method,
+		"format":          format,
+		"requestedLimit":  query.Limit,
+		"requestedOffset": query.Offset,
+		"returnedCount":   len(filtered),
+		"unfilteredCount": len(items),
+		"filteredDenied":  deniedByAuthz,
+	})
+
+	switch format {
+	case "jsonl":
+		w.Header().Set("Content-Type", "application/x-ndjson")
+		for _, item := range filtered {
+			b, err := json.Marshal(item)
+			if err != nil {
+				writeAPIError(w, http.StatusInternalServerError, "EXPORT_ENCODE_FAILED", "failed to encode export record", true, map[string]interface{}{"error": err.Error()})
+				return
+			}
+			_, _ = w.Write(append(b, '\n'))
+		}
+	case "csv":
+		w.Header().Set("Content-Type", "text/csv")
+		cw := csv.NewWriter(w)
+		header := []string{
+			"runId", "requestId", "tenantId", "projectId", "environment", "retentionClass", "expiresAt",
+			"status", "policyDecision", "policyBundleId", "policyBundleVersion",
+			"selectedProfileProvider", "selectedPolicyProvider", "selectedEvidenceProvider",
+			"policyGrantTokenPresent", "policyGrantTokenSha256", "createdAt", "updatedAt",
+		}
+		if err := cw.Write(header); err != nil {
+			writeAPIError(w, http.StatusInternalServerError, "EXPORT_ENCODE_FAILED", "failed to write CSV header", true, map[string]interface{}{"error": err.Error()})
+			return
+		}
+		for _, item := range filtered {
+			expiresAt := ""
+			if item.ExpiresAt != nil {
+				expiresAt = item.ExpiresAt.UTC().Format(time.RFC3339)
+			}
+			row := []string{
+				item.RunID,
+				item.RequestID,
+				item.TenantID,
+				item.ProjectID,
+				item.Environment,
+				item.RetentionClass,
+				expiresAt,
+				string(item.Status),
+				item.PolicyDecision,
+				item.PolicyBundleID,
+				item.PolicyBundleVersion,
+				item.SelectedProfileProvider,
+				item.SelectedPolicyProvider,
+				item.SelectedEvidenceProvider,
+				strconv.FormatBool(item.PolicyGrantTokenPresent),
+				item.PolicyGrantTokenSHA256,
+				item.CreatedAt.UTC().Format(time.RFC3339),
+				item.UpdatedAt.UTC().Format(time.RFC3339),
+			}
+			if err := cw.Write(row); err != nil {
+				writeAPIError(w, http.StatusInternalServerError, "EXPORT_ENCODE_FAILED", "failed to write CSV row", true, map[string]interface{}{"error": err.Error()})
+				return
+			}
+		}
+		cw.Flush()
+		if err := cw.Error(); err != nil {
+			writeAPIError(w, http.StatusInternalServerError, "EXPORT_ENCODE_FAILED", "failed to flush CSV export", true, map[string]interface{}{"error": err.Error()})
+			return
+		}
+	}
+}
+
+type retentionPruneRequest struct {
+	DryRun         *bool  `json:"dryRun,omitempty"`
+	Before         string `json:"before,omitempty"`
+	RetentionClass string `json:"retentionClass,omitempty"`
+	Limit          int    `json:"limit,omitempty"`
+}
+
+func (s *APIServer) handleRunRetentionPrune(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeAPIError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "method not allowed", false, nil)
+		return
+	}
+	ctx, ok := s.authorizeRequest(w, r, PermissionRunCreate)
+	if !ok {
+		return
+	}
+	r = r.WithContext(ctx)
+
+	identity, _ := RuntimeIdentityFromContext(r.Context())
+	if err := s.authorizeScoped(identity, PermissionRunCreate, "", ""); err != nil {
+		s.writeAuthError(w, err)
+		return
+	}
+
+	req := retentionPruneRequest{Limit: 500}
+	if r.Body != nil {
+		defer r.Body.Close()
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&req); err != nil && !errors.Is(err, io.EOF) {
+			writeAPIError(w, http.StatusBadRequest, "INVALID_JSON", "invalid JSON body", false, map[string]interface{}{"error": err.Error()})
+			return
+		}
+	}
+
+	dryRun := true
+	if req.DryRun != nil {
+		dryRun = *req.DryRun
+	}
+	before := time.Now().UTC()
+	if raw := strings.TrimSpace(req.Before); raw != "" {
+		parsed, err := time.Parse(time.RFC3339, raw)
+		if err != nil {
+			writeAPIError(w, http.StatusBadRequest, "INVALID_BEFORE", "before must be RFC3339", false, map[string]interface{}{"before": raw})
+			return
+		}
+		before = parsed.UTC()
+	}
+
+	result, err := s.store.PruneRuns(r.Context(), RunPruneQuery{
+		Before:         before,
+		RetentionClass: strings.TrimSpace(req.RetentionClass),
+		Limit:          req.Limit,
+		DryRun:         dryRun,
+	})
+	if err != nil {
+		writeAPIError(w, http.StatusInternalServerError, "RETENTION_PRUNE_FAILED", "failed to prune retention-expired runs", true, map[string]interface{}{"error": err.Error()})
+		return
+	}
+	emitAuditEvent(r.Context(), "runtime.retention.prune", map[string]interface{}{
+		"path":           r.URL.Path,
+		"method":         r.Method,
+		"dryRun":         result.DryRun,
+		"before":         result.Before.Format(time.RFC3339),
+		"retentionClass": result.RetentionClass,
+		"limit":          result.Limit,
+		"matched":        result.Matched,
+		"deleted":        result.Deleted,
+	})
+	writeJSON(w, http.StatusOK, result)
 }
 
 func (s *APIServer) handleRunByID(w http.ResponseWriter, r *http.Request) {
@@ -496,6 +686,64 @@ func filterAuditEventsByAuthorization(items []map[string]interface{}, identity *
 		out = append(out, cloneInterfaceMap(item))
 	}
 	return out, denied
+}
+
+func parseRunListQuery(r *http.Request) (RunListQuery, error) {
+	q := RunListQuery{
+		Limit:          100,
+		Offset:         0,
+		IncludeExpired: true,
+		TenantID:       strings.TrimSpace(r.URL.Query().Get("tenantId")),
+		ProjectID:      strings.TrimSpace(r.URL.Query().Get("projectId")),
+		Environment:    strings.TrimSpace(r.URL.Query().Get("environment")),
+		Status:         strings.ToUpper(strings.TrimSpace(r.URL.Query().Get("status"))),
+		PolicyDecision: strings.ToUpper(strings.TrimSpace(r.URL.Query().Get("policyDecision"))),
+		ProviderID:     strings.TrimSpace(r.URL.Query().Get("providerId")),
+		RetentionClass: strings.TrimSpace(r.URL.Query().Get("retentionClass")),
+		Search:         strings.TrimSpace(r.URL.Query().Get("search")),
+	}
+
+	if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil {
+			return q, fmt.Errorf("limit must be an integer")
+		}
+		q.Limit = parsed
+	}
+	if raw := strings.TrimSpace(r.URL.Query().Get("offset")); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil {
+			return q, fmt.Errorf("offset must be an integer")
+		}
+		q.Offset = parsed
+	}
+	if raw := strings.TrimSpace(r.URL.Query().Get("includeExpired")); raw != "" {
+		parsed, err := strconv.ParseBool(raw)
+		if err != nil {
+			return q, fmt.Errorf("includeExpired must be boolean")
+		}
+		q.IncludeExpired = parsed
+	}
+	if raw := strings.TrimSpace(r.URL.Query().Get("createdAfter")); raw != "" {
+		parsed, err := time.Parse(time.RFC3339, raw)
+		if err != nil {
+			return q, fmt.Errorf("createdAfter must be RFC3339")
+		}
+		t := parsed.UTC()
+		q.CreatedAfter = &t
+	}
+	if raw := strings.TrimSpace(r.URL.Query().Get("createdBefore")); raw != "" {
+		parsed, err := time.Parse(time.RFC3339, raw)
+		if err != nil {
+			return q, fmt.Errorf("createdBefore must be RFC3339")
+		}
+		t := parsed.UTC()
+		q.CreatedBefore = &t
+	}
+	if q.CreatedAfter != nil && q.CreatedBefore != nil && q.CreatedAfter.After(*q.CreatedBefore) {
+		return q, fmt.Errorf("createdAfter must be <= createdBefore")
+	}
+	return q, nil
 }
 
 func writeAPIError(w http.ResponseWriter, code int, errorCode, msg string, retryable bool, details map[string]interface{}) {

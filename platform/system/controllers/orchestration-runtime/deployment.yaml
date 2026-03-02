@@ -71,6 +71,20 @@ spec:
               value: "false"
             - name: AUTHZ_REQUIRE_POLICY_GRANT
               value: "false"
+            - name: POLICY_LIFECYCLE_ENABLED
+              value: "false"
+            - name: POLICY_LIFECYCLE_MODE
+              value: observe
+            - name: POLICY_ALLOWED_IDS
+              value: ""
+            - name: POLICY_MIN_VERSION
+              value: ""
+            - name: POLICY_ROLLOUT_PERCENT
+              value: "100"
+            - name: RETENTION_DEFAULT_CLASS
+              value: standard
+            - name: RETENTION_POLICY_JSON
+              value: ""
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:

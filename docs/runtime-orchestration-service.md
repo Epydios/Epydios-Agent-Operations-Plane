@@ -25,7 +25,9 @@ This service moves policy/evidence/profile execution flow out of ad-hoc scripts 
 
 - `GET /healthz`
 - `POST /v1alpha1/runtime/runs`
-- `GET /v1alpha1/runtime/runs?limit=25`
+- `GET /v1alpha1/runtime/runs?limit=100&offset=0&status=...&policyDecision=...&tenantId=...&projectId=...&environment=...&providerId=...&retentionClass=...&search=...&createdAfter=...&createdBefore=...&includeExpired=true|false`
+- `GET /v1alpha1/runtime/runs/export?format=jsonl|csv` (supports the same filters as list)
+- `POST /v1alpha1/runtime/runs/retention/prune` (`dryRun`, `before`, `retentionClass`, `limit`)
 - `GET /v1alpha1/runtime/runs/{runId}`
 - `GET /v1alpha1/runtime/audit/events?limit=100&tenantId=...&projectId=...&providerId=...&decision=...&event=...`
 
@@ -46,6 +48,13 @@ This service moves policy/evidence/profile execution flow out of ad-hoc scripts 
   - `AUTHZ_POLICY_MATRIX_JSON` (tenant/project allow/deny policy rules)
   - `AUTHZ_POLICY_MATRIX_REQUIRED` (require non-empty policy matrix when auth is enabled)
   - `AUTHZ_REQUIRE_POLICY_GRANT` (require policy grant token for non-`DENY` decisions before execution continues)
+  - `POLICY_LIFECYCLE_ENABLED` (enable lifecycle checks on policy bundle metadata)
+  - `POLICY_LIFECYCLE_MODE` (`observe` or `enforce`)
+  - `POLICY_ALLOWED_IDS` (comma-separated allowed policy bundle IDs)
+  - `POLICY_MIN_VERSION` (minimum accepted policy bundle version)
+  - `POLICY_ROLLOUT_PERCENT` (stable rollout bucket allowlist, `0-100`)
+  - `RETENTION_DEFAULT_CLASS` (default class when request omits `retentionClass`)
+  - `RETENTION_POLICY_JSON` (JSON map of `retentionClass -> duration`, for example `{"short":"24h","standard":"168h","archive":"720h"}`)
 - Scope enforcement:
   - create/read/list paths enforce tenant/project scope from JWT claims when scope claims are present
   - cross-tenant and cross-project access is denied
@@ -59,6 +68,25 @@ This service moves policy/evidence/profile execution flow out of ad-hoc scripts 
 - Error mapping:
   - missing/invalid token -> `401 UNAUTHORIZED`
   - permission/client-id denial -> `403 FORBIDDEN`
+
+## Policy Lifecycle Controls (M9.6)
+
+- Runtime captures policy bundle metadata (`policyBundleId`, `policyBundleVersion`) from policy responses.
+- Lifecycle policy can enforce:
+  - approved policy IDs (`POLICY_ALLOWED_IDS`)
+  - minimum version floor (`POLICY_MIN_VERSION`)
+  - rollout window (`POLICY_ROLLOUT_PERCENT`)
+- Modes:
+  - `observe`: emit lifecycle violation audit events and continue execution
+  - `enforce`: block run execution when lifecycle checks fail
+
+## Retention Controls (M9.6)
+
+- Runtime records `retentionClass` and computes `expiresAt` from `RETENTION_POLICY_JSON`.
+- Unknown retention classes are rejected when retention policy map is configured.
+- Operators can run prune checks (or deletion) via:
+  - `POST /v1alpha1/runtime/runs/retention/prune`
+  - `dryRun=true` returns candidate run IDs/count without deleting.
 
 ## Policy Grant Enforcement (AIMXS-Compatible)
 
@@ -109,6 +137,12 @@ This service moves policy/evidence/profile execution flow out of ad-hoc scripts 
   - validates authenticated `GET /v1alpha1/runtime/audit/events` reads
   - validates tenant/project scoped filtering and provider/decision/event query filters
   - validates invalid query handling (`INVALID_LIMIT`)
+- `platform/local/bin/verify-m9-policy-lifecycle-and-run-query.sh`
+  - optional baseline bootstrap via M5 verifier
+  - validates policy lifecycle enforcement (`observe|enforce`)
+  - validates run list filter/search semantics
+  - validates CSV/JSONL export
+  - validates retention prune dry-run behavior
 - `platform/local/bin/verify-m10-policy-grant-enforcement.sh`
   - optional baseline bootstrap via M5 verifier
   - validates non-bypassable grant enforcement (`no token => no execution`) for non-`DENY` policy decisions

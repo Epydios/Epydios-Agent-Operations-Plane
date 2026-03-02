@@ -67,3 +67,25 @@ PROFILE=prod-full ./platform/ci/bin/run-gate-profile.sh
 2. Run `staging-full` profile and archive output in release evidence.
 3. Validate alert routing path with synthetic smoke alert.
 4. Ensure `prod-full` profile is available in runbook and dry-run on pre-prod before promotion.
+
+## Adoption Sign-off Record
+
+Status: COMPLETE (2026-03-01)
+
+Evidence:
+
+1. Staging strict profile proof:
+   - `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/promotion/staging-full-gate-20260301T183622Z.log`
+   - `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/promotion/staging-full-gate-20260301T183622Z.log.sha256`
+   - `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/promotion/staging-full-gate-20260301T183622Z.log.proof.json`
+2. Prod strict profile proof:
+   - `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/promotion/prod-full-gate-20260301T184620Z.log`
+   - `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/promotion/prod-full-gate-20260301T184620Z.log.sha256`
+   - `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/promotion/prod-full-gate-20260301T184620Z.log.proof.json`
+
+Ownership confirmation:
+
+1. Platform engineering: approved.
+2. Operations/SRE: approved.
+3. Security: approved.
+4. Product/on-call: approved.

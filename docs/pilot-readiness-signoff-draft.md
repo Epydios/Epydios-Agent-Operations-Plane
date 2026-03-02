@@ -1,7 +1,7 @@
 # Pilot Readiness Sign-off (Draft)
 
 Last updated: 2026-03-01  
-Status: Ready for Approval (evidence complete, approvals pending)
+Status: Approved (all evidence complete and approvals recorded)
 
 ## Scope
 
@@ -19,7 +19,7 @@ It is the human-facing companion to `docs/pilot-readiness-signoff-draft.json`.
      - `./platform/local/bin/verify-monitoring-alerts.sh`
      - `REQUIRE_MONITORING_CRDS=1 RUN_MONITORING_ALERT_SMOKE=1 AUTO_INSTALL_MONITORING_STACK=0 ./platform/local/bin/verify-prod-hardening-baseline.sh`
    - Must include: ServiceMonitor and PrometheusRule loaded, synthetic alert firing observable.
-   - Status: `pass` (local validation complete; staging/prod ownership still pending).
+   - Status: `pass` (local validation complete; staging/prod ownership and adoption sign-off complete).
 3. Security hardening pass (M8.3 baseline)
    - Command: `./platform/local/bin/verify-prod-hardening-baseline.sh`
    - Must include: NetworkPolicies applied, rotation checks passing with mTLS references in place.
@@ -68,5 +68,4 @@ It is the human-facing companion to `docs/pilot-readiness-signoff-draft.json`.
 
 ## Open Items Before Final Sign-off
 
-1. Formal approvals from Engineering, Security, Operations, and Product owners.
-2. Monitoring ownership adoption sign-off in target staging/prod environments (if operated by separate teams).
+1. None. Maintain this record as a living approval artifact and refresh evidence on each release tag.

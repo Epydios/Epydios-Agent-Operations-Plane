@@ -57,3 +57,38 @@ spec:
               value: "true"
             - name: AUTHZ_REQUIRE_POLICY_GRANT
               value: "true"
+            - name: POLICY_LIFECYCLE_ENABLED
+              valueFrom:
+                configMapKeyRef:
+                  name: orchestration-runtime-auth-config
+                  key: policy_lifecycle_enabled
+            - name: POLICY_LIFECYCLE_MODE
+              valueFrom:
+                configMapKeyRef:
+                  name: orchestration-runtime-auth-config
+                  key: policy_lifecycle_mode
+            - name: POLICY_ALLOWED_IDS
+              valueFrom:
+                configMapKeyRef:
+                  name: orchestration-runtime-auth-config
+                  key: policy_allowed_ids
+            - name: POLICY_MIN_VERSION
+              valueFrom:
+                configMapKeyRef:
+                  name: orchestration-runtime-auth-config
+                  key: policy_min_version
+            - name: POLICY_ROLLOUT_PERCENT
+              valueFrom:
+                configMapKeyRef:
+                  name: orchestration-runtime-auth-config
+                  key: policy_rollout_percent
+            - name: RETENTION_DEFAULT_CLASS
+              valueFrom:
+                configMapKeyRef:
+                  name: orchestration-runtime-auth-config
+                  key: retention_default_class
+            - name: RETENTION_POLICY_JSON
+              valueFrom:
+                configMapKeyRef:
+                  name: orchestration-runtime-auth-config
+                  key: retention_policy_json

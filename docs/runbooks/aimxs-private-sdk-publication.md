@@ -1,6 +1,6 @@
 # AIMXS Private SDK Publication
 
-Last updated: 2026-02-28
+Last updated: 2026-03-01
 
 ## Purpose
 
@@ -51,11 +51,12 @@ Define the release process for the private AIMXS SDK/reference adapter while kee
 ## OSS Evidence Artifacts (M10.2)
 
 1. Input metadata:
-   - `provenance/aimxs/private-release-inputs.vars`
+   - `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/private-release-inputs.vars` (default)
+   - `provenance/aimxs/private-release-inputs.vars` (repo-local fallback for offline/local-only usage)
 2. Generated evidence:
-   - `provenance/aimxs/m10-2-private-release-evidence-<timestamp>.json`
-   - `provenance/aimxs/m10-2-private-release-evidence-<timestamp>.json.sha256`
-   - `provenance/aimxs/m10-2-private-release-evidence-latest.json`
+   - `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/m10-2-private-release-evidence-<timestamp>.json`
+   - `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/m10-2-private-release-evidence-<timestamp>.json.sha256`
+   - `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/m10-2-private-release-evidence-latest.json`
 
 ## Rollback
 
