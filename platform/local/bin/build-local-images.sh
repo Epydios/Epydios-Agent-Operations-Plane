@@ -47,6 +47,13 @@ build_image() {
 main() {
   require_cmd docker
 
+  if [ -n "${DOCKER_PLATFORM}" ]; then
+    echo "Building images for explicit platform: ${DOCKER_PLATFORM}"
+  else
+    echo "Building images for Docker host default platform."
+    echo "Set DOCKER_PLATFORM=linux/amd64 (or use build-local-images-amd64.sh) for Intel/x86_64 targets."
+  fi
+
   build_image "${CONTROLLER_IMAGE}" "./cmd/extension-provider-registry-controller"
   build_image "${PROFILE_RESOLVER_IMAGE}" "./cmd/profile-resolver-provider"
   build_image "${RUNTIME_ORCHESTRATOR_IMAGE}" "./cmd/control-plane-runtime"

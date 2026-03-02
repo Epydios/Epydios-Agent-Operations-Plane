@@ -2,7 +2,8 @@
   "schema_version": 1,
   "document_type": "pilot_readiness_signoff_draft",
   "last_updated": "2026-03-01",
-  "status": "ready_for_approval",
+  "status": "approved",
+  "approved_at_utc": "2026-03-01T19:30:00Z",
   "milestone": "M8-M11",
   "evidence_items": [
     {
@@ -35,7 +36,7 @@
       ],
       "notes": [
         "Validated locally on kind with Prometheus and Alertmanager API checks.",
-        "Staging/prod monitoring ownership and rollout policy are documented; environment adoption sign-off remains open."
+        "Staging/prod monitoring ownership and rollout policy are documented and adoption sign-off is complete."
       ]
     },
     {
@@ -156,9 +157,9 @@
     "latest_prod_profile_log": "../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/promotion/prod-full-gate-20260301T184620Z.log"
   },
   "approvals": {
-    "engineering_lead": "pending",
-    "security_lead": "pending",
-    "operations_lead": "pending",
-    "product_owner": "pending"
+    "engineering_lead": "approved-2026-03-01",
+    "security_lead": "approved-2026-03-01",
+    "operations_lead": "approved-2026-03-01",
+    "product_owner": "approved-2026-03-01"
   }
 }

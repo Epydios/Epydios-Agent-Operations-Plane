@@ -607,6 +607,26 @@ Validates AIMXS plug-in boundary constraints:
 ./platform/local/bin/verify-aimxs-boundary.sh
 ```
 
+### AIMXS local dev loopback profile (pre-private endpoint)
+
+Registers a dev-only AIMXS placeholder provider against the OSS local policy service, so you can validate contract/routing behavior before private AIMXS is reachable:
+
+```bash
+kubectl apply -f examples/aimxs/extensionprovider-policy-local-dev.yaml
+kubectl -n epydios-system patch extensionprovider oss-policy-opa --type=merge -p '{"spec":{"selection":{"enabled":false,"priority":90}}}'
+kubectl -n epydios-system patch extensionprovider aimxs-policy-local-dev --type=merge -p '{"spec":{"selection":{"enabled":true,"priority":850}}}'
+```
+
+Switch back to secure/private AIMXS registration:
+
+```bash
+kubectl apply -f examples/aimxs/extensionprovider-policy-mtls-bearer.yaml
+kubectl -n epydios-system patch extensionprovider aimxs-policy-local-dev --type=merge -p '{"spec":{"selection":{"enabled":false,"priority":850}}}'
+kubectl -n epydios-system patch extensionprovider aimxs-policy-primary --type=merge -p '{"spec":{"selection":{"enabled":true,"priority":900}}}'
+```
+
+The local loopback profile is local-only and must not be promoted to staging/prod.
+
 ### PR CI gate parity (kind, ephemeral)
 
 GitHub Actions PRs run `Phase 00/01 + Phase 02 + Phase 03 + Phase 04` with functional KServe smoke enabled using pinned remote refs (no local substrate dependency).
@@ -734,6 +754,7 @@ WITH_SYSTEM_SMOKETEST=1 ./platform/local/bin/bootstrap-k3d.sh
 ## Local Image Helpers
 
 - `platform/local/bin/build-local-images.sh` builds the Epydios controller/provider images locally using `build/docker/Dockerfile.go-binary`
+- `platform/local/bin/build-local-images-amd64.sh` builds Intel/x86_64 images (`DOCKER_PLATFORM=linux/amd64`) for release-aligned validation
 - `platform/local/bin/load-local-images-kind.sh` loads local images into an existing `kind` cluster
 - `platform/local/bin/load-local-images-k3d.sh` imports local images into an existing `k3d` cluster
 - `platform/local/bin/smoke-provider-discovery.sh` applies `platform/system` and verifies `ExtensionProvider` discovery status (`Ready=True`, `Probed=True`)
@@ -766,6 +787,14 @@ WITH_SYSTEM_SMOKETEST=1 ./platform/local/bin/bootstrap-k3d.sh
 - `platform/local/bin/verify-aimxs-boundary.sh` verifies AIMXS stays an external HTTPS plug-in boundary (slot contract + import boundary + manifest auth constraints)
 - `platform/local/bin/verify-provenance-lockfiles.sh` validates chart/image/CRD/license lockfiles (development and strict modes)
 - `platform/local/bin/sync-provenance-image-digests.sh` fills `provenance/images.lock.yaml` digests from running cluster image IDs and optional registry pulls
+
+For release-aligned Intel targets, use:
+
+```bash
+./platform/local/bin/build-local-images-amd64.sh
+```
+
+For native local speed (for example Apple Silicon), keep using `build-local-images.sh`.
 
 ## Notes
 

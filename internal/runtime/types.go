@@ -49,11 +49,15 @@ type RunRecord struct {
 	TenantID                 string          `json:"tenantId,omitempty"`
 	ProjectID                string          `json:"projectId,omitempty"`
 	Environment              string          `json:"environment,omitempty"`
+	RetentionClass           string          `json:"retentionClass,omitempty"`
+	ExpiresAt                *time.Time      `json:"expiresAt,omitempty"`
 	Status                   RunStatus       `json:"status"`
 	SelectedProfileProvider  string          `json:"selectedProfileProvider,omitempty"`
 	SelectedPolicyProvider   string          `json:"selectedPolicyProvider,omitempty"`
 	SelectedEvidenceProvider string          `json:"selectedEvidenceProvider,omitempty"`
 	PolicyDecision           string          `json:"policyDecision,omitempty"`
+	PolicyBundleID           string          `json:"policyBundleId,omitempty"`
+	PolicyBundleVersion      string          `json:"policyBundleVersion,omitempty"`
 	PolicyGrantTokenPresent  bool            `json:"policyGrantTokenPresent,omitempty"`
 	PolicyGrantTokenSHA256   string          `json:"policyGrantTokenSha256,omitempty"`
 	RequestPayload           json.RawMessage `json:"requestPayload,omitempty"`
@@ -67,20 +71,63 @@ type RunRecord struct {
 }
 
 type RunSummary struct {
-	RunID                    string    `json:"runId"`
-	RequestID                string    `json:"requestId"`
-	TenantID                 string    `json:"tenantId,omitempty"`
-	ProjectID                string    `json:"projectId,omitempty"`
-	Environment              string    `json:"environment,omitempty"`
-	Status                   RunStatus `json:"status"`
-	SelectedProfileProvider  string    `json:"selectedProfileProvider,omitempty"`
-	SelectedPolicyProvider   string    `json:"selectedPolicyProvider,omitempty"`
-	SelectedEvidenceProvider string    `json:"selectedEvidenceProvider,omitempty"`
-	PolicyDecision           string    `json:"policyDecision,omitempty"`
-	PolicyGrantTokenPresent  bool      `json:"policyGrantTokenPresent,omitempty"`
-	PolicyGrantTokenSHA256   string    `json:"policyGrantTokenSha256,omitempty"`
-	CreatedAt                time.Time `json:"createdAt"`
-	UpdatedAt                time.Time `json:"updatedAt"`
+	RunID                    string     `json:"runId"`
+	RequestID                string     `json:"requestId"`
+	TenantID                 string     `json:"tenantId,omitempty"`
+	ProjectID                string     `json:"projectId,omitempty"`
+	Environment              string     `json:"environment,omitempty"`
+	RetentionClass           string     `json:"retentionClass,omitempty"`
+	ExpiresAt                *time.Time `json:"expiresAt,omitempty"`
+	Status                   RunStatus  `json:"status"`
+	SelectedProfileProvider  string     `json:"selectedProfileProvider,omitempty"`
+	SelectedPolicyProvider   string     `json:"selectedPolicyProvider,omitempty"`
+	SelectedEvidenceProvider string     `json:"selectedEvidenceProvider,omitempty"`
+	PolicyDecision           string     `json:"policyDecision,omitempty"`
+	PolicyBundleID           string     `json:"policyBundleId,omitempty"`
+	PolicyBundleVersion      string     `json:"policyBundleVersion,omitempty"`
+	PolicyGrantTokenPresent  bool       `json:"policyGrantTokenPresent,omitempty"`
+	PolicyGrantTokenSHA256   string     `json:"policyGrantTokenSha256,omitempty"`
+	CreatedAt                time.Time  `json:"createdAt"`
+	UpdatedAt                time.Time  `json:"updatedAt"`
+}
+
+type RunListQuery struct {
+	Limit          int
+	Offset         int
+	TenantID       string
+	ProjectID      string
+	Environment    string
+	Status         string
+	PolicyDecision string
+	ProviderID     string
+	RetentionClass string
+	Search         string
+	CreatedAfter   *time.Time
+	CreatedBefore  *time.Time
+	IncludeExpired bool
+}
+
+type RunPruneQuery struct {
+	Before         time.Time
+	RetentionClass string
+	Limit          int
+	DryRun         bool
+}
+
+type RunPruneResult struct {
+	DryRun         bool      `json:"dryRun"`
+	Before         time.Time `json:"before"`
+	RetentionClass string    `json:"retentionClass,omitempty"`
+	Limit          int       `json:"limit"`
+	Matched        int       `json:"matched"`
+	Deleted        int       `json:"deleted"`
+	RunIDs         []string  `json:"runIds,omitempty"`
+}
+
+type PolicyBundleRef struct {
+	PolicyID      string `json:"policyId,omitempty"`
+	PolicyVersion string `json:"policyVersion,omitempty"`
+	Checksum      string `json:"checksum,omitempty"`
 }
 
 type APIError struct {

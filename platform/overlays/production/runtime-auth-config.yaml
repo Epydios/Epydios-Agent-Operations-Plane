@@ -27,3 +27,15 @@ data:
         {"name":"allow-tenant-reader","effect":"allow","roles":["runtime.tenant_reader"],"permissions":["runtime.run.read"],"tenants":["*"],"projects":["*"]}
       ]
     }
+  policy_lifecycle_enabled: "true"
+  policy_lifecycle_mode: enforce
+  policy_allowed_ids: EPYDIOS_OSS_POLICY_BASELINE
+  policy_min_version: v1
+  policy_rollout_percent: "100"
+  retention_default_class: standard
+  retention_policy_json: |
+    {
+      "short": "24h",
+      "standard": "168h",
+      "archive": "720h"
+    }

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -53,6 +54,13 @@ type Config struct {
 	AuthPolicyMatrixJSON    string
 	AuthRequirePolicyMatrix bool
 	AuthRequirePolicyGrant  bool
+	PolicyLifecycleEnabled  bool
+	PolicyLifecycleMode     string
+	PolicyAllowedIDs        string
+	PolicyMinVersion        string
+	PolicyRolloutPercent    int
+	RetentionDefaultClass   string
+	RetentionPolicyJSON     string
 }
 
 func main() {
@@ -91,6 +99,13 @@ func parseFlags() Config {
 		AuthPolicyMatrixJSON:    envOrDefault("AUTHZ_POLICY_MATRIX_JSON", ""),
 		AuthRequirePolicyMatrix: envBoolOrDefault("AUTHZ_POLICY_MATRIX_REQUIRED", false),
 		AuthRequirePolicyGrant:  envBoolOrDefault("AUTHZ_REQUIRE_POLICY_GRANT", false),
+		PolicyLifecycleEnabled:  envBoolOrDefault("POLICY_LIFECYCLE_ENABLED", false),
+		PolicyLifecycleMode:     envOrDefault("POLICY_LIFECYCLE_MODE", "observe"),
+		PolicyAllowedIDs:        envOrDefault("POLICY_ALLOWED_IDS", ""),
+		PolicyMinVersion:        envOrDefault("POLICY_MIN_VERSION", ""),
+		PolicyRolloutPercent:    envIntOrDefault("POLICY_ROLLOUT_PERCENT", 100),
+		RetentionDefaultClass:   envOrDefault("RETENTION_DEFAULT_CLASS", "standard"),
+		RetentionPolicyJSON:     envOrDefault("RETENTION_POLICY_JSON", ""),
 	}
 
 	flag.StringVar(&cfg.ListenAddr, "listen", cfg.ListenAddr, "HTTP listen address")
@@ -122,6 +137,13 @@ func parseFlags() Config {
 	flag.StringVar(&cfg.AuthPolicyMatrixJSON, "authz-policy-matrix-json", cfg.AuthPolicyMatrixJSON, "JSON authz policy matrix (allow/deny rules with tenant/project selectors)")
 	flag.BoolVar(&cfg.AuthRequirePolicyMatrix, "authz-policy-matrix-required", cfg.AuthRequirePolicyMatrix, "Require non-empty authz policy matrix when auth is enabled")
 	flag.BoolVar(&cfg.AuthRequirePolicyGrant, "authz-require-policy-grant", cfg.AuthRequirePolicyGrant, "Require policy grant token for non-DENY decisions before execution continues")
+	flag.BoolVar(&cfg.PolicyLifecycleEnabled, "policy-lifecycle-enabled", cfg.PolicyLifecycleEnabled, "Enable policy bundle lifecycle controls")
+	flag.StringVar(&cfg.PolicyLifecycleMode, "policy-lifecycle-mode", cfg.PolicyLifecycleMode, "Policy lifecycle mode: observe|enforce")
+	flag.StringVar(&cfg.PolicyAllowedIDs, "policy-allowed-ids", cfg.PolicyAllowedIDs, "Comma-separated allowed policy bundle IDs")
+	flag.StringVar(&cfg.PolicyMinVersion, "policy-min-version", cfg.PolicyMinVersion, "Minimum accepted policy bundle version")
+	flag.IntVar(&cfg.PolicyRolloutPercent, "policy-rollout-percent", cfg.PolicyRolloutPercent, "Policy bundle rollout percentage (0-100)")
+	flag.StringVar(&cfg.RetentionDefaultClass, "retention-default-class", cfg.RetentionDefaultClass, "Default retention class for runs")
+	flag.StringVar(&cfg.RetentionPolicyJSON, "retention-policy-json", cfg.RetentionPolicyJSON, "JSON map of retentionClass to duration (for example {\"standard\":\"168h\",\"short\":\"24h\"})")
 	flag.Parse()
 
 	return cfg
@@ -161,13 +183,25 @@ func run(cfg Config) error {
 	}
 
 	orchestrator := &cpruntime.Orchestrator{
-		Namespace:           cfg.Namespace,
-		Store:               store,
-		ProviderRegistry:    cpruntime.NewProviderRegistry(k8sClient),
-		ProfileMinPriority:  cfg.ProfileMinPriority,
-		PolicyMinPriority:   cfg.PolicyMinPriority,
-		EvidenceMinPriority: cfg.EvidenceMinPriority,
-		RequirePolicyGrant:  cfg.AuthRequirePolicyGrant,
+		Namespace:             cfg.Namespace,
+		Store:                 store,
+		ProviderRegistry:      cpruntime.NewProviderRegistry(k8sClient),
+		ProfileMinPriority:    cfg.ProfileMinPriority,
+		PolicyMinPriority:     cfg.PolicyMinPriority,
+		EvidenceMinPriority:   cfg.EvidenceMinPriority,
+		RequirePolicyGrant:    cfg.AuthRequirePolicyGrant,
+		RetentionDefaultClass: cfg.RetentionDefaultClass,
+		PolicyLifecycle: cpruntime.PolicyLifecycleConfig{
+			Enabled:          cfg.PolicyLifecycleEnabled,
+			Mode:             cfg.PolicyLifecycleMode,
+			AllowedPolicyIDs: toStringSet(splitCommaList(cfg.PolicyAllowedIDs)),
+			MinVersion:       cfg.PolicyMinVersion,
+			RolloutPercent:   cfg.PolicyRolloutPercent,
+		},
+	}
+	orchestrator.RetentionClassTTLs, err = parseRetentionPolicy(cfg.RetentionPolicyJSON)
+	if err != nil {
+		return fmt.Errorf("parse retention policy: %w", err)
 	}
 	authEnforcer, err := cpruntime.NewAuthEnforcer(cpruntime.AuthConfig{
 		Enabled:             cfg.AuthEnabled,
@@ -192,7 +226,15 @@ func run(cfg Config) error {
 	}
 	api := cpruntime.NewAPIServer(store, orchestrator, authEnforcer)
 
-	log.Printf("runtime orchestration service listening on %s namespace=%s authnEnabled=%t requirePolicyGrant=%t", cfg.ListenAddr, cfg.Namespace, cfg.AuthEnabled, cfg.AuthRequirePolicyGrant)
+	log.Printf(
+		"runtime orchestration service listening on %s namespace=%s authnEnabled=%t requirePolicyGrant=%t policyLifecycleEnabled=%t policyLifecycleMode=%s",
+		cfg.ListenAddr,
+		cfg.Namespace,
+		cfg.AuthEnabled,
+		cfg.AuthRequirePolicyGrant,
+		cfg.PolicyLifecycleEnabled,
+		cfg.PolicyLifecycleMode,
+	)
 	serverCtx := ctrl.SetupSignalHandler()
 	err = cpruntime.StartHTTPServer(serverCtx, cpruntime.ServerConfig{ListenAddr: cfg.ListenAddr}, api.Routes())
 	if err != nil && err != context.Canceled {
@@ -286,4 +328,51 @@ func splitCommaList(raw string) []string {
 		}
 	}
 	return out
+}
+
+func toStringSet(values []string) map[string]struct{} {
+	if len(values) == 0 {
+		return nil
+	}
+	out := make(map[string]struct{}, len(values))
+	for _, v := range values {
+		if trimmed := strings.TrimSpace(v); trimmed != "" {
+			out[trimmed] = struct{}{}
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func parseRetentionPolicy(raw string) (map[string]time.Duration, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil, nil
+	}
+	decoded := make(map[string]string)
+	if err := json.Unmarshal([]byte(raw), &decoded); err != nil {
+		return nil, err
+	}
+	out := make(map[string]time.Duration, len(decoded))
+	for class, ttlRaw := range decoded {
+		class = strings.TrimSpace(class)
+		if class == "" {
+			continue
+		}
+		ttlRaw = strings.TrimSpace(ttlRaw)
+		if ttlRaw == "" {
+			return nil, fmt.Errorf("retention policy class %q has empty duration", class)
+		}
+		ttl, err := time.ParseDuration(ttlRaw)
+		if err != nil {
+			return nil, fmt.Errorf("retention policy class %q: %w", class, err)
+		}
+		if ttl < 0 {
+			return nil, fmt.Errorf("retention policy class %q has negative duration", class)
+		}
+		out[class] = ttl
+	}
+	return out, nil
 }

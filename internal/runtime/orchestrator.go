@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -13,13 +14,24 @@ import (
 )
 
 type Orchestrator struct {
-	Namespace           string
-	Store               RunStore
-	ProviderRegistry    *ProviderRegistry
-	ProfileMinPriority  int64
-	PolicyMinPriority   int64
-	EvidenceMinPriority int64
-	RequirePolicyGrant  bool
+	Namespace             string
+	Store                 RunStore
+	ProviderRegistry      *ProviderRegistry
+	ProfileMinPriority    int64
+	PolicyMinPriority     int64
+	EvidenceMinPriority   int64
+	RequirePolicyGrant    bool
+	PolicyLifecycle       PolicyLifecycleConfig
+	RetentionDefaultClass string
+	RetentionClassTTLs    map[string]time.Duration
+}
+
+type PolicyLifecycleConfig struct {
+	Enabled          bool
+	Mode             string
+	AllowedPolicyIDs map[string]struct{}
+	MinVersion       string
+	RolloutPercent   int
 }
 
 func (o *Orchestrator) ExecuteRun(ctx context.Context, req RunCreateRequest) (*RunRecord, error) {
@@ -39,7 +51,16 @@ func (o *Orchestrator) ExecuteRun(ctx context.Context, req RunCreateRequest) (*R
 		normalizedReq.Mode = "enforce"
 	}
 	if strings.TrimSpace(normalizedReq.RetentionClass) == "" {
-		normalizedReq.RetentionClass = "standard"
+		normalizedReq.RetentionClass = firstNonEmpty(strings.TrimSpace(o.RetentionDefaultClass), "standard")
+	}
+	retentionTTL, err := o.retentionTTLForClass(normalizedReq.RetentionClass)
+	if err != nil {
+		return nil, err
+	}
+	var expiresAt *time.Time
+	if retentionTTL > 0 {
+		expires := now.Add(retentionTTL).UTC()
+		expiresAt = &expires
 	}
 
 	runID := "run-" + strings.ReplaceAll(uuid.NewString(), "-", "")
@@ -54,6 +75,8 @@ func (o *Orchestrator) ExecuteRun(ctx context.Context, req RunCreateRequest) (*R
 		TenantID:       normalizedReq.Meta.TenantID,
 		ProjectID:      normalizedReq.Meta.ProjectID,
 		Environment:    normalizedReq.Meta.Environment,
+		RetentionClass: normalizedReq.RetentionClass,
+		ExpiresAt:      expiresAt,
 		Status:         RunStatusPending,
 		RequestPayload: requestPayload,
 		CreatedAt:      now,
@@ -175,6 +198,13 @@ func (o *Orchestrator) ExecuteRun(ctx context.Context, req RunCreateRequest) (*R
 	}
 	decisionUpper := strings.ToUpper(strings.TrimSpace(decision))
 	run.PolicyDecision = decisionUpper
+	policyBundle := extractPolicyBundleRef(policyResp)
+	run.PolicyBundleID = policyBundle.PolicyID
+	run.PolicyBundleVersion = policyBundle.PolicyVersion
+
+	if err := o.evaluatePolicyLifecycle(ctx, run, policyBundle); err != nil {
+		return failRun(err)
+	}
 
 	grantToken, grantTokenSource := extractPolicyGrantToken(policyResp)
 	if grantToken != "" {
@@ -327,6 +357,187 @@ func (o *Orchestrator) ExecuteRun(ctx context.Context, req RunCreateRequest) (*R
 	})
 
 	return run, nil
+}
+
+func (o *Orchestrator) retentionTTLForClass(retentionClass string) (time.Duration, error) {
+	retentionClass = strings.TrimSpace(retentionClass)
+	if retentionClass == "" {
+		return 0, fmt.Errorf("retentionClass is required")
+	}
+	if len(o.RetentionClassTTLs) == 0 {
+		return 0, nil
+	}
+	ttl, ok := o.RetentionClassTTLs[retentionClass]
+	if !ok {
+		return 0, fmt.Errorf("unsupported retentionClass %q", retentionClass)
+	}
+	if ttl < 0 {
+		return 0, fmt.Errorf("invalid retention TTL for class %q", retentionClass)
+	}
+	return ttl, nil
+}
+
+func (o *Orchestrator) evaluatePolicyLifecycle(ctx context.Context, run *RunRecord, bundle PolicyBundleRef) error {
+	if !o.PolicyLifecycle.Enabled {
+		return nil
+	}
+	mode := strings.ToLower(strings.TrimSpace(o.PolicyLifecycle.Mode))
+	if mode == "" {
+		mode = "observe"
+	}
+	if mode != "observe" && mode != "enforce" {
+		mode = "observe"
+	}
+
+	violations := make([]string, 0, 4)
+	policyID := strings.TrimSpace(bundle.PolicyID)
+	policyVersion := strings.TrimSpace(bundle.PolicyVersion)
+
+	if policyID == "" {
+		violations = append(violations, "policyBundle.policyId is missing")
+	}
+	if policyVersion == "" {
+		violations = append(violations, "policyBundle.policyVersion is missing")
+	}
+	if len(o.PolicyLifecycle.AllowedPolicyIDs) > 0 && policyID != "" {
+		if _, ok := o.PolicyLifecycle.AllowedPolicyIDs[policyID]; !ok {
+			violations = append(violations, fmt.Sprintf("policyId %q not in allowed policy set", policyID))
+		}
+	}
+	minVersion := strings.TrimSpace(o.PolicyLifecycle.MinVersion)
+	if minVersion != "" && policyVersion != "" && comparePolicyVersions(policyVersion, minVersion) < 0 {
+		violations = append(violations, fmt.Sprintf("policyVersion %q is below minimum %q", policyVersion, minVersion))
+	}
+
+	rolloutPercent := o.PolicyLifecycle.RolloutPercent
+	if rolloutPercent <= 0 || rolloutPercent > 100 {
+		rolloutPercent = 100
+	}
+	rolloutBucket := stableRolloutBucket(run.RequestID, policyID, policyVersion)
+	if rolloutPercent < 100 && rolloutBucket >= rolloutPercent {
+		violations = append(violations, fmt.Sprintf("policyVersion %q held back by rolloutPercent=%d (bucket=%d)", policyVersion, rolloutPercent, rolloutBucket))
+	}
+
+	emitAuditEvent(ctx, "runtime.policy.lifecycle.evaluate", map[string]interface{}{
+		"runId":          run.RunID,
+		"requestId":      run.RequestID,
+		"mode":           mode,
+		"policyId":       policyID,
+		"policyVersion":  policyVersion,
+		"minVersion":     minVersion,
+		"rolloutPercent": rolloutPercent,
+		"rolloutBucket":  rolloutBucket,
+		"violations":     append([]string(nil), violations...),
+	})
+
+	if len(violations) == 0 {
+		emitAuditEvent(ctx, "runtime.policy.lifecycle.allow", map[string]interface{}{
+			"runId":         run.RunID,
+			"requestId":     run.RequestID,
+			"policyId":      policyID,
+			"policyVersion": policyVersion,
+		})
+		return nil
+	}
+
+	event := "runtime.policy.lifecycle.observe_violation"
+	if mode == "enforce" {
+		event = "runtime.policy.lifecycle.deny"
+	}
+	emitAuditEvent(ctx, event, map[string]interface{}{
+		"runId":         run.RunID,
+		"requestId":     run.RequestID,
+		"policyId":      policyID,
+		"policyVersion": policyVersion,
+		"violations":    append([]string(nil), violations...),
+	})
+	if mode == "enforce" {
+		return fmt.Errorf("policy lifecycle validation failed: %s", strings.Join(violations, "; "))
+	}
+	return nil
+}
+
+func stableRolloutBucket(parts ...string) int {
+	s := strings.Join(parts, "|")
+	sum := sha256.Sum256([]byte(s))
+	// Use first two bytes for a stable 0-99 bucket.
+	v := int(sum[0])<<8 | int(sum[1])
+	return v % 100
+}
+
+func extractPolicyBundleRef(policyResp map[string]interface{}) PolicyBundleRef {
+	out := PolicyBundleRef{}
+	if policyResp == nil {
+		return out
+	}
+	if m, ok := policyResp["policyBundle"].(map[string]interface{}); ok {
+		out.PolicyID = strings.TrimSpace(policyValueToString(m["policyId"]))
+		out.PolicyVersion = strings.TrimSpace(policyValueToString(m["policyVersion"]))
+		out.Checksum = strings.TrimSpace(policyValueToString(m["checksum"]))
+	}
+	if out.PolicyID == "" {
+		out.PolicyID = strings.TrimSpace(policyValueToString(policyResp["policyId"]))
+	}
+	if out.PolicyVersion == "" {
+		out.PolicyVersion = strings.TrimSpace(policyValueToString(policyResp["policyVersion"]))
+	}
+	if out.Checksum == "" {
+		out.Checksum = strings.TrimSpace(policyValueToString(policyResp["policyChecksum"]))
+	}
+	return out
+}
+
+func comparePolicyVersions(a, b string) int {
+	normalize := func(v string) []string {
+		v = strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(strings.ToLower(v), "version-"), "v"))
+		v = strings.ReplaceAll(v, "-", ".")
+		v = strings.ReplaceAll(v, "_", ".")
+		parts := strings.Split(v, ".")
+		out := make([]string, 0, len(parts))
+		for _, p := range parts {
+			p = strings.TrimSpace(p)
+			if p != "" {
+				out = append(out, p)
+			}
+		}
+		return out
+	}
+
+	ap := normalize(a)
+	bp := normalize(b)
+	n := len(ap)
+	if len(bp) > n {
+		n = len(bp)
+	}
+	for i := 0; i < n; i++ {
+		av := "0"
+		bv := "0"
+		if i < len(ap) {
+			av = ap[i]
+		}
+		if i < len(bp) {
+			bv = bp[i]
+		}
+		ai, aErr := strconv.Atoi(av)
+		bi, bErr := strconv.Atoi(bv)
+		switch {
+		case aErr == nil && bErr == nil:
+			if ai < bi {
+				return -1
+			}
+			if ai > bi {
+				return 1
+			}
+		default:
+			if av < bv {
+				return -1
+			}
+			if av > bv {
+				return 1
+			}
+		}
+	}
+	return 0
 }
 
 func validateRunCreateRequest(req RunCreateRequest) error {

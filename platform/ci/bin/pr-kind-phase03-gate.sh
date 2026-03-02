@@ -22,6 +22,7 @@ RUN_M9_AUTHN_AUTHZ="${RUN_M9_AUTHN_AUTHZ:-}"
 RUN_M9_AUTHZ_TENANCY="${RUN_M9_AUTHZ_TENANCY:-}"
 RUN_M9_RBAC_MATRIX="${RUN_M9_RBAC_MATRIX:-}"
 RUN_M9_AUDIT_READ="${RUN_M9_AUDIT_READ:-}"
+RUN_M9_POLICY_LIFECYCLE="${RUN_M9_POLICY_LIFECYCLE:-}"
 RUN_M10_PROVIDER_CONFORMANCE="${RUN_M10_PROVIDER_CONFORMANCE:-}"
 RUN_M10_POLICY_GRANT_ENFORCEMENT="${RUN_M10_POLICY_GRANT_ENFORCEMENT:-}"
 RUN_M10_AIMXS_PRIVATE_RELEASE="${RUN_M10_AIMXS_PRIVATE_RELEASE:-}"
@@ -79,6 +80,7 @@ apply_gate_mode_defaults() {
       set_default_if_unset RUN_M9_AUTHZ_TENANCY 1
       set_default_if_unset RUN_M9_RBAC_MATRIX 1
       set_default_if_unset RUN_M9_AUDIT_READ 1
+      set_default_if_unset RUN_M9_POLICY_LIFECYCLE 1
       set_default_if_unset RUN_M10_PROVIDER_CONFORMANCE 1
       set_default_if_unset RUN_M10_POLICY_GRANT_ENFORCEMENT 1
       set_default_if_unset RUN_M10_AIMXS_PRIVATE_RELEASE 1
@@ -124,6 +126,7 @@ apply_gate_mode_defaults() {
       set_default_if_unset RUN_M9_AUTHZ_TENANCY 0
       set_default_if_unset RUN_M9_RBAC_MATRIX 0
       set_default_if_unset RUN_M9_AUDIT_READ 0
+      set_default_if_unset RUN_M9_POLICY_LIFECYCLE 0
       set_default_if_unset RUN_M10_PROVIDER_CONFORMANCE 0
       set_default_if_unset RUN_M10_POLICY_GRANT_ENFORCEMENT 0
       set_default_if_unset RUN_M10_AIMXS_PRIVATE_RELEASE 0
@@ -183,6 +186,7 @@ enforce_full_mode_contract() {
   check_required RUN_M9_AUTHZ_TENANCY 1
   check_required RUN_M9_RBAC_MATRIX 1
   check_required RUN_M9_AUDIT_READ 1
+  check_required RUN_M9_POLICY_LIFECYCLE 1
   check_required RUN_M10_PROVIDER_CONFORMANCE 1
   check_required RUN_M10_POLICY_GRANT_ENFORCEMENT 1
   check_required RUN_M10_AIMXS_PRIVATE_RELEASE 1
@@ -433,6 +437,21 @@ main() {
     RUN_M5_BOOTSTRAP="${RUN_PHASE_RUNTIME_BOOTSTRAP}" \
     RUN_M5_IMAGE_PREP="${RUN_PHASE_RUNTIME_IMAGE_PREP}" \
       "${REPO_ROOT}/platform/local/bin/verify-m9-audit-read.sh"
+  fi
+
+  if [ "${RUN_M9_POLICY_LIFECYCLE}" = "1" ]; then
+    echo "Running M9.6 gate (policy lifecycle controls + run query/export + retention controls)..."
+    local run_m5_baseline_for_m9_lifecycle=1
+    if [ "${RUN_M7_INTEGRATION}" = "1" ] || [ "${RUN_PHASE_RUNTIME}" = "1" ] || [ "${RUN_M9_AUTHN_AUTHZ}" = "1" ] || [ "${RUN_M9_AUTHZ_TENANCY}" = "1" ] || [ "${RUN_M9_RBAC_MATRIX}" = "1" ] || [ "${RUN_M9_AUDIT_READ}" = "1" ]; then
+      run_m5_baseline_for_m9_lifecycle=0
+    fi
+    RUNTIME=kind \
+    CLUSTER_NAME="${CLUSTER_NAME}" \
+    NAMESPACE=epydios-system \
+    RUN_M5_BASELINE="${run_m5_baseline_for_m9_lifecycle}" \
+    RUN_M5_BOOTSTRAP="${RUN_PHASE_RUNTIME_BOOTSTRAP}" \
+    RUN_M5_IMAGE_PREP="${RUN_PHASE_RUNTIME_IMAGE_PREP}" \
+      "${REPO_ROOT}/platform/local/bin/verify-m9-policy-lifecycle-and-run-query.sh"
   fi
 
   if [ "${RUN_M10_PROVIDER_CONFORMANCE}" = "1" ]; then

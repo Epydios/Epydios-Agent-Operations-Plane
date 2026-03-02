@@ -48,6 +48,11 @@ This directory contains CI entrypoint scripts invoked by GitHub Actions.
     - `RUN_M9_AUDIT_READ=0` default in fast mode
     - runs `platform/local/bin/verify-m9-audit-read.sh`
     - validates authenticated audit endpoint reads, scoped tenant/project filtering, and provider/decision query filters
+  - M9.6 policy lifecycle + run query/export + retention controls verification:
+    - `RUN_M9_POLICY_LIFECYCLE=1` in full mode (required)
+    - `RUN_M9_POLICY_LIFECYCLE=0` default in fast mode
+    - runs `platform/local/bin/verify-m9-policy-lifecycle-and-run-query.sh`
+    - validates lifecycle mode (`observe|enforce`), run filtering/search, CSV/JSONL export, and retention prune dry-run behavior
   - M10.1 provider conformance verification:
     - `RUN_M10_PROVIDER_CONFORMANCE=1` in full mode (required)
     - `RUN_M10_PROVIDER_CONFORMANCE=0` default in fast mode
@@ -68,12 +73,13 @@ This directory contains CI entrypoint scripts invoked by GitHub Actions.
     - `RUN_M10_AIMXS_PRIVATE_RELEASE=0` default in fast mode
     - runs `platform/local/bin/verify-m10-aimxs-private-release.sh`
     - validates first private AIMXS SDK/provider release evidence and staging strict-proof assertions
-    - reads `provenance/aimxs/private-release-inputs.vars` by default for private release metadata
+    - reads `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/private-release-inputs.vars` by default for private release metadata (falls back to repo-local path only if present)
   - M9 runtime authz checks in full mode (required, no skips):
     - `RUN_M9_AUTHN_AUTHZ=1`
     - `RUN_M9_AUTHZ_TENANCY=1`
     - `RUN_M9_RBAC_MATRIX=1`
     - `RUN_M9_AUDIT_READ=1`
+    - `RUN_M9_POLICY_LIFECYCLE=1`
     - Full mode enforces all M9 checks and exits if overridden to disabled values.
   - M10 provider conformance check in full mode (required, no skips):
     - `RUN_M10_PROVIDER_CONFORMANCE=1`

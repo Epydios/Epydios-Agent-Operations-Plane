@@ -22,6 +22,19 @@ AIMXS is treated as a private plug-in target, not a hard compile-time dependency
 
 This keeps the OSS baseline fully runnable while preserving AIMXS as a differentiating module.
 
+For local pre-integration bring-up, use the dev loopback AIMXS template:
+
+- `examples/aimxs/extensionprovider-policy-local-dev.yaml` (local-only, `auth.mode=None`, disabled by default)
+- then switch to `examples/aimxs/extensionprovider-policy-mtls-bearer.yaml` for secure staging/prod registration
+
+## Target Architecture
+
+- Release workflow defaults to multi-arch (`linux/amd64,linux/arm64`) unless overridden.
+- If your deployment target is Intel/x86_64, build local images with:
+  - `./platform/local/bin/build-local-images-amd64.sh`
+- Native Apple Silicon local iteration can continue using:
+  - `./platform/local/bin/build-local-images.sh`
+
 ## Baseline Build Sequence (Agreed)
 
 1. `Postgres + CloudNativePG`
