@@ -7,6 +7,10 @@ This document codifies the boundary: AIMXS remains private and external to the O
 - OSS control plane exposes versioned provider contracts and `ExtensionProvider` registration.
 - AIMXS runs as separate image(s)/repo(s), reachable via HTTPS endpoints.
 - OSS must not import AIMXS code directly.
+- Deployment modes stay on one contract surface:
+  - OSS-only (`platform/modes/oss-only`)
+  - AIMXS hosted HTTPS (`platform/modes/aimxs-hosted`)
+  - AIMXS customer-hosted local/on-prem (`platform/modes/aimxs-customer-hosted`)
 
 ## Slot Interface
 
@@ -34,6 +38,13 @@ This package defines:
 - Use it only to validate contract compatibility and routing behavior in local clusters.
 - Staging/prod must switch to HTTPS with `MTLS` or `MTLSAndBearerTokenSecret`.
 
+## Deployment Mode Profiles
+
+- Mode manifests are under `platform/modes/`.
+- `oss-only` routes to OSS providers and keeps AIMXS out of the execution path.
+- `aimxs-hosted` routes to hosted AIMXS endpoint over secure auth.
+- `aimxs-customer-hosted` routes to customer-local AIMXS endpoint over secure auth, so policy execution does not require external data egress.
+
 ## Operational Contract
 
 - AIMXS providers advertise capabilities through `/v1alpha1/capabilities`.
@@ -56,3 +67,5 @@ This package defines:
 - Local boundary verification is provided by:
   - `platform/local/bin/verify-aimxs-boundary.sh`
   - `platform/local/bin/verify-m10-policy-grant-enforcement.sh`
+  - `platform/local/bin/verify-m10-deployment-modes.sh`
+  - `platform/local/bin/verify-m10-no-egress-local-aimxs.sh`

@@ -68,6 +68,20 @@ This directory contains CI entrypoint scripts invoked by GitHub Actions.
       - non-DENY decision without grant token fails
       - DENY remains executable without token
       - ALLOW with token succeeds and token is redacted from runtime response payloads
+  - M10.4 deployment-mode switching verification:
+    - `RUN_M10_DEPLOYMENT_MODES=1` in full mode (required)
+    - `RUN_M10_DEPLOYMENT_MODES=0` default in fast mode
+    - runs `platform/local/bin/verify-m10-deployment-modes.sh`
+    - validates policy-provider routing transitions across:
+      - `platform/modes/oss-only`
+      - `platform/modes/aimxs-hosted`
+      - `platform/modes/aimxs-customer-hosted`
+    - confirms all three modes stay on one `ExtensionProvider` contract surface
+  - M10.5 customer-hosted no-egress verification:
+    - `RUN_M10_NO_EGRESS_LOCAL_AIMXS=1` in full mode (required)
+    - `RUN_M10_NO_EGRESS_LOCAL_AIMXS=0` default in fast mode
+    - runs `platform/local/bin/verify-m10-no-egress-local-aimxs.sh`
+    - validates local/customer-hosted policy path succeeds while external egress is blocked by a scoped runtime NetworkPolicy
   - M10.2 AIMXS private release evidence verification:
     - `RUN_M10_AIMXS_PRIVATE_RELEASE=1` in full mode (required)
     - `RUN_M10_AIMXS_PRIVATE_RELEASE=0` default in fast mode
@@ -84,8 +98,10 @@ This directory contains CI entrypoint scripts invoked by GitHub Actions.
   - M10 provider conformance check in full mode (required, no skips):
     - `RUN_M10_PROVIDER_CONFORMANCE=1`
     - `RUN_M10_POLICY_GRANT_ENFORCEMENT=1`
+    - `RUN_M10_DEPLOYMENT_MODES=1`
+    - `RUN_M10_NO_EGRESS_LOCAL_AIMXS=1`
     - `RUN_M10_AIMXS_PRIVATE_RELEASE=1`
-    - Full mode enforces M10.1 + M10.2 + M10.3 and exits if overridden to disabled value.
+    - Full mode enforces M10.1 + M10.2 + M10.3 + M10.4 + M10.5 and exits if overridden to disabled value.
   - M7 reliability suite in full mode (required, no skips):
     - `RUN_M7_INTEGRATION=1` (M0->M5 critical path through `platform/local/bin/verify-m7-integration.sh`)
     - `RUN_M7_BACKUP_RESTORE=1` (M7.2 CNPG backup/restore drill)

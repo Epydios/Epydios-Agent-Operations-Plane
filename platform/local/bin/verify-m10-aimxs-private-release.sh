@@ -11,8 +11,12 @@ OUTPUT_DIR="${OUTPUT_DIR:-}"
 STAGING_GATE_LOG_PATH="${STAGING_GATE_LOG_PATH:-}"
 RUN_BOUNDARY_CHECK="${RUN_BOUNDARY_CHECK:-1}"
 M10_3_GATE_EXECUTED="${M10_3_GATE_EXECUTED:-0}"
+M10_4_GATE_EXECUTED="${M10_4_GATE_EXECUTED:-0}"
+M10_5_GATE_EXECUTED="${M10_5_GATE_EXECUTED:-0}"
 
 M10_3_LOG_IN_STAGING="0"
+M10_4_LOG_IN_STAGING="0"
+M10_5_LOG_IN_STAGING="0"
 
 AIMXS_PRIVATE_SDK_RELEASE_TAG="${AIMXS_PRIVATE_SDK_RELEASE_TAG:-}"
 AIMXS_PRIVATE_SDK_ARTIFACT_PATH="${AIMXS_PRIVATE_SDK_ARTIFACT_PATH:-}"
@@ -176,6 +180,22 @@ find_staging_log() {
     echo "Missing completed staging strict gate log. Set STAGING_GATE_LOG_PATH or run PROFILE=staging-full gate first." >&2
     exit 1
   fi
+
+  if grep -Fq "Running M10.3 gate (policy grant token enforcement, no-token no-execution)..." "${STAGING_GATE_LOG_PATH}" 2>/dev/null; then
+    M10_3_LOG_IN_STAGING="1"
+  else
+    M10_3_LOG_IN_STAGING="0"
+  fi
+  if grep -Fq "Running M10.4 gate (three deployment modes on a single provider contract)..." "${STAGING_GATE_LOG_PATH}" 2>/dev/null; then
+    M10_4_LOG_IN_STAGING="1"
+  else
+    M10_4_LOG_IN_STAGING="0"
+  fi
+  if grep -Fq "Running M10.5 gate (customer-hosted local AIMXS no-egress proof)..." "${STAGING_GATE_LOG_PATH}" 2>/dev/null; then
+    M10_5_LOG_IN_STAGING="1"
+  else
+    M10_5_LOG_IN_STAGING="0"
+  fi
 }
 
 assert_log_contains() {
@@ -242,7 +262,7 @@ main() {
 
   find_staging_log
 
-  local line_m101 line_m103 line_boundary_pass line_gate_pass
+  local line_m101 line_m103 line_m104 line_m105 line_boundary_pass line_gate_pass
   line_m101="$(assert_log_contains "Running M10.1 gate (provider conformance matrix across auth modes)..." "m10_1_gate")"
   line_boundary_pass="$(assert_log_contains "AIMXS boundary verification passed." "aimxs_boundary_pass")"
   if [ "${M10_3_GATE_EXECUTED}" = "1" ]; then
@@ -260,6 +280,24 @@ main() {
     exit 1
   fi
 
+  line_m104=""
+  if [ "${M10_4_LOG_IN_STAGING}" = "1" ]; then
+    line_m104="$(assert_log_contains "Running M10.4 gate (three deployment modes on a single provider contract)..." "m10_4_gate")"
+  elif [ "${M10_4_GATE_EXECUTED}" != "1" ]; then
+    echo "Staging log ${STAGING_GATE_LOG_PATH} does not include M10.4 marker and current run did not declare M10.4 execution." >&2
+    echo "Run PROFILE=staging-full gate once after M10.4 wiring or pass M10_4_GATE_EXECUTED=1 when invoking from CI gate." >&2
+    exit 1
+  fi
+
+  line_m105=""
+  if [ "${M10_5_LOG_IN_STAGING}" = "1" ]; then
+    line_m105="$(assert_log_contains "Running M10.5 gate (customer-hosted local AIMXS no-egress proof)..." "m10_5_gate")"
+  elif [ "${M10_5_GATE_EXECUTED}" != "1" ]; then
+    echo "Staging log ${STAGING_GATE_LOG_PATH} does not include M10.5 marker and current run did not declare M10.5 execution." >&2
+    echo "Run PROFILE=staging-full gate once after M10.5 wiring or pass M10_5_GATE_EXECUTED=1 when invoking from CI gate." >&2
+    exit 1
+  fi
+
   local staging_log_sha staging_log_size sdk_sha now_utc
   staging_log_sha="$(sha256_file "${STAGING_GATE_LOG_PATH}")"
   staging_log_size="$(file_size_bytes "${STAGING_GATE_LOG_PATH}")"
@@ -267,11 +305,13 @@ main() {
   now_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
   local assertions_json
-  if [ "${M10_3_LOG_IN_STAGING}" = "1" ]; then
+  if [ "${M10_3_LOG_IN_STAGING}" = "1" ] && [ "${M10_4_LOG_IN_STAGING}" = "1" ] && [ "${M10_5_LOG_IN_STAGING}" = "1" ]; then
     assertions_json="$(
       jq -n \
         --arg line_m101 "${line_m101}" \
         --arg line_m103 "${line_m103}" \
+        --arg line_m104 "${line_m104}" \
+        --arg line_m105 "${line_m105}" \
         --arg line_boundary_pass "${line_boundary_pass}" \
         --arg line_gate_pass "${line_gate_pass}" \
         '[
@@ -284,6 +324,16 @@ main() {
             name: "m10_3_gate_invoked",
             contains: "Running M10.3 gate (policy grant token enforcement, no-token no-execution)...",
             line: ($line_m103 | tonumber)
+          },
+          {
+            name: "m10_4_gate_invoked",
+            contains: "Running M10.4 gate (three deployment modes on a single provider contract)...",
+            line: ($line_m104 | tonumber)
+          },
+          {
+            name: "m10_5_gate_invoked",
+            contains: "Running M10.5 gate (customer-hosted local AIMXS no-egress proof)...",
+            line: ($line_m105 | tonumber)
           },
           {
             name: "aimxs_boundary_passed",
@@ -303,6 +353,9 @@ main() {
         --arg line_m101 "${line_m101}" \
         --arg line_boundary_pass "${line_boundary_pass}" \
         --arg line_gate_pass "${line_gate_pass}" \
+        --arg line_m103 "${line_m103}" \
+        --arg line_m104 "${line_m104}" \
+        --arg line_m105 "${line_m105}" \
         '[
           {
             name: "m10_1_gate_invoked",
@@ -310,9 +363,19 @@ main() {
             line: ($line_m101 | tonumber)
           },
           {
-            name: "m10_3_gate_invoked_current_run",
-            contains: "M10_3_GATE_EXECUTED=1 (current gate execution)",
-            line: null
+            name: "m10_3_gate_invoked",
+            contains: (if ($line_m103 | length) > 0 then "Running M10.3 gate (policy grant token enforcement, no-token no-execution)..." else "M10_3_GATE_EXECUTED=1 (current gate execution)" end),
+            line: (if ($line_m103 | length) > 0 then ($line_m103 | tonumber) else null end)
+          },
+          {
+            name: "m10_4_gate_invoked",
+            contains: (if ($line_m104 | length) > 0 then "Running M10.4 gate (three deployment modes on a single provider contract)..." else "M10_4_GATE_EXECUTED=1 (current gate execution)" end),
+            line: (if ($line_m104 | length) > 0 then ($line_m104 | tonumber) else null end)
+          },
+          {
+            name: "m10_5_gate_invoked",
+            contains: (if ($line_m105 | length) > 0 then "Running M10.5 gate (customer-hosted local AIMXS no-egress proof)..." else "M10_5_GATE_EXECUTED=1 (current gate execution)" end),
+            line: (if ($line_m105 | length) > 0 then ($line_m105 | tonumber) else null end)
           },
           {
             name: "aimxs_boundary_passed",

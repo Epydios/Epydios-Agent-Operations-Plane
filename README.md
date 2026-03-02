@@ -26,6 +26,10 @@ For local pre-integration bring-up, use the dev loopback AIMXS template:
 
 - `examples/aimxs/extensionprovider-policy-local-dev.yaml` (local-only, `auth.mode=None`, disabled by default)
 - then switch to `examples/aimxs/extensionprovider-policy-mtls-bearer.yaml` for secure staging/prod registration
+- deployment mode packs:
+  - `platform/modes/oss-only`
+  - `platform/modes/aimxs-hosted`
+  - `platform/modes/aimxs-customer-hosted`
 
 ## Target Architecture
 

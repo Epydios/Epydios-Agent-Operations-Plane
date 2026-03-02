@@ -627,6 +627,16 @@ kubectl -n epydios-system patch extensionprovider aimxs-policy-primary --type=me
 
 The local loopback profile is local-only and must not be promoted to staging/prod.
 
+### AIMXS deployment mode packs
+
+Apply policy-routing mode manifests directly:
+
+```bash
+kubectl apply -k platform/modes/oss-only
+kubectl apply -k platform/modes/aimxs-hosted
+kubectl apply -k platform/modes/aimxs-customer-hosted
+```
+
 ### PR CI gate parity (kind, ephemeral)
 
 GitHub Actions PRs run `Phase 00/01 + Phase 02 + Phase 03 + Phase 04` with functional KServe smoke enabled using pinned remote refs (no local substrate dependency).
@@ -775,6 +785,8 @@ WITH_SYSTEM_SMOKETEST=1 ./platform/local/bin/bootstrap-k3d.sh
 - `platform/local/bin/verify-phase-05-kuberay.sh` installs and verifies optional phase 05 KubeRay components
 - `platform/local/bin/verify-m10-provider-conformance.sh` validates provider contract/auth-mode conformance across ProfileResolver/PolicyProvider/EvidenceProvider
 - `platform/local/bin/verify-m10-policy-grant-enforcement.sh` validates required grant-token enforcement (`no token => no execution` for non-DENY decisions)
+- `platform/local/bin/verify-m10-deployment-modes.sh` validates three deployment-mode routing transitions (`oss-only`, `aimxs-hosted`, `aimxs-customer-hosted`) under one provider contract
+- `platform/local/bin/verify-m10-no-egress-local-aimxs.sh` validates customer-hosted local AIMXS mode under scoped no-egress network policy constraints
 - `platform/local/bin/verify-m7-integration.sh` runs an end-to-end M0->M5 critical-path integration gate (optionally includes M7.2)
 - `platform/local/bin/verify-m7-cnpg-backup-restore.sh` runs the M7.2 CNPG backup/restore drill
 - `platform/local/bin/verify-m7-upgrade-safety.sh` runs the M7.3 N-1->N upgrade safety gate
