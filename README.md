@@ -1,81 +1,165 @@
 # Epydios AgentOps Control Plane
 
-`Epydios AgentOps Control Plane` is the open-source Kubernetes control plane for AI/agent workloads, governance, and platform operations.
+**Policy-driven control plane for AI and agent workflows on Kubernetes.**
 
-## Scope (Current Phase)
+Epydios AgentOps Control Plane gives platform and security teams one place to govern AI runtime behavior, enforce policy, capture evidence, and operate safely across environments.
 
-This repository is for the enterprise Kubernetes control plane baseline:
+It is designed as an **enterprise-ready baseline**: strong controls, clear extension contracts, and repeatable promotion gates.
 
-- Control-plane infrastructure and add-ons
-- Versioned extension interfaces for private/public policy/evidence/profile providers
-- Provenance, licensing, and dependency lockfiles
-- Deployment and integration scaffolding
+## Why Teams Use It
 
-## AIMXS Strategy
+- **Governed execution**: policy decision + evidence capture are first-class runtime paths.
+- **Extensible by contract**: swap providers without changing control-plane internals.
+- **Security-first operations**: authn/authz, tenancy scoping, audit trails, signed+pinned image admission.
+- **Promotion discipline**: strict staging/prod gates with provenance artifacts.
+- **AIMXS-compatible**: private AIMXS integration through HTTPS provider boundary, not OSS code linkage.
 
-AIMXS is treated as a private plug-in target, not a hard compile-time dependency of the OSS control plane.
+## What You Get Today
 
-- OSS core exposes versioned extension interfaces
-- OSS ships baseline providers (profile resolver + OPA policy + memory evidence)
-- AIMXS plugs in via the same interfaces under separate licensing
-- AIMXS integration remains network-boundary only (HTTPS/mTLS preferred), and runtime can enforce non-bypassable grant semantics (`AUTHZ_REQUIRE_POLICY_GRANT=true`)
+### Core platform
 
-This keeps the OSS baseline fully runnable while preserving AIMXS as a differentiating module.
+- Kubernetes-native control-plane components
+- Postgres/CNPG-backed runtime state
+- Runtime orchestration API with lifecycle/query/export controls
+- Delivery/event and model-serving baseline (Argo + KServe path)
 
-For local pre-integration bring-up, use the dev loopback AIMXS template:
+### Security and governance
 
-- `examples/aimxs/extensionprovider-policy-local-dev.yaml` (local-only, `auth.mode=None`, disabled by default)
-- then switch to `examples/aimxs/extensionprovider-policy-mtls-bearer.yaml` for secure staging/prod registration
-- deployment mode packs:
-  - `platform/modes/oss-only`
-  - `platform/modes/aimxs-hosted`
-  - `platform/modes/aimxs-customer-hosted`
+- OIDC/JWT authn/authz for runtime API
+- Tenant/project isolation checks
+- Structured audit events and scoped audit read endpoint
+- Provider auth modes:
+  - `None`
+  - `BearerTokenSecret`
+  - `MTLS`
+  - `MTLSAndBearerTokenSecret`
+- Policy grant enforcement and entitlement-deny path assertions
 
-## Target Architecture
+### Production hardening
 
-- Release workflow defaults to multi-arch (`linux/amd64,linux/arm64`) unless overridden.
-- If your deployment target is Intel/x86_64, build local images with:
-  - `./platform/local/bin/build-local-images-amd64.sh`
-- Native Apple Silicon local iteration can continue using:
-  - `./platform/local/bin/build-local-images.sh`
+- NetworkPolicy baseline (controller/provider/runtime boundaries)
+- ServiceMonitor + PrometheusRule coverage
+- Secret/cert rotation checks
+- Admission enforcement for immutable/signed images
+- DR game day + rollback/failure-injection verification paths
 
-## Baseline Build Sequence (Agreed)
+## Deployment Modes (Single Contract Surface)
 
-1. `Postgres + CloudNativePG`
-2. `cert-manager + External Secrets`
-3. `Gateway API`
-4. `OTel Operator` (with OTel Collector already present in substrate)
-5. `Fluent Bit` (logs -> OpenSearch)
-6. `KEDA`
-7. `Argo Rollouts + Argo Events`
-8. `KServe` (before `KubeRay`)
-9. `KubeRay` (when distributed workloads justify it)
+| Mode | Provider target | Network expectation | Typical buyer |
+|---|---|---|---|
+| OSS-only | OSS providers in this repo | In-cluster | teams starting quickly |
+| AIMXS hosted | external AIMXS HTTPS endpoint | outbound to hosted AIMXS | central managed service model |
+| AIMXS customer-hosted | customer AIMXS in customer environment | no internet dependency required | regulated/on-prem buyers |
 
-## Repo Layout
+Mode overlays live under:
 
-- `contracts/extensions/v1alpha1/` versioned extension interfaces and provider registration CRD
-- `docs/` architecture and implementation notes
-  - includes `pilot-readiness-signoff-draft.md` and runbooks under `docs/runbooks/`
-  - runbooks include incident triage, Postgres backup/restore, monitoring ownership/rollout, and AIMXS private SDK publication process
-- `platform/base/` cluster base manifests (namespaces, shared CRDs)
-- `platform/overlays/` environment overlays (for example `production`)
-- `platform/data/` local/test data plane manifests (CNPG test cluster, Postgres smoke test)
-- `platform/providers/` optional provider deployment manifests for milestone validation (for example, OSS OPA policy provider)
-- `platform/ci/` CI entrypoints used by GitHub Actions gates
-  - includes profile runner `platform/ci/bin/run-gate-profile.sh` and environment profiles under `platform/ci/profiles/`
-- `platform/baseline/` ordered component catalog and rollout plan
-- `platform/local/` local `kind`/`k3d` bootstrap configs and scripts
-- `provenance/` lockfiles for charts, images, CRDs, licenses
-- `providers/` provider implementation configs and baselines
-  - includes OSS `ProfileResolver`, OSS `PolicyProvider` (OPA adapter), and OSS `EvidenceProvider` (memory)
-- `cmd/control-plane-runtime/` persistent orchestration runtime API (Postgres-backed run lifecycle)
+- `platform/modes/oss-only`
+- `platform/modes/aimxs-hosted`
+- `platform/modes/aimxs-customer-hosted`
 
-## Relationship to Workspace-Level Substrate Cache
+## AIMXS Boundary (Explicit)
 
-The workspace includes upstream source clones and backup zips in:
+AIMXS is **not** compiled into OSS control-plane code.
 
-- `../SUBSTRATE_UPSTREAMS/`
-- `../SUBSTRATE_UPSTREAMS/ZIPS/`
-- `../provenance/third_party_sources.yaml`
+- Integration is through `ExtensionProvider` registration and provider contracts.
+- Recommended boundary is HTTPS + mTLS (`MTLSAndBearerTokenSecret` for stricter paths).
+- Entitlement and deny semantics are enforced in runtime policy flow.
 
-This repository consumes pinned versions from lockfiles and does not depend on local source checkouts to build or deploy.
+Reference docs:
+
+- `docs/aimxs-plugin-slot.md`
+- `docs/runbooks/aimxs-private-sdk-publication.md`
+
+## Quick Start (Local)
+
+Prerequisites:
+
+- Docker + kind
+- kubectl
+- Helm
+- Go toolchain
+
+Run baseline bring-up + smoke:
+
+```bash
+./platform/local/bin/verify-m0.sh
+```
+
+Run strict profile gates:
+
+```bash
+PROFILE=staging-full ./platform/ci/bin/run-gate-profile.sh
+PROFILE=prod-full ./platform/ci/bin/run-gate-profile.sh
+```
+
+Run preflight QC only:
+
+```bash
+./platform/ci/bin/qc-preflight.sh
+```
+
+## Architecture At A Glance
+
+- **Control plane**: provider registry controller + runtime orchestration API
+- **Providers**: ProfileResolver, PolicyProvider, EvidenceProvider
+- **Data plane state**: Postgres (CNPG)
+- **Ops controls**: monitoring, admission policy, provenance lock checks, promotion gates
+
+Key paths:
+
+- Contracts: `contracts/extensions/v1alpha1/`
+- Runtime: `cmd/control-plane-runtime/`, `internal/runtime/`
+- Provider registry controller: `cmd/extension-provider-registry-controller/`, `internal/extensionprovider/`
+- CI/gates: `platform/ci/bin/`
+- Local verifiers: `platform/local/bin/`
+- Provenance lockfiles: `provenance/`
+
+## Enterprise Readiness Signals
+
+This project intentionally avoids vague "enterprise-grade" claims. Instead, readiness is shown by explicit controls and passing gates.
+
+Current signal categories:
+
+- security controls present and enforced
+- strict staging/prod profile gates passing
+- provenance lock checks strict-pass
+- DR + rollback drills captured as machine-readable evidence
+- AIMXS boundary validation and private-release evidence path
+
+## Comparison (At A Glance)
+
+| Capability area | Typical API wrapper stack | Model-serving-only stack | Epydios AgentOps Control Plane |
+|---|---|---|---|
+| Provider contract model | limited/informal | limited | explicit versioned contracts |
+| Policy + evidence in runtime path | partial/manual | partial | built-in and test-gated |
+| Tenant/project authz | often custom add-on | often custom add-on | built-in runtime checks |
+| Admission + supply-chain controls | external bolt-on | external bolt-on | integrated verification path |
+| AIMXS private boundary support | custom integration | custom integration | first-class external provider pattern |
+| Promotion evidence (staging/prod strict) | inconsistent | inconsistent | profile-driven strict gate artifacts |
+
+## What This Repo Is / Is Not
+
+This repo **is**:
+
+- the backend control plane and provider contract framework
+
+This repo **is not**:
+
+- a bundled end-user desktop UI module
+- AIMXS source code
+
+Related UI module (separate):
+
+- `../EPYDIOS_AGENTOPS_DESKTOP`
+
+## Licensing and Commercial Model
+
+- OSS control plane stays open and contract-stable.
+- AIMXS remains private and integrates through external provider boundary.
+- This supports a single developer contract with OSS and premium deployment options.
+
+## Repo Hygiene Expectations
+
+- Keep runtime artifacts/log bundles outside this repo (use `EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB`).
+- Keep workspace governance files outside this repo root.
+- Keep only source + manifests + runbooks + lockfiles required for reproducible builds and gates.
