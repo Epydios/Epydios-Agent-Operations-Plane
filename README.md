@@ -82,7 +82,7 @@ NOTE: There are two systems, the OSS baseline system here is enforcing real poli
 * durable *run metadata and payload snapshots* in Postgres
 * Evidence provider in-memory provider (evidence persists only as long as that provider pod stays up, it is not a durable evidence store)
 
-### AIMXS Features 
+### AIMXS Premium Features
 
 * Richer decision model at the contract boundary
 * Allows decision values: ALLOW, DENY, CHALLENGE, DEFER.
