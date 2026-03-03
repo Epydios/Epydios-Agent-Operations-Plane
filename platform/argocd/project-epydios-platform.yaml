@@ -6,8 +6,8 @@ metadata:
 spec:
   description: Baseline platform add-ons for Epydios AgentOps Control Plane
   sourceRepos:
-    - https://github.com/Epydios/Epydios-AgentOps-Desktop.git
-    - ssh://git@github.com/Epydios/Epydios-AgentOps-Desktop.git
+    - https://github.com/Epydios/Epydios-AgentOps-Control-Plane.git
+    - ssh://git@github.com/Epydios/Epydios-AgentOps-Control-Plane.git
     - https://charts.jetstack.io
     - https://charts.external-secrets.io
     - https://cloudnative-pg.github.io/charts

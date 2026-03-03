@@ -8,7 +8,7 @@ metadata:
 spec:
   project: epydios-platform
   source:
-    repoURL: https://github.com/Epydios/Epydios-AgentOps-Desktop.git
+    repoURL: https://github.com/Epydios/Epydios-AgentOps-Control-Plane.git
     targetRevision: main
     path: platform/overlays/production
   destination:
