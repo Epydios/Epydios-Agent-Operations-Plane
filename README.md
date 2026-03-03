@@ -2,7 +2,7 @@
 
 **Policy-driven control plane for AI and agent workflows on Kubernetes.**
 
-Epydios AgentOps Control Plane gives platform and security teams one place to govern AI runtime behavior, enforce policy, capture evidence and operate safely across environments.
+AgentOps Desktop is an open source control plane for running agents with guardrails that are enforceable and auditable. It evaluates each agent action against a policy provider, selects the right profile and extensions for the context and records a structured evidence trail. Designed to be Kubernetes-native, fast and composable, it gives you a clean provider interface so you can swap policy engines, evidence stores and organization-specific decision logic without rewriting your runtime.
 
 ## Overview
 Profile Provider = “What context/profile should we apply?”
