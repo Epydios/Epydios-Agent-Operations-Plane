@@ -7,7 +7,6 @@ AgentOps Desktop is an open source control plane for running agents with guardra
 ## Overview
 Profile Provider = “What context/profile should we apply?”
 - Looks at your request fields (tenant, project, environment, sensitivity, etc.)
-- Returns a profileId like EPYDIOS_PROFILE_DEV_FAST_V1 or EPYDIOS_PROFILE_HARDENED_V1
 
 Policy Provider = “Given this request + profile, should we allow it?”
 - Approve/deny decision is made
