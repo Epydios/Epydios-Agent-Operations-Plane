@@ -2,7 +2,7 @@
 
 **Policy-driven control plane for AI and agent workflows on Kubernetes.**
 
-AgentOps Desktop is an open source control plane for governing agent actions with enforceable policy and auditable evidence. It evaluates each agent action against a policy provider, selects the right profile and extensions for the context, and records a structured evidence trail. Kubernetes-native, fast and composable, it provides a clean provider interface so you can swap policy engines, evidence stores and organization-specific decision logic without rewriting your runtime.
+AgentOps Control Plane is an open source control plane for governing agent actions with enforceable policy and auditable evidence. It evaluates each agent action against a policy provider, selects the right profile and extensions for the context, and records a structured evidence trail. Kubernetes-native, fast and composable, it provides a clean provider interface so you can swap policy engines, evidence stores and organization-specific decision logic without rewriting your runtime.
 
 ## Overview
 Profile Provider = “What context/profile should we apply?”

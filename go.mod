@@ -1,4 +1,4 @@
-module github.com/Epydios/Epydios-AgentOps-Desktop
+module github.com/Epydios/Epydios-AgentOps-Control-Plane
 
 go 1.25.0
 
