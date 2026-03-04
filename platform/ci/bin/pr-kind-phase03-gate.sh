@@ -24,6 +24,8 @@ RUN_M9_RBAC_MATRIX="${RUN_M9_RBAC_MATRIX:-}"
 RUN_M9_AUDIT_READ="${RUN_M9_AUDIT_READ:-}"
 RUN_M9_POLICY_LIFECYCLE="${RUN_M9_POLICY_LIFECYCLE:-}"
 RUN_M10_PROVIDER_CONFORMANCE="${RUN_M10_PROVIDER_CONFORMANCE:-}"
+RUN_M13_DESKTOP_PROVIDER="${RUN_M13_DESKTOP_PROVIDER:-}"
+RUN_M13_DESKTOP_RUNTIME="${RUN_M13_DESKTOP_RUNTIME:-}"
 RUN_M10_POLICY_GRANT_ENFORCEMENT="${RUN_M10_POLICY_GRANT_ENFORCEMENT:-}"
 RUN_M10_DEPLOYMENT_MODES="${RUN_M10_DEPLOYMENT_MODES:-}"
 RUN_M10_NO_EGRESS_LOCAL_AIMXS="${RUN_M10_NO_EGRESS_LOCAL_AIMXS:-}"
@@ -95,6 +97,8 @@ apply_gate_mode_defaults() {
       set_default_if_unset RUN_M9_AUDIT_READ 1
       set_default_if_unset RUN_M9_POLICY_LIFECYCLE 1
       set_default_if_unset RUN_M10_PROVIDER_CONFORMANCE 1
+      set_default_if_unset RUN_M13_DESKTOP_PROVIDER 1
+      set_default_if_unset RUN_M13_DESKTOP_RUNTIME 1
       set_default_if_unset RUN_M10_POLICY_GRANT_ENFORCEMENT 1
       set_default_if_unset RUN_M10_DEPLOYMENT_MODES 1
       set_default_if_unset RUN_M10_NO_EGRESS_LOCAL_AIMXS 1
@@ -154,6 +158,8 @@ apply_gate_mode_defaults() {
       set_default_if_unset RUN_M9_AUDIT_READ 0
       set_default_if_unset RUN_M9_POLICY_LIFECYCLE 0
       set_default_if_unset RUN_M10_PROVIDER_CONFORMANCE 0
+      set_default_if_unset RUN_M13_DESKTOP_PROVIDER 0
+      set_default_if_unset RUN_M13_DESKTOP_RUNTIME 0
       set_default_if_unset RUN_M10_POLICY_GRANT_ENFORCEMENT 0
       set_default_if_unset RUN_M10_DEPLOYMENT_MODES 0
       set_default_if_unset RUN_M10_NO_EGRESS_LOCAL_AIMXS 0
@@ -227,6 +233,8 @@ enforce_full_mode_contract() {
   check_required RUN_M9_AUDIT_READ 1
   check_required RUN_M9_POLICY_LIFECYCLE 1
   check_required RUN_M10_PROVIDER_CONFORMANCE 1
+  check_required RUN_M13_DESKTOP_PROVIDER 1
+  check_required RUN_M13_DESKTOP_RUNTIME 1
   check_required RUN_M10_POLICY_GRANT_ENFORCEMENT 1
   check_required RUN_M10_DEPLOYMENT_MODES 1
   check_required RUN_M10_NO_EGRESS_LOCAL_AIMXS 1
@@ -332,6 +340,14 @@ main() {
   if [ "${RUN_PRODUCTION_PLACEHOLDER_CHECK}" = "1" ]; then
     echo "Running production placeholder check..."
     "${REPO_ROOT}/platform/ci/bin/check-production-placeholders.sh"
+  fi
+  if [ "${RUN_M13_DESKTOP_PROVIDER}" = "1" ]; then
+    echo "Running M13 gate (DesktopProvider contract + deny/no-policy/no-action + evidence completeness)..."
+    "${REPO_ROOT}/platform/local/bin/verify-m13-desktop-provider.sh"
+  fi
+  if [ "${RUN_M13_DESKTOP_RUNTIME}" = "1" ]; then
+    echo "Running M13 gate (runtime desktop tiering + Linux-first/autonomy guardrails)..."
+    "${REPO_ROOT}/platform/local/bin/verify-m13-desktop-runtime.sh"
   fi
 
   require_cmd docker
@@ -673,7 +689,7 @@ main() {
   cleanup_secure_fixture_resources
 
   echo
-  echo "CI gate passed (${GATE_MODE} mode): Phase 00/01 + Phase 02 + Phase 03 + Phase 04 + M5 runtime + M9 + M10 + M12.1/M12.2/M12.3 + optional Phase 05 + provenance check."
+  echo "CI gate passed (${GATE_MODE} mode): Phase 00/01 + Phase 02 + Phase 03 + Phase 04 + M5 runtime + M9 + M10 + M12.1/M12.2/M12.3 + M13 + optional Phase 05 + provenance check."
 }
 
 main "$@"

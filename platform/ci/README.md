@@ -7,6 +7,7 @@ This directory contains CI entrypoint scripts invoked by GitHub Actions.
 - `bin/pr-kind-phase03-gate.sh`
   - Always runs mandatory QC preflight first via `bin/qc-preflight.sh`:
     - `go test ./...`
+    - `bin/check-ip-intake-register.sh` (`go run ./cmd/ip-intake-check`) against `provenance/ip/intake-register.json`
     - shell syntax checks for `platform/**/*.sh`
     - `kubectl kustomize` render checks for all `platform/**/kustomization.yaml`
   - Ensures a local kind cluster exists
@@ -103,6 +104,23 @@ This directory contains CI entrypoint scripts invoked by GitHub Actions.
     - runs `platform/local/bin/verify-m10-customer-hosted-packaging.sh`
     - validates customer-hosted packaging references (signed image/artifact + SBOM + air-gapped install/update bundles + support/SLA docs)
     - reads `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/customer-hosted-release-inputs.vars` by default for private customer-hosted release metadata (falls back to repo-local path only if present)
+  - M13 desktop execution-plane contract + deny-path verifier:
+    - `RUN_M13_DESKTOP_PROVIDER=1` in full mode (required)
+    - `RUN_M13_DESKTOP_PROVIDER=0` default in fast mode
+    - runs `platform/local/bin/verify-m13-desktop-provider.sh`
+    - validates:
+      - `DesktopProvider` contract paths (`observe`, `actuate`, `verify`) in `contracts/extensions/v1alpha1/provider-contracts.openapi.yaml`
+      - `DesktopProvider` registration support in `contracts/extensions/v1alpha1/provider-registration-crd.yaml`
+      - deny/no-policy/no-action fixture assertions and evidence completeness verifier expectations (`V-M13-LNX-001/002/003`)
+  - M13 desktop runtime tiering + Linux-first guardrail verifier:
+    - `RUN_M13_DESKTOP_RUNTIME=1` in full mode (required)
+    - `RUN_M13_DESKTOP_RUNTIME=0` default in fast mode
+    - runs `platform/local/bin/verify-m13-desktop-runtime.sh`
+    - validates:
+      - Tier 1 connector-first skip behavior
+      - Linux-first default target enforcement (`DESKTOP_ALLOW_NON_LINUX=false`)
+      - restricted-host explicit opt-in requirement
+      - Tier 3 human-approval + policy-grant requirements
   - M12.1 runtime SLO/SLI + error-budget verification:
     - `RUN_M12_SLO_SLI_PACK=1` in full mode (required)
     - `RUN_M12_SLO_SLI_PACK=0` default in fast mode
@@ -158,6 +176,12 @@ This directory contains CI entrypoint scripts invoked by GitHub Actions.
     - `RUN_M12_DR_GAMEDAY=1`
     - `RUN_M12_FAILURE_INJECTION=1`
     - Full mode enforces M12.1 + M12.2 + M12.3 verifiers and exits if overridden to disabled values.
+  - M13 desktop-provider check in full mode (required, no skips):
+    - `RUN_M13_DESKTOP_PROVIDER=1`
+    - Full mode enforces the contract + deny-path/no-policy/no-action + evidence completeness verifier and exits if overridden to disabled value.
+  - M13 desktop-runtime check in full mode (required, no skips):
+    - `RUN_M13_DESKTOP_RUNTIME=1`
+    - Full mode enforces runtime tiering + Linux-first/autonomy guardrail verifier and exits if overridden to disabled value.
   - M7 reliability suite in full mode (required, no skips):
     - `RUN_M7_INTEGRATION=1` (M0->M5 critical path through `platform/local/bin/verify-m7-integration.sh`)
     - `RUN_M7_BACKUP_RESTORE=1` (M7.2 CNPG backup/restore drill)
@@ -198,6 +222,16 @@ This directory contains CI entrypoint scripts invoked by GitHub Actions.
 The default GitHub Actions workflow is:
 
 - `.github/workflows/pr-kind-phase03-gate.yml`
+
+## IP Intake Governance (M13/M14 planning controls)
+
+- `bin/check-ip-intake-register.sh`
+  - Validates `provenance/ip/intake-register.json`.
+  - Enforces:
+    - first-party new IP entries include explicit review metadata/ticket.
+    - planned/shipped upstream linkage stays permissive-only.
+    - copyleft/source-available entries are `reference_only` unless policy/legal exceptions are explicitly approved.
+- Under current contract, `qc-preflight.sh` is the required enforcement point and is invoked unconditionally by the PR gate.
 
 ## Gate Profiles
 

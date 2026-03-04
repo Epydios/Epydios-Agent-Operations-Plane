@@ -8,7 +8,7 @@ RUNTIME="${RUNTIME:-kind}" # kind | k3d
 CLUSTER_NAME="${CLUSTER_NAME:-epydios-dev}"
 NAMESPACE="${NAMESPACE:-epydios-system}"
 
-PREVIOUS_TAG="${PREVIOUS_TAG:-0.0.9}"
+PREVIOUS_TAG="${PREVIOUS_TAG:-0.1.0}"
 CURRENT_TAG="${CURRENT_TAG:-0.2.0}"
 UPGRADE_POLICY_FILE="${UPGRADE_POLICY_FILE:-${REPO_ROOT}/platform/upgrade/compatibility-policy.yaml}"
 
