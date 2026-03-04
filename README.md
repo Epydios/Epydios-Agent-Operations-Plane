@@ -83,7 +83,7 @@ Run preflight QC only:
 ## Architecture At A Glance
 
 - **Control plane**: provider registry controller + runtime orchestration API
-- **Providers**: ProfileResolver, PolicyProvider, EvidenceProvider
+- **Providers**: ProfileResolver, PolicyProvider, EvidenceProvider, DesktopProvider (observe/actuate/verify)
 - **Data plane state**: Postgres (CNPG)
 - **Ops controls**: monitoring, admission policy, provenance lock checks, promotion gates
 

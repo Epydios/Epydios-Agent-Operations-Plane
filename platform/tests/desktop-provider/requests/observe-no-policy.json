@@ -1,0 +1,18 @@
+{
+  "caseId": "observe-no-policy",
+  "operation": "observe",
+  "request": {
+    "policyDecision": "",
+    "requestedCapabilities": [
+      "observe.window_metadata",
+      "observe.screenshot_hash"
+    ],
+    "actionRequested": true
+  },
+  "expected": {
+    "decision": "DENY",
+    "reasonCode": "no_policy",
+    "verifierId": "V-M13-LNX-002"
+  }
+}
+

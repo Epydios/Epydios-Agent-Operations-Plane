@@ -37,6 +37,7 @@ spec:
                     - PolicyProvider
                     - EvidenceProvider
                     - ProfileResolver
+                    - DesktopProvider
                 providerId:
                   type: string
                 contractVersion:
@@ -163,4 +164,3 @@ spec:
         - name: Ready
           type: string
           jsonPath: .status.conditions[?(@.type=="Ready")].status
-

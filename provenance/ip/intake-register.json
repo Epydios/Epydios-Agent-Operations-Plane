@@ -1,0 +1,269 @@
+{
+  "schema_version": 1,
+  "generated_utc": "2026-03-04T00:00:00Z",
+  "policy": {
+    "allowed_linkage_licenses": [
+      "Apache-2.0",
+      "MIT",
+      "BSD-2-Clause",
+      "BSD-3-Clause",
+      "PostgreSQL"
+    ],
+    "copyleft_licenses": [
+      "AGPL-3.0",
+      "GPL-3.0",
+      "SSPL-1.0",
+      "BUSL-1.1"
+    ],
+    "notes": [
+      "Copyleft and source-available licenses are reference-only by default until explicit policy/legal approval.",
+      "First-party new IP must carry a review ticket before planned or shipped linkage."
+    ]
+  },
+  "entries": [
+    {
+      "id": "desktop-provider-contract-v1alpha1",
+      "name": "DesktopProvider contract surface (observe/actuate/verify)",
+      "ip_type": "first_party_new_ip",
+      "source_url": "",
+      "source_ref": "contracts/extensions/v1alpha1",
+      "license": "Proprietary-Internal",
+      "linkage": "planned",
+      "status": "pending_review",
+      "owner": "desktop-platform",
+      "review": {
+        "required": true,
+        "status": "pending",
+        "ticket": "M13-IP-001",
+        "evidence": [
+          "PIPELINE_LIVING.txt",
+          "PIPELINE_LIVING.json"
+        ]
+      },
+      "notes": "Core execution-plane contract for Linux-first sandbox profile."
+    },
+    {
+      "id": "desktop-policy-verifier-pack",
+      "name": "Desktop deny-path/no-policy/no-action verifier pack",
+      "ip_type": "first_party_new_ip",
+      "source_url": "",
+      "source_ref": "platform/local/bin/verify-m13-desktop-provider.sh",
+      "license": "Proprietary-Internal",
+      "linkage": "planned",
+      "status": "pending_review",
+      "owner": "desktop-platform",
+      "review": {
+        "required": true,
+        "status": "pending",
+        "ticket": "M13-IP-002",
+        "evidence": [
+          "PIPELINE_LIVING.txt",
+          "PIPELINE_LIVING.json"
+        ]
+      },
+      "notes": "Verifiers required before broad host autonomy is allowed."
+    },
+    {
+      "id": "desktop-ui-governance-runtime",
+      "name": "Desktop governance UI runtime module",
+      "ip_type": "first_party_new_ip",
+      "source_url": "",
+      "source_ref": "EPYDIOS_AGENTOPS_DESKTOP_UI",
+      "license": "Proprietary-Internal",
+      "linkage": "planned",
+      "status": "pending_review",
+      "owner": "desktop-ui",
+      "review": {
+        "required": true,
+        "status": "pending",
+        "ticket": "M14-IP-001",
+        "evidence": [
+          "PIPELINE_LIVING.txt",
+          "PIPELINE_LIVING.json"
+        ]
+      },
+      "notes": "Policy/evidence approval UI and run timeline surfaces."
+    },
+    {
+      "id": "oss-playwright",
+      "name": "Playwright",
+      "ip_type": "upstream_oss",
+      "source_url": "https://github.com/microsoft/playwright",
+      "source_ref": "6ae6e049fefe",
+      "license": "Apache-2.0",
+      "linkage": "planned",
+      "status": "pending_review",
+      "owner": "desktop-platform",
+      "review": {
+        "required": false,
+        "status": "not_required",
+        "ticket": "",
+        "evidence": []
+      },
+      "notes": "Linux-first deterministic browser automation fallback path."
+    },
+    {
+      "id": "oss-stagehand",
+      "name": "Stagehand",
+      "ip_type": "upstream_oss",
+      "source_url": "https://github.com/browserbase/stagehand",
+      "source_ref": "3e28a6b2ba09",
+      "license": "MIT",
+      "linkage": "planned",
+      "status": "pending_review",
+      "owner": "desktop-platform",
+      "review": {
+        "required": false,
+        "status": "not_required",
+        "ticket": "",
+        "evidence": []
+      },
+      "notes": "Candidate Tier-2 actuation orchestration helper."
+    },
+    {
+      "id": "oss-browser-use",
+      "name": "browser-use",
+      "ip_type": "upstream_oss",
+      "source_url": "https://github.com/browser-use/browser-use",
+      "source_ref": "bf7775dc85e1",
+      "license": "UNKNOWN",
+      "linkage": "reference_only",
+      "status": "pending_review",
+      "owner": "desktop-platform",
+      "review": {
+        "required": false,
+        "status": "not_required",
+        "ticket": "",
+        "evidence": []
+      },
+      "notes": "Reference-only until license and fit review is complete."
+    },
+    {
+      "id": "oss-openfang",
+      "name": "openfang",
+      "ip_type": "upstream_oss",
+      "source_url": "https://github.com/RightNow-AI/openfang",
+      "source_ref": "53e1b31777ea",
+      "license": "UNKNOWN",
+      "linkage": "reference_only",
+      "status": "pending_review",
+      "owner": "desktop-platform",
+      "review": {
+        "required": false,
+        "status": "not_required",
+        "ticket": "",
+        "evidence": []
+      },
+      "notes": "Reference-only until contract-fit and license verification complete."
+    },
+    {
+      "id": "oss-pywinauto",
+      "name": "pywinauto",
+      "ip_type": "upstream_oss",
+      "source_url": "https://github.com/pywinauto/pywinauto",
+      "source_ref": "c23e64d5ea2c",
+      "license": "BSD-3-Clause",
+      "linkage": "planned",
+      "status": "pending_review",
+      "owner": "desktop-platform",
+      "review": {
+        "required": false,
+        "status": "not_required",
+        "ticket": "",
+        "evidence": []
+      },
+      "notes": "Windows restricted-profile candidate."
+    },
+    {
+      "id": "oss-winappdriver",
+      "name": "WinAppDriver",
+      "ip_type": "upstream_oss",
+      "source_url": "https://github.com/microsoft/WinAppDriver",
+      "source_ref": "09e3f7111eb2",
+      "license": "MIT",
+      "linkage": "planned",
+      "status": "pending_review",
+      "owner": "desktop-platform",
+      "review": {
+        "required": false,
+        "status": "not_required",
+        "ticket": "",
+        "evidence": []
+      },
+      "notes": "Windows restricted-profile candidate."
+    },
+    {
+      "id": "oss-hammerspoon",
+      "name": "Hammerspoon",
+      "ip_type": "upstream_oss",
+      "source_url": "https://github.com/Hammerspoon/hammerspoon",
+      "source_ref": "08e93f679bb5",
+      "license": "MIT",
+      "linkage": "planned",
+      "status": "pending_review",
+      "owner": "desktop-platform",
+      "review": {
+        "required": false,
+        "status": "not_required",
+        "ticket": "",
+        "evidence": []
+      },
+      "notes": "macOS restricted-profile candidate."
+    },
+    {
+      "id": "oss-cliclick",
+      "name": "cliclick",
+      "ip_type": "upstream_oss",
+      "source_url": "https://github.com/BlueM/cliclick",
+      "source_ref": "e7976889c9f4",
+      "license": "BSD-3-Clause",
+      "linkage": "planned",
+      "status": "pending_review",
+      "owner": "desktop-platform",
+      "review": {
+        "required": false,
+        "status": "not_required",
+        "ticket": "",
+        "evidence": []
+      },
+      "notes": "macOS restricted-profile candidate."
+    },
+    {
+      "id": "oss-skyvern",
+      "name": "Skyvern",
+      "ip_type": "upstream_oss",
+      "source_url": "https://github.com/Skyvern-AI/skyvern",
+      "source_ref": "537de306bc88",
+      "license": "AGPL-3.0",
+      "linkage": "reference_only",
+      "status": "blocked",
+      "owner": "desktop-platform",
+      "review": {
+        "required": false,
+        "status": "not_required",
+        "ticket": "",
+        "evidence": []
+      },
+      "notes": "Blocked for build-graph linkage under current permissive-only posture."
+    },
+    {
+      "id": "oss-ydotool",
+      "name": "ydotool",
+      "ip_type": "upstream_oss",
+      "source_url": "https://github.com/ReimuNotMoe/ydotool",
+      "source_ref": "708e96ff27e3",
+      "license": "AGPL-3.0",
+      "linkage": "reference_only",
+      "status": "blocked",
+      "owner": "desktop-platform",
+      "review": {
+        "required": false,
+        "status": "not_required",
+        "ticket": "",
+        "evidence": []
+      },
+      "notes": "Reference-only unless explicit legal/policy exception is granted."
+    }
+  ]
+}
+

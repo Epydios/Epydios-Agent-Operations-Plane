@@ -21,6 +21,8 @@ type Orchestrator struct {
 	ProfileMinPriority    int64
 	PolicyMinPriority     int64
 	EvidenceMinPriority   int64
+	DesktopMinPriority    int64
+	DesktopAllowNonLinux  bool
 	RequirePolicyGrant    bool
 	AIMXSEntitlement      AIMXSEntitlementConfig
 	PolicyLifecycle       PolicyLifecycleConfig
@@ -300,6 +302,163 @@ func (o *Orchestrator) ExecuteRun(ctx context.Context, req RunCreateRequest) (*R
 		return failRun(fmt.Errorf("persist policy stage: %w", err))
 	}
 
+	desktopRequested := desktopRequestEnabled(normalizedReq.Desktop)
+	var desktopPayload map[string]interface{}
+	if desktopRequested {
+		desktopPayload = map[string]interface{}{
+			"requested": true,
+		}
+		if decisionUpper != "ALLOW" {
+			desktopPayload["state"] = "skipped"
+			desktopPayload["reason"] = "policy_not_allow"
+			desktopPayload["policyDecision"] = decisionUpper
+			emitAuditEvent(ctx, "runtime.desktop.skipped", map[string]interface{}{
+				"runId":          run.RunID,
+				"requestId":      run.RequestID,
+				"policyDecision": decisionUpper,
+				"reason":         "policy_not_allow",
+			})
+		} else {
+			desktopPlan, planErr := deriveDesktopExecutionPlan(normalizedReq, run.RunID, grantToken, o.DesktopAllowNonLinux)
+			if planErr != nil {
+				return failRun(fmt.Errorf("derive desktop execution plan: %w", planErr))
+			}
+			desktopPayload["tier"] = desktopPlan.Tier
+			if !desktopPlan.Enabled {
+				desktopPayload["state"] = "skipped"
+				reason := "not_requested"
+				if desktopPlan.Tier <= desktopTierConnectors {
+					reason = "tier1_connector_path"
+				}
+				desktopPayload["reason"] = reason
+				emitAuditEvent(ctx, "runtime.desktop.skipped", map[string]interface{}{
+					"runId":     run.RunID,
+					"requestId": run.RequestID,
+					"reason":    reason,
+					"tier":      desktopPlan.Tier,
+				})
+			} else {
+				desktopProvider, selErr := o.ProviderRegistry.SelectProvider(ctx, o.Namespace, "DesktopProvider", "observe.window_metadata", o.DesktopMinPriority)
+				if selErr != nil {
+					return failRun(fmt.Errorf("select desktop provider: %w", selErr))
+				}
+				run.SelectedDesktopProvider = desktopProvider.Name
+				emitAuditEvent(ctx, "runtime.provider.selected", map[string]interface{}{
+					"runId":        run.RunID,
+					"providerType": "DesktopProvider",
+					"providerName": desktopProvider.Name,
+					"providerId":   desktopProvider.ProviderID,
+					"capability":   "observe.window_metadata",
+					"priority":     desktopProvider.Priority,
+					"authMode":     desktopProvider.AuthMode,
+				})
+
+				observeReq := DesktopObserveRequest{
+					Meta:     normalizedReq.Meta,
+					Step:     desktopPlan.Step,
+					Observer: desktopPlan.Observer,
+				}
+				var observeResp DesktopObserveResponse
+				if err := callProvider("DesktopProvider", "desktop-observe", desktopProvider, "/v1alpha1/desktop-provider/observe", observeReq, &observeResp); err != nil {
+					return failRun(fmt.Errorf("desktop observe call: %w", err))
+				}
+				if err := validateDesktopDecision("observe", observeResp.DesktopDecisionResponse); err != nil {
+					return failRun(err)
+				}
+				if err := validateDesktopEvidence("observe", &observeResp.EvidenceBundle); err != nil {
+					return failRun(err)
+				}
+				emitAuditEvent(ctx, "runtime.desktop.observe", map[string]interface{}{
+					"runId":      run.RunID,
+					"requestId":  run.RequestID,
+					"provider":   run.SelectedDesktopProvider,
+					"targetOS":   desktopPlan.Step.TargetOS,
+					"profile":    desktopPlan.Step.TargetExecutionProfile,
+					"tier":       desktopPlan.Tier,
+					"verifierId": observeResp.VerifierID,
+					"reasonCode": observeResp.ReasonCode,
+					"decision":   strings.ToUpper(strings.TrimSpace(observeResp.Decision)),
+				})
+
+				actuateReq := DesktopActuateRequest{
+					Meta:   normalizedReq.Meta,
+					Step:   desktopPlan.Step,
+					Action: desktopPlan.Actuation,
+				}
+				var actuateResp DesktopActuateResponse
+				if err := callProvider("DesktopProvider", "desktop-actuate", desktopProvider, "/v1alpha1/desktop-provider/actuate", actuateReq, &actuateResp); err != nil {
+					return failRun(fmt.Errorf("desktop actuate call: %w", err))
+				}
+				if err := validateDesktopDecision("actuate", actuateResp.DesktopDecisionResponse); err != nil {
+					return failRun(err)
+				}
+				if err := validateDesktopEvidence("actuate", actuateResp.EvidenceBundle); err != nil {
+					return failRun(err)
+				}
+				emitAuditEvent(ctx, "runtime.desktop.actuate", map[string]interface{}{
+					"runId":      run.RunID,
+					"requestId":  run.RequestID,
+					"provider":   run.SelectedDesktopProvider,
+					"verifierId": actuateResp.VerifierID,
+					"reasonCode": actuateResp.ReasonCode,
+					"decision":   strings.ToUpper(strings.TrimSpace(actuateResp.Decision)),
+				})
+
+				verifyReq := DesktopVerifyRequest{
+					Meta:       normalizedReq.Meta,
+					Step:       desktopPlan.Step,
+					PostAction: desktopPlan.PostAction,
+				}
+				var verifyResp DesktopVerifyResponse
+				if err := callProvider("DesktopProvider", "desktop-verify", desktopProvider, "/v1alpha1/desktop-provider/verify", verifyReq, &verifyResp); err != nil {
+					return failRun(fmt.Errorf("desktop verify call: %w", err))
+				}
+				if err := validateDesktopDecision("verify", verifyResp.DesktopDecisionResponse); err != nil {
+					return failRun(err)
+				}
+				if err := validateDesktopEvidence("verify", &verifyResp.EvidenceBundle); err != nil {
+					return failRun(err)
+				}
+				emitAuditEvent(ctx, "runtime.desktop.verify", map[string]interface{}{
+					"runId":      run.RunID,
+					"requestId":  run.RequestID,
+					"provider":   run.SelectedDesktopProvider,
+					"verifierId": verifyResp.VerifierID,
+					"reasonCode": verifyResp.ReasonCode,
+					"decision":   strings.ToUpper(strings.TrimSpace(verifyResp.Decision)),
+				})
+
+				if run.DesktopObserveResponse, err = json.Marshal(observeResp); err != nil {
+					return failRun(fmt.Errorf("marshal desktop observe response: %w", err))
+				}
+				if run.DesktopActuateResponse, err = json.Marshal(actuateResp); err != nil {
+					return failRun(fmt.Errorf("marshal desktop actuate response: %w", err))
+				}
+				if run.DesktopVerifyResponse, err = json.Marshal(verifyResp); err != nil {
+					return failRun(fmt.Errorf("marshal desktop verify response: %w", err))
+				}
+				run.Status = RunStatusDesktopVerified
+				run.UpdatedAt = time.Now().UTC()
+				if err := o.Store.UpsertRun(ctx, run); err != nil {
+					return failRun(fmt.Errorf("persist desktop stage: %w", err))
+				}
+
+				desktopPayload["state"] = "verified"
+				desktopPayload["provider"] = map[string]interface{}{
+					"name":             desktopProvider.Name,
+					"id":               desktopProvider.ProviderID,
+					"priority":         desktopProvider.Priority,
+					"targetOS":         desktopPlan.Step.TargetOS,
+					"executionProfile": desktopPlan.Step.TargetExecutionProfile,
+				}
+				desktopPayload["step"] = desktopPlan.Step
+				desktopPayload["observe"] = observeResp
+				desktopPayload["actuate"] = actuateResp
+				desktopPayload["verify"] = verifyResp
+			}
+		}
+	}
+
 	evidenceProvider, err := o.ProviderRegistry.SelectProvider(ctx, o.Namespace, "EvidenceProvider", "evidence.record", o.EvidenceMinPriority)
 	if err != nil {
 		return failRun(fmt.Errorf("select evidence provider: %w", err))
@@ -322,6 +481,15 @@ func (o *Orchestrator) ExecuteRun(ctx context.Context, req RunCreateRequest) (*R
 		stage = "deny"
 	}
 
+	recordPayload := map[string]interface{}{
+		"profile": profileResp,
+		"policy":  sanitizedPolicyResp,
+		"context": normalizedReq.Context,
+	}
+	if len(desktopPayload) > 0 {
+		recordPayload["desktop"] = desktopPayload
+	}
+
 	recordReq := map[string]interface{}{
 		"meta": map[string]interface{}{
 			"requestId":   normalizedReq.Meta.RequestID,
@@ -331,15 +499,11 @@ func (o *Orchestrator) ExecuteRun(ctx context.Context, req RunCreateRequest) (*R
 			"environment": normalizedReq.Meta.Environment,
 			"actor":       normalizedReq.Meta.Actor,
 		},
-		"eventType": eventType,
-		"eventId":   fmt.Sprintf("%s-%s", run.RunID, stage),
-		"runId":     run.RunID,
-		"stage":     stage,
-		"payload": map[string]interface{}{
-			"profile": profileResp,
-			"policy":  sanitizedPolicyResp,
-			"context": normalizedReq.Context,
-		},
+		"eventType":      eventType,
+		"eventId":        fmt.Sprintf("%s-%s", run.RunID, stage),
+		"runId":          run.RunID,
+		"stage":          stage,
+		"payload":        recordPayload,
 		"retentionClass": normalizedReq.RetentionClass,
 	}
 
@@ -375,6 +539,7 @@ func (o *Orchestrator) ExecuteRun(ctx context.Context, req RunCreateRequest) (*R
 			"selectedProfileProvider":  run.SelectedProfileProvider,
 			"selectedPolicyProvider":   run.SelectedPolicyProvider,
 			"selectedEvidenceProvider": run.SelectedEvidenceProvider,
+			"selectedDesktopProvider":  run.SelectedDesktopProvider,
 			"decision":                 decisionUpper,
 		},
 	}
@@ -401,6 +566,7 @@ func (o *Orchestrator) ExecuteRun(ctx context.Context, req RunCreateRequest) (*R
 		"profileProvider":  run.SelectedProfileProvider,
 		"policyProvider":   run.SelectedPolicyProvider,
 		"evidenceProvider": run.SelectedEvidenceProvider,
+		"desktopProvider":  run.SelectedDesktopProvider,
 		"grantPresent":     run.PolicyGrantTokenPresent,
 		"grantSha256":      run.PolicyGrantTokenSHA256,
 	})

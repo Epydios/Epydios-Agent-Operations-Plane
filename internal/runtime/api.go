@@ -157,6 +157,7 @@ func (s *APIServer) handleCreateRun(w http.ResponseWriter, r *http.Request) {
 		"profileRef":  run.SelectedProfileProvider,
 		"policyRef":   run.SelectedPolicyProvider,
 		"evidenceRef": run.SelectedEvidenceProvider,
+		"desktopRef":  run.SelectedDesktopProvider,
 	})
 	writeJSON(w, http.StatusCreated, run)
 }
@@ -266,7 +267,7 @@ func (s *APIServer) handleRunExport(w http.ResponseWriter, r *http.Request) {
 		header := []string{
 			"runId", "requestId", "tenantId", "projectId", "environment", "retentionClass", "expiresAt",
 			"status", "policyDecision", "policyBundleId", "policyBundleVersion",
-			"selectedProfileProvider", "selectedPolicyProvider", "selectedEvidenceProvider",
+			"selectedProfileProvider", "selectedPolicyProvider", "selectedEvidenceProvider", "selectedDesktopProvider",
 			"policyGrantTokenPresent", "policyGrantTokenSha256", "createdAt", "updatedAt",
 		}
 		if err := cw.Write(header); err != nil {
@@ -293,6 +294,7 @@ func (s *APIServer) handleRunExport(w http.ResponseWriter, r *http.Request) {
 				item.SelectedProfileProvider,
 				item.SelectedPolicyProvider,
 				item.SelectedEvidenceProvider,
+				item.SelectedDesktopProvider,
 				strconv.FormatBool(item.PolicyGrantTokenPresent),
 				item.PolicyGrantTokenSHA256,
 				item.CreatedAt.UTC().Format(time.RFC3339),
