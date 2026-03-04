@@ -296,7 +296,34 @@ Runs the runtime orchestration service smoke against the local cluster:
 Fast path on an already prepared cluster (skip bootstrap and image build/load):
 
 ```bash
-RUN_BOOTSTRAP=0 RUN_IMAGE_PREP=0 ./platform/local/bin/verify-m5-runtime-orchestration.sh
+  RUN_BOOTSTRAP=0 RUN_IMAGE_PREP=0 ./platform/local/bin/verify-m5-runtime-orchestration.sh
+```
+
+### M13 desktop provider contract + deny-path verification
+
+Runs a Linux-first desktop execution-plane verifier without requiring cluster actuation:
+- validates `DesktopProvider` contract endpoints/schemas (`observe`, `actuate`, `verify`)
+- validates `ExtensionProvider` CRD supports `providerType: DesktopProvider`
+- validates deny/no-policy/no-action fixtures and evidence completeness expectations for verifier IDs:
+  - `V-M13-LNX-001` contract conformance
+  - `V-M13-LNX-002` deny/no-policy/no-action enforcement
+  - `V-M13-LNX-003` evidence completeness enforcement
+
+```bash
+./platform/local/bin/verify-m13-desktop-provider.sh
+```
+
+### M13 desktop runtime tiering + Linux-first verifier
+
+Runs runtime guardrail checks for desktop execution planning:
+- Tier 1 stays connector/API-first and skips desktop actuation.
+- Tier 2 desktop path remains enabled when requested.
+- non-Linux desktop targets are blocked by default unless explicitly enabled.
+- `restricted_host` requires explicit request opt-in.
+- Tier 3 requires both human approval and policy grant token.
+
+```bash
+./platform/local/bin/verify-m13-desktop-runtime.sh
 ```
 
 ### M9.1 runtime API authn/authz skeleton verification
@@ -539,6 +566,8 @@ Runs upgrade-safety validation for first-party control-plane deployments:
 ```bash
 ./platform/local/bin/verify-m7-upgrade-safety.sh
 ```
+
+Default tested path is `0.1.0 -> 0.2.0` (aligned to `platform/upgrade/compatibility-policy.yaml`).
 
 Override tested path:
 

@@ -4,3 +4,7 @@ This directory contains provider-specific Kubernetes manifests that are not yet 
 
 These are used for incremental milestones (for example, M1 policy provider validation) without destabilizing the M0 foundation smoke path.
 
+Current optional bundles include:
+- `platform/providers/oss-policy-opa` (`PolicyProvider`)
+- `platform/providers/oss-evidence-memory` (`EvidenceProvider`)
+- `platform/providers/oss-desktop-mock` (`DesktopProvider`, Linux-first M13 mock)

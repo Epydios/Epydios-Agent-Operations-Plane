@@ -10,3 +10,8 @@ Current enforcement entrypoint:
 - `platform/local/bin/verify-m7-upgrade-safety.sh`
 
 The verifier fails early if `PREVIOUS_TAG -> CURRENT_TAG` is not listed in `allowed_upgrade_paths`.
+
+Current local/default drill path:
+
+- `PREVIOUS_TAG=0.1.0`
+- `CURRENT_TAG=0.2.0`
