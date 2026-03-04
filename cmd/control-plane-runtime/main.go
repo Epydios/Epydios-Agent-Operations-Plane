@@ -24,18 +24,20 @@ import (
 )
 
 type Config struct {
-	ListenAddr          string
-	Namespace           string
-	PostgresDSN         string
-	PostgresHost        string
-	PostgresPort        int
-	PostgresDB          string
-	PostgresUser        string
-	PostgresPassword    string
-	PostgresSSLMode     string
-	ProfileMinPriority  int64
-	PolicyMinPriority   int64
-	EvidenceMinPriority int64
+	ListenAddr           string
+	Namespace            string
+	PostgresDSN          string
+	PostgresHost         string
+	PostgresPort         int
+	PostgresDB           string
+	PostgresUser         string
+	PostgresPassword     string
+	PostgresSSLMode      string
+	ProfileMinPriority   int64
+	PolicyMinPriority    int64
+	EvidenceMinPriority  int64
+	DesktopMinPriority   int64
+	DesktopAllowNonLinux bool
 
 	AuthEnabled                       bool
 	AuthIssuer                        string
@@ -116,6 +118,8 @@ func parseFlags() Config {
 		PolicyAllowedIDs:                  envOrDefault("POLICY_ALLOWED_IDS", ""),
 		PolicyMinVersion:                  envOrDefault("POLICY_MIN_VERSION", ""),
 		PolicyRolloutPercent:              envIntOrDefault("POLICY_ROLLOUT_PERCENT", 100),
+		DesktopMinPriority:                int64(envIntOrDefault("DESKTOP_MIN_PRIORITY", 0)),
+		DesktopAllowNonLinux:              envBoolOrDefault("DESKTOP_ALLOW_NON_LINUX", false),
 		RetentionDefaultClass:             envOrDefault("RETENTION_DEFAULT_CLASS", "standard"),
 		RetentionPolicyJSON:               envOrDefault("RETENTION_POLICY_JSON", ""),
 	}
@@ -132,6 +136,8 @@ func parseFlags() Config {
 	flag.Int64Var(&cfg.ProfileMinPriority, "profile-min-priority", 0, "Minimum priority for ProfileResolver providers")
 	flag.Int64Var(&cfg.PolicyMinPriority, "policy-min-priority", 0, "Minimum priority for PolicyProvider providers")
 	flag.Int64Var(&cfg.EvidenceMinPriority, "evidence-min-priority", 0, "Minimum priority for EvidenceProvider providers")
+	flag.Int64Var(&cfg.DesktopMinPriority, "desktop-min-priority", 0, "Minimum priority for DesktopProvider providers")
+	flag.BoolVar(&cfg.DesktopAllowNonLinux, "desktop-allow-non-linux", cfg.DesktopAllowNonLinux, "Allow non-Linux desktop targets (disabled by default)")
 	flag.BoolVar(&cfg.AuthEnabled, "authn-enabled", cfg.AuthEnabled, "Enable runtime API OIDC/JWT authn/authz checks")
 	flag.StringVar(&cfg.AuthIssuer, "authn-issuer", cfg.AuthIssuer, "Required JWT issuer claim (optional)")
 	flag.StringVar(&cfg.AuthAudience, "authn-audience", cfg.AuthAudience, "Required JWT audience claim (optional)")
@@ -205,13 +211,15 @@ func run(cfg Config) error {
 	}
 
 	orchestrator := &cpruntime.Orchestrator{
-		Namespace:           cfg.Namespace,
-		Store:               store,
-		ProviderRegistry:    cpruntime.NewProviderRegistry(k8sClient),
-		ProfileMinPriority:  cfg.ProfileMinPriority,
-		PolicyMinPriority:   cfg.PolicyMinPriority,
-		EvidenceMinPriority: cfg.EvidenceMinPriority,
-		RequirePolicyGrant:  cfg.AuthRequirePolicyGrant,
+		Namespace:            cfg.Namespace,
+		Store:                store,
+		ProviderRegistry:     cpruntime.NewProviderRegistry(k8sClient),
+		ProfileMinPriority:   cfg.ProfileMinPriority,
+		PolicyMinPriority:    cfg.PolicyMinPriority,
+		EvidenceMinPriority:  cfg.EvidenceMinPriority,
+		DesktopMinPriority:   cfg.DesktopMinPriority,
+		DesktopAllowNonLinux: cfg.DesktopAllowNonLinux,
+		RequirePolicyGrant:   cfg.AuthRequirePolicyGrant,
 		AIMXSEntitlement: cpruntime.AIMXSEntitlementConfig{
 			Enabled:               cfg.AuthRequireAIMXSEntitlement,
 			ProviderNamePrefixes:  splitCommaList(cfg.AuthAIMXSProviderPrefixes),
@@ -257,7 +265,7 @@ func run(cfg Config) error {
 	api := cpruntime.NewAPIServer(store, orchestrator, authEnforcer)
 
 	log.Printf(
-		"runtime orchestration service listening on %s namespace=%s authnEnabled=%t requirePolicyGrant=%t requireAIMXSEntitlement=%t policyLifecycleEnabled=%t policyLifecycleMode=%s",
+		"runtime orchestration service listening on %s namespace=%s authnEnabled=%t requirePolicyGrant=%t requireAIMXSEntitlement=%t policyLifecycleEnabled=%t policyLifecycleMode=%s desktopMinPriority=%d desktopAllowNonLinux=%t",
 		cfg.ListenAddr,
 		cfg.Namespace,
 		cfg.AuthEnabled,
@@ -265,6 +273,8 @@ func run(cfg Config) error {
 		cfg.AuthRequireAIMXSEntitlement,
 		cfg.PolicyLifecycleEnabled,
 		cfg.PolicyLifecycleMode,
+		cfg.DesktopMinPriority,
+		cfg.DesktopAllowNonLinux,
 	)
 	serverCtx := ctrl.SetupSignalHandler()
 	err = cpruntime.StartHTTPServer(serverCtx, cpruntime.ServerConfig{ListenAddr: cfg.ListenAddr}, api.Routes())

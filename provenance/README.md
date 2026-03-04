@@ -20,6 +20,7 @@ Keep these in-repo files as authoritative sources:
 - `charts.lock.yaml`
 - `crds.lock.yaml`
 - `licenses.lock.yaml`
+- `ip/intake-register.json`
 - `aimxs/README.md` (boundary/process documentation only)
 
 ## Validation Gate
@@ -34,6 +35,12 @@ Run strict release mode (blocking for unresolved required image digests and unve
 
 ```bash
 STRICT=1 ./platform/local/bin/verify-provenance-lockfiles.sh
+```
+
+Run IP intake governance validation (first-party IP declarations + OSS linkage/license policy):
+
+```bash
+./platform/ci/bin/check-ip-intake-register.sh
 ```
 
 Use strict mode as the release gate after digests and license verification are fully populated.
@@ -86,6 +93,7 @@ ALLOW_DOCKER_PULL=1 ./platform/local/bin/sync-provenance-image-digests.sh
 - `images.lock.yaml` image tags and digests
 - `crds.lock.yaml` CRD source/version references
 - `licenses.lock.yaml` license expectations and verification status
+- `ip/intake-register.json` machine-readable OSS-intake and first-party IP governance register
 - `aimxs/` private AIMXS publication evidence for M10.2 (tag + digest evidence + staging strict proof)
 
 ## Relationship to Workspace-Level Provenance

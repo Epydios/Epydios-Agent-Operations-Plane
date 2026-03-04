@@ -43,6 +43,7 @@ func (s *PostgresRunStore) EnsureSchema(ctx context.Context) error {
 			selected_profile_provider TEXT,
 			selected_policy_provider TEXT,
 			selected_evidence_provider TEXT,
+			selected_desktop_provider TEXT,
 			policy_decision TEXT,
 			policy_bundle_id TEXT,
 			policy_bundle_version TEXT,
@@ -51,6 +52,9 @@ func (s *PostgresRunStore) EnsureSchema(ctx context.Context) error {
 			request_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
 			profile_response JSONB,
 			policy_response JSONB,
+			desktop_observe_response JSONB,
+			desktop_actuate_response JSONB,
+			desktop_verify_response JSONB,
 			evidence_record_response JSONB,
 			evidence_bundle_response JSONB,
 			error_message TEXT,
@@ -63,6 +67,10 @@ func (s *PostgresRunStore) EnsureSchema(ctx context.Context) error {
 		`ALTER TABLE orchestration_runs ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ`,
 		`ALTER TABLE orchestration_runs ADD COLUMN IF NOT EXISTS policy_bundle_id TEXT`,
 		`ALTER TABLE orchestration_runs ADD COLUMN IF NOT EXISTS policy_bundle_version TEXT`,
+		`ALTER TABLE orchestration_runs ADD COLUMN IF NOT EXISTS selected_desktop_provider TEXT`,
+		`ALTER TABLE orchestration_runs ADD COLUMN IF NOT EXISTS desktop_observe_response JSONB`,
+		`ALTER TABLE orchestration_runs ADD COLUMN IF NOT EXISTS desktop_actuate_response JSONB`,
+		`ALTER TABLE orchestration_runs ADD COLUMN IF NOT EXISTS desktop_verify_response JSONB`,
 		`CREATE INDEX IF NOT EXISTS idx_orchestration_runs_created_at ON orchestration_runs (created_at DESC)`,
 		`CREATE INDEX IF NOT EXISTS idx_orchestration_runs_status ON orchestration_runs (status)`,
 		`CREATE INDEX IF NOT EXISTS idx_orchestration_runs_scope ON orchestration_runs (tenant_id, project_id)`,
@@ -92,6 +100,7 @@ INSERT INTO orchestration_runs (
 	selected_profile_provider,
 	selected_policy_provider,
 	selected_evidence_provider,
+	selected_desktop_provider,
 	policy_decision,
 	policy_bundle_id,
 	policy_bundle_version,
@@ -100,13 +109,16 @@ INSERT INTO orchestration_runs (
 	request_payload,
 	profile_response,
 	policy_response,
+	desktop_observe_response,
+	desktop_actuate_response,
+	desktop_verify_response,
 	evidence_record_response,
 	evidence_bundle_response,
 	error_message,
 	created_at,
 	updated_at
 ) VALUES (
-	$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24
+	$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28
 )
 ON CONFLICT (run_id) DO UPDATE SET
 	request_id = EXCLUDED.request_id,
@@ -119,6 +131,7 @@ ON CONFLICT (run_id) DO UPDATE SET
 	selected_profile_provider = EXCLUDED.selected_profile_provider,
 	selected_policy_provider = EXCLUDED.selected_policy_provider,
 	selected_evidence_provider = EXCLUDED.selected_evidence_provider,
+	selected_desktop_provider = EXCLUDED.selected_desktop_provider,
 	policy_decision = EXCLUDED.policy_decision,
 	policy_bundle_id = EXCLUDED.policy_bundle_id,
 	policy_bundle_version = EXCLUDED.policy_bundle_version,
@@ -127,6 +140,9 @@ ON CONFLICT (run_id) DO UPDATE SET
 	request_payload = EXCLUDED.request_payload,
 	profile_response = EXCLUDED.profile_response,
 	policy_response = EXCLUDED.policy_response,
+	desktop_observe_response = EXCLUDED.desktop_observe_response,
+	desktop_actuate_response = EXCLUDED.desktop_actuate_response,
+	desktop_verify_response = EXCLUDED.desktop_verify_response,
 	evidence_record_response = EXCLUDED.evidence_record_response,
 	evidence_bundle_response = EXCLUDED.evidence_bundle_response,
 	error_message = EXCLUDED.error_message,
@@ -158,6 +174,7 @@ ON CONFLICT (run_id) DO UPDATE SET
 		nullStr(run.SelectedProfileProvider),
 		nullStr(run.SelectedPolicyProvider),
 		nullStr(run.SelectedEvidenceProvider),
+		nullStr(run.SelectedDesktopProvider),
 		nullStr(run.PolicyDecision),
 		nullStr(run.PolicyBundleID),
 		nullStr(run.PolicyBundleVersion),
@@ -166,6 +183,9 @@ ON CONFLICT (run_id) DO UPDATE SET
 		jsonBytesOrEmptyObject(run.RequestPayload),
 		nullJSON(run.ProfileResponse),
 		nullJSON(run.PolicyResponse),
+		nullJSON(run.DesktopObserveResponse),
+		nullJSON(run.DesktopActuateResponse),
+		nullJSON(run.DesktopVerifyResponse),
 		nullJSON(run.EvidenceRecordResponse),
 		nullJSON(run.EvidenceBundleResponse),
 		nullStr(run.ErrorMessage),
@@ -192,6 +212,7 @@ SELECT
 	COALESCE(selected_profile_provider, ''),
 	COALESCE(selected_policy_provider, ''),
 	COALESCE(selected_evidence_provider, ''),
+	COALESCE(selected_desktop_provider, ''),
 	COALESCE(policy_decision, ''),
 	COALESCE(policy_bundle_id, ''),
 	COALESCE(policy_bundle_version, ''),
@@ -200,6 +221,9 @@ SELECT
 	request_payload,
 	profile_response,
 	policy_response,
+	desktop_observe_response,
+	desktop_actuate_response,
+	desktop_verify_response,
 	evidence_record_response,
 	evidence_bundle_response,
 	COALESCE(error_message, ''),
@@ -215,6 +239,9 @@ WHERE run_id = $1
 		reqJSON   []byte
 		pJSON     []byte
 		polJSON   []byte
+		doJSON    []byte
+		daJSON    []byte
+		dvJSON    []byte
 		erJSON    []byte
 		ebJSON    []byte
 		expiresAt sql.NullTime
@@ -232,6 +259,7 @@ WHERE run_id = $1
 		&rec.SelectedProfileProvider,
 		&rec.SelectedPolicyProvider,
 		&rec.SelectedEvidenceProvider,
+		&rec.SelectedDesktopProvider,
 		&rec.PolicyDecision,
 		&rec.PolicyBundleID,
 		&rec.PolicyBundleVersion,
@@ -240,6 +268,9 @@ WHERE run_id = $1
 		&reqJSON,
 		&pJSON,
 		&polJSON,
+		&doJSON,
+		&daJSON,
+		&dvJSON,
 		&erJSON,
 		&ebJSON,
 		&rec.ErrorMessage,
@@ -253,6 +284,9 @@ WHERE run_id = $1
 	rec.RequestPayload = reqJSON
 	rec.ProfileResponse = pJSON
 	rec.PolicyResponse = polJSON
+	rec.DesktopObserveResponse = doJSON
+	rec.DesktopActuateResponse = daJSON
+	rec.DesktopVerifyResponse = dvJSON
 	rec.EvidenceRecordResponse = erJSON
 	rec.EvidenceBundleResponse = ebJSON
 	if expiresAt.Valid {
@@ -292,6 +326,7 @@ SELECT
 	COALESCE(selected_profile_provider, ''),
 	COALESCE(selected_policy_provider, ''),
 	COALESCE(selected_evidence_provider, ''),
+	COALESCE(selected_desktop_provider, ''),
 	COALESCE(policy_decision, ''),
 	COALESCE(policy_bundle_id, ''),
 	COALESCE(policy_bundle_version, ''),
@@ -334,7 +369,7 @@ FROM orchestration_runs
 	}
 	if query.ProviderID != "" {
 		i := appendArg(query.ProviderID)
-		appendClause(fmt.Sprintf("(selected_profile_provider = $%d OR selected_policy_provider = $%d OR selected_evidence_provider = $%d)", i, i, i))
+		appendClause(fmt.Sprintf("(selected_profile_provider = $%d OR selected_policy_provider = $%d OR selected_evidence_provider = $%d OR selected_desktop_provider = $%d)", i, i, i, i))
 	}
 	if query.RetentionClass != "" {
 		i := appendArg(query.RetentionClass)
@@ -389,6 +424,7 @@ FROM orchestration_runs
 			&item.SelectedProfileProvider,
 			&item.SelectedPolicyProvider,
 			&item.SelectedEvidenceProvider,
+			&item.SelectedDesktopProvider,
 			&item.PolicyDecision,
 			&item.PolicyBundleID,
 			&item.PolicyBundleVersion,

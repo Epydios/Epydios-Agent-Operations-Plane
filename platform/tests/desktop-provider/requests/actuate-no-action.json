@@ -1,0 +1,15 @@
+{
+  "caseId": "actuate-no-action",
+  "operation": "actuate",
+  "request": {
+    "policyDecision": "ALLOW",
+    "requestedCapabilities": [],
+    "actionRequested": false
+  },
+  "expected": {
+    "decision": "DENY",
+    "reasonCode": "no_action",
+    "verifierId": "V-M13-LNX-002"
+  }
+}
+

@@ -1,0 +1,17 @@
+{
+  "caseId": "observe-allow-contract",
+  "operation": "observe",
+  "request": {
+    "policyDecision": "ALLOW",
+    "requestedCapabilities": [
+      "observe.window_metadata"
+    ],
+    "actionRequested": true
+  },
+  "expected": {
+    "decision": "ALLOW",
+    "reasonCode": "ok",
+    "verifierId": "V-M13-LNX-001"
+  }
+}
+

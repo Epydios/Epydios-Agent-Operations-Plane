@@ -5,6 +5,7 @@ This package freezes the first versioned plug-in boundary for:
 - `PolicyProvider`
 - `EvidenceProvider`
 - `ProfileResolver`
+- `DesktopProvider` (`observe`, `actuate`, `verify`)
 
 These interfaces are the public OSS contracts that private modules (including AIMXS) can implement.
 
@@ -35,4 +36,3 @@ These interfaces are the public OSS contracts that private modules (including AI
 - mTLS is preferred for all provider traffic
 - Bearer tokens or projected service account tokens may be used where mTLS is not yet available
 - Provider responses are auditable and correlated via `requestId`
-

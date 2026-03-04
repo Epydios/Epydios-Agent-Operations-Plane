@@ -1,0 +1,17 @@
+{
+  "caseId": "actuate-policy-deny",
+  "operation": "actuate",
+  "request": {
+    "policyDecision": "DENY",
+    "requestedCapabilities": [
+      "actuate.window_focus"
+    ],
+    "actionRequested": true
+  },
+  "expected": {
+    "decision": "DENY",
+    "reasonCode": "policy_deny",
+    "verifierId": "V-M13-LNX-002"
+  }
+}
+

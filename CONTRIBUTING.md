@@ -20,3 +20,9 @@ If you believe you have found a security vulnerability, please do not file a pub
 - Keep changes focused and easy to review.
 - Add or update tests when behavior changes.
 - Update documentation when user-facing behavior changes.
+
+## IP and OSS intake governance
+- If your change introduces or modifies OSS intake usage or creates new first-party IP surfaces, update `provenance/ip/intake-register.json` in the same PR.
+- Do not link copyleft/source-available dependencies into planned/shipped product paths unless explicit approval evidence exists.
+- New first-party IP entries must include review metadata (`review.required=true`, review status, and review ticket).
+- Run `./platform/ci/bin/check-ip-intake-register.sh` locally before opening a PR.

@@ -1,0 +1,25 @@
+{
+  "caseId": "verify-allow-evidence",
+  "operation": "verify",
+  "request": {
+    "policyDecision": "ALLOW",
+    "requestedCapabilities": [
+      "verify.post_action_state"
+    ],
+    "actionRequested": true,
+    "evidenceBundle": {
+      "windowMetadata": {
+        "windowTitle": "Epydios Runtime",
+        "focusedApp": "Browser"
+      },
+      "screenshotHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "resultCode": "ok"
+    }
+  },
+  "expected": {
+    "decision": "ALLOW",
+    "reasonCode": "ok",
+    "verifierId": "V-M13-LNX-003"
+  }
+}
+

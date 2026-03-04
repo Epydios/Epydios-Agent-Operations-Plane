@@ -20,6 +20,7 @@ This service moves policy/evidence/profile execution flow out of ad-hoc scripts 
   - `profile.resolve`
   - `policy.evaluate`
   - `evidence.record`
+  - `observe.window_metadata` (DesktopProvider, when desktop execution is requested)
 
 ## API Endpoints
 
@@ -71,6 +72,8 @@ Runtime exposes SLO/SLI metrics at `/metrics`:
   - `POLICY_ALLOWED_IDS` (comma-separated allowed policy bundle IDs)
   - `POLICY_MIN_VERSION` (minimum accepted policy bundle version)
   - `POLICY_ROLLOUT_PERCENT` (stable rollout bucket allowlist, `0-100`)
+  - `DESKTOP_MIN_PRIORITY` (minimum provider priority for `DesktopProvider` selection)
+  - `DESKTOP_ALLOW_NON_LINUX` (defaults `false`; keeps runtime Linux-first for desktop execution path)
   - `RETENTION_DEFAULT_CLASS` (default class when request omits `retentionClass`)
   - `RETENTION_POLICY_JSON` (JSON map of `retentionClass -> duration`, for example `{"short":"24h","standard":"168h","archive":"720h"}`)
 - Scope enforcement:
@@ -142,9 +145,31 @@ Runtime exposes SLO/SLI metrics at `/metrics`:
 
 1. Resolve profile
 2. Evaluate policy
-3. Record evidence
-4. Finalize evidence bundle
-5. Persist stage transitions and outputs in Postgres
+3. Optional desktop execution step loop (`observe -> actuate -> verify`) when `desktop` request block is present and policy decision is `ALLOW`
+4. Record evidence
+5. Finalize evidence bundle
+6. Persist stage transitions and outputs in Postgres
+
+## Desktop Execution Plane (M13.2 baseline)
+
+- Runtime executes desktop steps only when request includes a `desktop` block.
+- Tier behavior:
+  - Tier 1 (`desktop.tier=1`): desktop path is skipped (`Tier 1 connectors/API-first`).
+  - Tier 2 (`desktop.tier=2`, default): governed desktop `observe -> actuate -> verify` is allowed.
+  - Tier 3 (`desktop.tier>=3`): requires both `desktop.humanApprovalGranted=true` and policy grant token.
+- Linux-first restrictions:
+  - `desktop.targetOS` defaults to `linux`.
+  - Non-Linux targets are blocked unless `DESKTOP_ALLOW_NON_LINUX=true`.
+- Autonomy profile defaults:
+  - `desktop.targetExecutionProfile` defaults to `sandbox_vm_autonomous`.
+  - `restricted_host` requires explicit `desktop.restrictedHostOptIn=true`.
+- Evidence + audit:
+  - Desktop responses are persisted in run record fields:
+    - `selectedDesktopProvider`
+    - `desktopObserveResponse`
+    - `desktopActuateResponse`
+    - `desktopVerifyResponse`
+  - Evidence record payload includes a `desktop` section with step, decisions, and verifier outputs.
 
 ## Kubernetes Manifests
 

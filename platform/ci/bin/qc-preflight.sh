@@ -18,8 +18,15 @@ main() {
   require_cmd find
   require_cmd sort
 
+  local_go_cache="${GOCACHE:-${REPO_ROOT}/.tmp/go-build}"
+  mkdir -p "${local_go_cache}"
+  export GOCACHE="${local_go_cache}"
+
   echo "QC: go test ./..."
   (cd "${REPO_ROOT}" && go test ./...)
+
+  echo "QC: IP intake register policy validation"
+  "${REPO_ROOT}/platform/ci/bin/check-ip-intake-register.sh"
 
   echo "QC: shell syntax validation (platform/**/*.sh)"
   while IFS= read -r script; do

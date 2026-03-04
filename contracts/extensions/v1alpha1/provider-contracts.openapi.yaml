@@ -13,6 +13,7 @@ tags:
   - name: PolicyProvider
   - name: EvidenceProvider
   - name: ProfileResolver
+  - name: DesktopProvider
 paths:
   /healthz:
     get:
@@ -157,6 +158,84 @@ paths:
           $ref: "#/components/responses/ProviderError"
         "500":
           $ref: "#/components/responses/ProviderError"
+  /v1alpha1/desktop-provider/observe:
+    post:
+      tags: [DesktopProvider]
+      operationId: desktopObserve
+      summary: Observe desktop state for a single governed step
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DesktopObserveRequest"
+      responses:
+        "200":
+          description: Observe step decision and evidence snapshot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DesktopObserveResponse"
+        "400":
+          $ref: "#/components/responses/ProviderError"
+        "401":
+          $ref: "#/components/responses/ProviderError"
+        "403":
+          $ref: "#/components/responses/ProviderError"
+        "500":
+          $ref: "#/components/responses/ProviderError"
+  /v1alpha1/desktop-provider/actuate:
+    post:
+      tags: [DesktopProvider]
+      operationId: desktopActuate
+      summary: Execute a single desktop actuation step under policy constraints
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DesktopActuateRequest"
+      responses:
+        "200":
+          description: Actuation step decision and result code
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DesktopActuateResponse"
+        "400":
+          $ref: "#/components/responses/ProviderError"
+        "401":
+          $ref: "#/components/responses/ProviderError"
+        "403":
+          $ref: "#/components/responses/ProviderError"
+        "500":
+          $ref: "#/components/responses/ProviderError"
+  /v1alpha1/desktop-provider/verify:
+    post:
+      tags: [DesktopProvider]
+      operationId: desktopVerify
+      summary: Verify post-action desktop state and evidence completeness
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DesktopVerifyRequest"
+      responses:
+        "200":
+          description: Verification decision and evidence completeness assertion
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DesktopVerifyResponse"
+        "400":
+          $ref: "#/components/responses/ProviderError"
+        "401":
+          $ref: "#/components/responses/ProviderError"
+        "403":
+          $ref: "#/components/responses/ProviderError"
+        "500":
+          $ref: "#/components/responses/ProviderError"
 components:
   responses:
     ProviderError:
@@ -247,7 +326,7 @@ components:
       properties:
         providerType:
           type: string
-          enum: [PolicyProvider, EvidenceProvider, ProfileResolver]
+          enum: [PolicyProvider, EvidenceProvider, ProfileResolver, DesktopProvider]
         providerId:
           type: string
         contractVersion:
@@ -521,3 +600,132 @@ components:
               type: string
             checksum:
               type: string
+    DesktopStepEnvelope:
+      type: object
+      required: [runId, stepId, targetOS, targetExecutionProfile, requestedCapabilities, verifierPolicy]
+      properties:
+        runId:
+          type: string
+        stepId:
+          type: string
+        targetOS:
+          type: string
+          enum: [linux, windows, macos]
+        targetExecutionProfile:
+          type: string
+          enum: [sandbox_vm_autonomous, restricted_host]
+        requestedCapabilities:
+          type: array
+          items:
+            type: string
+        verifierPolicy:
+          $ref: "#/components/schemas/DesktopVerifierPolicy"
+        grant:
+          type: object
+          properties:
+            capabilityGrantToken:
+              type: string
+            capabilityScope:
+              type: object
+              additionalProperties: true
+            grantExpiresAt:
+              type: string
+              format: date-time
+    DesktopVerifierPolicy:
+      type: object
+      required: [requiredVerifierIds]
+      properties:
+        requiredVerifierIds:
+          type: array
+          items:
+            type: string
+    DesktopEvidenceBundle:
+      type: object
+      required: [windowMetadata, screenshotHash, resultCode]
+      properties:
+        windowMetadata:
+          type: object
+          additionalProperties: true
+        screenshotHash:
+          type: string
+          pattern: "^sha256:[a-f0-9]{64}$"
+        resultCode:
+          type: string
+        screenshotUri:
+          type: string
+          format: uri
+    DesktopDecisionResponse:
+      type: object
+      required: [decision, verifierId, reasonCode]
+      properties:
+        decision:
+          type: string
+          enum: [ALLOW, DENY]
+        verifierId:
+          type: string
+          enum: [V-M13-LNX-001, V-M13-LNX-002, V-M13-LNX-003]
+        reasonCode:
+          type: string
+          enum: [ok, no_policy, no_action, policy_deny, capability_not_granted, ambiguous_state]
+        reasonMessage:
+          type: string
+        observedCapabilities:
+          type: array
+          items:
+            type: string
+    DesktopObserveRequest:
+      type: object
+      required: [meta, step, observer]
+      properties:
+        meta:
+          $ref: "#/components/schemas/ObjectMeta"
+        step:
+          $ref: "#/components/schemas/DesktopStepEnvelope"
+        observer:
+          type: object
+          additionalProperties: true
+    DesktopObserveResponse:
+      allOf:
+        - $ref: "#/components/schemas/DesktopDecisionResponse"
+        - type: object
+          required: [evidenceBundle]
+          properties:
+            evidenceBundle:
+              $ref: "#/components/schemas/DesktopEvidenceBundle"
+    DesktopActuateRequest:
+      type: object
+      required: [meta, step, action]
+      properties:
+        meta:
+          $ref: "#/components/schemas/ObjectMeta"
+        step:
+          $ref: "#/components/schemas/DesktopStepEnvelope"
+        action:
+          type: object
+          additionalProperties: true
+    DesktopActuateResponse:
+      allOf:
+        - $ref: "#/components/schemas/DesktopDecisionResponse"
+        - type: object
+          properties:
+            evidenceBundle:
+              $ref: "#/components/schemas/DesktopEvidenceBundle"
+    DesktopVerifyRequest:
+      type: object
+      required: [meta, step, postAction]
+      properties:
+        meta:
+          $ref: "#/components/schemas/ObjectMeta"
+        step:
+          $ref: "#/components/schemas/DesktopStepEnvelope"
+        postAction:
+          type: object
+          additionalProperties: true
+    DesktopVerifyResponse:
+      allOf:
+        - $ref: "#/components/schemas/DesktopDecisionResponse"
+        - type: object
+          required: [evidenceBundle]
+          properties:
+            evidenceBundle:
+              $ref: "#/components/schemas/DesktopEvidenceBundle"
