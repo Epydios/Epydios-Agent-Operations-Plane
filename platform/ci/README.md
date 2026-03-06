@@ -121,6 +121,56 @@ This directory contains CI entrypoint scripts invoked by GitHub Actions.
       - Linux-first default target enforcement (`DESKTOP_ALLOW_NON_LINUX=false`)
       - restricted-host explicit opt-in requirement
       - Tier 3 human-approval + policy-grant requirements
+  - M13 Openfang adapter guardrail verifier:
+    - `RUN_M13_OPENFANG_ADAPTER=1` in full mode (required)
+    - `RUN_M13_OPENFANG_ADAPTER=0` default in fast mode
+    - runs `platform/local/bin/verify-m13-openfang-adapter.sh`
+    - validates:
+      - Linux-first Openfang provider defaults remain denied-by-default for activation (`selection.enabled=false`)
+      - restricted-host posture remains blocked by default (`allowRestrictedHost=false`)
+      - secure endpoint template keeps `MTLSAndBearerTokenSecret` and disabled selection until explicit enablement
+  - M13 Openfang runtime integration verifier:
+    - `RUN_M13_OPENFANG_RUNTIME_INTEGRATION=1` in full mode (required)
+    - `RUN_M13_OPENFANG_RUNTIME_INTEGRATION=0` default in fast mode
+    - runs `platform/local/bin/verify-m13-openfang-runtime-integration.sh`
+    - validates:
+      - runtime `observe -> actuate -> verify` path and restricted-host deny behavior
+      - runtime -> Openfang adapter -> upstream contract path assertions
+  - M13 runtime approvals verifier:
+    - `RUN_M13_RUNTIME_APPROVALS=1` in full mode (required)
+    - `RUN_M13_RUNTIME_APPROVALS=0` default in fast mode
+    - runs `platform/local/bin/verify-m13-runtime-approvals.sh`
+    - validates:
+      - approval queue contract (`GET /v1alpha1/runtime/approvals`) including status filter behavior
+      - approval decision contract (`POST /v1alpha1/runtime/approvals/{runId}/decision`) for approve/deny transitions
+      - expired approval rejection behavior (`APPROVAL_EXPIRED`)
+  - M13 Openfang sandbox rehearsal verifier:
+    - `RUN_M13_OPENFANG_SANDBOX_REHEARSAL=0` default in full and fast modes (optional)
+    - runs `platform/local/bin/verify-m13-openfang-sandbox-rehearsal.sh` when enabled
+    - validates:
+      - kind/k3d rehearsal context manifest posture (`selection.enabled=false`, Linux-first defaults, restricted-host blocked)
+      - runtime -> adapter integration assertion path in rehearsal command
+  - M14.6 Windows restricted-profile readiness verifier:
+    - `RUN_M14_WIN_RESTRICTED_READINESS=0` default in full and fast modes (optional)
+    - runs `platform/local/bin/verify-m14-win-restricted-readiness.sh` when enabled
+    - validates:
+      - windows restricted-profile provider template stays disabled-by-default (`selection.enabled=false`)
+      - runtime non-Linux gating remains blocked-by-default unless explicitly enabled
+      - Linux adapter deny path rejects windows target requests prior to actuation
+  - M14.6 macOS restricted-profile readiness verifier:
+    - `RUN_M14_MAC_RESTRICTED_READINESS=0` default in full and fast modes (optional)
+    - runs `platform/local/bin/verify-m14-mac-restricted-readiness.sh` when enabled
+    - validates:
+      - macOS restricted-profile provider template stays disabled-by-default (`selection.enabled=false`)
+      - runtime non-Linux gating remains blocked-by-default unless explicitly enabled
+      - Linux adapter deny path rejects macOS target requests prior to actuation
+  - M14.7 cross-OS parity and closeout evidence verifier:
+    - `RUN_M14_XOS_PARITY=0` default in full and fast modes (optional)
+    - runs `platform/local/bin/verify-m14-xos-parity.sh` when enabled
+    - validates:
+      - prerequisite `V-M14-WIN-001` and `V-M14-MAC-001` checks pass in the same run
+      - cross-OS template parity for restricted profile contract/auth/capability shape
+      - machine-readable M14.7 closeout evidence artifact emission to non-GitHub provenance
   - M12.1 runtime SLO/SLI + error-budget verification:
     - `RUN_M12_SLO_SLI_PACK=1` in full mode (required)
     - `RUN_M12_SLO_SLI_PACK=0` default in fast mode
@@ -182,6 +232,15 @@ This directory contains CI entrypoint scripts invoked by GitHub Actions.
   - M13 desktop-runtime check in full mode (required, no skips):
     - `RUN_M13_DESKTOP_RUNTIME=1`
     - Full mode enforces runtime tiering + Linux-first/autonomy guardrail verifier and exits if overridden to disabled value.
+  - M13 Openfang adapter check in full mode (required, no skips):
+    - `RUN_M13_OPENFANG_ADAPTER=1`
+    - Full mode enforces Openfang adapter guardrail verifier and exits if overridden to disabled value.
+  - M13 Openfang runtime integration check in full mode (required, no skips):
+    - `RUN_M13_OPENFANG_RUNTIME_INTEGRATION=1`
+    - Full mode enforces Openfang runtime integration verifier and exits if overridden to disabled value.
+  - M13 runtime approvals check in full mode (required, no skips):
+    - `RUN_M13_RUNTIME_APPROVALS=1`
+    - Full mode enforces runtime approvals verifier and exits if overridden to disabled value.
   - M7 reliability suite in full mode (required, no skips):
     - `RUN_M7_INTEGRATION=1` (M0->M5 critical path through `platform/local/bin/verify-m7-integration.sh`)
     - `RUN_M7_BACKUP_RESTORE=1` (M7.2 CNPG backup/restore drill)

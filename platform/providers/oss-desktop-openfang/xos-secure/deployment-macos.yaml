@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openfang-provider-macos
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: openfang-provider-macos
+      epydios.ai/target-os: macos
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: openfang-provider-macos
+        epydios.ai/target-os: macos
+    spec:
+      serviceAccountName: openfang-provider-macos
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: desktop-provider-openfang
+          image: ghcr.io/epydios/epydios-oss-desktop-openfang-provider:0.2.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - -listen=:8443
+            - -config=/config/config.json
+          ports:
+            - name: https
+              containerPort: 8443
+          readinessProbe:
+            tcpSocket:
+              port: https
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: https
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: provider-config
+              mountPath: /config
+              readOnly: true
+            - name: server-tls
+              mountPath: /tls/server
+              readOnly: true
+            - name: provider-ca
+              mountPath: /tls/ca
+              readOnly: true
+            - name: bearer-auth
+              mountPath: /auth
+              readOnly: true
+      volumes:
+        - name: provider-config
+          configMap:
+            name: openfang-provider-macos-config
+        - name: server-tls
+          secret:
+            secretName: openfang-provider-macos-server-tls
+        - name: provider-ca
+          secret:
+            secretName: openfang-desktop-provider-ca
+        - name: bearer-auth
+          secret:
+            secretName: openfang-desktop-provider-auth

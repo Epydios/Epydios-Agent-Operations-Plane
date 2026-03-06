@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_utc": "2026-03-04T00:00:00Z",
+  "generated_utc": "2026-03-05T01:13:57Z",
   "policy": {
     "allowed_linkage_licenses": [
       "Apache-2.0",
@@ -61,7 +61,7 @@
           "PIPELINE_LIVING.json"
         ]
       },
-      "notes": "Verifiers required before broad host autonomy is allowed."
+      "notes": "Verifier pack includes verify-m13-desktop-provider.sh, verify-m13-openfang-adapter.sh, verify-m13-openfang-runtime-integration.sh, verify-m13-runtime-approvals.sh, verify-m13-openfang-sandbox-rehearsal.sh, and verify-m13-desktop-daily-loop.sh before broad host autonomy is allowed."
     },
     {
       "id": "desktop-ui-governance-runtime",
@@ -78,11 +78,33 @@
         "status": "pending",
         "ticket": "M14-IP-001",
         "evidence": [
+          "EPYDIOS_AGENTOPS_DESKTOP_UI/bin/verify-m14-ui-014.sh",
+          "PIPELINE_LIVING.json",
+          "PIPELINE_LIVING.txt"
+        ]
+      },
+      "notes": "Policy/evidence approval UI, run timeline surfaces, and M14.8 IP-alignment verification path."
+    },
+    {
+      "id": "desktop-openfang-adapter",
+      "name": "Desktop Openfang external-endpoint adapter",
+      "ip_type": "first_party_new_ip",
+      "source_url": "",
+      "source_ref": "cmd/desktop-provider-openfang",
+      "license": "Proprietary-Internal",
+      "linkage": "planned",
+      "status": "pending_review",
+      "owner": "desktop-platform",
+      "review": {
+        "required": true,
+        "status": "pending",
+        "ticket": "M13-IP-003",
+        "evidence": [
           "PIPELINE_LIVING.txt",
           "PIPELINE_LIVING.json"
         ]
       },
-      "notes": "Policy/evidence approval UI and run timeline surfaces."
+      "notes": "Linux-first DesktopProvider adapter path for external Openfang endpoints; restricted_host remains blocked by default."
     },
     {
       "id": "oss-playwright",
@@ -263,7 +285,53 @@
         "evidence": []
       },
       "notes": "Reference-only unless explicit legal/policy exception is granted."
+    },
+    {
+      "id": "desktop-ui-project-integration-editor",
+      "name": "Desktop UI project-scoped integrations editor",
+      "ip_type": "first_party_new_ip",
+      "source_url": "",
+      "source_ref": "EPYDIOS_AGENTOPS_DESKTOP_UI/web/js/views/settings.js",
+      "license": "Proprietary-Internal",
+      "linkage": "planned",
+      "status": "pending_review",
+      "owner": "desktop-ui",
+      "review": {
+        "required": true,
+        "status": "pending",
+        "ticket": "M14-IP-002",
+        "evidence": [
+          "PIPELINE_LIVING.txt",
+          "PIPELINE_LIVING.json",
+          "EPYDIOS_AGENTOPS_DESKTOP_UI/bin/verify-m14-ui-013.sh",
+          "EPYDIOS_AGENTOPS_DESKTOP_UI/bin/verify-m14-ui-014.sh"
+        ]
+      },
+      "notes": "Per-project integration override editor with save/apply/reset governance flow and reference-only secret handling."
+    },
+    {
+      "id": "desktop-openfang-cross-os-restricted-readiness",
+      "name": "Desktop Openfang Windows/macOS restricted-readiness verifier pack",
+      "ip_type": "first_party_new_ip",
+      "source_url": "",
+      "source_ref": "platform/local/bin/verify-m14-xos-parity.sh",
+      "license": "Proprietary-Internal",
+      "linkage": "planned",
+      "status": "pending_review",
+      "owner": "desktop-platform",
+      "review": {
+        "required": true,
+        "status": "pending",
+        "ticket": "M14-IP-003",
+        "evidence": [
+          "PIPELINE_LIVING.txt",
+          "PIPELINE_LIVING.json",
+          "platform/local/bin/verify-m14-win-restricted-readiness.sh",
+          "platform/local/bin/verify-m14-mac-restricted-readiness.sh",
+          "platform/local/bin/verify-m14-xos-parity.sh"
+        ]
+      },
+      "notes": "M14.6 Windows/macOS restricted-profile readiness scaffolding with deny-by-default activation posture and Linux-first runtime guardrails preserved."
     }
   ]
 }
-

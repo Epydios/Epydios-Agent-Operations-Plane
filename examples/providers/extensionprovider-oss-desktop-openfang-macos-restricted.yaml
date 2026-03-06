@@ -1,0 +1,42 @@
+apiVersion: controlplane.epydios.ai/v1alpha1
+kind: ExtensionProvider
+metadata:
+  name: oss-desktop-openfang-macos-restricted
+  namespace: epydios-system
+  annotations:
+    epydios.ai/target-os: macos
+    epydios.ai/desktop-autonomy-profile: restricted_host_plus_vm_profile
+    epydios.ai/restricted-host-policy: blocked-by-default
+    epydios.ai/activation: m14-restricted-readiness-only
+spec:
+  providerType: DesktopProvider
+  providerId: oss-desktop-openfang-macos
+  contractVersion: v1alpha1
+  endpoint:
+    url: https://openfang-provider-macos.epydios-system.svc.cluster.local:8443
+    timeoutSeconds: 10
+    healthPath: /healthz
+    capabilitiesPath: /v1alpha1/capabilities
+  auth:
+    mode: MTLSAndBearerTokenSecret
+    bearerTokenSecretRef:
+      name: openfang-desktop-provider-auth
+      key: token
+    clientTLSSecretRef:
+      name: epydios-control-plane-client-tls
+    caSecretRef:
+      name: openfang-desktop-provider-ca
+  selection:
+    enabled: false
+    priority: 60
+  advertisedCapabilities:
+    - observe.window_metadata
+    - observe.screenshot_hash
+    - actuate.window_focus
+    - actuate.input.type_click
+    - verify.post_action_state
+  annotations:
+    epydios.ai/target-os: macos
+    epydios.ai/desktop-autonomy-profile: restricted_host_plus_vm_profile
+    epydios.ai/restricted-host-policy: blocked-by-default
+    epydios.ai/activation: m14-restricted-readiness-only

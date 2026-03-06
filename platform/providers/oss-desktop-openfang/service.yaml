@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: epydios-oss-desktop-openfang-provider
+spec:
+  selector:
+    app.kubernetes.io/name: epydios-oss-desktop-openfang-provider
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

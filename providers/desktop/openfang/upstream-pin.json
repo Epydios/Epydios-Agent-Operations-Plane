@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "name": "openfang",
+  "sourceUrl": "https://github.com/RightNow-AI/openfang.git",
+  "trackedTag": "v0.3.9",
+  "trackedCommit": "53e1b31777ea67ad10448808ae6a2936e67670b9",
+  "latestObservedTag": "v0.3.17",
+  "latestObservedCommit": "60566f22fb17bd86700175515d843f9977282117",
+  "lastVerifiedAtUtc": "2026-03-05T00:17:37Z",
+  "updatePolicy": {
+    "adoptionMode": "manual",
+    "requiredChecks": [
+      "platform/local/bin/verify-m13-openfang-adapter.sh",
+      "platform/local/bin/verify-m13-openfang-runtime-integration.sh",
+      "platform/local/bin/verify-m13-desktop-daily-loop.sh",
+      "platform/local/bin/verify-m13-m14-closeout-bundle.sh"
+    ],
+    "notes": [
+      "Do not auto-upgrade provider linkage from upstream tags.",
+      "Update trackedTag/trackedCommit only after guardrail and closeout bundle checks pass."
+    ]
+  }
+}

@@ -8,3 +8,4 @@ Current optional bundles include:
 - `platform/providers/oss-policy-opa` (`PolicyProvider`)
 - `platform/providers/oss-evidence-memory` (`EvidenceProvider`)
 - `platform/providers/oss-desktop-mock` (`DesktopProvider`, Linux-first M13 mock)
+- `platform/providers/oss-desktop-openfang` (`DesktopProvider`, Linux-first Openfang adapter scaffold, `selection.enabled=false` by default; includes Windows/macOS restricted scaffolds as explicit non-default manifests)

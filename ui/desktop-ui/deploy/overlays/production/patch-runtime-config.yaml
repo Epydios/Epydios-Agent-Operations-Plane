@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agentops-desktop-runtime-config
+data:
+  runtime-config.json: |
+    {
+      "appName": "Epydios AgentOps Desktop",
+      "environment": "production",
+      "mockMode": false,
+      "runtimeApiBaseUrl": "/",
+      "registryApiBaseUrl": "/",
+      "endpoints": {
+        "health": "/healthz",
+        "providers": "/v1alpha1/providers",
+        "pipelineStatus": "/v1alpha1/pipeline/status",
+        "runs": "/v1alpha1/runtime/runs",
+        "runByIdPrefix": "/v1alpha1/runtime/runs/",
+        "auditEvents": "/v1alpha1/runtime/audit/events"
+      },
+      "auth": {
+        "enabled": true,
+        "issuer": "https://auth.epydios.com/",
+        "authorizationEndpoint": "https://auth.epydios.com/authorize",
+        "tokenEndpoint": "https://auth.epydios.com/oauth/token",
+        "clientId": "epydios-runtime-prod-client",
+        "audience": "epydios-runtime",
+        "scopes": "openid profile email",
+        "responseType": "code",
+        "usePkce": true
+      }
+    }

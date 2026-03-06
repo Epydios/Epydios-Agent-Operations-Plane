@@ -15,6 +15,8 @@ type RunStore interface {
 	GetRun(context.Context, string) (*RunRecord, error)
 	ListRuns(context.Context, RunListQuery) ([]RunSummary, error)
 	PruneRuns(context.Context, RunPruneQuery) (*RunPruneResult, error)
+	UpsertIntegrationSettings(context.Context, *IntegrationSettingsRecord) error
+	GetIntegrationSettings(context.Context, string, string) (*IntegrationSettingsRecord, error)
 }
 
 type PostgresRunStore struct {
@@ -76,6 +78,18 @@ func (s *PostgresRunStore) EnsureSchema(ctx context.Context) error {
 		`CREATE INDEX IF NOT EXISTS idx_orchestration_runs_scope ON orchestration_runs (tenant_id, project_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_orchestration_runs_expires_at ON orchestration_runs (expires_at)`,
 		`CREATE INDEX IF NOT EXISTS idx_orchestration_runs_retention_class ON orchestration_runs (retention_class)`,
+		`CREATE TABLE IF NOT EXISTS orchestration_integration_settings (
+			tenant_id TEXT NOT NULL,
+			project_id TEXT NOT NULL,
+			settings JSONB NOT NULL DEFAULT '{}'::jsonb,
+			created_at TIMESTAMPTZ NOT NULL,
+			updated_at TIMESTAMPTZ NOT NULL,
+			PRIMARY KEY (tenant_id, project_id)
+		)`,
+		`ALTER TABLE orchestration_integration_settings ADD COLUMN IF NOT EXISTS settings JSONB NOT NULL DEFAULT '{}'::jsonb`,
+		`ALTER TABLE orchestration_integration_settings ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`,
+		`ALTER TABLE orchestration_integration_settings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`,
+		`CREATE INDEX IF NOT EXISTS idx_orchestration_integration_settings_updated_at ON orchestration_integration_settings (updated_at DESC)`,
 	}
 
 	for _, stmt := range stmts {
@@ -517,6 +531,96 @@ func (s *PostgresRunStore) PruneRuns(ctx context.Context, query RunPruneQuery) (
 	affected, _ := res.RowsAffected()
 	result.Deleted = int(affected)
 	return result, nil
+}
+
+func (s *PostgresRunStore) UpsertIntegrationSettings(ctx context.Context, record *IntegrationSettingsRecord) error {
+	if record == nil {
+		return fmt.Errorf("integration settings record is required")
+	}
+	tenantID := strings.TrimSpace(record.TenantID)
+	projectID := strings.TrimSpace(record.ProjectID)
+	if tenantID == "" {
+		return fmt.Errorf("integration settings tenantId is required")
+	}
+	if projectID == "" {
+		return fmt.Errorf("integration settings projectId is required")
+	}
+
+	const q = `
+INSERT INTO orchestration_integration_settings (
+	tenant_id,
+	project_id,
+	settings,
+	created_at,
+	updated_at
+) VALUES ($1,$2,$3,$4,$5)
+ON CONFLICT (tenant_id, project_id) DO UPDATE SET
+	settings = EXCLUDED.settings,
+	updated_at = EXCLUDED.updated_at
+`
+
+	createdAt := record.CreatedAt.UTC()
+	if createdAt.IsZero() {
+		createdAt = time.Now().UTC()
+		record.CreatedAt = createdAt
+	}
+	updatedAt := record.UpdatedAt.UTC()
+	if updatedAt.IsZero() {
+		updatedAt = createdAt
+		record.UpdatedAt = updatedAt
+	}
+
+	_, err := s.db.ExecContext(
+		ctx,
+		q,
+		tenantID,
+		projectID,
+		jsonBytesOrEmptyObject(record.Settings),
+		createdAt,
+		updatedAt,
+	)
+	if err != nil {
+		return fmt.Errorf("upsert integration settings tenant=%s project=%s: %w", tenantID, projectID, err)
+	}
+	return nil
+}
+
+func (s *PostgresRunStore) GetIntegrationSettings(ctx context.Context, tenantID, projectID string) (*IntegrationSettingsRecord, error) {
+	tenantID = strings.TrimSpace(tenantID)
+	projectID = strings.TrimSpace(projectID)
+	if tenantID == "" {
+		return nil, fmt.Errorf("integration settings tenantId is required")
+	}
+	if projectID == "" {
+		return nil, fmt.Errorf("integration settings projectId is required")
+	}
+
+	const q = `
+SELECT
+	tenant_id,
+	project_id,
+	settings,
+	created_at,
+	updated_at
+FROM orchestration_integration_settings
+WHERE tenant_id = $1 AND project_id = $2
+`
+
+	var (
+		record      IntegrationSettingsRecord
+		settingsRaw []byte
+	)
+	if err := s.db.QueryRowContext(ctx, q, tenantID, projectID).Scan(
+		&record.TenantID,
+		&record.ProjectID,
+		&settingsRaw,
+		&record.CreatedAt,
+		&record.UpdatedAt,
+	); err != nil {
+		return nil, err
+	}
+	record.Settings = settingsRaw
+	return &record, nil
 }
 
 func nullStr(v string) interface{} {
