@@ -1,5 +1,9 @@
 import { escapeHTML, formatTime } from "./common.js";
 
+function tableCell(label, content, attrs = "") {
+  return `<td data-label="${escapeHTML(label)}"${attrs}>${content}</td>`;
+}
+
 function chipClassForEndpointState(value) {
   const state = String(value || "").trim().toLowerCase();
   if (state === "available" || state === "mock" || state === "ready") {
@@ -19,11 +23,11 @@ function renderEndpointMatrixRows(items) {
       const updatedAt = item?.updatedAt ? new Date(item.updatedAt).toISOString() : "-";
       return `
         <tr data-settings-endpoint-id="${escapeHTML(endpointID)}">
-          <td>${escapeHTML(item?.label || "-")}</td>
-          <td><span class="${chipClassForEndpointState(state)}">${escapeHTML(state)}</span></td>
-          <td>${escapeHTML(item?.path || "-")}</td>
-          <td>${escapeHTML(item?.detail || "-")}</td>
-          <td>${escapeHTML(updatedAt)}</td>
+          ${tableCell("Endpoint", escapeHTML(item?.label || "-"))}
+          ${tableCell("Status", `<span class="${chipClassForEndpointState(state)}">${escapeHTML(state)}</span>`)}
+          ${tableCell("Path", escapeHTML(item?.path || "-"))}
+          ${tableCell("Detail", escapeHTML(item?.detail || "-"))}
+          ${tableCell("Updated", escapeHTML(updatedAt))}
         </tr>
       `;
     })
@@ -64,17 +68,20 @@ function renderProviderContractRows(items) {
       const selected = Boolean(item?.selected);
       return `
         <tr>
-          <td>${escapeHTML(item?.label || item?.profileId || "-")}</td>
-          <td>${escapeHTML(item?.provider || "-")}</td>
-          <td>${escapeHTML(item?.transport || "-")}</td>
-          <td>${escapeHTML(item?.model || "-")}</td>
-          <td><code>${escapeHTML(item?.endpointRef || "-")}</code></td>
-          <td><code>${escapeHTML(item?.credentialRef || "-")}</code></td>
-          <td>${escapeHTML(item?.credentialScope || "-")}</td>
-          <td>
+          ${tableCell("Profile", escapeHTML(item?.label || item?.profileId || "-"))}
+          ${tableCell("Contract", escapeHTML(item?.provider || "-"))}
+          ${tableCell("Transport", escapeHTML(item?.transport || "-"))}
+          ${tableCell("Model", escapeHTML(item?.model || "-"))}
+          ${tableCell("Endpoint Reference", `<code>${escapeHTML(item?.endpointRef || "-")}</code>`)}
+          ${tableCell("Credential Reference", `<code>${escapeHTML(item?.credentialRef || "-")}</code>`)}
+          ${tableCell("Scope", escapeHTML(item?.credentialScope || "-"))}
+          ${tableCell(
+            "Status",
+            `
             <span class="${chipClassForProviderContractStatus(item?.status)}">${escapeHTML(item?.status || "unknown")}</span>
             ${selected ? '<span class="chip chip-neutral chip-compact">selected</span>' : ""}
-          </td>
+          `
+          )}
         </tr>
       `;
     })
@@ -100,7 +107,7 @@ function renderAimxsStatus(settings) {
   const state = String(aimxs.state || "unknown").trim().toLowerCase();
   const providerIDs = Array.isArray(aimxs.providerIds) ? aimxs.providerIds : [];
   return `
-    <div class="metric">
+    <div class="metric settings-metric settings-metric-aimxs-provider">
       <div class="title">AIMXS Provider Status</div>
       <div class="meta">
         <span class="${chipClassForEndpointState(state)}">${escapeHTML(state)}</span>
@@ -128,7 +135,11 @@ function chipClassForConfigChangeStatus(value) {
 function renderConfigChangeRows(items) {
   const changes = Array.isArray(items) ? items : [];
   if (changes.length === 0) {
-    return '<tr><td colspan="7">No recent configuration changes captured.</td></tr>';
+    return `<tr>${tableCell(
+      "Status",
+      "No recent configuration changes are recorded yet. Save or apply a settings change, or open Audit Events to inspect runtime-side configuration activity.",
+      ' colspan="7"'
+    )}</tr>`;
   }
   return changes
     .map((item) => {
@@ -137,13 +148,18 @@ function renderConfigChangeRows(items) {
       const decision = String(item?.decision || "").trim().toUpperCase();
       return `
         <tr>
-          <td>${escapeHTML(formatTime(item?.ts))}</td>
-          <td>${escapeHTML(item?.action || "-")}</td>
-          <td>${escapeHTML(item?.scope || "-")}</td>
-          <td>${escapeHTML(item?.actor || "-")}</td>
-          <td>${escapeHTML(item?.source || "-")}</td>
-          <td><span class="${chipClassForConfigChangeStatus(item?.status)}">${escapeHTML(item?.status || "-")}</span></td>
-          <td>
+          ${tableCell("Timestamp", escapeHTML(formatTime(item?.ts)))}
+          ${tableCell("Change", escapeHTML(item?.action || "-"))}
+          ${tableCell("Scope", escapeHTML(item?.scope || "-"))}
+          ${tableCell("Actor", escapeHTML(item?.actor || "-"))}
+          ${tableCell("Source", escapeHTML(item?.source || "-"))}
+          ${tableCell(
+            "Status",
+            `<span class="${chipClassForConfigChangeStatus(item?.status)}">${escapeHTML(item?.status || "-")}</span>`
+          )}
+          ${tableCell(
+            "Action",
+            `
             <button
               class="btn btn-secondary btn-small"
               type="button"
@@ -151,12 +167,212 @@ function renderConfigChangeRows(items) {
               data-settings-config-event="${escapeHTML(eventName)}"
               data-settings-config-provider="${escapeHTML(providerId)}"
               data-settings-config-decision="${escapeHTML(decision)}"
-            >Open Audit</button>
-          </td>
+            >Open Audit Events</button>
+          `
+          )}
         </tr>
       `;
     })
     .join("");
+}
+
+function chipClassForWorkflowState(value) {
+  const state = String(value || "pending").trim().toLowerCase();
+  if (state === "active" || state === "complete") {
+    return "chip chip-ok chip-compact";
+  }
+  if (state === "attention" || state === "blocked") {
+    return "chip chip-danger chip-compact";
+  }
+  if (state === "ready") {
+    return "chip chip-warn chip-compact";
+  }
+  return "chip chip-neutral chip-compact";
+}
+
+function workflowStateLabel(value) {
+  const state = String(value || "pending").trim().toLowerCase();
+  if (state === "active") {
+    return "Active";
+  }
+  if (state === "complete") {
+    return "Complete";
+  }
+  if (state === "attention") {
+    return "Attention";
+  }
+  if (state === "ready") {
+    return "Ready";
+  }
+  return "Pending";
+}
+
+function renderSettingsRecoveryGuide(syncState, endpointState, projectScope, selectedSubview) {
+  const normalizedSync = String(syncState || "unknown").trim().toLowerCase();
+  const normalizedEndpoint = String(endpointState || "unknown").trim().toLowerCase();
+  const needsScopeRecovery = normalizedSync === "scope-unavailable";
+  const needsEndpointRecovery =
+    normalizedSync === "endpoint-unavailable" ||
+    normalizedEndpoint === "error" ||
+    normalizedEndpoint === "unknown";
+
+  if (!needsScopeRecovery && !needsEndpointRecovery) {
+    return "";
+  }
+
+  const title = needsScopeRecovery ? "Settings Scope Recovery" : "Settings Endpoint Recovery";
+  const chipClass = needsScopeRecovery ? "chip chip-danger chip-compact" : "chip chip-warn chip-compact";
+  const chipLabel = needsScopeRecovery ? "scope required" : "retry after diagnostics";
+  const summary = needsScopeRecovery
+    ? "Project scope is not pinned, so saved settings cannot be verified against a concrete runtime target yet."
+    : "The runtime integration settings endpoint is not ready, so local fallback can diverge from the live runtime until diagnostics pass again.";
+  const diagnosticsInstruction =
+    selectedSubview === "diagnostics"
+      ? "Diagnostics is already open. Inspect the Integration Sync Status card and the endpoint matrix before retrying."
+      : "Open Diagnostics first, then inspect the Integration Sync Status card and the endpoint matrix before retrying.";
+  const steps = needsScopeRecovery
+    ? [
+        "Choose the intended project from the workspace context bar so the editor is operating on a real tenant/project scope.",
+        "Return to Configuration and re-check the selected agent profile, routing mode, and endpoint references for that scope.",
+        "Save Draft again, then run Apply Saved only after the scope chip shows the intended project identifier.",
+        "Open Diagnostics and Audit Events to confirm the new scope and resulting control-plane trail."
+      ]
+    : [
+        diagnosticsInstruction,
+        "Verify that the integrationSettings endpoint row is available or ready, and confirm the endpoint detail text is no longer reporting fallback-only conditions.",
+        "Retry Apply Saved or Reset Project Override only after endpoint health is restored; otherwise treat the current result as local fallback only.",
+        `Before closing the workflow, confirm the recorded change for ${projectScope} in Audit Events so fallback state and runtime state are not confused.`
+      ];
+
+  return `
+    <div class="settings-recovery-guide">
+      <div class="metric-title-row">
+        <div class="title">${escapeHTML(title)}</div>
+        <span class="${chipClass}">${escapeHTML(chipLabel)}</span>
+      </div>
+      <div class="meta">${escapeHTML(summary)}</div>
+      <ol class="settings-recovery-list">
+        ${steps.map((step) => `<li>${escapeHTML(step)}</li>`).join("")}
+      </ol>
+    </div>
+  `;
+}
+
+function renderSettingsWorkflowPanel(settings, editorState, selectedSubview) {
+  const endpoints = Array.isArray(settings?.endpoints) ? settings.endpoints : [];
+  const integrationEndpoint =
+    endpoints.find((item) => String(item?.id || "").trim().toLowerCase() === "integrationsettings") || {};
+  const endpointState =
+    String(integrationEndpoint?.state || "unknown").trim().toLowerCase() || "unknown";
+  const syncState = String(editorState?.syncState || "unknown").trim().toLowerCase() || "unknown";
+  const source = String(editorState?.source || "none").trim().toLowerCase() || "none";
+  const editorStatus = String(editorState?.status || "clean").trim().toLowerCase() || "clean";
+  const projectScope = String(editorState?.projectId || "project:any").trim() || "project:any";
+  const savedAt = String(editorState?.savedAt || "").trim();
+  const appliedAt = String(editorState?.appliedAt || "").trim();
+  const recoveryGuide = renderSettingsRecoveryGuide(syncState, endpointState, projectScope, selectedSubview);
+
+  const workflowSteps = [
+    {
+      label: "Inspect current scope",
+      state: selectedSubview === "configuration" ? "active" : "ready",
+      detail:
+        selectedSubview === "configuration"
+          ? "Configuration is open. Confirm routing, profile contract, and current project scope before editing."
+          : "Open Configuration to inspect editable routing and profile defaults for the active scope."
+    },
+    {
+      label: "Edit draft values",
+      state: editorStatus === "dirty" || editorStatus === "invalid" ? "attention" : editorStatus === "clean" ? "pending" : "complete",
+      detail:
+        editorStatus === "invalid"
+          ? "Draft contains blocked values. Correct the invalid fields before saving or applying."
+          : editorStatus === "dirty"
+            ? "Draft has unapplied edits. Save Draft when the current values are ready for review."
+            : "Editor is aligned with the last saved or applied values."
+    },
+    {
+      label: "Save draft",
+      state: editorState?.hasSavedOverride ? "complete" : editorStatus === "dirty" ? "ready" : "pending",
+      detail: editorState?.hasSavedOverride
+        ? "A project-scoped draft is saved and available for apply."
+        : "No saved project draft exists yet. Use Save Draft to create a recoverable checkpoint before apply."
+    },
+    {
+      label: "Apply saved values",
+      state:
+        editorState?.applied
+          ? "active"
+          : syncState === "scope-unavailable" || syncState === "endpoint-unavailable" || endpointState === "error"
+            ? "attention"
+            : editorState?.hasSavedOverride
+              ? "ready"
+              : "pending",
+      detail: editorState?.applied
+        ? "Saved values are active for this project scope. Open Diagnostics and Audit Events before closing the workflow."
+        : syncState === "scope-unavailable"
+          ? "Tenant/project scope is unavailable. Re-establish scope from the context bar, then save and apply again."
+        : syncState === "endpoint-unavailable"
+          ? "Runtime endpoint is unavailable, so Apply Saved updates local fallback state only. Open Diagnostics, verify endpoint health, then retry before relying on the change."
+          : endpointState === "error" || endpointState === "unknown"
+            ? "Endpoint health is not ready for verification. Use Diagnostics first, then retry Apply Saved after the endpoint row returns to a ready state."
+          : "Apply Saved promotes the last saved draft into active runtime choices for this project scope."
+    },
+    {
+      label: "Verify diagnostics and audit trail",
+      state: selectedSubview === "diagnostics" ? "active" : "ready",
+      detail:
+        selectedSubview === "diagnostics"
+          ? "Diagnostics is open. Review endpoint state, recent changes, and contract matrices, then open Audit Events if you need the runtime trail."
+          : "Open Diagnostics to verify endpoint health and recent changes, then open Audit Events for the matching runtime trail."
+    }
+  ];
+
+  return `
+    <div class="metric settings-workflow-panel">
+      <div class="metric-title-row">
+        <div class="title focus-anchor" tabindex="-1" data-focus-anchor="settings-workflow">Settings Workflow Status</div>
+        <span class="${chipClassForEditorStatus(editorStatus)} chip-compact">editor=${escapeHTML(editorStatus)}</span>
+        <span class="${chipClassForSyncState(syncState)} chip-compact">sync=${escapeHTML(syncState)}</span>
+      </div>
+      <div class="run-detail-chips">
+        <span class="chip chip-neutral chip-compact">projectScope=${escapeHTML(projectScope)}</span>
+        <span class="${chipClassForEndpointState(endpointState)}">endpoint=${escapeHTML(endpointState)}</span>
+        <span class="${chipClassForIntegrationSource(source)}">source=${escapeHTML(source)}</span>
+        <span class="chip chip-neutral chip-compact">view=${escapeHTML(selectedSubview)}</span>
+      </div>
+      <div class="meta">Use Configuration to edit and checkpoint project-scoped settings. Use Diagnostics and Audit Events to confirm endpoint health and the resulting control-plane trail.</div>
+      ${savedAt ? `<div class="meta">draftSavedAt=${escapeHTML(savedAt)}</div>` : ""}
+      ${appliedAt ? `<div class="meta">appliedAt=${escapeHTML(appliedAt)}</div>` : ""}
+      ${recoveryGuide}
+      <ol class="settings-workflow-list">
+        ${workflowSteps
+          .map(
+            (step, index) => `
+              <li class="settings-workflow-item">
+                <span class="${chipClassForWorkflowState(step.state)}">${escapeHTML(workflowStateLabel(step.state))}</span>
+                <div class="settings-workflow-copy">
+                  <strong>${escapeHTML(`${index + 1}. ${step.label}`)}</strong>
+                  <span class="meta">${escapeHTML(step.detail)}</span>
+                </div>
+              </li>
+            `
+          )
+          .join("")}
+      </ol>
+      <div class="filter-row settings-workflow-actions">
+        <div class="action-hierarchy">
+          <div class="action-group action-group-primary">
+            <button class="btn btn-primary btn-small" type="button" data-settings-subtab="configuration">Open Configuration</button>
+          </div>
+          <div class="action-group action-group-secondary">
+            <button class="btn btn-secondary btn-small" type="button" data-settings-subtab="diagnostics" data-advanced-section="settings">Open Diagnostics</button>
+            <button class="btn btn-secondary btn-small" type="button" data-settings-config-open-audit="1" data-settings-config-event="" data-settings-config-provider="" data-settings-config-decision="">Open Audit Events</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 function detectLocalPlatform() {
@@ -311,9 +527,15 @@ function renderIntegrationSyncStatus(settings, editorState) {
     : "-";
   const scopeTenant = String(editorState?.scopeTenantId || "").trim() || "-";
   const scopeProject = String(editorState?.scopeProjectId || editorState?.projectId || "").trim() || "-";
+  const recoveryDetail =
+    syncState === "scope-unavailable"
+      ? "Recovery: choose a project from the workspace context bar, then reopen Configuration and retry save/apply."
+      : syncState === "endpoint-unavailable" || endpointState === "error" || endpointState === "unknown"
+        ? "Recovery: verify the integrationSettings endpoint row below, then retry the change and confirm the resulting Audit Events record."
+        : "";
 
   return `
-    <div class="metric settings-int-sync-status">
+    <div class="metric settings-metric settings-metric-sync settings-int-sync-status">
       <div class="title">Integration Sync Status</div>
       <div class="meta">
         syncState=<span id="settings-int-sync-state" class="${chipClassForSyncState(syncState)}">${escapeHTML(syncState)}</span>
@@ -327,6 +549,7 @@ function renderIntegrationSyncStatus(settings, editorState) {
       </div>
       <div class="meta" id="settings-int-sync-endpoint-detail">${escapeHTML(String(integrationEndpoint?.detail || "-"))}</div>
       <div class="meta">endpointUpdatedAt=${escapeHTML(endpointUpdatedAt)}</div>
+      ${recoveryDetail ? `<div class="meta settings-editor-warn">${escapeHTML(recoveryDetail)}</div>` : ""}
     </div>
   `;
 }
@@ -345,14 +568,17 @@ function renderEditorFeedback(editorState) {
     lines.push(`<div class="meta">${escapeHTML(message)}</div>`);
   }
   if (errors.length > 0) {
-    lines.push(...errors.map((item) => `<div class="meta settings-editor-error">error: ${escapeHTML(item)}</div>`));
+    lines.push(...errors.map((item) => `<div class="meta settings-editor-error">Blocked: ${escapeHTML(item)}</div>`));
   }
   if (warnings.length > 0) {
-    lines.push(...warnings.map((item) => `<div class="meta settings-editor-warn">warn: ${escapeHTML(item)}</div>`));
+    lines.push(...warnings.map((item) => `<div class="meta settings-editor-warn">Review before apply: ${escapeHTML(item)}</div>`));
   }
-  lines.push(`<div class="meta">savedOverride=${escapeHTML(String(hasSavedOverride))}; applied=${escapeHTML(String(applied))}</div>`);
+  if (!message && errors.length === 0 && warnings.length === 0) {
+    lines.push("<div class=\"meta\">Next step: edit the draft, then Save Draft for a checkpoint or Apply Saved for the current project scope.</div>");
+  }
+  lines.push(`<div class="meta">draftSaved=${escapeHTML(String(hasSavedOverride))}; applied=${escapeHTML(String(applied))}</div>`);
   if (savedAt) {
-    lines.push(`<div class="meta">savedAt=${escapeHTML(savedAt)}</div>`);
+    lines.push(`<div class="meta">draftSavedAt=${escapeHTML(savedAt)}</div>`);
   }
   if (appliedAt) {
     lines.push(`<div class="meta">appliedAt=${escapeHTML(appliedAt)}</div>`);
@@ -436,7 +662,7 @@ function renderIntegrationEditor(settings, editorState) {
     .join("");
 
   return `
-    <div class="metric" data-settings-int-project-id="${escapeHTML(projectID)}">
+    <div class="metric settings-metric settings-metric-editor" data-settings-int-project-id="${escapeHTML(projectID)}">
       <div class="title">Project Integration Editor</div>
       <div class="meta">projectScope=${escapeHTML(projectID)}; reference-only values only (ref://).</div>
       <div class="settings-editor-grid">
@@ -507,12 +733,20 @@ function renderIntegrationEditor(settings, editorState) {
         </label>
       </div>
       <div class="filter-row settings-editor-actions">
-        <button class="btn btn-secondary" type="button" data-settings-int-action="save">Save Draft</button>
-        <button class="btn btn-primary" type="button" data-settings-int-action="apply">Apply Saved</button>
-        <button class="btn btn-secondary" type="button" data-settings-int-action="reset">Reset Project Override</button>
+        <div class="action-hierarchy">
+          <div class="action-group action-group-primary">
+            <button class="btn btn-primary" type="button" data-settings-int-action="apply">Apply Saved</button>
+          </div>
+          <div class="action-group action-group-secondary">
+            <button class="btn btn-secondary" type="button" data-settings-int-action="save">Save Draft</button>
+          </div>
+          <div class="action-group action-group-destructive">
+            <button class="btn btn-danger" type="button" data-settings-int-action="reset">Reset Project Override</button>
+          </div>
+        </div>
         <span id="settings-int-status-chip" class="${statusChipClass}">${escapeHTML(status)}</span>
       </div>
-      <div id="settings-int-feedback" class="stack">${renderEditorFeedback(editorState)}</div>
+      <div id="settings-int-feedback" class="stack" role="status" aria-live="polite" aria-atomic="true">${renderEditorFeedback(editorState)}</div>
     </div>
   `;
 }
@@ -561,19 +795,21 @@ export function renderSettings(ui, settingsPayload, editorState = {}, viewState 
     : aimxsPaymentEntitled
       ? "Entitlement is active; HTTPS mode can be applied with valid ref:// credentials."
       : "Entitlement is locked; AIMXS HTTPS mode cannot be enabled yet.";
+  const settingsWorkflowPanel = renderSettingsWorkflowPanel(settings, editorState, selectedSubview);
 
   ui.settingsContent.innerHTML = `
-    <div class="metric">
+    <div class="metric settings-metric settings-metric-scope">
       <div class="title">Settings Scope</div>
       <div class="meta">Use Configuration for editable controls and Diagnostics for health, traceability, and contract inspection.</div>
       <div class="meta">Project overrides are applied to current workspace context unless explicitly reset.</div>
     </div>
-    <div class="settings-subtabs" role="tablist" aria-label="Settings views">
-      <button class="settings-subtab ${configurationClass}" type="button" data-settings-subtab="configuration" aria-selected="${selectedSubview === "configuration" ? "true" : "false"}">Configuration</button>
-      <button class="settings-subtab ${diagnosticsClass}" type="button" data-settings-subtab="diagnostics" data-advanced-section="settings" aria-selected="${selectedSubview === "diagnostics" ? "true" : "false"}">Diagnostics</button>
+    ${settingsWorkflowPanel}
+    <div class="settings-subtabs" role="tablist" aria-label="Settings views" aria-orientation="horizontal">
+      <button class="settings-subtab ${configurationClass}" id="settings-subtab-configuration" role="tab" type="button" data-settings-subtab="configuration" aria-controls="settings-subpanel-configuration" aria-selected="${selectedSubview === "configuration" ? "true" : "false"}" tabindex="${selectedSubview === "configuration" ? "0" : "-1"}">Configuration</button>
+      <button class="settings-subtab ${diagnosticsClass}" id="settings-subtab-diagnostics" role="tab" type="button" data-settings-subtab="diagnostics" data-advanced-section="settings" aria-controls="settings-subpanel-diagnostics" aria-selected="${selectedSubview === "diagnostics" ? "true" : "false"}" tabindex="${selectedSubview === "diagnostics" ? "0" : "-1"}">Diagnostics</button>
     </div>
-    <section class="settings-subpanel ${configurationClass}" data-settings-subpanel="configuration">
-      <div class="metric">
+    <section class="settings-subpanel settings-subpanel-configuration ${configurationClass}" id="settings-subpanel-configuration" role="tabpanel" aria-labelledby="settings-subtab-configuration" data-settings-subpanel="configuration" ${selectedSubview === "configuration" ? "" : "hidden"}>
+      <div class="metric settings-metric settings-metric-routing">
         <div class="title">Model Routing + Agent Profile</div>
         <div class="meta">modelRouting=${escapeHTML(integrations.modelRouting || "-")}</div>
         <div class="meta">gatewayProviderId=${escapeHTML(integrations.gatewayProviderId || "-")}</div>
@@ -582,13 +818,13 @@ export function renderSettings(ui, settingsPayload, editorState = {}, viewState 
         <div class="meta">profileProviderContract=${escapeHTML(agent.provider)}</div>
       </div>
       ${integrationEditor}
-      <div class="metric">
+      <div class="metric settings-metric settings-metric-gateway">
         <div class="title">Gateway Security References</div>
         <div class="meta">gatewayTokenRef=<code>${escapeHTML(integrations.gatewayTokenRef || "-")}</code></div>
         <div class="meta">gatewayMtlsCertRef=<code>${escapeHTML(integrations.gatewayMtlsCertRef || "-")}</code></div>
         <div class="meta">gatewayMtlsKeyRef=<code>${escapeHTML(integrations.gatewayMtlsKeyRef || "-")}</code></div>
       </div>
-      <div class="metric">
+      <div class="metric settings-metric settings-metric-aimxs-config">
         <div class="title">AIMXS HTTPS Mode</div>
         <div class="meta">entitlement=${escapeHTML(aimxsPaymentEntitled ? "active" : "locked")}; providerState=${escapeHTML(aimxsProviderState)}; providers=${escapeHTML(aimxsProviderIds.length > 0 ? aimxsProviderIds.join(", ") : "-")}</div>
         <div class="settings-editor-grid">
@@ -618,22 +854,26 @@ export function renderSettings(ui, settingsPayload, editorState = {}, viewState 
           </label>
         </div>
         <div class="filter-row settings-editor-actions">
-          <button class="btn btn-primary" type="button" data-settings-aimxs-action="apply">Apply AIMXS Settings</button>
+          <div class="action-hierarchy">
+            <div class="action-group action-group-primary">
+              <button class="btn btn-primary" type="button" data-settings-aimxs-action="apply">Apply AIMXS Settings</button>
+            </div>
+          </div>
           <span id="settings-aimxs-status-chip" class="${aimxsStatusChipClass}">${escapeHTML(aimxsEditorStatus || "clean")}</span>
         </div>
-        <div id="settings-aimxs-feedback" class="stack">
+        <div id="settings-aimxs-feedback" class="stack" role="status" aria-live="polite" aria-atomic="true">
           <div class="meta">${escapeHTML(aimxsStatusMessage)}</div>
           <div class="meta">HTTPS mode requires payment entitlement and valid ref:// credential references.</div>
         </div>
       </div>
-      <div class="metric">
+      <div class="metric settings-metric settings-metric-runtime-defaults">
         <div class="title">Runtime Defaults + Theme</div>
         <div class="meta">realtime=${escapeHTML(realtime.mode || "-")} / ${escapeHTML(String(realtime.pollIntervalMs || "-"))}ms</div>
         <div class="meta">terminal=${escapeHTML(terminal.mode || "-")}</div>
         <div class="meta">restrictedHostMode=${escapeHTML(terminal.restrictedHostMode || "-")}</div>
         <div class="meta">themeMode=${escapeHTML(theme.mode || "-")}</div>
       </div>
-      <div class="metric">
+      <div class="metric settings-metric settings-metric-storage">
         <div class="title">Local Storage + Retention</div>
         <div class="meta">platform=${escapeHTML(runtimePlatform)}</div>
         <div class="meta">baseDir=<code>${escapeHTML(localPaths.base)}</code></div>
@@ -648,8 +888,8 @@ export function renderSettings(ui, settingsPayload, editorState = {}, viewState 
         <div class="meta">retention.runSnapshotsDays=${escapeHTML(String(retention.runSnapshots))}</div>
       </div>
     </section>
-    <section class="settings-subpanel ${diagnosticsClass}" data-settings-subpanel="diagnostics" data-advanced-section="settings">
-      <div class="metric">
+    <section class="settings-subpanel settings-subpanel-diagnostics ${diagnosticsClass}" id="settings-subpanel-diagnostics" role="tabpanel" aria-labelledby="settings-subtab-diagnostics" data-settings-subpanel="diagnostics" data-advanced-section="settings" ${selectedSubview === "diagnostics" ? "" : "hidden"}>
+      <div class="metric settings-metric settings-metric-data-sources">
         <div class="title">Runtime Data Sources</div>
         <div class="meta">runs=${escapeHTML(summarizeDataSource(dataSources.runs))}</div>
         <div class="meta">approvals=${escapeHTML(summarizeDataSource(dataSources.approvals))}</div>
@@ -658,66 +898,73 @@ export function renderSettings(ui, settingsPayload, editorState = {}, viewState 
         <div class="meta">registryBase=${escapeHTML(settings.registryApiBaseUrl || "-")}</div>
       </div>
       ${integrationSyncStatus}
-      <div class="metric">
+      <div class="metric settings-metric settings-metric-config-changes">
         <div class="title">Recent Configuration Changes</div>
-        <div class="meta">Latest local/runtime settings updates; use Open Audit to view matching events in Incidents.</div>
+        <div class="meta">Latest local and runtime-observed settings activity for this scope. Open Audit Events to confirm the recorded runtime trail.</div>
         <div class="filter-row">
-          <button
-            class="btn btn-secondary btn-small"
-            type="button"
-            data-settings-config-open-audit="1"
-            data-settings-config-event=""
-            data-settings-config-provider=""
-            data-settings-config-decision=""
-          >Open Audit Events</button>
+          <div class="action-hierarchy">
+            <div class="action-group action-group-primary">
+              <button
+                class="btn btn-primary btn-small"
+                type="button"
+                data-settings-config-open-audit="1"
+                data-settings-config-event=""
+                data-settings-config-provider=""
+                data-settings-config-decision=""
+              >Open Audit Events</button>
+            </div>
+          </div>
         </div>
-        <table class="settings-table">
+        <table class="data-table settings-table">
+          <caption class="sr-only">Recent configuration changes for the current settings scope, including timestamp, change, scope, actor, source, status, and audit action.</caption>
           <thead>
             <tr>
-              <th>Timestamp</th>
-              <th>Change</th>
-              <th>Scope</th>
-              <th>Actor</th>
-              <th>Source</th>
-              <th>Status</th>
-              <th>Action</th>
+              <th scope="col">Timestamp</th>
+              <th scope="col">Change</th>
+              <th scope="col">Scope</th>
+              <th scope="col">Actor</th>
+              <th scope="col">Source</th>
+              <th scope="col">Status</th>
+              <th scope="col">Action</th>
             </tr>
           </thead>
           <tbody>${configChangeRows}</tbody>
         </table>
       </div>
-      <div class="metric">
+      <div class="metric settings-metric settings-metric-provider-contracts">
         <div class="title">Provider Contract Matrix</div>
-        <table class="settings-table">
+        <table class="data-table settings-table">
+          <caption class="sr-only">Provider contract matrix for the current scope, including profile, contract, transport, model, references, scope, and status.</caption>
           <thead>
             <tr>
-              <th>Profile</th>
-              <th>Contract</th>
-              <th>Transport</th>
-              <th>Model</th>
-              <th>Endpoint Reference</th>
-              <th>Credential Reference</th>
-              <th>Scope</th>
-              <th>Status</th>
+              <th scope="col">Profile</th>
+              <th scope="col">Contract</th>
+              <th scope="col">Transport</th>
+              <th scope="col">Model</th>
+              <th scope="col">Endpoint Reference</th>
+              <th scope="col">Credential Reference</th>
+              <th scope="col">Scope</th>
+              <th scope="col">Status</th>
             </tr>
           </thead>
-          <tbody>${providerContractRows || '<tr><td colspan="8">No provider contracts configured.</td></tr>'}</tbody>
+          <tbody>${providerContractRows || `<tr>${tableCell("Status", "No provider contracts are populated for the current scope. Select an agent profile or apply integration settings, then reopen Diagnostics.", ' colspan="8"')}</tr>`}</tbody>
         </table>
       </div>
       ${renderAimxsStatus(settings)}
-      <div class="metric">
+      <div class="metric settings-metric settings-metric-endpoints">
         <div class="title">Endpoint Contract Matrix</div>
-        <table class="settings-table">
+        <table class="data-table settings-table">
+          <caption class="sr-only">Endpoint contract matrix for the current scope, including endpoint, status, path, detail, and update time.</caption>
           <thead>
             <tr>
-              <th>Endpoint</th>
-              <th>Status</th>
-              <th>Path</th>
-              <th>Detail</th>
-              <th>Updated</th>
+              <th scope="col">Endpoint</th>
+              <th scope="col">Status</th>
+              <th scope="col">Path</th>
+              <th scope="col">Detail</th>
+              <th scope="col">Updated</th>
             </tr>
           </thead>
-          <tbody>${endpointRows || '<tr><td colspan="5">No endpoint status rows available.</td></tr>'}</tbody>
+          <tbody>${endpointRows || `<tr>${tableCell("Status", "No endpoint status rows are available for the current scope. Refresh the workspace, then verify provider readiness and runtime endpoint health.", ' colspan="5"')}</tr>`}</tbody>
         </table>
       </div>
     </section>

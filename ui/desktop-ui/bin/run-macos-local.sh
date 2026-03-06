@@ -110,6 +110,12 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
+if lsof -nP -iTCP:"${UI_PORT}" -sTCP:LISTEN >/dev/null 2>&1; then
+  echo "UI port ${UI_PORT} is already in use. Stop the existing listener before launching this repo UI." >&2
+  lsof -nP -iTCP:"${UI_PORT}" -sTCP:LISTEN >&2 || true
+  exit 1
+fi
+
 if [[ "${MODE}" == "live" ]]; then
   kubectl -n epydios-system port-forward svc/orchestration-runtime "${RUNTIME_LOCAL_PORT}:8080" > "${PF_LOG}" 2>&1 &
   PF_PID="$!"
@@ -129,7 +135,31 @@ if [[ "${MODE}" == "live" ]]; then
   fi
 fi
 
-python3 -m http.server "${UI_PORT}" --bind "${UI_HOST}" --directory "${WEB_ROOT}" > "${UI_LOG}" 2>&1 &
+python3 - "${UI_HOST}" "${UI_PORT}" "${WEB_ROOT}" > "${UI_LOG}" 2>&1 <<'PY' &
+import http.server
+import socketserver
+import sys
+
+host = sys.argv[1]
+port = int(sys.argv[2])
+directory = sys.argv[3]
+
+class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, directory=directory, **kwargs)
+
+    def end_headers(self):
+        self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+        self.send_header("Pragma", "no-cache")
+        self.send_header("Expires", "0")
+        super().end_headers()
+
+class ReusableTCPServer(socketserver.TCPServer):
+    allow_reuse_address = True
+
+with ReusableTCPServer((host, port), NoCacheHandler) as httpd:
+    httpd.serve_forever()
+PY
 UI_PID="$!"
 
 ready=0

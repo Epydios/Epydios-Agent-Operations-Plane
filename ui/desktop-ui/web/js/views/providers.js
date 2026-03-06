@@ -1,9 +1,18 @@
-import { chipClassForStatus, escapeHTML } from "./common.js";
+import { chipClassForStatus, escapeHTML, renderPanelStateMetric } from "./common.js";
+
+function tableCell(label, content, attrs = "") {
+  return `<td data-label="${escapeHTML(label)}"${attrs}>${content}</td>`;
+}
 
 export function renderProviders(ui, providerPayload) {
   const items = providerPayload?.items || [];
   if (items.length === 0) {
-    ui.providersContent.innerHTML = '<div class="metric"><div class="meta">No providers returned.</div></div>';
+    ui.providersContent.innerHTML = renderPanelStateMetric(
+      "empty",
+      "Extension Providers",
+      "No providers returned for the current scope.",
+      "Refresh the workspace or widen scope. If providers should exist, verify contract discovery and endpoint health."
+    );
     return;
   }
 
@@ -12,25 +21,26 @@ export function renderProviders(ui, providerPayload) {
       const stateLabel = item.ready && item.probed ? "READY" : "ERROR";
       return `
         <tr>
-          <td>${escapeHTML(item.providerId || "-")}</td>
-          <td>${escapeHTML(item.providerType || "-")}</td>
-          <td><span class="${chipClassForStatus(stateLabel)}">${stateLabel}</span></td>
-          <td>${escapeHTML(item.message || "-")}</td>
-          <td>${escapeHTML(item.endpoint || "-")}</td>
+          ${tableCell("Provider ID", escapeHTML(item.providerId || "-"), ' class="provider-cell-id"')}
+          ${tableCell("Type", escapeHTML(item.providerType || "-"), ' class="provider-cell-type"')}
+          ${tableCell("Status", `<span class="${chipClassForStatus(stateLabel)}">${stateLabel}</span>`, ' class="provider-cell-status"')}
+          ${tableCell("Message", escapeHTML(item.message || "-"), ' class="provider-cell-message"')}
+          ${tableCell("Endpoint", escapeHTML(item.endpoint || "-"), ' class="provider-cell-endpoint"')}
         </tr>
       `;
     })
     .join("");
 
   ui.providersContent.innerHTML = `
-    <table class="providers-table">
+    <table class="data-table providers-table">
+      <caption class="sr-only">Provider contract inventory for the current settings scope, including provider identity, type, readiness, message, and endpoint.</caption>
       <thead>
         <tr>
-          <th>Provider ID</th>
-          <th>Type</th>
-          <th>Status</th>
-          <th>Message</th>
-          <th>Endpoint</th>
+          <th scope="col">Provider ID</th>
+          <th scope="col">Type</th>
+          <th scope="col">Status</th>
+          <th scope="col">Message</th>
+          <th scope="col">Endpoint</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>

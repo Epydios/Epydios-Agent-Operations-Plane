@@ -49,6 +49,7 @@ import {
   paginateItems,
   parsePositiveInt,
   parseTimeMs,
+  renderPanelStateMetric,
   resolveTimeBounds,
   withinTimeBounds
 } from "./views/common.js";
@@ -59,6 +60,7 @@ const ui = {
   configSummary: document.getElementById("config-summary"),
   workspaceLayout: document.getElementById("workspace-layout"),
   workspaceTabs: Array.from(document.querySelectorAll("[data-workspace-tab]")),
+  workspacePanels: [],
   triageContent: document.getElementById("triage-content"),
   executionDefaultsContent: document.getElementById("execution-defaults-content"),
   settingsContent: document.getElementById("settings-content"),
@@ -210,7 +212,7 @@ const INCIDENT_STATUS_TRANSITIONS = {
   ],
   filed: [
     { to: "closed", label: "Mark Closed" },
-    { to: "drafted", label: "Revert Draft" }
+    { to: "drafted", label: "Return to Draft" }
   ],
   closed: [
     { to: "filed", label: "Reopen Filed" }
@@ -683,16 +685,159 @@ function normalizeWorkspaceView(value, fallback = "operations") {
   return "operations";
 }
 
+function initializeWorkspacePanels() {
+  if (!(ui.workspaceLayout instanceof HTMLElement)) {
+    ui.workspacePanels = [];
+    return;
+  }
+  const layout = ui.workspaceLayout;
+  const existingPanels = Array.from(layout.querySelectorAll(":scope > [data-workspace-panel]"));
+  if (existingPanels.length > 0) {
+    ui.workspacePanels = existingPanels;
+    return;
+  }
+  const sectionNodes = Array.from(layout.querySelectorAll(":scope > [data-workspace-section]"));
+  const wrappers = new Map();
+  for (const view of WORKSPACE_VIEW_IDS) {
+    const panel = document.createElement("section");
+    panel.className = "workspace-panel";
+    panel.dataset.workspacePanel = view;
+    panel.hidden = true;
+    wrappers.set(view, panel);
+  }
+  for (const section of sectionNodes) {
+    const view = normalizeWorkspaceView(section?.dataset?.workspaceSection, "");
+    const panel = wrappers.get(view);
+    if (panel) {
+      panel.appendChild(section);
+    }
+  }
+  for (const view of WORKSPACE_VIEW_IDS) {
+    const panel = wrappers.get(view);
+    if (!(panel instanceof HTMLElement)) {
+      continue;
+    }
+    layout.appendChild(panel);
+  }
+  ui.workspacePanels = Array.from(layout.querySelectorAll(":scope > [data-workspace-panel]"));
+}
+
+function initializePanelRegions(root = document) {
+  const panels = Array.from(root.querySelectorAll(".panel"));
+  let headingCounter = 0;
+  for (const panel of panels) {
+    if (!(panel instanceof HTMLElement)) {
+      continue;
+    }
+    const heading =
+      panel.querySelector(".panel-header h2, .panel-heading h2, h2") ||
+      panel.querySelector(".title");
+    if (!(heading instanceof HTMLElement)) {
+      continue;
+    }
+    headingCounter += 1;
+    heading.id = heading.id || `panel-heading-${headingCounter}`;
+    panel.setAttribute("role", "region");
+    panel.setAttribute("aria-labelledby", heading.id);
+  }
+}
+
+function initializeLiveRegionSemantics() {
+  const liveNodes = [
+    ui.approvalsFeedback,
+    ui.auditFeedback,
+    document.getElementById("run-builder-feedback"),
+    document.getElementById("terminal-feedback"),
+    ui.incidentHistorySummary,
+    document.getElementById("settings-int-feedback"),
+    document.getElementById("settings-aimxs-feedback")
+  ];
+  for (const node of liveNodes) {
+    if (!(node instanceof HTMLElement)) {
+      continue;
+    }
+    node.setAttribute("role", "status");
+    node.setAttribute("aria-live", node.getAttribute("aria-live") || "polite");
+    node.setAttribute("aria-atomic", "true");
+  }
+  if (ui.auditHandoffPreview instanceof HTMLElement) {
+    ui.auditHandoffPreview.setAttribute("role", "region");
+    ui.auditHandoffPreview.setAttribute("aria-label", "Audit and incident handoff preview");
+    ui.auditHandoffPreview.setAttribute("aria-live", "polite");
+    ui.auditHandoffPreview.setAttribute("aria-atomic", "true");
+  }
+}
+
+function activeElementWithin(node) {
+  const active = document.activeElement;
+  return node instanceof HTMLElement && active instanceof HTMLElement && node.contains(active);
+}
+
+function setSubtreeInert(node, inactive) {
+  if (!(node instanceof HTMLElement)) {
+    return;
+  }
+  if (inactive) {
+    node.setAttribute("inert", "");
+  } else {
+    node.removeAttribute("inert");
+  }
+}
+
+function focusElement(node, options = {}) {
+  if (!(node instanceof HTMLElement)) {
+    return false;
+  }
+  if (!node.hasAttribute("tabindex") && !["BUTTON", "INPUT", "SELECT", "TEXTAREA", "SUMMARY", "A"].includes(node.tagName)) {
+    node.setAttribute("tabindex", "-1");
+  }
+  window.requestAnimationFrame(() => {
+    node.focus({ preventScroll: options.scroll === false });
+  });
+  return true;
+}
+
 function applyWorkspaceView(view) {
   const selectedView = normalizeWorkspaceView(view, "operations");
   if (ui.workspaceLayout) {
     ui.workspaceLayout.setAttribute("data-workspace-view", selectedView);
   }
+  let recoverFocus = false;
+  let activeTab = null;
   for (const tab of ui.workspaceTabs || []) {
     const tabView = normalizeWorkspaceView(tab?.dataset?.workspaceTab, "");
     const isActive = tabView === selectedView;
+    const panel = (ui.workspacePanels || []).find(
+      (item) => normalizeWorkspaceView(item?.dataset?.workspacePanel, "") === tabView
+    );
+    if (tabView) {
+      tab.id = tab.id || `workspace-tab-${tabView}`;
+    }
+    if (panel && tabView) {
+      panel.id = panel.id || `workspace-panel-${tabView}`;
+      panel.setAttribute("role", "tabpanel");
+      panel.setAttribute("aria-labelledby", tab.id);
+      tab.setAttribute("aria-controls", panel.id);
+    }
     tab.classList.toggle("is-active", isActive);
     tab.setAttribute("aria-selected", isActive ? "true" : "false");
+    tab.setAttribute("tabindex", isActive ? "0" : "-1");
+    if (isActive) {
+      activeTab = tab;
+    }
+  }
+  for (const panel of ui.workspacePanels || []) {
+    const panelView = normalizeWorkspaceView(panel?.dataset?.workspacePanel, "");
+    const isActive = panelView === selectedView;
+    if (!isActive && activeElementWithin(panel)) {
+      recoverFocus = true;
+    }
+    panel.hidden = !isActive;
+    panel.setAttribute("aria-hidden", isActive ? "false" : "true");
+    setSubtreeInert(panel, !isActive);
+  }
+  if (recoverFocus && activeTab instanceof HTMLElement) {
+    focusElement(activeTab, { scroll: false });
   }
   return selectedView;
 }
@@ -719,16 +864,40 @@ function normalizeIncidentSubview(value, fallback = "queue") {
 
 function applyIncidentSubview(view) {
   const selectedView = normalizeIncidentSubview(view, "queue");
+  let recoverFocus = false;
   for (const tab of ui.incidentSubtabs || []) {
     const tabView = normalizeIncidentSubview(tab?.dataset?.incidentSubtab, "");
     const isActive = tabView === selectedView;
+    const panel = (ui.incidentSubpanels || []).find(
+      (item) => normalizeIncidentSubview(item?.dataset?.incidentSubpanel, "") === tabView
+    );
+    if (tabView) {
+      tab.id = tab.id || `incident-subtab-${tabView}`;
+    }
+    if (panel && tabView) {
+      panel.id = panel.id || `incident-subpanel-${tabView}`;
+      panel.setAttribute("role", "tabpanel");
+      panel.setAttribute("aria-labelledby", tab.id);
+      tab.setAttribute("aria-controls", panel.id);
+    }
+    tab.setAttribute("role", "tab");
     tab.classList.toggle("is-active", isActive);
     tab.setAttribute("aria-selected", isActive ? "true" : "false");
+    tab.setAttribute("tabindex", isActive ? "0" : "-1");
   }
   for (const panel of ui.incidentSubpanels || []) {
     const panelView = normalizeIncidentSubview(panel?.dataset?.incidentSubpanel, "");
     const isActive = panelView === selectedView;
+    if (!isActive && activeElementWithin(panel)) {
+      recoverFocus = true;
+    }
     panel.classList.toggle("is-active", isActive);
+    panel.hidden = !isActive;
+    panel.setAttribute("aria-hidden", isActive ? "false" : "true");
+    setSubtreeInert(panel, !isActive);
+  }
+  if (recoverFocus) {
+    focusActiveIncidentSubview({ scroll: false });
   }
   return selectedView;
 }
@@ -756,17 +925,41 @@ function normalizeSettingsSubview(value, fallback = "configuration") {
 function applySettingsSubview(view) {
   const selected = normalizeSettingsSubview(view, "configuration");
   const tabs = Array.from(ui.settingsContent?.querySelectorAll("[data-settings-subtab]") || []);
+  let recoverFocus = false;
   for (const tab of tabs) {
-    const tabView = normalizeSettingsSubview(tab?.dataset?.settingsSubview, "");
+    const tabView = normalizeSettingsSubview(tab?.dataset?.settingsSubtab, "");
     const isActive = tabView === selected;
+    const panel = Array.from(ui.settingsContent?.querySelectorAll("[data-settings-subpanel]") || []).find(
+      (item) => normalizeSettingsSubview(item?.dataset?.settingsSubpanel, "") === tabView
+    );
+    if (tabView) {
+      tab.id = tab.id || `settings-subtab-${tabView}`;
+    }
+    if (panel && tabView) {
+      panel.id = panel.id || `settings-subpanel-${tabView}`;
+      panel.setAttribute("role", "tabpanel");
+      panel.setAttribute("aria-labelledby", tab.id);
+      tab.setAttribute("aria-controls", panel.id);
+    }
+    tab.setAttribute("role", "tab");
     tab.classList.toggle("is-active", isActive);
     tab.setAttribute("aria-selected", isActive ? "true" : "false");
+    tab.setAttribute("tabindex", isActive ? "0" : "-1");
   }
   const panels = Array.from(ui.settingsContent?.querySelectorAll("[data-settings-subpanel]") || []);
   for (const panel of panels) {
     const panelView = normalizeSettingsSubview(panel?.dataset?.settingsSubpanel, "");
     const isActive = panelView === selected;
+    if (!isActive && activeElementWithin(panel)) {
+      recoverFocus = true;
+    }
     panel.classList.toggle("is-active", isActive);
+    panel.hidden = !isActive;
+    panel.setAttribute("aria-hidden", isActive ? "false" : "true");
+    setSubtreeInert(panel, !isActive);
+  }
+  if (recoverFocus) {
+    focusActiveSettingsSubview({ scroll: false });
   }
   return selected;
 }
@@ -781,6 +974,87 @@ function setSettingsSubview(view, persist = false) {
     saveValue(SETTINGS_SUBVIEW_PREF_KEY, selected);
   }
   return selected;
+}
+
+function getFocusableTabCandidates(nodes) {
+  return (nodes || []).filter(
+    (node) =>
+      node instanceof HTMLElement &&
+      !node.hidden &&
+      node.getAttribute("aria-hidden") !== "true" &&
+      !node.classList.contains("advanced-hidden")
+  );
+}
+
+function handleHorizontalTabKeydown(event, nodes, readValue, activate) {
+  if (!(event.target instanceof HTMLElement)) {
+    return false;
+  }
+  const key = String(event.key || "");
+  if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(key)) {
+    return false;
+  }
+  const tabs = getFocusableTabCandidates(nodes);
+  if (tabs.length === 0) {
+    return false;
+  }
+  const currentIndex = Math.max(0, tabs.indexOf(event.target.closest("[role='tab']")));
+  let nextIndex = currentIndex;
+  if (key === "Home") {
+    nextIndex = 0;
+  } else if (key === "End") {
+    nextIndex = tabs.length - 1;
+  } else if (key === "ArrowLeft" || key === "ArrowUp") {
+    nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+  } else if (key === "ArrowRight" || key === "ArrowDown") {
+    nextIndex = (currentIndex + 1) % tabs.length;
+  }
+  const nextTab = tabs[nextIndex];
+  if (!(nextTab instanceof HTMLElement)) {
+    return false;
+  }
+  event.preventDefault();
+  const requested = readValue(nextTab);
+  if (requested) {
+    activate(requested);
+  }
+  nextTab.focus({ preventScroll: true });
+  return true;
+}
+
+function focusRenderedRegion(container, options = {}) {
+  if (!(container instanceof HTMLElement)) {
+    return false;
+  }
+  const scroll = options.scroll !== false;
+  if (scroll) {
+    container.scrollIntoView({ behavior: "smooth", block: options.block || "start" });
+  }
+  const focusTarget =
+    container.querySelector("[data-focus-anchor]") ||
+    container.querySelector("h2, .title, .panel-lead, button, input, select, textarea, summary");
+  const target = focusTarget instanceof HTMLElement ? focusTarget : container;
+  if (!target.hasAttribute("tabindex") && !["BUTTON", "INPUT", "SELECT", "TEXTAREA", "SUMMARY", "A"].includes(target.tagName)) {
+    target.setAttribute("tabindex", "-1");
+  }
+  window.requestAnimationFrame(() => {
+    target.focus({ preventScroll: true });
+  });
+  return true;
+}
+
+function focusActiveIncidentSubview(options = {}) {
+  const panel = (ui.incidentSubpanels || []).find(
+    (item) => item instanceof HTMLElement && !item.hidden && item.getAttribute("aria-hidden") !== "true"
+  );
+  return focusRenderedRegion(panel, options);
+}
+
+function focusActiveSettingsSubview(options = {}) {
+  const panel = Array.from(ui.settingsContent?.querySelectorAll("[data-settings-subpanel]") || []).find(
+    (item) => item instanceof HTMLElement && !item.hidden && item.getAttribute("aria-hidden") !== "true"
+  );
+  return focusRenderedRegion(panel, options);
 }
 
 function normalizeAdvancedSectionState(raw) {
@@ -815,6 +1089,7 @@ function applyAdvancedToggleLabels(root = document) {
 
 function applyAdvancedVisibility(root = document) {
   const nodes = Array.from(root.querySelectorAll("[data-advanced-section]") || []);
+  let recoverSection = "";
   for (const node of nodes) {
     if (!(node instanceof HTMLElement)) {
       continue;
@@ -824,8 +1099,16 @@ function applyAdvancedVisibility(root = document) {
       continue;
     }
     const enabled = isAdvancedSectionEnabled(section);
+    if (!enabled && !recoverSection && activeElementWithin(node)) {
+      recoverSection = section;
+    }
     node.classList.toggle("advanced-hidden", !enabled);
     node.setAttribute("aria-hidden", enabled ? "false" : "true");
+    setSubtreeInert(node, !enabled);
+  }
+  if (recoverSection) {
+    const toggle = root.querySelector(`[data-advanced-toggle-section="${recoverSection}"]`) || document.querySelector(`[data-advanced-toggle-section="${recoverSection}"]`);
+    focusElement(toggle, { scroll: false });
   }
 }
 
@@ -1129,7 +1412,76 @@ function applyListFilterState(raw) {
   incidentHistoryViewState.pageSize = state.incidents.pageSize;
   incidentHistoryViewState.page = state.incidents.page;
   applyIncidentHistoryViewControls();
+  syncCustomTimeFilterControls("runs");
+  syncCustomTimeFilterControls("approvals");
+  syncCustomTimeFilterControls("audit");
+  syncCustomTimeFilterControls("incidents");
   return state;
+}
+
+function resolveCustomTimeFilterControls(sectionID) {
+  const section = String(sectionID || "").trim().toLowerCase();
+  if (section === "runs") {
+    return {
+      range: ui.runsTimeRange,
+      from: ui.runsTimeFrom,
+      to: ui.runsTimeTo,
+      fields: document.querySelector('[data-time-filter-fields="runs"]')
+    };
+  }
+  if (section === "approvals") {
+    return {
+      range: ui.approvalsTimeRange,
+      from: ui.approvalsTimeFrom,
+      to: ui.approvalsTimeTo,
+      fields: document.querySelector('[data-time-filter-fields="approvals"]')
+    };
+  }
+  if (section === "audit") {
+    return {
+      range: ui.auditTimeRange,
+      from: ui.auditTimeFrom,
+      to: ui.auditTimeTo,
+      fields: document.querySelector('[data-time-filter-fields="audit"]')
+    };
+  }
+  if (section === "incidents") {
+    return {
+      range: ui.incidentHistoryTimeRange,
+      from: ui.incidentHistoryTimeFrom,
+      to: ui.incidentHistoryTimeTo,
+      fields: document.querySelector('[data-time-filter-fields="incidents"]')
+    };
+  }
+  return null;
+}
+
+function syncCustomTimeFilterControls(sectionID) {
+  const controls = resolveCustomTimeFilterControls(sectionID);
+  if (!controls?.range || !controls?.from || !controls?.to || !(controls.fields instanceof HTMLElement)) {
+    return;
+  }
+  const customSelected = String(controls.range.value || "").trim().toLowerCase() === "custom";
+  if (!customSelected) {
+    controls.from.value = "";
+    controls.to.value = "";
+  }
+  controls.fields.hidden = !customSelected;
+  controls.fields.setAttribute("aria-hidden", customSelected ? "false" : "true");
+  setSubtreeInert(controls.fields, !customSelected);
+  controls.from.disabled = !customSelected;
+  controls.to.disabled = !customSelected;
+}
+
+function promoteCustomTimeFilter(sectionID) {
+  const controls = resolveCustomTimeFilterControls(sectionID);
+  if (!controls?.range) {
+    return;
+  }
+  if (String(controls.range.value || "").trim().toLowerCase() !== "custom") {
+    controls.range.value = "custom";
+  }
+  syncCustomTimeFilterControls(sectionID);
 }
 
 function readListFilterStateFromUI() {
@@ -1311,7 +1663,11 @@ function focusSettingsEndpointRow(endpointID) {
   window.setTimeout(() => {
     row.classList.remove("settings-row-focus");
   }, 1800);
+  row.setAttribute("tabindex", "-1");
   row.scrollIntoView({ behavior: "smooth", block: "center" });
+  window.requestAnimationFrame(() => {
+    row.focus({ preventScroll: true });
+  });
   return true;
 }
 
@@ -1327,6 +1683,18 @@ function settingsEditorChipClass(value) {
     return "chip chip-danger";
   }
   return "chip chip-neutral";
+}
+
+function settingsEditorStatusLabel(value) {
+  const status = String(value || "clean").trim().toLowerCase();
+  if (status === "pending_apply") {
+    return "Pending Apply";
+  }
+  return status
+    .split("_")
+    .filter(Boolean)
+    .map((item) => item.charAt(0).toUpperCase() + item.slice(1))
+    .join(" ") || "Clean";
 }
 
 function buildSettingsEditorState(
@@ -1379,7 +1747,7 @@ function renderSettingsEditorFeedbackInline(state) {
   const chip = ui.settingsContent.querySelector("#settings-int-status-chip");
   if (chip instanceof HTMLElement) {
     chip.className = settingsEditorChipClass(state?.status);
-    chip.textContent = String(state?.status || "clean").trim().toLowerCase() || "clean";
+    chip.textContent = settingsEditorStatusLabel(state?.status);
   }
 
   const feedback = ui.settingsContent.querySelector("#settings-int-feedback");
@@ -1395,16 +1763,19 @@ function renderSettingsEditorFeedbackInline(state) {
     parts.push(`<div class="meta">${escapeHTML(message)}</div>`);
   }
   for (const item of errors) {
-    parts.push(`<div class="meta settings-editor-error">error: ${escapeHTML(item)}</div>`);
+    parts.push(`<div class="meta settings-editor-error">Blocked: ${escapeHTML(item)}</div>`);
   }
   for (const item of warnings) {
-    parts.push(`<div class="meta settings-editor-warn">warn: ${escapeHTML(item)}</div>`);
+    parts.push(`<div class="meta settings-editor-warn">Review before apply: ${escapeHTML(item)}</div>`);
+  }
+  if (!message && errors.length === 0 && warnings.length === 0) {
+    parts.push("<div class=\"meta\">Next step: edit the draft, then Save Draft for a checkpoint or Apply Saved for this project scope.</div>");
   }
   parts.push(
-    `<div class="meta">savedOverride=${escapeHTML(String(Boolean(state?.hasSavedOverride)))}; applied=${escapeHTML(String(Boolean(state?.applied)))}</div>`
+    `<div class="meta">draftSaved=${escapeHTML(String(Boolean(state?.hasSavedOverride)))}; applied=${escapeHTML(String(Boolean(state?.applied)))}</div>`
   );
   if (state?.savedAt) {
-    parts.push(`<div class="meta">savedAt=${escapeHTML(String(state.savedAt))}</div>`);
+    parts.push(`<div class="meta">draftSavedAt=${escapeHTML(String(state.savedAt))}</div>`);
   }
   if (state?.appliedAt) {
     parts.push(`<div class="meta">appliedAt=${escapeHTML(String(state.appliedAt))}</div>`);
@@ -1419,7 +1790,7 @@ function renderAimxsEditorFeedbackInline(state) {
   const chip = ui.settingsContent.querySelector("#settings-aimxs-status-chip");
   if (chip instanceof HTMLElement) {
     chip.className = settingsEditorChipClass(state?.status);
-    chip.textContent = String(state?.status || "clean").trim().toLowerCase() || "clean";
+    chip.textContent = settingsEditorStatusLabel(state?.status);
   }
 
   const feedback = ui.settingsContent.querySelector("#settings-aimxs-feedback");
@@ -1435,13 +1806,13 @@ function renderAimxsEditorFeedbackInline(state) {
     parts.push(`<div class="meta">${escapeHTML(message)}</div>`);
   }
   for (const item of errors) {
-    parts.push(`<div class="meta settings-editor-error">error: ${escapeHTML(item)}</div>`);
+    parts.push(`<div class="meta settings-editor-error">Blocked: ${escapeHTML(item)}</div>`);
   }
   for (const item of warnings) {
-    parts.push(`<div class="meta settings-editor-warn">warn: ${escapeHTML(item)}</div>`);
+    parts.push(`<div class="meta settings-editor-warn">Review before apply: ${escapeHTML(item)}</div>`);
   }
   parts.push(
-    "<div class=\"meta\">HTTPS mode requires payment entitlement and valid ref:// credential references.</div>"
+    "<div class=\"meta\">Next step: confirm entitlement and valid ref:// credential references, then rerun Apply AIMXS Settings.</div>"
   );
   feedback.innerHTML = parts.join("");
 }
@@ -1456,12 +1827,92 @@ function safeFileToken(value, fallback = "any") {
   return cleaned || fallback;
 }
 
-function buildAuditFileSuffix(filters) {
+function buildTimestampToken(value = new Date().toISOString()) {
+  return String(value || new Date().toISOString())
+    .trim()
+    .replace(/[-:]/g, "")
+    .replace(/\.\d+Z$/, "Z");
+}
+
+function buildAuditFileSuffix(filters, generatedAt = new Date().toISOString()) {
   const tenant = safeFileToken(filters?.tenant, "tenant-any");
   const project = safeFileToken(filters?.project, "project-any");
+  const provider = safeFileToken(filters?.providerId, "provider-any");
   const decision = safeFileToken(filters?.decision, "decision-any");
-  const timestamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
-  return `${tenant}-${project}-${decision}-${timestamp}`;
+  const timestamp = buildTimestampToken(generatedAt);
+  return `${tenant}-${project}-${provider}-${decision}-${timestamp}`;
+}
+
+function buildAuditExportFileName(format, filters, generatedAt) {
+  const extension = String(format || "").trim().toLowerCase() === "csv" ? "csv" : "json";
+  return `epydios-agentops-audit-events-${buildAuditFileSuffix(filters, generatedAt)}.${extension}`;
+}
+
+function buildIncidentPackageFileName(runId, filters, generatedAt) {
+  const runToken = safeFileToken(runId, "run");
+  return `epydios-agentops-incident-package-${runToken}-${buildAuditFileSuffix(filters, generatedAt)}.json`;
+}
+
+function buildIncidentSelectionFileName(count, generatedAt) {
+  const safeCount = Math.max(0, Number(count) || 0);
+  return `epydios-agentops-incident-selected-bundle-${safeCount}-items-${buildTimestampToken(generatedAt)}.json`;
+}
+
+function formatScopeLabel(tenantId, projectId) {
+  const tenant = String(tenantId || "").trim() || "-";
+  const project = String(projectId || "").trim() || "-";
+  return `${tenant}/${project}`;
+}
+
+function resolveAuditBundleScope(bundle) {
+  return formatScopeLabel(bundle?.meta?.filters?.tenant, bundle?.meta?.filters?.project);
+}
+
+function resolveIncidentPackageScope(pkg) {
+  return formatScopeLabel(
+    pkg?.run?.summary?.tenantId || pkg?.approval?.record?.tenantId || pkg?.audit?.meta?.filters?.tenant,
+    pkg?.run?.summary?.projectId || pkg?.approval?.record?.projectId || pkg?.audit?.meta?.filters?.project
+  );
+}
+
+function resolveIncidentPackageSources(pkg) {
+  return [
+    `run:${String(pkg?.run?.detailSource || "").trim() || "-"}`,
+    `approval:${String(pkg?.approval?.source || "").trim() || "-"}`,
+    `audit:${String(pkg?.audit?.meta?.source || "").trim() || "-"}`
+  ].join(",");
+}
+
+function buildAuditTraceabilitySummary(bundle, fileName = "") {
+  const parts = [];
+  if (fileName) {
+    parts.push(`file=${fileName}`);
+  }
+  parts.push(`source=${String(bundle?.meta?.source || "").trim() || "-"}`);
+  parts.push(`scope=${resolveAuditBundleScope(bundle)}`);
+  parts.push(`generatedAt=${String(bundle?.meta?.generatedAt || "").trim() || "-"}`);
+  return parts.join("; ");
+}
+
+function buildIncidentTraceabilitySummary(pkg, fileName = "") {
+  const parts = [
+    `packageId=${String(pkg?.meta?.packageId || "").trim() || "-"}`,
+    `scope=${resolveIncidentPackageScope(pkg)}`,
+    `generatedAt=${String(pkg?.meta?.generatedAt || "").trim() || "-"}`,
+    `sources=${resolveIncidentPackageSources(pkg)}`
+  ];
+  if (fileName) {
+    parts.splice(1, 0, `file=${fileName}`);
+  }
+  return parts.join("; ");
+}
+
+function buildIncidentEntryTraceabilitySummary(entry) {
+  return [
+    `scope=${String(entry?.scope || "").trim() || "-"}`,
+    `generatedAt=${String(entry?.generatedAt || entry?.createdAt || "").trim() || "-"}`,
+    `sources=run:${String(entry?.runDetailSource || "").trim() || "-"},approval:${String(entry?.approvalSource || "").trim() || "-"},audit:${String(entry?.auditSource || "").trim() || "-"}`
+  ].join("; ");
 }
 
 function triggerTextDownload(content, fileName, mimeType = "text/plain;charset=utf-8") {
@@ -1500,13 +1951,83 @@ function renderAuditFilingFeedback(tone, message) {
     return;
   }
   const normalizedTone = String(tone || "warn").trim().toLowerCase();
-  const className =
+  const state =
     normalizedTone === "ok"
-      ? "audit-feedback-ok"
+      ? "success"
       : normalizedTone === "error"
-        ? "audit-feedback-error"
-        : "audit-feedback-warn";
-  ui.auditFeedback.innerHTML = `<div class="meta ${className}">${escapeHTML(message || "")}</div>`;
+        ? "error"
+        : normalizedTone === "warn"
+          ? "warn"
+          : "info";
+  const title =
+    normalizedTone === "ok"
+      ? "Audit/Incident Action Complete"
+      : normalizedTone === "error"
+        ? "Audit/Incident Action Failed"
+        : normalizedTone === "warn"
+          ? "Audit/Incident Action Needs Review"
+          : "Audit And Incident Actions";
+  ui.auditFeedback.innerHTML = renderPanelStateMetric(state, title, message || "");
+}
+
+function requestTypedConfirmation(title, lines, acknowledgement) {
+  const heading = String(title || "").trim() || "Confirm action";
+  const detailLines = Array.isArray(lines)
+    ? lines.map((line) => String(line || "").trim()).filter(Boolean)
+    : [];
+  const requiredPhrase = String(acknowledgement || "").trim().toUpperCase();
+  const promptText = [
+    heading,
+    "",
+    ...detailLines,
+    "",
+    `Type ${requiredPhrase} to continue.`
+  ].join("\n");
+  if (typeof window?.prompt === "function") {
+    const response = window.prompt(promptText, "");
+    if (response === null) {
+      return { confirmed: false, reason: "cancelled" };
+    }
+    if (String(response || "").trim().toUpperCase() !== requiredPhrase) {
+      return { confirmed: false, reason: "mismatch" };
+    }
+    return { confirmed: true, reason: "confirmed" };
+  }
+  if (typeof window?.confirm === "function") {
+    return {
+      confirmed: Boolean(window.confirm(promptText)),
+      reason: "confirm_fallback"
+    };
+  }
+  return { confirmed: true, reason: "prompt_unavailable" };
+}
+
+function confirmIncidentQueueClear(totalCount, selectedCount) {
+  return requestTypedConfirmation(
+    "Clear Incident Queue",
+    [
+      `Scope: queue rows=${String(totalCount || 0)}; selected rows=${String(selectedCount || 0)}.`,
+      "Effect: this removes every tracked incident package from the local queue and clears current selection.",
+      "Impact: queue contents, copied handoff history context, and download shortcuts will be removed from this UI state.",
+      "Recovery: this cannot be undone from this prompt; you would need to rebuild incident packages manually."
+    ],
+    "CLEAR QUEUE"
+  );
+}
+
+function confirmResetProjectOverride(scope, projectID) {
+  const tenantId = String(scope?.tenantId || "").trim() || "tenant:unscoped";
+  const scopedProjectId = String(scope?.projectId || projectID || "").trim() || "project:any";
+  return requestTypedConfirmation(
+    "Reset Project Override",
+    [
+      `Scope: tenant=${tenantId}; project=${scopedProjectId}.`,
+      "Effect: this replaces the current project override with baseline defaults and discards unsaved edits in the editor.",
+      "Impact: runtime-linked settings for this project scope may be overwritten immediately when the runtime endpoint is available.",
+      "Recovery: this cannot be undone from this prompt; you would need to rebuild and re-apply the prior override manually."
+    ],
+    "RESET OVERRIDE"
+  );
 }
 
 function buildIncidentPackageHandoffText(pkg) {
@@ -1515,15 +2036,33 @@ function buildIncidentPackageHandoffText(pkg) {
   const approval = pkg?.approval || {};
   const audit = pkg?.audit || {};
   const summary = audit?.summary || {};
+  const scope = resolveIncidentPackageScope(pkg);
+  const auditSource = String(audit?.meta?.source || "").trim() || "-";
+  const auditGeneratedAt = String(audit?.meta?.generatedAt || "").trim() || "-";
+  const auditTimeRange = String(audit?.meta?.filters?.timeRange || "").trim() || "any";
+  const auditTimeFrom = String(audit?.meta?.filters?.timeFrom || "").trim() || "-";
+  const auditTimeTo = String(audit?.meta?.filters?.timeTo || "").trim() || "-";
+  const provenanceTag = String(
+    run?.detail?.provenance?.commandTag || run?.summary?.provenanceTag || run?.detail?.provenanceTag || ""
+  ).trim() || "-";
   return [
-    "Epydios AgentOps Desktop Incident Package",
+    "Epydios AgentOps Desktop Incident Handoff Summary",
     `packageId=${String(meta.packageId || "").trim() || "-"}`,
     `generatedAt=${String(meta.generatedAt || "").trim() || "-"}`,
     `actor=${String(meta.actor || "").trim() || "-"}`,
+    `scope=${scope}`,
+    `packageVersion=${String(meta.packageVersion || "").trim() || "-"}`,
     `runId=${String(run.runId || "").trim() || "-"}`,
     `runDetailSource=${String(run.detailSource || "").trim() || "-"}`,
     `approvalStatus=${String(approval.status || "").trim() || "-"}`,
     `approvalSource=${String(approval.source || "").trim() || "-"}`,
+    `auditSource=${auditSource}`,
+    `auditGeneratedAt=${auditGeneratedAt}`,
+    `auditScope=${formatScopeLabel(audit?.meta?.filters?.tenant, audit?.meta?.filters?.project)}`,
+    `auditTimeRange=${auditTimeRange}`,
+    `auditTimeFrom=${auditTimeFrom}`,
+    `auditTimeTo=${auditTimeTo}`,
+    `provenanceTag=${provenanceTag}`,
     `auditMatchedCount=${String(audit?.meta?.matchedCount ?? 0)}`,
     `auditDecisionBreakdown=ALLOW:${String(summary.allowCount ?? 0)};DENY:${String(summary.denyCount ?? 0)};OTHER:${String(summary.otherCount ?? 0)}`
   ].join("\n");
@@ -1558,13 +2097,25 @@ function buildIncidentHistoryEntry(incidentPkg, fileName) {
   const auditMatchedCount = Number(incidentPkg?.audit?.meta?.matchedCount || 0);
   const handoffText = String(incidentPkg?.handoff?.text || "").trim();
   const filingStatus = normalizeIncidentFilingStatus("drafted");
+  const generatedAt = createdAt;
   return {
     id: packageId || `incident-history-${Date.now()}-${Math.floor(Math.random() * 100000)}`,
     packageId,
     createdAt,
+    generatedAt,
     runId,
     approvalStatus,
     auditMatchedCount,
+    scope: resolveIncidentPackageScope(incidentPkg),
+    runDetailSource: String(incidentPkg?.run?.detailSource || "").trim() || "-",
+    approvalSource: String(incidentPkg?.approval?.source || "").trim() || "-",
+    auditSource: String(incidentPkg?.audit?.meta?.source || "").trim() || "-",
+    provenanceTag: String(
+      incidentPkg?.run?.detail?.provenance?.commandTag ||
+      incidentPkg?.run?.summary?.provenanceTag ||
+      incidentPkg?.run?.detail?.provenanceTag ||
+      ""
+    ).trim(),
     fileName: String(fileName || "").trim(),
     handoffText,
     payload: deepClone(incidentPkg || {}),
@@ -1578,16 +2129,30 @@ function normalizeIncidentHistoryEntry(input = {}) {
   const createdAt = String(candidate.createdAt || candidate?.meta?.generatedAt || new Date().toISOString()).trim();
   const filingStatus = normalizeIncidentFilingStatus(candidate.filingStatus);
   const filingUpdatedAt = String(candidate.filingUpdatedAt || createdAt).trim() || createdAt;
+  const payload = candidate.payload && typeof candidate.payload === "object" ? deepClone(candidate.payload) : {};
+  const generatedAt = String(candidate.generatedAt || payload?.meta?.generatedAt || createdAt).trim() || createdAt;
   return {
     id: String(candidate.id || candidate.packageId || `incident-history-${Date.now()}-${Math.floor(Math.random() * 100000)}`).trim(),
     packageId: String(candidate.packageId || "").trim(),
     createdAt,
+    generatedAt,
     runId: String(candidate.runId || "").trim(),
     approvalStatus: String(candidate.approvalStatus || "UNAVAILABLE").trim().toUpperCase(),
     auditMatchedCount: Number(candidate.auditMatchedCount || 0),
+    scope: String(candidate.scope || resolveIncidentPackageScope(payload)).trim(),
+    runDetailSource: String(candidate.runDetailSource || payload?.run?.detailSource || "").trim(),
+    approvalSource: String(candidate.approvalSource || payload?.approval?.source || "").trim(),
+    auditSource: String(candidate.auditSource || payload?.audit?.meta?.source || "").trim(),
+    provenanceTag: String(
+      candidate.provenanceTag ||
+      payload?.run?.detail?.provenance?.commandTag ||
+      payload?.run?.summary?.provenanceTag ||
+      payload?.run?.detail?.provenanceTag ||
+      ""
+    ).trim(),
     fileName: String(candidate.fileName || "").trim(),
     handoffText: String(candidate.handoffText || "").trim(),
-    payload: candidate.payload && typeof candidate.payload === "object" ? deepClone(candidate.payload) : {},
+    payload,
     filingStatus,
     filingUpdatedAt
   };
@@ -1628,27 +2193,64 @@ function clearDataPanels() {
   if (ui.terminalHistoryStatusFilter) {
     ui.terminalHistoryStatusFilter.value = "";
   }
-  ui.providersContent.innerHTML = "";
-  ui.settingsContent.innerHTML = "";
+  ui.providersContent.innerHTML = renderPanelStateMetric(
+    "empty",
+    "Extension Providers",
+    "No provider data loaded."
+  );
+  ui.settingsContent.innerHTML = renderPanelStateMetric(
+    "empty",
+    "Settings",
+    "No configuration data loaded.",
+    "Refresh the workspace. If settings should be present, verify scope and runtime endpoint availability."
+  );
   ui.approvalsFeedback.innerHTML = "";
-  ui.approvalsContent.innerHTML = "";
+  ui.approvalsContent.innerHTML = renderPanelStateMetric(
+    "empty",
+    "Approvals Queue",
+    "No approval data loaded.",
+    "Refresh the workspace, then verify approval endpoint health and active scope."
+  );
   if (ui.approvalsDetailContent) {
-    ui.approvalsDetailContent.innerHTML = "";
+    ui.approvalsDetailContent.innerHTML = renderPanelStateMetric(
+      "info",
+      "Approval Detail",
+      "Select an approval row to review detail."
+    );
     delete ui.approvalsDetailContent.dataset.selectedRunId;
   }
   ui.terminalFeedback.innerHTML = "";
-  ui.terminalHistory.innerHTML = "";
+  ui.terminalHistory.innerHTML = renderPanelStateMetric(
+    "empty",
+    "Terminal History",
+    "No terminal history loaded.",
+    "Run a terminal request or refresh the workspace to repopulate history."
+  );
   ui.terminalPayload.textContent = "";
   ui.terminalPolicyHints.innerHTML = "";
-  ui.runsContent.innerHTML = "";
-  ui.runDetailContent.innerHTML = "";
+  ui.runsContent.innerHTML = renderPanelStateMetric(
+    "empty",
+    "Runs",
+    "No run data loaded.",
+    "Refresh the workspace, then verify runtime availability and current scope."
+  );
+  ui.runDetailContent.innerHTML = renderPanelStateMetric(
+    "info",
+    "Run Detail",
+    "Select a run to view detail."
+  );
   delete ui.runDetailContent.dataset.selectedRunId;
-  ui.auditContent.innerHTML = "";
+  ui.auditContent.innerHTML = renderPanelStateMetric(
+    "empty",
+    "Audit Events",
+    "No audit data loaded.",
+    "Refresh the workspace, then verify audit source availability and current filters."
+  );
   if (ui.auditFeedback) {
     ui.auditFeedback.innerHTML = "";
   }
   if (ui.auditHandoffPreview) {
-    ui.auditHandoffPreview.textContent = "Audit handoff preview appears here after Copy Handoff.";
+    ui.auditHandoffPreview.textContent = "Copy an audit or incident handoff to populate this preview. Review the text here before sharing it downstream.";
   }
   renderIncidentHistoryPanel();
   if (ui.triageContent) {
@@ -1659,6 +2261,39 @@ function clearDataPanels() {
   }
   if (ui.contextEndpointBadges) {
     ui.contextEndpointBadges.innerHTML = "";
+  }
+}
+
+function renderPanelLoadingStates() {
+  if (ui.healthContent) {
+    ui.healthContent.innerHTML = renderPanelStateMetric(
+      "loading",
+      "Platform Health",
+      "Loading runtime and pipeline status..."
+    );
+  }
+  if (ui.providersContent) {
+    ui.providersContent.innerHTML = renderPanelStateMetric(
+      "loading",
+      "Extension Providers",
+      "Loading provider contract and readiness data..."
+    );
+  }
+  if (ui.runsContent) {
+    ui.runsContent.innerHTML = renderPanelStateMetric("loading", "Runs", "Loading run history...");
+  }
+  if (ui.approvalsContent) {
+    ui.approvalsContent.innerHTML = renderPanelStateMetric("loading", "Approvals Queue", "Loading approvals...");
+  }
+  if (ui.auditContent) {
+    ui.auditContent.innerHTML = renderPanelStateMetric("loading", "Audit Events", "Loading audit events...");
+  }
+  if (ui.settingsContent) {
+    ui.settingsContent.innerHTML = renderPanelStateMetric(
+      "loading",
+      "Settings",
+      "Loading configuration and diagnostics..."
+    );
   }
 }
 
@@ -1781,6 +2416,41 @@ function normalizeIncidentHistorySearch(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+function countIncidentStatuses(items) {
+  const counts = {
+    drafted: 0,
+    filed: 0,
+    closed: 0
+  };
+  for (const item of items || []) {
+    const status = normalizeIncidentFilingStatus(item?.filingStatus);
+    counts[status] = (counts[status] || 0) + 1;
+  }
+  return counts;
+}
+
+function incidentStatusMeaning(status) {
+  const normalized = normalizeIncidentFilingStatus(status);
+  if (normalized === "filed") {
+    return "Filed means the package has been handed off and is waiting for closure tracking.";
+  }
+  if (normalized === "closed") {
+    return "Closed means queue tracking is complete unless follow-up requires reopening.";
+  }
+  return "Drafted means the package is prepared but not yet handed off downstream.";
+}
+
+function incidentStatusNextStep(status) {
+  const normalized = normalizeIncidentFilingStatus(status);
+  if (normalized === "filed") {
+    return "Next: mark closed when downstream response is complete, or return to draft if the package needs revision.";
+  }
+  if (normalized === "closed") {
+    return "Next: reopen filed only if downstream handling resumes or new response work appears.";
+  }
+  return "Next: review the package and handoff summary, then mark filed when downstream handoff actually occurs.";
+}
+
 function normalizeIncidentHistoryTimeRange(value) {
   return normalizeTimeRange(value);
 }
@@ -1804,6 +2474,7 @@ function applyIncidentHistoryViewControls() {
   if (ui.incidentHistoryTimeTo) {
     ui.incidentHistoryTimeTo.value = incidentHistoryViewState.timeTo;
   }
+  syncCustomTimeFilterControls("incidents");
   if (ui.incidentHistoryPageSize) {
     ui.incidentHistoryPageSize.value = String(incidentHistoryViewState.pageSize);
   }
@@ -1900,7 +2571,7 @@ function applyBulkIncidentStatusTransition(nextStatus) {
   const targetStatus = normalizeIncidentFilingStatus(nextStatus);
   const selectedIDs = Array.from(incidentHistorySelection);
   if (selectedIDs.length === 0) {
-    renderAuditFilingFeedback("warn", "Select one or more incident rows before bulk status updates.");
+    renderAuditFilingFeedback("warn", "Select one or more incident rows before bulk status updates. Bulk actions apply only to the current selection.");
     return;
   }
   let updatedCount = 0;
@@ -1926,7 +2597,7 @@ function applyBulkIncidentStatusTransition(nextStatus) {
   if (updatedCount === 0) {
     renderAuditFilingFeedback(
       "warn",
-      `Bulk update blocked: no selected rows can transition to ${targetStatus}.`
+      `Bulk update blocked: no selected rows can transition to ${targetStatus}. Review current filing state first.`
     );
     return;
   }
@@ -1935,7 +2606,7 @@ function applyBulkIncidentStatusTransition(nextStatus) {
   const detail = skippedCount > 0 ? `; skipped=${skippedCount}` : "";
   renderAuditFilingFeedback(
     "ok",
-    `Bulk incident status update complete: to=${targetStatus}; updated=${updatedCount}${detail}.`
+    `Bulk incident status update complete: nextStatus=${targetStatus}; updated=${updatedCount}${detail}. Review skipped rows before leaving the queue.`
   );
 }
 
@@ -1954,12 +2625,16 @@ function buildSelectedIncidentExportBundle(entries, view, actor) {
   const items = (Array.isArray(entries) ? entries : []).map((entry) =>
     normalizeIncidentHistoryEntry(entry)
   );
+  const uniqueScopes = Array.from(new Set(items.map((item) => String(item?.scope || "").trim()).filter(Boolean))).slice(0, 5);
+  const uniqueAuditSources = Array.from(new Set(items.map((item) => String(item?.auditSource || "").trim()).filter(Boolean))).slice(0, 5);
   return {
     meta: {
       generatedAt,
       actor: String(actor || "").trim(),
       source: "incident-history-selection",
       selectedCount: items.length,
+      scopeSummary: uniqueScopes,
+      auditSources: uniqueAuditSources,
       view: {
         status: normalizeIncidentHistoryStatusFilter(view?.status),
         sort: normalizeIncidentHistorySort(view?.sort),
@@ -1991,14 +2666,14 @@ function parseIncidentHistoryStoragePayload(raw) {
 function syncIncidentHistoryFromStorage(raw, sourceLabel = "storage") {
   const parsed = parseIncidentHistoryStoragePayload(raw);
   if (parsed === null) {
-    renderAuditFilingFeedback("warn", `Incident queue sync ignored (${sourceLabel}): invalid storage payload.`);
+    renderAuditFilingFeedback("warn", `Incident queue sync ignored (${sourceLabel}) because the storage payload is invalid.`);
     return false;
   }
   store.setIncidentPackageHistory(parsed);
   renderIncidentHistoryPanel();
   renderAuditFilingFeedback(
     "ok",
-    `Incident queue synced from ${sourceLabel} (rows=${parsed.length}).`
+    `Incident queue synced from ${sourceLabel}. rows=${parsed.length}; review latest scope and source before bulk actions.`
   );
   return true;
 }
@@ -2095,15 +2770,36 @@ function buildSettingsConfigChanges(localChanges, auditPayload) {
   return deduped.slice(0, 20);
 }
 
-function renderIncidentHistorySummary(totalCount, visibleCount, selectedCount, view) {
+function renderIncidentHistorySummary(totalCount, visibleCount, selectedCount, view, allItems = [], visibleItems = []) {
   if (!(ui.incidentHistorySummary instanceof HTMLElement)) {
     return;
   }
   const searchLabel = normalizeIncidentHistorySearch(view?.search) || "-";
   const pageLabel = `${String(view?.page || 1)}/${String(view?.totalPages || 1)}`;
+  const totalStatusCounts = countIncidentStatuses(allItems);
+  const visibleStatusCounts = countIncidentStatuses(visibleItems);
+  const latestVisible = Array.isArray(visibleItems) && visibleItems.length > 0 ? visibleItems[0] : null;
+  const timeLabel =
+    normalizeIncidentHistoryTimeRange(view?.timeRange) || (view?.timeFrom || view?.timeTo ? "custom" : "any");
   ui.incidentHistorySummary.innerHTML = `
     <div class="metric">
-      <div class="meta">queueTotal=${escapeHTML(String(totalCount || 0))}; visible=${escapeHTML(String(visibleCount || 0))}; selected=${escapeHTML(String(selectedCount || 0))}; filter=${escapeHTML(view?.status || "any")}; sort=${escapeHTML(view?.sort || "newest")}; search=${escapeHTML(searchLabel)}; page=${escapeHTML(pageLabel)}; pageSize=${escapeHTML(String(view?.pageSize || 25))}</div>
+      <div class="metric-title-row">
+        <div class="title">Incident Queue Summary</div>
+        <span class="chip chip-neutral chip-compact">queueTotal=${escapeHTML(String(totalCount || 0))}</span>
+        <span class="chip chip-neutral chip-compact">visible=${escapeHTML(String(visibleCount || 0))}</span>
+        <span class="${selectedCount > 0 ? "chip chip-warn chip-compact" : "chip chip-neutral chip-compact"}">selected=${escapeHTML(String(selectedCount || 0))}</span>
+      </div>
+      <div class="run-detail-chips">
+        <span class="chip chip-neutral chip-compact">drafted=${escapeHTML(String(visibleStatusCounts.drafted))}/${escapeHTML(String(totalStatusCounts.drafted))}</span>
+        <span class="chip chip-neutral chip-compact">filed=${escapeHTML(String(visibleStatusCounts.filed))}/${escapeHTML(String(totalStatusCounts.filed))}</span>
+        <span class="chip chip-neutral chip-compact">closed=${escapeHTML(String(visibleStatusCounts.closed))}/${escapeHTML(String(totalStatusCounts.closed))}</span>
+        <span class="chip chip-neutral chip-compact">latestScope=${escapeHTML(String(latestVisible?.scope || "-"))}</span>
+        <span class="chip chip-neutral chip-compact">latestSource=${escapeHTML(String(latestVisible?.auditSource || "-"))}</span>
+      </div>
+      <div class="meta incident-history-note">Transition semantics: drafted=prepared locally, filed=handed off downstream, closed=queue tracking complete.</div>
+      <div class="meta incident-history-note">Bulk actions touch selected rows only. Rows that cannot move to the requested next status are skipped and reported in feedback.</div>
+      <div class="meta">latestPackage=${escapeHTML(String(latestVisible?.packageId || "-"))}; latestGeneratedAt=${escapeHTML(String(latestVisible?.generatedAt || latestVisible?.createdAt || "-"))}</div>
+      <div class="meta">filter=${escapeHTML(String(view?.status || "any"))}; sort=${escapeHTML(String(view?.sort || "newest"))}; time=${escapeHTML(timeLabel)}; search=${escapeHTML(searchLabel)}; page=${escapeHTML(pageLabel)}; pageSize=${escapeHTML(String(view?.pageSize || 25))}</div>
     </div>
   `;
 }
@@ -2136,21 +2832,23 @@ function renderIncidentHistoryPanel() {
     page: pageState.page,
     pageSize: pageState.pageSize,
     totalPages: pageState.totalPages
-  });
+  }, allItems, filteredSorted);
   if (!Array.isArray(allItems) || allItems.length === 0) {
-    ui.incidentHistoryContent.innerHTML = `
-      <div class="metric">
-        <div class="meta">No incident packages in queue.</div>
-      </div>
-    `;
+    ui.incidentHistoryContent.innerHTML = renderPanelStateMetric(
+      "empty",
+      "Incident Queue",
+      "No incident packages are currently tracked.",
+      "Start in Audit Events: open a run detail, then export an incident package to seed this queue."
+    );
     return;
   }
   if (items.length === 0) {
-    ui.incidentHistoryContent.innerHTML = `
-      <div class="metric">
-        <div class="meta">No incident packages match current queue filters/search.</div>
-      </div>
-    `;
+    ui.incidentHistoryContent.innerHTML = renderPanelStateMetric(
+      "empty",
+      "Incident Queue",
+      "No incident packages match the current queue filters.",
+      "Clear filters or widen scope, then review drafted or filed packages."
+    );
     return;
   }
   const pager = `
@@ -2176,10 +2874,13 @@ function renderIncidentHistoryRow(item) {
   const fileName = String(item?.fileName || "").trim() || "(unspecified)";
   const filingStatus = normalizeIncidentFilingStatus(item?.filingStatus);
   const filingUpdatedAt = formatTime(item?.filingUpdatedAt || item?.createdAt);
+  const generatedAt = formatTime(item?.generatedAt || item?.createdAt);
   const statusChipClass = incidentStatusChipClass(filingStatus);
   const transitionActions = buildIncidentTransitionButtons(entryId, filingStatus);
+  const statusMeaning = incidentStatusMeaning(filingStatus);
+  const nextStep = incidentStatusNextStep(filingStatus);
   const openRunAction = runIdValue
-    ? `<button class="btn btn-secondary btn-small" type="button" data-incident-history-open-run-id="${escapeHTML(runIdValue)}">Open Run</button>`
+    ? `<button class="btn btn-secondary btn-small" type="button" data-incident-history-open-run-id="${escapeHTML(runIdValue)}">Open Run Detail</button>`
     : "";
   return `
     <article class="metric incident-history-row" data-incident-history-entry-id="${escapeHTML(entryId)}">
@@ -2191,14 +2892,29 @@ function renderIncidentHistoryRow(item) {
         </label>
         <span class="${statusChipClass}" data-incident-history-status="${escapeHTML(filingStatus)}">status:${escapeHTML(filingStatus)}</span>
       </div>
-      <div class="incident-history-meta">
-        created=${escapeHTML(createdAt)}; filingUpdated=${escapeHTML(filingUpdatedAt)}; runId=${escapeHTML(runId)}; approval=${escapeHTML(approvalStatus)}; auditRows=${escapeHTML(String(auditRows))}; file=${escapeHTML(fileName)}
+      <div class="incident-history-note">${escapeHTML(statusMeaning)}</div>
+      <div class="run-detail-chips">
+        <span class="chip chip-neutral chip-compact">scope=${escapeHTML(String(item?.scope || "-"))}</span>
+        <span class="chip chip-neutral chip-compact">auditSource=${escapeHTML(String(item?.auditSource || "-"))}</span>
+        <span class="chip chip-neutral chip-compact">runDetail=${escapeHTML(String(item?.runDetailSource || "-"))}</span>
+        <span class="chip chip-neutral chip-compact">approvalSource=${escapeHTML(String(item?.approvalSource || "-"))}</span>
       </div>
+      <div class="incident-history-meta">
+        created=${escapeHTML(createdAt)}; generatedAt=${escapeHTML(generatedAt)}; filingUpdated=${escapeHTML(filingUpdatedAt)}; runId=${escapeHTML(runId)}; approval=${escapeHTML(approvalStatus)}; auditRows=${escapeHTML(String(auditRows))}; file=${escapeHTML(fileName)}
+      </div>
+      <div class="incident-history-meta">${escapeHTML(buildIncidentEntryTraceabilitySummary(item))}</div>
+      <div class="incident-history-note">${escapeHTML(nextStep)}</div>
       <div class="incident-history-actions">
-        <button class="btn btn-secondary btn-small" type="button" data-incident-history-download-id="${escapeHTML(entryId)}">Download</button>
-        <button class="btn btn-secondary btn-small" type="button" data-incident-history-copy-id="${escapeHTML(entryId)}">Copy Handoff</button>
-        ${transitionActions}
-        ${openRunAction}
+        <div class="action-hierarchy">
+          <div class="action-group action-group-primary">
+            <button class="btn btn-primary btn-small" type="button" data-incident-history-download-id="${escapeHTML(entryId)}">Download Incident JSON</button>
+          </div>
+          <div class="action-group action-group-secondary">
+            <button class="btn btn-secondary btn-small" type="button" data-incident-history-copy-id="${escapeHTML(entryId)}">Copy Incident Handoff</button>
+            ${transitionActions}
+            ${openRunAction}
+          </div>
+        </div>
       </div>
     </article>
   `;
@@ -2267,7 +2983,7 @@ function renderOpsTriage(snapshot) {
       <div class="triage-value">${escapeHTML(String(triage.pendingApprovals))}</div>
       <div class="meta"><span class="${approvalTone}">expiring <=5m: ${escapeHTML(String(triage.expiringSoonApprovals))}</span></div>
       <div class="triage-actions">
-        <button class="btn btn-secondary btn-small" type="button" data-triage-action="open-approvals-pending">Open Queue</button>
+        <button class="btn btn-secondary btn-small" type="button" data-triage-action="open-approvals-pending">Open Approval Queue</button>
       </div>
     </article>
     <article class="triage-card">
@@ -2280,7 +2996,7 @@ function renderOpsTriage(snapshot) {
           type="button"
           data-triage-action="open-runs-attention"
           data-triage-run-id="${escapeHTML(triage.latestAttentionRunId || "")}"
-        >Open Runs</button>
+        >Open Run List</button>
       </div>
     </article>
     <article class="triage-card">
@@ -2288,7 +3004,7 @@ function renderOpsTriage(snapshot) {
       <div class="triage-value">${escapeHTML(String(triage.denyAuditEvents))}</div>
       <div class="meta"><span class="${auditTone}">current audit scope</span></div>
       <div class="triage-actions">
-        <button class="btn btn-secondary btn-small" type="button" data-triage-action="open-audit-deny">Filter DENY</button>
+        <button class="btn btn-secondary btn-small" type="button" data-triage-action="open-audit-deny">Filter Deny Events</button>
       </div>
     </article>
     <article class="triage-card">
@@ -2296,7 +3012,7 @@ function renderOpsTriage(snapshot) {
       <div class="triage-value">${escapeHTML(String(terminalIssueCount))}</div>
       <div class="meta"><span class="${terminalTone}">policy_blocked=${escapeHTML(String(triage.terminalPolicyBlocked))}; failed=${escapeHTML(String(triage.terminalFailed))}</span></div>
       <div class="triage-actions">
-        <button class="btn btn-secondary btn-small" type="button" data-triage-action="open-terminal-issues">Open History</button>
+        <button class="btn btn-secondary btn-small" type="button" data-triage-action="open-terminal-issues">Open Terminal History</button>
       </div>
     </article>
   `;
@@ -2305,6 +3021,9 @@ function renderOpsTriage(snapshot) {
 async function main() {
   const config = await loadConfig();
   window.__m14MainReady = false;
+  initializeWorkspacePanels();
+  initializePanelRegions();
+  initializeLiveRegionSemantics();
   const baselineChoices = resolveRuntimeChoices(config);
   let aimxsOverride = normalizeAimxsOverride(
     readSavedJSON(AIMXS_OVERRIDE_KEY),
@@ -2435,11 +3154,31 @@ async function main() {
       const requested = String(tab.dataset.workspaceTab || "").trim().toLowerCase();
       setWorkspaceView(requested, true);
     });
+    tab.addEventListener("keydown", (event) => {
+      handleHorizontalTabKeydown(
+        event,
+        ui.workspaceTabs || [],
+        (node) => String(node?.dataset?.workspaceTab || "").trim().toLowerCase(),
+        (requested) => setWorkspaceView(requested, true)
+      );
+    });
   }
   for (const tab of ui.incidentSubtabs || []) {
     tab.addEventListener("click", () => {
       const requested = String(tab.dataset.incidentSubtab || "").trim().toLowerCase();
       setIncidentSubview(requested, true);
+      focusActiveIncidentSubview({ scroll: false });
+    });
+    tab.addEventListener("keydown", (event) => {
+      handleHorizontalTabKeydown(
+        event,
+        ui.incidentSubtabs || [],
+        (node) => String(node?.dataset?.incidentSubtab || "").trim().toLowerCase(),
+        (requested) => {
+          setIncidentSubview(requested, true);
+          focusActiveIncidentSubview({ scroll: false });
+        }
+      );
     });
   }
   document.addEventListener("click", (event) => {
@@ -2456,6 +3195,7 @@ async function main() {
     if (section === "settings" && nextEnabled && settingsSubviewState === "configuration") {
       setSettingsSubview("diagnostics", true);
     }
+    focusElement(toggleNode, { scroll: false });
   });
   document.addEventListener("toggle", (event) => {
     const target = event.target;
@@ -2493,6 +3233,10 @@ async function main() {
   if (savedListFilters && Object.keys(savedListFilters).length > 0) {
     applyListFilterState(savedListFilters);
   }
+  syncCustomTimeFilterControls("runs");
+  syncCustomTimeFilterControls("approvals");
+  syncCustomTimeFilterControls("audit");
+  syncCustomTimeFilterControls("incidents");
   persistListFilterStateFromUI();
 
   let initialChoices = resolveProjectChoices(initialProjectScope);
@@ -2660,6 +3404,8 @@ async function main() {
       return;
     }
 
+    renderPanelLoadingStates();
+
     try {
       const runScope = readRunFilters(ui);
       const auditScope = readAuditFilters(ui);
@@ -2735,7 +3481,12 @@ async function main() {
       renderApprovals(ui, store, approvals, approvalScope, selectedApprovalRunId);
       renderApprovalsDetail(ui, store.getApprovalByRunID(selectedApprovalRunId));
       renderRuns(ui, store, runs, runScope);
-      renderAudit(ui, audit, auditScope);
+      renderAudit(ui, audit, auditScope, {
+        actor: String(
+          session?.claims?.sub || session?.claims?.email || session?.claims?.client_id || ""
+        ).trim(),
+        source: audit?.source || ""
+      });
       applyAdvancedState();
       applyDetailsOpenState();
       refreshSucceeded = true;
@@ -2787,7 +3538,17 @@ async function main() {
         packageId,
         generatedAt,
         actor,
-        packageVersion: "v1alpha1"
+        packageVersion: "v1alpha1",
+        scope: resolveIncidentPackageScope({
+          run: { summary: runSummary },
+          approval: { record: approvalRecord },
+          audit: auditBundle
+        }),
+        sources: resolveIncidentPackageSources({
+          run: { detailSource: latestRunDetailSource },
+          approval: { source: approvalStatus ? "approval-queue" : "none" },
+          audit: auditBundle
+        })
       },
       run: {
         runId,
@@ -2859,11 +3620,15 @@ async function main() {
         latestRunDetail = null;
         latestRunDetailSource = "unavailable";
         ui.runDetailContent.dataset.selectedRunId = nextRunID;
-        ui.runDetailContent.innerHTML = `<div class="metric"><div class="meta">Run detail failed: ${escapeHTML(error.message)}</div></div>`;
+        ui.runDetailContent.innerHTML = renderPanelStateMetric(
+          "error",
+          "Run Detail",
+          `Run detail failed: ${error.message}`
+        );
       }
     }
 
-    ui.runDetailContent?.scrollIntoView({ behavior: "smooth", block: "start" });
+    focusRenderedRegion(ui.runDetailContent);
   }
 
   function openApprovalDetail(runID) {
@@ -2880,7 +3645,7 @@ async function main() {
     ui.approvalsDetailContent.dataset.selectedRunId = nextRunID;
     const approval = store.getApprovalByRunID(nextRunID);
     renderApprovalsDetail(ui, approval);
-    ui.approvalsDetailContent.scrollIntoView({ behavior: "smooth", block: "start" });
+    focusRenderedRegion(ui.approvalsDetailContent);
     return "opened";
   }
 
@@ -3033,18 +3798,21 @@ async function main() {
     if (ui.approvalsPage) {
       ui.approvalsPage.value = "1";
     }
+    syncCustomTimeFilterControls("approvals");
     refresh().catch(() => {});
   });
   ui.approvalsTimeFrom?.addEventListener("change", () => {
     if (ui.approvalsPage) {
       ui.approvalsPage.value = "1";
     }
+    promoteCustomTimeFilter("approvals");
     refresh().catch(() => {});
   });
   ui.approvalsTimeTo?.addEventListener("change", () => {
     if (ui.approvalsPage) {
       ui.approvalsPage.value = "1";
     }
+    promoteCustomTimeFilter("approvals");
     refresh().catch(() => {});
   });
   ui.approvalsPageSize?.addEventListener("change", () => {
@@ -3082,17 +3850,15 @@ async function main() {
       return;
     }
 
-    let focused = focusSettingsEndpointRow(endpointID);
-    if (!focused) {
-      await refresh();
-      focused = focusSettingsEndpointRow(endpointID);
+    setWorkspaceView("settings", true);
+    setAdvancedSectionEnabled("settings", true, true);
+    setSettingsSubview("diagnostics", true);
+    await refresh();
+    if (focusSettingsEndpointRow(endpointID)) {
+      return;
     }
-    if (focused) {
-      setWorkspaceView("settings", true);
-      setAdvancedSectionEnabled("settings", true, true);
-      setSettingsSubview("diagnostics", true);
-      ui.settingsContent?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
+    ui.settingsContent?.scrollIntoView({ behavior: "smooth", block: "start" });
+    focusRenderedRegion(ui.settingsContent, { scroll: false });
   });
   ui.settingsOpenAuditEventsButton?.addEventListener("click", async () => {
     setWorkspaceView("incidents", true);
@@ -3101,7 +3867,7 @@ async function main() {
       ui.auditPage.value = "1";
     }
     await refresh();
-    ui.auditContent?.scrollIntoView({ behavior: "smooth", block: "start" });
+    focusRenderedRegion(ui.auditContent);
   });
   ui.settingsThemeMode?.addEventListener("change", () => {
     const mode = normalizeThemeMode(ui.settingsThemeMode?.value, "system");
@@ -3159,13 +3925,13 @@ async function main() {
         ? {
             status: "dirty",
             message:
-              "Draft has unapplied changes. Click Apply AIMXS Settings to update runtime choices.",
+              "AIMXS draft changed. Review warnings, then run Apply AIMXS Settings to update the active runtime choices.",
             errors: [],
             warnings: validation.warnings
           }
         : {
             status: "invalid",
-            message: "AIMXS settings failed validation; correct fields before apply.",
+            message: "AIMXS apply is blocked. Fix the fields below, then run Apply AIMXS Settings again.",
             errors: validation.errors,
             warnings: validation.warnings
           };
@@ -3182,7 +3948,7 @@ async function main() {
     const entry = integrationOverrides[key];
     const inlineState = {
       status: "dirty",
-      message: "Draft has unapplied changes. Save Draft, then Apply Saved to activate.",
+      message: "Project settings draft changed. Save Draft to checkpoint it, then run Apply Saved to activate this scope.",
       errors: [],
       warnings: [],
       hasSavedOverride: Boolean(entry?.override),
@@ -3200,8 +3966,9 @@ async function main() {
     }
     const settingsSubviewNode = target.closest("[data-settings-subtab]");
     if (settingsSubviewNode instanceof HTMLElement) {
-      const requested = String(settingsSubviewNode.dataset.settingsSubview || "").trim().toLowerCase();
+      const requested = String(settingsSubviewNode.dataset.settingsSubtab || "").trim().toLowerCase();
       setSettingsSubview(requested, true);
+      focusActiveSettingsSubview({ scroll: false });
       return;
     }
     const openAuditNode = target.closest("[data-settings-config-open-audit]");
@@ -3226,7 +3993,7 @@ async function main() {
       setWorkspaceView("incidents", true);
       setIncidentSubview("audit", true);
       await refresh();
-      ui.auditContent?.scrollIntoView({ behavior: "smooth", block: "start" });
+      focusRenderedRegion(ui.auditContent);
       return;
     }
     const aimxsActionNode = target.closest("[data-settings-aimxs-action]");
@@ -3243,7 +4010,7 @@ async function main() {
         if (!draft) {
           aimxsEditorState = {
             status: "invalid",
-            message: "AIMXS settings controls are unavailable in the current view.",
+            message: "AIMXS controls are unavailable in this view. Reopen Settings and retry the action.",
             errors: [],
             warnings: []
           };
@@ -3255,7 +4022,7 @@ async function main() {
         if (!validation.valid) {
           aimxsEditorState = {
             status: "invalid",
-            message: "AIMXS settings failed validation; correct fields before apply.",
+            message: "AIMXS apply is blocked. Fix the fields below, then run Apply AIMXS Settings again.",
             errors: validation.errors,
             warnings: validation.warnings
           };
@@ -3277,10 +4044,10 @@ async function main() {
         const mode = String(aimxsOverride.mode || "disabled").trim().toLowerCase();
         const message =
           mode === "https_external"
-            ? "AIMXS HTTPS mode applied with external provider refs."
+            ? "AIMXS HTTPS mode is active with external provider references."
             : mode === "in_stack_reserved"
-              ? "AIMXS mode set to in_stack_reserved placeholder; HTTPS external path remains primary."
-              : "AIMXS mode set to disabled.";
+              ? "AIMXS mode is set to in_stack_reserved placeholder; HTTPS external remains the active path in this build."
+              : "AIMXS mode is disabled.";
         aimxsEditorState = {
           status: "applied",
           message,
@@ -3322,7 +4089,7 @@ async function main() {
       if (!validation.valid) {
         const invalidState = {
           status: "invalid",
-          message: "Draft failed validation; fix errors before saving.",
+          message: "Save Draft is blocked. Fix the fields below, then save the project draft again.",
           errors: validation.errors,
           warnings: validation.warnings,
           hasSavedOverride: Boolean(integrationOverrides[key]?.override),
@@ -3345,7 +4112,7 @@ async function main() {
       persistIntegrationOverrides();
       const savedState = {
         status: "saved",
-        message: "Draft saved for this project scope. Click Apply Saved to activate.",
+        message: "Draft saved for this project scope. Review warnings if present, then run Apply Saved when you are ready to activate it.",
         errors: [],
         warnings: validation.warnings,
         hasSavedOverride: true,
@@ -3372,7 +4139,7 @@ async function main() {
       if (!validation.valid) {
         const invalidState = {
           status: "invalid",
-          message: "Saved draft is invalid; fix values and save again.",
+          message: "Apply Saved is blocked because the saved draft is invalid. Fix the values, save again, then retry Apply Saved.",
           errors: validation.errors,
           warnings: validation.warnings,
           hasSavedOverride: Boolean(entry?.override),
@@ -3387,7 +4154,9 @@ async function main() {
 
       const scope = resolveIntegrationScope(getSession(), projectID);
       const now = new Date().toISOString();
-      let appliedMessage = "Saved draft applied to active runtime choices for this project scope.";
+      let appliedMessage =
+        "Saved draft applied to active runtime choices for this project scope. Open Diagnostics to verify endpoint state and traceability.";
+      let appliedWarnings = [];
       let appliedAt = now;
       let savedAt = String(entry?.savedAt || now).trim();
       let source = "local-fallback";
@@ -3405,16 +4174,25 @@ async function main() {
           source = "runtime-endpoint";
           appliedAt = String(result?.updatedAt || now).trim() || now;
           savedAt = appliedAt;
-          appliedMessage = "Saved draft applied via runtime endpoint and activated for this project scope.";
+          appliedMessage =
+            "Saved draft applied via runtime endpoint and activated for this project scope. Open Diagnostics and Audit Events to verify the recorded change.";
           runtimeIntegrationSyncStateByProject[key] = "loaded";
         } else if (result?.source === "endpoint-unavailable") {
           appliedMessage =
-            "Runtime integration settings endpoint is unavailable; applied local fallback for this project scope.";
+            "Runtime integration settings endpoint is unavailable; applied local fallback for this project scope. Open Diagnostics, verify the integrationSettings endpoint row, then retry Apply Saved before relying on the change.";
+          appliedWarnings = [
+            "Runtime state may still differ from the local fallback until the integrationSettings endpoint returns to ready or available.",
+            `Retry Apply Saved after Diagnostics is clean, then open Audit Events for ${String(scope.projectId || projectID || "project:any")} to confirm the recorded runtime trail.`
+          ];
           runtimeIntegrationSyncStateByProject[key] = "endpoint-unavailable";
         }
       } else {
         appliedMessage =
-          "Tenant/project scope is unavailable; applied local fallback for this project scope.";
+          "Tenant/project scope is unavailable. Local fallback was updated only. Choose the intended project in the context bar, then save and apply again before relying on the change.";
+        appliedWarnings = [
+          "A runtime endpoint write cannot be verified until both tenant and project scope are present.",
+          "After scope is restored, reopen Configuration, confirm the project scope chip, then rerun Save Draft and Apply Saved."
+        ];
       }
 
       integrationOverrides[key] = {
@@ -3440,7 +4218,7 @@ async function main() {
         status: "applied",
         message: appliedMessage,
         errors: [],
-        warnings: validation.warnings,
+        warnings: [...validation.warnings, ...appliedWarnings],
         hasSavedOverride: true,
         applied: true,
         savedAt: String(integrationOverrides[key].savedAt || "").trim(),
@@ -3459,6 +4237,27 @@ async function main() {
 
     if (action === "reset") {
       const scope = resolveIntegrationScope(getSession(), projectID);
+      const confirmation = confirmResetProjectOverride(scope, projectID);
+      if (!confirmation.confirmed) {
+        const cancelledState = {
+          status: "warn",
+          message:
+            confirmation.reason === "mismatch"
+              ? "Reset override cancelled. Type RESET OVERRIDE to replace this project's saved values with baseline defaults."
+              : "Reset override cancelled. Existing project-scoped values remain active.",
+          errors: [],
+          warnings: [
+            `Current values remain active for ${String(scope?.tenantId || "tenant:unscoped")}/${String(scope?.projectId || projectID || "project:any")}.`
+          ],
+          hasSavedOverride: Boolean(integrationOverrides[key]?.override),
+          applied: Boolean(integrationOverrides[key]?.applied),
+          savedAt: String(integrationOverrides[key]?.savedAt || "").trim(),
+          appliedAt: String(integrationOverrides[key]?.appliedAt || "").trim()
+        };
+        setEditorStatusForProject(projectID, cancelledState);
+        renderSettingsEditorFeedbackInline(cancelledState);
+        return;
+      }
       const baselineProjectChoices = resolveChoicesForProject(baselineChoices, projectID, {});
       const baselineDraft = buildEditorDraftFromChoices(
         baselineProjectChoices,
@@ -3466,7 +4265,9 @@ async function main() {
       );
       const now = new Date().toISOString();
       let source = "local-fallback";
-      let statusMessage = "Project override reset to baseline defaults in local fallback mode.";
+      let statusMessage =
+        "Project override reset to baseline defaults in local fallback mode. Review the resulting values before editing again.";
+      let resetWarnings = [];
       let syncedAt = now;
 
       if (scope.tenantId && scope.projectId) {
@@ -3482,16 +4283,24 @@ async function main() {
           source = "runtime-endpoint";
           syncedAt = String(result?.updatedAt || now).trim() || now;
           statusMessage =
-            "Project override reset to baseline defaults via runtime endpoint.";
+            "Project override reset to baseline defaults via runtime endpoint. Open Diagnostics and Audit Events to confirm the new baseline.";
           runtimeIntegrationSyncStateByProject[key] = "loaded";
         } else if (result?.source === "endpoint-unavailable") {
           runtimeIntegrationSyncStateByProject[key] = "endpoint-unavailable";
           statusMessage =
-            "Runtime integration settings endpoint is unavailable; baseline defaults were applied locally only.";
+            "Runtime integration settings endpoint is unavailable; baseline defaults were applied locally only. Open Diagnostics, verify the integrationSettings endpoint row, then retry Reset Project Override before relying on this reset.";
+          resetWarnings = [
+            "Local baseline values can drift from runtime state until the integrationSettings endpoint is healthy again.",
+            `After endpoint recovery, rerun Reset Project Override and inspect Audit Events for ${String(scope.projectId || projectID || "project:any")}.`
+          ];
         }
       } else {
         statusMessage =
-          "Tenant/project scope is unavailable; baseline defaults were applied locally only.";
+          "Tenant/project scope is unavailable. Baseline defaults were applied locally only. Re-establish scope from the context bar, then retry the reset before relying on it.";
+        resetWarnings = [
+          "Scope must be restored before a runtime-backed reset can be confirmed.",
+          "After scope is restored, reopen Configuration, confirm project scope, rerun the reset, then verify Diagnostics and Audit Events."
+        ];
       }
 
       integrationOverrides[key] = {
@@ -3509,7 +4318,7 @@ async function main() {
         status: "applied",
         message: statusMessage,
         errors: [],
-        warnings: [],
+        warnings: resetWarnings,
         hasSavedOverride: true,
         applied: true,
         savedAt: syncedAt,
@@ -3529,6 +4338,24 @@ async function main() {
       });
       await refresh();
     }
+  });
+  ui.settingsContent?.addEventListener("keydown", (event) => {
+    if (!(event.target instanceof HTMLElement)) {
+      return;
+    }
+    const settingsSubviewNode = event.target.closest("[data-settings-subtab]");
+    if (!(settingsSubviewNode instanceof HTMLElement)) {
+      return;
+    }
+    handleHorizontalTabKeydown(
+      event,
+      Array.from(ui.settingsContent?.querySelectorAll("[data-settings-subtab]") || []),
+      (node) => String(node?.dataset?.settingsSubtab || "").trim().toLowerCase(),
+      (requested) => {
+        setSettingsSubview(requested, true);
+        focusActiveSettingsSubview({ scroll: false });
+      }
+    );
   });
   async function submitTerminalFromCurrentInput(origin = "manual") {
     const { input, issues, payload } = refreshTerminalPreview(getSession(), getRuntimeChoices());
@@ -3653,6 +4480,7 @@ async function main() {
     if (selectRunID) {
       openApprovalDetail(selectRunID);
       await refresh();
+      focusRenderedRegion(ui.approvalsDetailContent, { scroll: false });
       return;
     }
     const openRunNode = target.closest("[data-approval-open-run-id]");
@@ -3700,18 +4528,25 @@ async function main() {
     }
 
     const approvalScope = readApprovalFilters(ui);
+    const approvalRecord = store.getApprovalByRunID(runID) || {};
+    const decisionScope = formatScopeLabel(approvalRecord?.tenantId, approvalRecord?.projectId);
+    const submittedAt = new Date().toISOString();
     try {
       const result = await api.submitApprovalDecision(runID, decision, {
         ttlSeconds: approvalScope.ttlSeconds,
         reason
       });
       if (result?.applied === false) {
-        renderApprovalFeedback(ui, "warn", result.warning || "No approval endpoint available.");
+        renderApprovalFeedback(
+          ui,
+          "warn",
+          `${result.warning || "No approval endpoint available."} scope=${decisionScope}; source=approval-queue; submittedAt=${submittedAt}`
+        );
       } else {
         renderApprovalFeedback(
           ui,
           "ok",
-          `runId=${runID}; decision=${decision}; status=${result.status || "updated"}`
+          `runId=${runID}; decision=${decision}; status=${result.status || "updated"}; scope=${decisionScope}; source=approval-queue; submittedAt=${submittedAt}`
         );
       }
       if (ui.approvalsDetailContent) {
@@ -3747,6 +4582,7 @@ async function main() {
       await refresh();
       setWorkspaceView("approvals", true);
       ui.approvalsContent?.scrollIntoView({ behavior: "smooth", block: "start" });
+      focusRenderedRegion(ui.approvalsContent, { scroll: false });
       return;
     }
 
@@ -3777,6 +4613,7 @@ async function main() {
       setWorkspaceView("incidents", true);
       setIncidentSubview("audit", true);
       ui.auditContent?.scrollIntoView({ behavior: "smooth", block: "start" });
+      focusRenderedRegion(ui.auditContent, { scroll: false });
       return;
     }
 
@@ -3787,6 +4624,7 @@ async function main() {
       renderTerminalHistoryPanel();
       setWorkspaceView("operations", true);
       ui.terminalHistory?.scrollIntoView({ behavior: "smooth", block: "start" });
+      focusRenderedRegion(ui.terminalHistory, { scroll: false });
     }
   });
 
@@ -3825,18 +4663,21 @@ async function main() {
     if (ui.runsPage) {
       ui.runsPage.value = "1";
     }
+    syncCustomTimeFilterControls("runs");
     refresh().catch(() => {});
   });
   ui.runsTimeFrom?.addEventListener("change", () => {
     if (ui.runsPage) {
       ui.runsPage.value = "1";
     }
+    promoteCustomTimeFilter("runs");
     refresh().catch(() => {});
   });
   ui.runsTimeTo?.addEventListener("change", () => {
     if (ui.runsPage) {
       ui.runsPage.value = "1";
     }
+    promoteCustomTimeFilter("runs");
     refresh().catch(() => {});
   });
   ui.runsPageSize?.addEventListener("change", () => {
@@ -3858,18 +4699,21 @@ async function main() {
     if (ui.auditPage) {
       ui.auditPage.value = "1";
     }
+    syncCustomTimeFilterControls("audit");
     refresh().catch(() => {});
   });
   ui.auditTimeFrom?.addEventListener("change", () => {
     if (ui.auditPage) {
       ui.auditPage.value = "1";
     }
+    promoteCustomTimeFilter("audit");
     refresh().catch(() => {});
   });
   ui.auditTimeTo?.addEventListener("change", () => {
     if (ui.auditPage) {
       ui.auditPage.value = "1";
     }
+    promoteCustomTimeFilter("audit");
     refresh().catch(() => {});
   });
   ui.auditPageSize?.addEventListener("change", () => {
@@ -3890,33 +4734,37 @@ async function main() {
   ui.auditExportJsonButton?.addEventListener("click", () => {
     const bundle = getCurrentAuditFilingBundle();
     if (!Array.isArray(bundle?.items) || bundle.items.length === 0) {
-      renderAuditFilingFeedback("warn", "No audit rows match current filters; JSON export skipped.");
+      renderAuditFilingFeedback("warn", "No audit rows match the current filters, so JSON export was skipped.");
       return;
     }
-    const suffix = buildAuditFileSuffix(bundle?.meta?.filters || {});
-    const fileName = `audit-events-${suffix}.json`;
+    const fileName = buildAuditExportFileName("json", bundle?.meta?.filters || {}, bundle?.meta?.generatedAt);
     triggerTextDownload(JSON.stringify(bundle, null, 2), fileName, "application/json;charset=utf-8");
     if (ui.auditHandoffPreview instanceof HTMLElement) {
       ui.auditHandoffPreview.textContent = buildAuditHandoffText(bundle);
     }
-    renderAuditFilingFeedback("ok", `Exported ${bundle.items.length} rows to ${fileName}.`);
+    renderAuditFilingFeedback(
+      "ok",
+      `Audit JSON exported to ${fileName}. rows=${bundle.items.length}. Review the handoff preview before sharing downstream. ${buildAuditTraceabilitySummary(bundle, fileName)}`
+    );
   });
   ui.auditExportCsvButton?.addEventListener("click", () => {
     const bundle = getCurrentAuditFilingBundle();
     if (!Array.isArray(bundle?.items) || bundle.items.length === 0) {
-      renderAuditFilingFeedback("warn", "No audit rows match current filters; CSV export skipped.");
+      renderAuditFilingFeedback("warn", "No audit rows match the current filters, so CSV export was skipped.");
       return;
     }
-    const suffix = buildAuditFileSuffix(bundle?.meta?.filters || {});
-    const fileName = `audit-events-${suffix}.csv`;
+    const fileName = buildAuditExportFileName("csv", bundle?.meta?.filters || {}, bundle?.meta?.generatedAt);
     const csv = buildAuditCsv(bundle.items);
     triggerTextDownload(csv, fileName, "text/csv;charset=utf-8");
-    renderAuditFilingFeedback("ok", `Exported ${bundle.items.length} rows to ${fileName}.`);
+    renderAuditFilingFeedback(
+      "ok",
+      `Audit CSV exported to ${fileName}. rows=${bundle.items.length}. Review scope and time window before sharing downstream. ${buildAuditTraceabilitySummary(bundle, fileName)}`
+    );
   });
   ui.auditCopyHandoffButton?.addEventListener("click", async () => {
     const bundle = getCurrentAuditFilingBundle();
     if (!Array.isArray(bundle?.items) || bundle.items.length === 0) {
-      renderAuditFilingFeedback("warn", "No audit rows match current filters; handoff copy skipped.");
+      renderAuditFilingFeedback("warn", "No audit rows match the current filters, so handoff copy was skipped.");
       return;
     }
     const handoffText = buildAuditHandoffText(bundle);
@@ -3925,26 +4773,31 @@ async function main() {
       if (ui.auditHandoffPreview instanceof HTMLElement) {
         ui.auditHandoffPreview.textContent = handoffText;
       }
-      renderAuditFilingFeedback("ok", `Copied handoff summary for ${bundle.items.length} rows to clipboard.`);
+      renderAuditFilingFeedback(
+        "ok",
+        `Copied handoff summary for ${bundle.items.length} audit rows to clipboard. Review the preview pane before sending it downstream. ${buildAuditTraceabilitySummary(bundle)}`
+      );
     } catch (error) {
-      renderAuditFilingFeedback("error", `Handoff copy failed: ${error.message}`);
+      renderAuditFilingFeedback("error", `Audit handoff copy failed: ${error.message}`);
     }
   });
   ui.auditExportIncidentButton?.addEventListener("click", () => {
     const incidentPkg = getCurrentIncidentPackage();
     const runId = String(incidentPkg?.run?.runId || "").trim();
     if (!runId) {
-      renderAuditFilingFeedback("warn", "Select a run detail first, then export the incident package.");
+      renderAuditFilingFeedback("warn", "Select a run detail first, then export the incident package from Audit Events.");
       return;
     }
 
-    const suffix = buildAuditFileSuffix(incidentPkg?.audit?.meta?.filters || {});
-    const runToken = safeFileToken(runId, "run");
-    const fileName = `incident-package-${runToken}-${suffix}.json`;
     const handoffText = buildIncidentPackageHandoffText(incidentPkg);
     incidentPkg.handoff = {
       text: handoffText
     };
+    const fileName = buildIncidentPackageFileName(
+      runId,
+      incidentPkg?.audit?.meta?.filters || {},
+      incidentPkg?.meta?.generatedAt
+    );
     triggerTextDownload(JSON.stringify(incidentPkg, null, 2), fileName, "application/json;charset=utf-8");
     pushIncidentHistory(buildIncidentHistoryEntry(incidentPkg, fileName));
     if (ui.auditHandoffPreview instanceof HTMLElement) {
@@ -3954,7 +4807,7 @@ async function main() {
     const approvalStatus = String(incidentPkg?.approval?.status || "UNAVAILABLE").trim().toUpperCase();
     renderAuditFilingFeedback(
       "ok",
-      `Exported incident package ${fileName} (runId=${runId}; approval=${approvalStatus}; auditRows=${auditCount}).`
+      `Incident package exported to ${fileName}. runId=${runId}; approval=${approvalStatus}; auditRows=${auditCount}. Review the handoff preview and queue status before downstream handoff. ${buildIncidentTraceabilitySummary(incidentPkg, fileName)}`
     );
   });
   ui.auditContent?.addEventListener("click", async (event) => {
@@ -3984,14 +4837,17 @@ async function main() {
   });
   ui.incidentHistoryTimeRange?.addEventListener("change", () => {
     incidentHistoryViewState.page = 1;
+    syncCustomTimeFilterControls("incidents");
     renderIncidentHistoryPanel();
   });
   ui.incidentHistoryTimeFrom?.addEventListener("change", () => {
     incidentHistoryViewState.page = 1;
+    promoteCustomTimeFilter("incidents");
     renderIncidentHistoryPanel();
   });
   ui.incidentHistoryTimeTo?.addEventListener("change", () => {
     incidentHistoryViewState.page = 1;
+    promoteCustomTimeFilter("incidents");
     renderIncidentHistoryPanel();
   });
   ui.incidentHistoryPageSize?.addEventListener("change", () => {
@@ -4034,7 +4890,7 @@ async function main() {
   ui.incidentHistoryExportSelectedButton?.addEventListener("click", () => {
     const selectedEntries = getSelectedIncidentEntries();
     if (selectedEntries.length === 0) {
-      renderAuditFilingFeedback("warn", "Select one or more incident rows before export bundle.");
+      renderAuditFilingFeedback("warn", "Select one or more incident rows before exporting a bundle. This action exports selected incident JSON only.");
       return;
     }
     const session = getSession();
@@ -4043,29 +4899,26 @@ async function main() {
     ).trim();
     const view = readIncidentHistoryViewFromUI();
     const bundle = buildSelectedIncidentExportBundle(selectedEntries, view, actor);
-    const timestamp = String(bundle?.meta?.generatedAt || new Date().toISOString())
-      .replace(/[-:]/g, "")
-      .replace(/\.\d{3}Z$/, "Z");
-    const fileName = `incident-selected-bundle-${selectedEntries.length}-${timestamp}.json`;
+    const fileName = buildIncidentSelectionFileName(selectedEntries.length, bundle?.meta?.generatedAt);
     triggerTextDownload(JSON.stringify(bundle, null, 2), fileName, "application/json;charset=utf-8");
     renderAuditFilingFeedback(
       "ok",
-      `Exported selected incident bundle ${fileName} (rows=${selectedEntries.length}).`
+      `Selected incident bundle exported to ${fileName}. rows=${selectedEntries.length}; source=${bundle?.meta?.source || "-"}; generatedAt=${bundle?.meta?.generatedAt || "-"}; scopes=${(bundle?.meta?.scopeSummary || []).join(",") || "-"}. Review scope coverage before sharing downstream.`
     );
   });
   ui.incidentHistoryClearSelectionButton?.addEventListener("click", () => {
     clearIncidentHistorySelection();
-    renderAuditFilingFeedback("warn", "Cleared incident selection.");
+    renderAuditFilingFeedback("info", "Incident selection cleared. Choose queue rows again before running bulk actions or selected export.");
   });
   ui.incidentHistoryCopyLatestButton?.addEventListener("click", async () => {
     const [latest] = store.getIncidentPackageHistory();
     if (!latest) {
-      renderAuditFilingFeedback("warn", "Incident queue is empty; no handoff text to copy.");
+      renderAuditFilingFeedback("warn", "Incident queue is empty, so there is no incident handoff summary to copy.");
       return;
     }
     const handoffText = String(latest?.handoffText || "").trim();
     if (!handoffText) {
-      renderAuditFilingFeedback("warn", "Latest incident package has no handoff text.");
+      renderAuditFilingFeedback("warn", "Latest incident package does not have a handoff summary yet.");
       return;
     }
     try {
@@ -4073,14 +4926,28 @@ async function main() {
       if (ui.auditHandoffPreview instanceof HTMLElement) {
         ui.auditHandoffPreview.textContent = handoffText;
       }
-      renderAuditFilingFeedback("ok", `Copied latest incident handoff (${latest.packageId || latest.id}).`);
+      renderAuditFilingFeedback(
+        "ok",
+        `Latest incident handoff summary copied for ${latest.packageId || latest.id}. Review the preview pane before sending it downstream. ${buildIncidentEntryTraceabilitySummary(latest)}`
+      );
     } catch (error) {
-      renderAuditFilingFeedback("error", `Incident handoff copy failed: ${error.message}`);
+      renderAuditFilingFeedback("error", `Incident handoff summary copy failed: ${error.message}`);
     }
   });
   ui.incidentHistoryClearButton?.addEventListener("click", () => {
+    const totalCount = store.getIncidentPackageHistory().length;
+    const confirmation = confirmIncidentQueueClear(totalCount, incidentHistorySelection.size);
+    if (!confirmation.confirmed) {
+      renderAuditFilingFeedback(
+        "warn",
+        confirmation.reason === "mismatch"
+          ? "Incident queue clear cancelled. Type CLEAR QUEUE to confirm destructive queue removal."
+          : "Incident queue clear cancelled. Queue contents were preserved."
+      );
+      return;
+    }
     clearIncidentHistoryQueue();
-    renderAuditFilingFeedback("warn", "Cleared incident filing queue.");
+    renderAuditFilingFeedback("warn", "Incident queue cleared after operator confirmation. Export a new incident package if downstream tracking must continue.");
   });
   ui.incidentHistoryContent?.addEventListener("change", (event) => {
     const target = event.target;
@@ -4105,7 +4972,7 @@ async function main() {
       page: pageState.page,
       pageSize: pageState.pageSize,
       totalPages: pageState.totalPages
-    });
+    }, allItems, visible);
   });
   ui.incidentHistoryContent?.addEventListener("click", async (event) => {
     const target = event.target;
@@ -4134,7 +5001,7 @@ async function main() {
       if (!canTransitionIncidentStatus(currentStatus, nextStatus)) {
         renderAuditFilingFeedback(
           "warn",
-          `Transition blocked for ${entry.packageId || entry.id}: ${currentStatus} -> ${nextStatus}.`
+          `Status change blocked for ${entry.packageId || entry.id}: ${currentStatus} -> ${nextStatus}. Follow the row guidance before retrying.`
         );
         return;
       }
@@ -4147,7 +5014,7 @@ async function main() {
       renderIncidentHistoryPanel();
       renderAuditFilingFeedback(
         "ok",
-        `Updated filing status for ${entry.packageId || entry.id}: ${currentStatus} -> ${nextStatus}.`
+        `Incident queue status updated for ${entry.packageId || entry.id}: ${currentStatus} -> ${nextStatus}. Review the row guidance before leaving the queue.`
       );
       return;
     }
@@ -4159,10 +5026,9 @@ async function main() {
       }
       const fallbackRunId = String(entry?.runId || "").trim();
       const fallbackFileName = String(entry?.fileName || "").trim();
-      const runToken = safeFileToken(fallbackRunId, "run");
-      const fileName = fallbackFileName || `incident-package-${runToken}-${Date.now()}.json`;
+      const fileName = fallbackFileName || buildIncidentPackageFileName(fallbackRunId, {}, new Date().toISOString());
       triggerTextDownload(JSON.stringify(entry.payload, null, 2), fileName, "application/json;charset=utf-8");
-      renderAuditFilingFeedback("ok", `Downloaded incident package ${fileName}.`);
+      renderAuditFilingFeedback("ok", `Incident package JSON downloaded to ${fileName}. Review package metadata before external handoff. ${buildIncidentEntryTraceabilitySummary(entry)}`);
       return;
     }
     const copyId = String(target.dataset.incidentHistoryCopyId || "").trim();
@@ -4170,7 +5036,7 @@ async function main() {
       const entry = store.getIncidentPackageHistoryById(copyId);
       const handoffText = String(entry?.handoffText || "").trim();
       if (!handoffText) {
-        renderAuditFilingFeedback("warn", "Selected incident entry has no handoff text.");
+        renderAuditFilingFeedback("warn", "Selected incident entry does not have a handoff summary yet.");
         return;
       }
       try {
@@ -4178,9 +5044,12 @@ async function main() {
         if (ui.auditHandoffPreview instanceof HTMLElement) {
           ui.auditHandoffPreview.textContent = handoffText;
         }
-        renderAuditFilingFeedback("ok", `Copied incident handoff (${entry.packageId || entry.id}).`);
+        renderAuditFilingFeedback(
+          "ok",
+          `Incident handoff summary copied for ${entry.packageId || entry.id}. Review the preview pane before sending it downstream. ${buildIncidentEntryTraceabilitySummary(entry)}`
+        );
       } catch (error) {
-        renderAuditFilingFeedback("error", `Incident handoff copy failed: ${error.message}`);
+        renderAuditFilingFeedback("error", `Incident handoff summary copy failed: ${error.message}`);
       }
       return;
     }
@@ -4285,7 +5154,11 @@ async function main() {
       latestRunDetail = null;
       latestRunDetailSource = "unknown";
       delete ui.runDetailContent.dataset.selectedRunId;
-      ui.runDetailContent.innerHTML = '<div class="metric"><div class="meta">Select a run to view detail.</div></div>';
+      ui.runDetailContent.innerHTML = renderPanelStateMetric(
+        "info",
+        "Run Detail",
+        "Select a run to view detail."
+      );
       await refresh();
       return;
     }
@@ -4319,7 +5192,7 @@ async function main() {
 
     await refresh();
     setWorkspaceView("approvals", true);
-    ui.approvalsContent?.scrollIntoView({ behavior: "smooth", block: "start" });
+    openApprovalDetail(openApprovalRunID);
   });
 
   const stopRefreshLoop = startRealtimeRefreshLoop(getRuntimeChoices(), refresh);

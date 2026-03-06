@@ -30,6 +30,132 @@ export function chipClassForStatus(status) {
   return "chip chip-danger";
 }
 
+function normalizePanelStateTone(value) {
+  const tone = String(value || "").trim().toLowerCase();
+  if (
+    tone === "loading" ||
+    tone === "empty" ||
+    tone === "error" ||
+    tone === "success" ||
+    tone === "warn" ||
+    tone === "info"
+  ) {
+    return tone;
+  }
+  return "info";
+}
+
+function panelStateLabel(tone) {
+  if (tone === "loading") {
+    return "Loading";
+  }
+  if (tone === "empty") {
+    return "Empty";
+  }
+  if (tone === "error") {
+    return "Error";
+  }
+  if (tone === "success") {
+    return "Success";
+  }
+  if (tone === "warn") {
+    return "Warning";
+  }
+  return "Info";
+}
+
+function panelStateChipClass(tone) {
+  if (tone === "success") {
+    return "chip chip-ok chip-compact";
+  }
+  if (tone === "error") {
+    return "chip chip-danger chip-compact";
+  }
+  if (tone === "loading" || tone === "warn") {
+    return "chip chip-warn chip-compact";
+  }
+  return "chip chip-neutral chip-compact";
+}
+
+function defaultPanelStateNextStep(tone) {
+  if (tone === "loading") {
+    return "Next step: wait for refresh to finish, then confirm scope, counts, and latest timestamps.";
+  }
+  if (tone === "empty") {
+    return "Next step: widen scope or clear filters. If data should exist, refresh and verify upstream runtime or endpoint health.";
+  }
+  if (tone === "error") {
+    return "Next step: retry once, then verify scope, endpoint health, and upstream runtime state before proceeding.";
+  }
+  if (tone === "warn") {
+    return "Next step: confirm scope and source, then continue only if the warning matches operator intent.";
+  }
+  return "";
+}
+
+export function renderPanelStateMetric(state, title, message, detail = "") {
+  const tone = normalizePanelStateTone(state);
+  const label = panelStateLabel(tone);
+  const chipClass = panelStateChipClass(tone);
+  const safeTitle = String(title || "").trim() || "Status";
+  const safeMessage = String(message || "").trim() || "-";
+  const safeDetail = String(detail || "").trim() || defaultPanelStateNextStep(tone);
+  return `
+    <div class="metric panel-state panel-state-${escapeHTML(tone)}">
+      <div class="title">${escapeHTML(safeTitle)}</div>
+      <div class="meta"><span class="${chipClass}">${escapeHTML(label)}</span></div>
+      <div class="meta">${escapeHTML(safeMessage)}</div>
+      ${safeDetail ? `<div class="meta panel-state-next">${escapeHTML(safeDetail)}</div>` : ""}
+    </div>
+  `;
+}
+
+function traceabilityChipClass(tone) {
+  const normalized = String(tone || "").trim().toLowerCase();
+  if (normalized === "ok" || normalized === "success") {
+    return "chip chip-ok chip-compact";
+  }
+  if (normalized === "warn" || normalized === "warning") {
+    return "chip chip-warn chip-compact";
+  }
+  if (normalized === "danger" || normalized === "error") {
+    return "chip chip-danger chip-compact";
+  }
+  return "chip chip-neutral chip-compact";
+}
+
+export function renderTraceabilityChips(entries = []) {
+  const items = Array.isArray(entries) ? entries : [];
+  return items
+    .map((entry) => {
+      const label = String(entry?.label || "").trim();
+      if (!label) {
+        return "";
+      }
+      const value = String(entry?.value || "").trim() || "-";
+      return `<span class="${traceabilityChipClass(entry?.tone)}">${escapeHTML(label)}=${escapeHTML(value)}</span>`;
+    })
+    .filter(Boolean)
+    .join("");
+}
+
+export function renderTraceabilityMetric(title, entries = [], note = "", lines = []) {
+  const chips = renderTraceabilityChips(entries);
+  const safeTitle = String(title || "").trim() || "Traceability";
+  const safeNote = String(note || "").trim();
+  const extraLines = (Array.isArray(lines) ? lines : [])
+    .map((line) => String(line || "").trim())
+    .filter(Boolean);
+  return `
+    <div class="metric traceability-metric">
+      <div class="title">${escapeHTML(safeTitle)}</div>
+      ${safeNote ? `<div class="meta metric-note">${escapeHTML(safeNote)}</div>` : ""}
+      ${chips ? `<div class="run-detail-chips">${chips}</div>` : ""}
+      ${extraLines.map((line) => `<div class="meta">${escapeHTML(line)}</div>`).join("")}
+    </div>
+  `;
+}
+
 export function formatTime(value) {
   if (!value) {
     return "-";

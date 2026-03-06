@@ -24,7 +24,7 @@
       </div>
     </header>
 
-    <nav class="workspace-nav" aria-label="Workspace sections" role="tablist">
+    <nav class="workspace-nav" aria-label="Workspace sections" role="tablist" aria-orientation="horizontal">
       <button class="workspace-tab is-active" type="button" role="tab" aria-selected="true" data-workspace-tab="operations">
         Operations
       </button>
@@ -132,7 +132,10 @@
 
       <section class="panel panel-settings" data-workspace-section="settings">
         <div class="panel-header">
-          <h2>Settings &amp; Integration Contracts</h2>
+          <div class="panel-heading">
+            <h2>Settings Control Plane</h2>
+            <p class="panel-lead">Manage routing defaults, provider contracts, storage, and diagnostics before changing runtime behavior.</p>
+          </div>
           <div class="filter-row">
             <select id="settings-agent-profile" class="filter-input"></select>
             <select id="settings-theme-mode" class="filter-input">
@@ -148,6 +151,15 @@
             >Show advanced details</button>
             <button id="settings-open-audit-events-button" class="btn btn-secondary" type="button">Open Audit Events</button>
           </div>
+        </div>
+        <div class="metric workflow-guide">
+          <div class="title">Settings Workflow</div>
+          <div class="meta">Use this workspace to change configuration deliberately and verify the resulting control-plane state.</div>
+          <ol class="workflow-guide-list">
+            <li>Select the active agent profile, then open the relevant settings subpanel.</li>
+            <li>Review configuration and diagnostics before applying a change.</li>
+            <li>Use Open Audit Events after changes to confirm the recorded control-plane trail.</li>
+          </ol>
         </div>
         <div id="settings-content" class="stack"></div>
       </section>
@@ -319,55 +331,90 @@
       </section>
 
       <section class="panel panel-providers" data-workspace-section="settings">
-        <h2>Extension Providers</h2>
+        <div class="panel-heading">
+          <h2>Provider Contract Inventory</h2>
+          <p class="panel-lead">Review registered extension providers, versions, endpoints, and capability coverage for the active scope.</p>
+        </div>
         <div id="providers-content" class="stack"></div>
       </section>
 
       <section class="panel panel-approvals" data-workspace-section="approvals">
         <div class="panel-header">
-          <h2>Approvals Queue</h2>
-          <div class="filter-row">
-            <input id="approvals-tenant-filter" class="filter-input" type="text" placeholder="tenant filter" />
-            <input id="approvals-project-filter" class="filter-input" type="text" placeholder="project filter" />
-            <select id="approvals-status-filter" class="filter-input">
-              <option value="">status:any</option>
-              <option value="PENDING">status:pending</option>
-              <option value="APPROVED">status:approved</option>
-              <option value="DENIED">status:denied</option>
-              <option value="EXPIRED">status:expired</option>
-            </select>
-            <select id="approvals-time-range" class="filter-input">
-              <option value="">time:any</option>
-              <option value="1h">time:last-1h</option>
-              <option value="24h">time:last-24h</option>
-              <option value="7d">time:last-7d</option>
-              <option value="30d">time:last-30d</option>
-              <option value="custom">time:custom</option>
-            </select>
-            <input id="approvals-time-from" class="filter-input" type="datetime-local" aria-label="approvals from time" />
-            <input id="approvals-time-to" class="filter-input" type="datetime-local" aria-label="approvals to time" />
-            <select id="approvals-sort" class="filter-input">
-              <option value="ttl_asc">sort:ttl-soonest</option>
-              <option value="ttl_desc">sort:ttl-latest</option>
-              <option value="created_desc">sort:newest</option>
-              <option value="status">sort:status</option>
-            </select>
-            <select id="approvals-page-size" class="filter-input">
-              <option value="10">page:10</option>
-              <option value="25" selected>page:25</option>
-              <option value="50">page:50</option>
-              <option value="100">page:100</option>
-            </select>
-            <input id="approvals-page" class="filter-input filter-input-small" type="number" min="1" value="1" />
-            <input id="approvals-ttl-seconds" class="filter-input filter-input-small" type="number" min="60" max="86400" value="900" data-advanced-section="approvals" />
-            <button
-              id="approvals-advanced-toggle"
-              class="btn btn-secondary btn-small"
-              type="button"
-              data-advanced-toggle-section="approvals"
-            >Show advanced details</button>
-            <button id="approvals-apply-button" class="btn btn-secondary">Apply</button>
+          <div class="panel-heading">
+            <h2>Approval Decision Queue</h2>
+            <p class="panel-lead">Review human-gated requests, confirm decision context, and record approve or deny outcomes with evidence.</p>
           </div>
+          <div class="filter-row filter-row-data filter-row-approvals">
+            <div class="filter-group filter-group-scope">
+              <span class="filter-group-label">Scope</span>
+              <input id="approvals-tenant-filter" class="filter-input" type="text" placeholder="tenant filter" />
+              <input id="approvals-project-filter" class="filter-input" type="text" placeholder="project filter" />
+              <select id="approvals-status-filter" class="filter-input">
+                <option value="">status:any</option>
+                <option value="PENDING">status:pending</option>
+                <option value="APPROVED">status:approved</option>
+                <option value="DENIED">status:denied</option>
+                <option value="EXPIRED">status:expired</option>
+              </select>
+            </div>
+            <div class="filter-group filter-group-time">
+              <span class="filter-group-label">Time + Order</span>
+              <select id="approvals-time-range" class="filter-input">
+                <option value="">time:any</option>
+                <option value="1h">time:last-1h</option>
+                <option value="24h">time:last-24h</option>
+                <option value="7d">time:last-7d</option>
+                <option value="30d">time:last-30d</option>
+                <option value="custom">time:custom</option>
+              </select>
+              <select id="approvals-sort" class="filter-input">
+                <option value="ttl_asc">sort:ttl-soonest</option>
+                <option value="ttl_desc">sort:ttl-latest</option>
+                <option value="created_desc">sort:newest</option>
+                <option value="status">sort:status</option>
+              </select>
+              <div class="filter-custom-time-range" data-time-filter-fields="approvals" hidden aria-hidden="true">
+                <input id="approvals-time-from" class="filter-input" type="datetime-local" aria-label="approvals from time" />
+                <input id="approvals-time-to" class="filter-input" type="datetime-local" aria-label="approvals to time" />
+              </div>
+            </div>
+            <div class="filter-group filter-group-page">
+              <span class="filter-group-label">Pagination</span>
+              <select id="approvals-page-size" class="filter-input">
+                <option value="10">page:10</option>
+                <option value="25" selected>page:25</option>
+                <option value="50">page:50</option>
+                <option value="100">page:100</option>
+              </select>
+              <input id="approvals-page" class="filter-input filter-input-small" type="number" min="1" value="1" />
+              <input id="approvals-ttl-seconds" class="filter-input filter-input-small" type="number" min="60" max="86400" value="900" data-advanced-section="approvals" />
+            </div>
+            <div class="filter-group filter-group-actions">
+              <span class="filter-group-label">Actions</span>
+              <div class="action-hierarchy">
+                <div class="action-group action-group-secondary">
+                  <button
+                    id="approvals-advanced-toggle"
+                    class="btn btn-secondary btn-small"
+                    type="button"
+                    data-advanced-toggle-section="approvals"
+                  >Show advanced details</button>
+                </div>
+                <div class="action-group action-group-primary">
+                  <button id="approvals-apply-button" class="btn btn-primary">Apply</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="metric workflow-guide">
+          <div class="title">Approvals Workflow</div>
+          <div class="meta">Use this queue when runtime policy or human gating requires an operator decision.</div>
+          <ol class="workflow-guide-list">
+            <li>Apply scope and time filters to isolate pending or expiring approvals.</li>
+            <li>Open an approval row to review run context, policy basis, and time-to-expiry.</li>
+            <li>Approve or deny only after confirming the requested action and related run evidence.</li>
+          </ol>
         </div>
         <div id="approvals-feedback" class="stack" aria-live="polite"></div>
         <div id="approvals-content" class="stack"></div>
@@ -376,56 +423,88 @@
 
       <section class="panel panel-runs" data-workspace-section="runs">
         <div class="panel-header">
-          <h2>Runs</h2>
-          <div class="filter-row">
-            <input id="runs-runid-filter" class="filter-input" type="text" placeholder="runId filter" />
-            <input id="runs-tenant-filter" class="filter-input" type="text" placeholder="tenant filter" />
-            <input id="runs-project-filter" class="filter-input" type="text" placeholder="project filter" />
-            <select id="runs-status-filter" class="filter-input">
-              <option value="">status:any</option>
-              <option value="COMPLETED">status:completed</option>
-              <option value="FAILED">status:failed</option>
-              <option value="POLICY_BLOCKED">status:policy_blocked</option>
-              <option value="POLICY_EVALUATED">status:policy_evaluated</option>
-              <option value="DESKTOP_VERIFIED">status:desktop_verified</option>
-            </select>
-            <select id="runs-decision-filter" class="filter-input">
-              <option value="">decision:any</option>
-              <option value="ALLOW">decision:allow</option>
-              <option value="DENY">decision:deny</option>
-            </select>
-            <select id="runs-time-range" class="filter-input">
-              <option value="">time:any</option>
-              <option value="1h">time:last-1h</option>
-              <option value="24h">time:last-24h</option>
-              <option value="7d">time:last-7d</option>
-              <option value="30d">time:last-30d</option>
-              <option value="custom">time:custom</option>
-            </select>
-            <input id="runs-time-from" class="filter-input" type="datetime-local" aria-label="runs from time" />
-            <input id="runs-time-to" class="filter-input" type="datetime-local" aria-label="runs to time" />
-            <select id="runs-sort" class="filter-input">
-              <option value="updated_desc">sort:updated-newest</option>
-              <option value="updated_asc">sort:updated-oldest</option>
-              <option value="created_desc">sort:created-newest</option>
-              <option value="status">sort:status</option>
-            </select>
-            <input id="runs-limit-filter" class="filter-input filter-input-small" type="number" min="1" max="500" value="25" data-advanced-section="runs" />
-            <select id="runs-page-size" class="filter-input">
-              <option value="10">page:10</option>
-              <option value="25" selected>page:25</option>
-              <option value="50">page:50</option>
-              <option value="100">page:100</option>
-            </select>
-            <input id="runs-page" class="filter-input filter-input-small" type="number" min="1" value="1" />
-            <button
-              id="runs-advanced-toggle"
-              class="btn btn-secondary btn-small"
-              type="button"
-              data-advanced-toggle-section="runs"
-            >Show advanced details</button>
-            <button id="runs-apply-button" class="btn btn-secondary">Apply</button>
+          <div class="panel-heading">
+            <h2>Run Review Queue</h2>
+            <p class="panel-lead">Track execution state, inspect evidence, and connect each run to approval or incident handling.</p>
           </div>
+          <div class="filter-row filter-row-data filter-row-runs">
+            <div class="filter-group filter-group-scope">
+              <span class="filter-group-label">Scope</span>
+              <input id="runs-runid-filter" class="filter-input filter-input-wide" type="text" placeholder="runId filter" />
+              <input id="runs-tenant-filter" class="filter-input" type="text" placeholder="tenant filter" />
+              <input id="runs-project-filter" class="filter-input" type="text" placeholder="project filter" />
+              <select id="runs-status-filter" class="filter-input">
+                <option value="">status:any</option>
+                <option value="COMPLETED">status:completed</option>
+                <option value="FAILED">status:failed</option>
+                <option value="POLICY_BLOCKED">status:policy_blocked</option>
+                <option value="POLICY_EVALUATED">status:policy_evaluated</option>
+                <option value="DESKTOP_VERIFIED">status:desktop_verified</option>
+              </select>
+              <select id="runs-decision-filter" class="filter-input">
+                <option value="">decision:any</option>
+                <option value="ALLOW">decision:allow</option>
+                <option value="DENY">decision:deny</option>
+              </select>
+            </div>
+            <div class="filter-group filter-group-time">
+              <span class="filter-group-label">Time + Order</span>
+              <select id="runs-time-range" class="filter-input">
+                <option value="">time:any</option>
+                <option value="1h">time:last-1h</option>
+                <option value="24h">time:last-24h</option>
+                <option value="7d">time:last-7d</option>
+                <option value="30d">time:last-30d</option>
+                <option value="custom">time:custom</option>
+              </select>
+              <select id="runs-sort" class="filter-input">
+                <option value="updated_desc">sort:updated-newest</option>
+                <option value="updated_asc">sort:updated-oldest</option>
+                <option value="created_desc">sort:created-newest</option>
+                <option value="status">sort:status</option>
+              </select>
+              <div class="filter-custom-time-range" data-time-filter-fields="runs" hidden aria-hidden="true">
+                <input id="runs-time-from" class="filter-input" type="datetime-local" aria-label="runs from time" />
+                <input id="runs-time-to" class="filter-input" type="datetime-local" aria-label="runs to time" />
+              </div>
+            </div>
+            <div class="filter-group filter-group-page">
+              <span class="filter-group-label">Pagination</span>
+              <input id="runs-limit-filter" class="filter-input filter-input-small" type="number" min="1" max="500" value="25" data-advanced-section="runs" />
+              <select id="runs-page-size" class="filter-input">
+                <option value="10">page:10</option>
+                <option value="25" selected>page:25</option>
+                <option value="50">page:50</option>
+                <option value="100">page:100</option>
+              </select>
+              <input id="runs-page" class="filter-input filter-input-small" type="number" min="1" value="1" />
+            </div>
+            <div class="filter-group filter-group-actions">
+              <span class="filter-group-label">Actions</span>
+              <div class="action-hierarchy">
+                <div class="action-group action-group-secondary">
+                  <button
+                    id="runs-advanced-toggle"
+                    class="btn btn-secondary btn-small"
+                    type="button"
+                    data-advanced-toggle-section="runs"
+                  >Show advanced details</button>
+                </div>
+                <div class="action-group action-group-primary">
+                  <button id="runs-apply-button" class="btn btn-primary">Apply</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="metric workflow-guide">
+          <div class="title">Runs Workflow</div>
+          <div class="meta">Use this queue to verify what happened, why it happened, and what operational handoff comes next.</div>
+          <ol class="workflow-guide-list">
+            <li>Apply scope, status, and time filters to narrow the run set.</li>
+            <li>Select a run row and review timeline first, then evidence, then approval linkage.</li>
+            <li>Escalate only after evidence review, using Approval Detail or incident export as needed.</li>
+          </ol>
         </div>
         <div id="runs-content" class="stack"></div>
         <div id="run-detail-content" class="stack"></div>
@@ -433,64 +512,109 @@
 
       <section class="panel panel-audit" data-workspace-section="incidents">
         <div class="panel-header">
-          <h2>Incidents</h2>
-          <div class="incident-subtabs" role="tablist" aria-label="Incidents views">
-            <button class="incident-subtab is-active" type="button" data-incident-subtab="queue">Incident Queue</button>
-            <button class="incident-subtab" type="button" data-incident-subtab="audit">Audit Events</button>
+          <div class="panel-heading">
+            <h2>Incident Coordination</h2>
+            <p class="panel-lead">Package filing-ready runs, manage queue status, and export audit-aligned handoffs for downstream response.</p>
           </div>
-          <button
-            id="incidents-advanced-toggle"
-            class="btn btn-secondary btn-small"
-            type="button"
-            data-advanced-toggle-section="incidents"
-          >Show advanced details</button>
+          <div class="panel-header-actions">
+            <div class="incident-subtabs" role="tablist" aria-label="Incidents views" aria-orientation="horizontal">
+              <button class="incident-subtab is-active" type="button" data-incident-subtab="queue">Incident Queue</button>
+              <button class="incident-subtab" type="button" data-incident-subtab="audit">Audit Events</button>
+            </div>
+            <button
+              id="incidents-advanced-toggle"
+              class="btn btn-secondary btn-small"
+              type="button"
+              data-advanced-toggle-section="incidents"
+            >Show advanced details</button>
+          </div>
+        </div>
+        <div class="metric workflow-guide">
+          <div class="title">Incidents Workflow</div>
+          <div class="meta">Use this workspace when a run needs durable incident packaging, queue tracking, or audit-backed handoff output.</div>
+          <ol class="workflow-guide-list">
+            <li>Use queue filters or quick views to isolate drafted, filed, or closure-required packages.</li>
+            <li>Select packages, update filing status, and export incident JSON or copy the matching handoff summary.</li>
+            <li>Use Audit Events to validate source records and produce audit exports for response teams.</li>
+          </ol>
         </div>
         <section class="incident-subpanel is-active" data-incident-subpanel="queue">
           <div class="panel-header">
-            <h2>Incident Filing Queue</h2>
+            <div class="panel-heading">
+              <h2>Incident Filing Queue</h2>
+              <p class="panel-lead">Triage run-linked incident packages, manage filing state, and prepare handoff bundles.</p>
+            </div>
             <div class="incident-toolbar">
-              <div class="filter-row incident-filter-row">
-                <select id="incident-history-status-filter" class="filter-input" aria-label="incident status filter">
-                  <option value="">status:any</option>
-                  <option value="drafted">status:drafted</option>
-                  <option value="filed">status:filed</option>
-                  <option value="closed">status:closed</option>
-                </select>
-                <select id="incident-history-sort" class="filter-input" aria-label="incident sort">
-                  <option value="newest">sort:newest</option>
-                  <option value="oldest">sort:oldest</option>
-                  <option value="status">sort:status</option>
-                </select>
-                <select id="incident-history-time-range" class="filter-input">
-                  <option value="">time:any</option>
-                  <option value="1h">time:last-1h</option>
-                  <option value="24h">time:last-24h</option>
-                  <option value="7d">time:last-7d</option>
-                  <option value="30d">time:last-30d</option>
-                  <option value="custom">time:custom</option>
-                </select>
-                <input id="incident-history-time-from" class="filter-input" type="datetime-local" aria-label="incident from time" />
-                <input id="incident-history-time-to" class="filter-input" type="datetime-local" aria-label="incident to time" />
-                <select id="incident-history-page-size" class="filter-input">
-                  <option value="10">page:10</option>
-                  <option value="25" selected>page:25</option>
-                  <option value="50">page:50</option>
-                  <option value="100">page:100</option>
-                </select>
-                <input id="incident-history-page" class="filter-input filter-input-small" type="number" min="1" value="1" />
-                <input id="incident-history-search-input" class="filter-input" type="text" placeholder="search runId/packageId" aria-label="incident search" />
-                <button id="incident-history-search-clear-button" class="btn btn-secondary" type="button">Clear Search</button>
-                <button id="incident-history-quick-all-button" class="btn btn-secondary" type="button">Show All</button>
-                <button id="incident-history-quick-filed-button" class="btn btn-secondary" type="button">Show Filed</button>
-                <button id="incident-history-quick-needs-closure-button" class="btn btn-secondary" type="button">Needs Closure</button>
+              <div class="filter-row filter-row-data filter-row-incidents incident-filter-row">
+                <div class="filter-group filter-group-scope">
+                  <span class="filter-group-label">Scope</span>
+                  <select id="incident-history-status-filter" class="filter-input" aria-label="incident status filter">
+                    <option value="">status:any</option>
+                    <option value="drafted">status:drafted</option>
+                    <option value="filed">status:filed</option>
+                    <option value="closed">status:closed</option>
+                  </select>
+                  <select id="incident-history-sort" class="filter-input" aria-label="incident sort">
+                    <option value="newest">sort:newest</option>
+                    <option value="oldest">sort:oldest</option>
+                    <option value="status">sort:status</option>
+                  </select>
+                  <input id="incident-history-search-input" class="filter-input" type="text" placeholder="search runId/packageId" aria-label="incident search" />
+                  <button id="incident-history-search-clear-button" class="btn btn-secondary" type="button">Clear Search</button>
+                </div>
+                <div class="filter-group filter-group-time">
+                  <span class="filter-group-label">Time</span>
+                  <select id="incident-history-time-range" class="filter-input">
+                    <option value="">time:any</option>
+                    <option value="1h">time:last-1h</option>
+                    <option value="24h">time:last-24h</option>
+                    <option value="7d">time:last-7d</option>
+                    <option value="30d">time:last-30d</option>
+                    <option value="custom">time:custom</option>
+                  </select>
+                  <div class="filter-custom-time-range" data-time-filter-fields="incidents" hidden aria-hidden="true">
+                    <input id="incident-history-time-from" class="filter-input" type="datetime-local" aria-label="incident from time" />
+                    <input id="incident-history-time-to" class="filter-input" type="datetime-local" aria-label="incident to time" />
+                  </div>
+                </div>
+                <div class="filter-group filter-group-page">
+                  <span class="filter-group-label">Pagination</span>
+                  <select id="incident-history-page-size" class="filter-input">
+                    <option value="10">page:10</option>
+                    <option value="25" selected>page:25</option>
+                    <option value="50">page:50</option>
+                    <option value="100">page:100</option>
+                  </select>
+                  <input id="incident-history-page" class="filter-input filter-input-small" type="number" min="1" value="1" />
+                </div>
+                <div class="filter-group filter-group-actions">
+                  <span class="filter-group-label">Quick Views</span>
+                  <div class="action-hierarchy">
+                    <div class="action-group action-group-primary">
+                      <button id="incident-history-quick-all-button" class="btn btn-primary" type="button">Show All</button>
+                    </div>
+                    <div class="action-group action-group-secondary">
+                      <button id="incident-history-quick-filed-button" class="btn btn-secondary" type="button">Show Filed</button>
+                      <button id="incident-history-quick-needs-closure-button" class="btn btn-secondary" type="button">Needs Closure</button>
+                    </div>
+                  </div>
+                </div>
               </div>
               <div class="filter-row incident-action-row" data-advanced-section="incidents">
-                <button id="incident-history-bulk-filed-button" class="btn btn-secondary" type="button">Mark Selected Filed</button>
-                <button id="incident-history-bulk-closed-button" class="btn btn-secondary" type="button">Mark Selected Closed</button>
-                <button id="incident-history-export-selected-button" class="btn btn-secondary" type="button">Export Selected Bundle</button>
-                <button id="incident-history-clear-selection-button" class="btn btn-secondary" type="button">Clear Selection</button>
-                <button id="incident-history-copy-latest-button" class="btn btn-secondary" type="button">Copy Latest Handoff</button>
-                <button id="incident-history-clear-button" class="btn btn-secondary" type="button">Clear Queue</button>
+                <div class="action-hierarchy">
+                  <div class="action-group action-group-primary">
+                    <button id="incident-history-bulk-filed-button" class="btn btn-primary" type="button">Mark Selected Filed</button>
+                  </div>
+                  <div class="action-group action-group-secondary">
+                    <button id="incident-history-bulk-closed-button" class="btn btn-secondary" type="button">Mark Selected Closed</button>
+                    <button id="incident-history-export-selected-button" class="btn btn-secondary" type="button">Export Selected Bundle JSON</button>
+                    <button id="incident-history-clear-selection-button" class="btn btn-secondary" type="button">Clear Selection</button>
+                    <button id="incident-history-copy-latest-button" class="btn btn-secondary" type="button">Copy Latest Handoff Summary</button>
+                  </div>
+                  <div class="action-group action-group-destructive">
+                    <button id="incident-history-clear-button" class="btn btn-danger" type="button">Clear Queue</button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -499,44 +623,67 @@
         </section>
         <section class="incident-subpanel" data-incident-subpanel="audit">
           <div class="panel-header">
-            <h2>Audit Events</h2>
-            <div class="filter-row">
-              <input id="audit-tenant-filter" class="filter-input" type="text" placeholder="tenant filter" />
-              <input id="audit-project-filter" class="filter-input" type="text" placeholder="project filter" />
-              <input id="audit-provider-filter" class="filter-input" type="text" placeholder="provider filter" />
-              <input id="audit-event-filter" class="filter-input" type="text" placeholder="event filter" />
-              <select id="audit-decision-filter" class="filter-input">
-                <option value="">decision:any</option>
-                <option value="ALLOW">decision:allow</option>
-                <option value="DENY">decision:deny</option>
-              </select>
-              <select id="audit-time-range" class="filter-input">
-                <option value="">time:any</option>
-                <option value="1h">time:last-1h</option>
-                <option value="24h">time:last-24h</option>
-                <option value="7d">time:last-7d</option>
-                <option value="30d">time:last-30d</option>
-                <option value="custom">time:custom</option>
-              </select>
-              <input id="audit-time-from" class="filter-input" type="datetime-local" aria-label="audit from time" />
-              <input id="audit-time-to" class="filter-input" type="datetime-local" aria-label="audit to time" />
-              <select id="audit-page-size" class="filter-input">
-                <option value="10">page:10</option>
-                <option value="25" selected>page:25</option>
-                <option value="50">page:50</option>
-                <option value="100">page:100</option>
-              </select>
-              <input id="audit-page" class="filter-input filter-input-small" type="number" min="1" value="1" />
-              <button id="audit-apply-button" class="btn btn-secondary">Apply</button>
-              <button id="audit-export-json-button" class="btn btn-secondary" type="button">Export Filtered JSON</button>
-              <button id="audit-export-csv-button" class="btn btn-secondary" type="button">Export Filtered CSV</button>
-              <button id="audit-copy-handoff-button" class="btn btn-secondary" type="button" data-advanced-section="incidents">Copy Filtered Handoff</button>
-              <button id="audit-export-incident-button" class="btn btn-primary" type="button" data-advanced-section="incidents">Export Selected Run Incident Package</button>
+            <div class="panel-heading">
+              <h2>Audit Events</h2>
+              <p class="panel-lead">Filter source-of-truth event records, export audit evidence, and build run-specific incident packages from active scope.</p>
+            </div>
+            <div class="filter-row filter-row-data filter-row-audit">
+              <div class="filter-group filter-group-scope">
+                <span class="filter-group-label">Scope</span>
+                <input id="audit-tenant-filter" class="filter-input" type="text" placeholder="tenant filter" />
+                <input id="audit-project-filter" class="filter-input" type="text" placeholder="project filter" />
+                <input id="audit-provider-filter" class="filter-input" type="text" placeholder="provider filter" />
+                <input id="audit-event-filter" class="filter-input" type="text" placeholder="event filter" />
+                <select id="audit-decision-filter" class="filter-input">
+                  <option value="">decision:any</option>
+                  <option value="ALLOW">decision:allow</option>
+                  <option value="DENY">decision:deny</option>
+                </select>
+              </div>
+              <div class="filter-group filter-group-time">
+                <span class="filter-group-label">Time</span>
+                <select id="audit-time-range" class="filter-input">
+                  <option value="">time:any</option>
+                  <option value="1h">time:last-1h</option>
+                  <option value="24h">time:last-24h</option>
+                  <option value="7d">time:last-7d</option>
+                  <option value="30d">time:last-30d</option>
+                  <option value="custom">time:custom</option>
+                </select>
+                <div class="filter-custom-time-range" data-time-filter-fields="audit" hidden aria-hidden="true">
+                  <input id="audit-time-from" class="filter-input" type="datetime-local" aria-label="audit from time" />
+                  <input id="audit-time-to" class="filter-input" type="datetime-local" aria-label="audit to time" />
+                </div>
+              </div>
+              <div class="filter-group filter-group-page">
+                <span class="filter-group-label">Pagination</span>
+                <select id="audit-page-size" class="filter-input">
+                  <option value="10">page:10</option>
+                  <option value="25" selected>page:25</option>
+                  <option value="50">page:50</option>
+                  <option value="100">page:100</option>
+                </select>
+                <input id="audit-page" class="filter-input filter-input-small" type="number" min="1" value="1" />
+              </div>
+              <div class="filter-group filter-group-actions">
+                <span class="filter-group-label">Actions</span>
+                <div class="action-hierarchy">
+                  <div class="action-group action-group-primary">
+                    <button id="audit-apply-button" class="btn btn-primary">Apply</button>
+                  </div>
+                  <div class="action-group action-group-secondary">
+                    <button id="audit-export-json-button" class="btn btn-secondary" type="button">Export Audit JSON</button>
+                    <button id="audit-export-csv-button" class="btn btn-secondary" type="button">Export Audit CSV</button>
+                    <button id="audit-copy-handoff-button" class="btn btn-secondary" type="button" data-advanced-section="incidents">Copy Audit Handoff</button>
+                    <button id="audit-export-incident-button" class="btn btn-secondary" type="button" data-advanced-section="incidents">Export Incident Package JSON</button>
+                  </div>
+                </div>
+              </div>
             </div>
             <div class="meta">Export and copy actions use the current audit filters and selected run context.</div>
           </div>
           <div id="audit-feedback" class="stack" aria-live="polite"></div>
-          <pre id="audit-handoff-preview" class="monospace audit-handoff-preview" data-advanced-section="incidents">Audit handoff preview appears here after Copy Handoff.</pre>
+          <pre id="audit-handoff-preview" class="monospace audit-handoff-preview" data-advanced-section="incidents">Audit or incident handoff preview appears here after a copy action.</pre>
           <div id="audit-content" class="stack"></div>
         </section>
       </section>

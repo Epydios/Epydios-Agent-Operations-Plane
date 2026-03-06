@@ -1,4 +1,4 @@
-import { escapeHTML } from "./common.js";
+import { escapeHTML, renderPanelStateMetric } from "./common.js";
 
 function simpleCommandTag(value) {
   const text = String(value || "");
@@ -145,25 +145,22 @@ export function renderTerminalPolicyHints(ui, choices, issues) {
   const restrictedHostMode = String(choices?.terminal?.restrictedHostMode || "-");
   const issueRows =
     issues.length === 0
-      ? '<div class="metric"><div class="meta">No blocking terminal policy issues detected.</div></div>'
+      ? renderPanelStateMetric("success", "Validation", "No blocking terminal policy issues detected.")
       : issues
           .map((issue) => {
             const level = issue.severity === "error" ? "ERROR" : "WARN";
-            return `
-              <div class="metric">
-                <div class="title">${escapeHTML(level)}</div>
-                <div class="meta">${escapeHTML(issue.message)}</div>
-              </div>
-            `;
+            const state = issue.severity === "error" ? "error" : "warn";
+            return renderPanelStateMetric(state, level, issue.message);
           })
           .join("");
 
   ui.terminalPolicyHints.innerHTML = `
-    <div class="metric">
-      <div class="meta">terminalMode=${escapeHTML(terminalMode)}</div>
-      <div class="meta">restrictedHostMode=${escapeHTML(restrictedHostMode)}</div>
-      <div class="meta">Every command is tagged with provenance and linked to audit filters by run.</div>
-    </div>
+    ${renderPanelStateMetric(
+      "info",
+      "Terminal Policy Context",
+      `terminalMode=${terminalMode}; restrictedHostMode=${restrictedHostMode}`,
+      "Every command is tagged with provenance and linked to audit filters by run."
+    )}
     ${issueRows}
   `;
 }
@@ -204,15 +201,20 @@ export function renderTerminalFeedback(ui, tone, message, result = null) {
     .slice(0, 180);
   const outputLine = outputPreview ? `output="${outputPreview}"` : "";
 
-  ui.terminalFeedback.innerHTML = `
-    <div class="metric">
-      <div class="title">${escapeHTML(title)}</div>
-      <div class="meta">${escapeHTML(message || "")}</div>
-      <div class="meta">${escapeHTML(sessionId)}; ${escapeHTML(status)}; ${escapeHTML(commandTag)}</div>
-      <div class="meta">${escapeHTML(exitCode)}; ${escapeHTML(outputHash)}; ${escapeHTML(timedOut)}; ${escapeHTML(truncated)}</div>
-      ${outputLine ? `<div class="meta">${escapeHTML(outputLine)}</div>` : ""}
-    </div>
-  `;
+  const state = tone === "error" ? "error" : tone === "ok" ? "success" : tone === "warn" ? "warn" : "info";
+  const detailParts = [
+    `${sessionId}; ${status}; ${commandTag}`,
+    `${exitCode}; ${outputHash}; ${timedOut}; ${truncated}`
+  ];
+  if (outputLine) {
+    detailParts.push(outputLine);
+  }
+  ui.terminalFeedback.innerHTML = renderPanelStateMetric(
+    state,
+    title,
+    message || "",
+    detailParts.join(" | ")
+  );
 }
 
 function filterTerminalHistory(items, filters) {
@@ -238,20 +240,22 @@ export function renderTerminalHistory(ui, items, filters) {
 
   const allItems = Array.isArray(items) ? items : [];
   if (allItems.length === 0) {
-    ui.terminalHistory.innerHTML = `
-      <div class="metric">
-        <div class="meta">No terminal requests have been submitted in this session.</div>
-      </div>
-    `;
+    ui.terminalHistory.innerHTML = renderPanelStateMetric(
+      "empty",
+      "Terminal History",
+      "No terminal requests have been submitted in this session.",
+      "Run a command from Terminal Control to seed history for this workspace."
+    );
     return;
   }
   const history = filterTerminalHistory(allItems, filters);
   if (history.length === 0) {
-    ui.terminalHistory.innerHTML = `
-      <div class="metric">
-        <div class="meta">No terminal history rows match current filters.</div>
-      </div>
-    `;
+    ui.terminalHistory.innerHTML = renderPanelStateMetric(
+      "empty",
+      "Terminal History",
+      "No terminal history rows match current filters.",
+      "Clear the run or status filter, then review the recorded command history."
+    );
     return;
   }
 
@@ -272,8 +276,10 @@ export function renderTerminalHistory(ui, items, filters) {
           <div class="meta">runId=${escapeHTML(runId)}; createdAt=${escapeHTML(createdAt)}; status=${escapeHTML(status)}; sessionId=${escapeHTML(sessionId)}</div>
           <div class="meta">exitCode=${escapeHTML(exitCode)}; outputSha256=${escapeHTML(outputHash)}</div>
           ${message ? `<div class="meta">${escapeHTML(message)}</div>` : ""}
-          <div class="approval-actions">
-            <button class="btn btn-secondary btn-small" type="button" data-terminal-history-rerun-id="${escapeHTML(id)}">Rerun</button>
+          <div class="approval-actions action-hierarchy">
+            <div class="action-group action-group-primary">
+              <button class="btn btn-primary btn-small" type="button" data-terminal-history-rerun-id="${escapeHTML(id)}">Rerun</button>
+            </div>
           </div>
         </div>
       `;

@@ -5,9 +5,14 @@ import {
   formatTime,
   paginateItems,
   parsePositiveInt,
+  renderPanelStateMetric,
   resolveTimeBounds,
   withinTimeBounds
 } from "./common.js";
+
+function tableCell(label, content, attrs = "") {
+  return `<td data-label="${escapeHTML(label)}"${attrs}>${content}</td>`;
+}
 
 function hasValue(value) {
   if (value === null || value === undefined) {
@@ -146,7 +151,12 @@ export function renderRuns(ui, store, runPayload, filters) {
   }
 
   if (filteredItems.length === 0) {
-    ui.runsContent.innerHTML = '<div class="metric"><div class="meta">No runtime runs match current filters. Adjust scope/time filters and click Apply.</div></div>';
+    ui.runsContent.innerHTML = renderPanelStateMetric(
+      "empty",
+      "Runs",
+      "No runtime runs match current filters.",
+      "Adjust scope, decision, or time filters, then click Apply."
+    );
     if (!hasSelectedRun) {
       ui.runDetailContent.innerHTML = "";
     }
@@ -161,18 +171,21 @@ export function renderRuns(ui, store, runPayload, filters) {
       const toggleMarker = isSelected ? "v" : ">";
       return `
         <tr${isSelected ? ' class="settings-row-focus"' : ""}>
-          <td>
-            <button class="row-action run-row-action" type="button" data-run-id="${escapeHTML(runId)}">
+          ${tableCell(
+            "Run ID",
+            `
+            <button class="row-action run-row-action" type="button" data-run-id="${escapeHTML(runId)}" aria-controls="run-detail-content">
               <span class="run-row-toggle">${escapeHTML(toggleMarker)}</span>
               <span>${escapeHTML(item.runId || "-")}</span>
             </button>
-          </td>
-          <td>${escapeHTML(item.tenantId || "-")}</td>
-          <td>${escapeHTML(item.projectId || "-")}</td>
-          <td><span class="${chipClassForStatus(item.status)} chip-compact">${escapeHTML(item.status || "-")}</span></td>
-          <td><span class="${chipClassForStatus(decision)} chip-compact">${escapeHTML(decision || "-")}</span></td>
-          <td>${escapeHTML(formatTime(item.createdAt))}</td>
-          <td>${escapeHTML(formatTime(item.updatedAt))}</td>
+          `
+          )}
+          ${tableCell("Tenant", escapeHTML(item.tenantId || "-"))}
+          ${tableCell("Project", escapeHTML(item.projectId || "-"))}
+          ${tableCell("Status", `<span class="${chipClassForStatus(item.status)} chip-compact">${escapeHTML(item.status || "-")}</span>`)}
+          ${tableCell("Decision", `<span class="${chipClassForStatus(decision)} chip-compact">${escapeHTML(decision || "-")}</span>`)}
+          ${tableCell("Created", escapeHTML(formatTime(item.createdAt)))}
+          ${tableCell("Updated", escapeHTML(formatTime(item.updatedAt)))}
         </tr>
       `;
     })
@@ -185,16 +198,17 @@ export function renderRuns(ui, store, runPayload, filters) {
       <button class="btn btn-secondary btn-small" type="button" data-runs-page-action="prev" ${pageState.page <= 1 ? "disabled" : ""}>Prev</button>
       <button class="btn btn-secondary btn-small" type="button" data-runs-page-action="next" ${pageState.page >= pageState.totalPages ? "disabled" : ""}>Next</button>
     </div>
-    <table class="runs-table">
+    <table class="data-table runs-table">
+      <caption class="sr-only">Run review queue table for the current run filters, including run identity, scope, status, decision, and timestamps.</caption>
       <thead>
         <tr>
-          <th>Run ID</th>
-          <th>Tenant</th>
-          <th>Project</th>
-          <th>Status</th>
-          <th>Decision</th>
-          <th>Created</th>
-          <th>Updated</th>
+          <th scope="col">Run ID</th>
+          <th scope="col">Tenant</th>
+          <th scope="col">Project</th>
+          <th scope="col">Status</th>
+          <th scope="col">Decision</th>
+          <th scope="col">Created</th>
+          <th scope="col">Updated</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
@@ -202,7 +216,11 @@ export function renderRuns(ui, store, runPayload, filters) {
   `;
 
   if (!hasSelectedRun) {
-    ui.runDetailContent.innerHTML = '<div class="metric"><div class="meta">Select a run row to view detail, evidence, and approval linkage.</div></div>';
+    ui.runDetailContent.innerHTML = renderPanelStateMetric(
+      "info",
+      "Run Detail",
+      "Select a run row to view detail, evidence, and approval linkage."
+    );
   }
 }
 
@@ -258,9 +276,9 @@ export function renderRunDetail(ui, run, options = {}) {
       const status = step.state === "complete" ? "COMPLETED" : step.state === "failed" ? "FAILED" : "PENDING";
       return `
         <tr>
-          <td>${escapeHTML(step.label)}</td>
-          <td><span class="${chipClassForStatus(status)}">${escapeHTML(status)}</span></td>
-          <td>${escapeHTML(step.note)}</td>
+          ${tableCell("Step", escapeHTML(step.label))}
+          ${tableCell("Status", `<span class="${chipClassForStatus(status)}">${escapeHTML(status)}</span>`)}
+          ${tableCell("Detail", escapeHTML(step.note))}
         </tr>
       `;
     })
@@ -271,32 +289,37 @@ export function renderRunDetail(ui, run, options = {}) {
     desktopEvidenceStage(run, "desktopActuateResponse", "Actuate"),
     desktopEvidenceStage(run, "desktopVerifyResponse", "Verify")
   ].filter(Boolean);
+  const artifactEntries = buildArtifactEntries(run);
+  const runStatus = String(run?.status || "").toUpperCase();
+  const runDecision = String(run?.policyDecision || "").toUpperCase();
+  const runStatusChipClass = runStatus ? chipClassForStatus(runStatus) : "chip chip-neutral";
+  const runDecisionChipClass = runDecision ? chipClassForStatus(runDecision) : "chip chip-neutral";
 
   const evidenceRows =
     evidenceStages.length === 0
       ? `
         <tr>
-          <td colspan="8">No desktop evidence responses are currently available for this run.</td>
+          ${tableCell("Status", "No desktop evidence responses are currently available for this run.", ' colspan="8"')}
         </tr>
       `
       : evidenceStages
           .map((stage) => {
             return `
               <tr>
-                <td>${escapeHTML(stage.label)}</td>
-                <td><span class="${chipClassForStatus(stage.decision || "unknown")}">${escapeHTML(stage.decision || "-")}</span></td>
-                <td>${escapeHTML(stage.verifierId || "-")}</td>
-                <td>${escapeHTML(stage.reasonCode || "-")}</td>
-                <td>${escapeHTML(stage.resultCode || "-")}</td>
-                <td>${escapeHTML(stage.screenshotHash || "-")}</td>
-                <td>${escapeHTML(stage.windowTitle || "-")}</td>
-                <td>${escapeHTML(stage.screenshotUri || "-")}</td>
+                ${tableCell("Stage", escapeHTML(stage.label))}
+                ${tableCell("Decision", `<span class="${chipClassForStatus(stage.decision || "unknown")}">${escapeHTML(stage.decision || "-")}</span>`)}
+                ${tableCell("Verifier", escapeHTML(stage.verifierId || "-"))}
+                ${tableCell("Reason", escapeHTML(stage.reasonCode || "-"))}
+                ${tableCell("Result", escapeHTML(stage.resultCode || "-"))}
+                ${tableCell("Screenshot Hash", escapeHTML(stage.screenshotHash || "-"))}
+                ${tableCell("Window", escapeHTML(stage.windowTitle || "-"))}
+                ${tableCell("Screenshot URI", escapeHTML(stage.screenshotUri || "-"))}
               </tr>
             `;
           })
           .join("");
 
-  const artifactPanels = buildArtifactEntries(run)
+  const artifactPanels = artifactEntries
     .map((entry) => {
       const valueText =
         typeof entry.value === "string" ? entry.value : JSON.stringify(entry.value, null, 2);
@@ -318,10 +341,22 @@ export function renderRunDetail(ui, run, options = {}) {
 
   ui.runDetailContent.innerHTML = `
     <div class="metric">
-      <div class="title">Run Timeline</div>
+      <div class="metric-title-row">
+        <div class="title focus-anchor" tabindex="-1" data-focus-anchor="run-detail">1. Timeline Review</div>
+        <span class="${runStatusChipClass} chip-compact">status=${escapeHTML(runStatus || "UNKNOWN")}</span>
+        <span class="${runDecisionChipClass} chip-compact">decision=${escapeHTML(runDecision || "UNSET")}</span>
+      </div>
+      <div class="meta metric-note">Read this first to confirm request intake, policy evaluation, execution, and verification order for the selected run.</div>
+      <div class="run-detail-chips">
+        <span class="chip chip-neutral chip-compact">runId=${escapeHTML(run?.runId || "-")}</span>
+        <span class="chip chip-neutral chip-compact">tenant=${escapeHTML(run?.tenantId || "-")}</span>
+        <span class="chip chip-neutral chip-compact">project=${escapeHTML(run?.projectId || "-")}</span>
+        <span class="chip chip-neutral chip-compact">created=${escapeHTML(formatTime(run?.createdAt))}</span>
+        <span class="chip chip-neutral chip-compact">updated=${escapeHTML(formatTime(run?.updatedAt))}</span>
+      </div>
       <details class="artifact-panel" data-detail-key="runs.timeline" open>
-        <summary>Show timeline details</summary>
-        <table class="runs-table">
+        <summary>Show stage-by-stage progression</summary>
+        <table class="data-table runs-table">
           <thead>
             <tr>
               <th>Step</th>
@@ -334,10 +369,12 @@ export function renderRunDetail(ui, run, options = {}) {
       </details>
     </div>
     <div class="metric">
-      <div class="title">Desktop Evidence Summary</div>
+      <div class="title">2. Evidence Review</div>
+      <div class="meta metric-note">Confirm verifier outputs, reason codes, and screenshot linkage before handing off this run.</div>
+      <div class="meta">desktopEvidenceStages=${escapeHTML(String(evidenceStages.length))}</div>
       <details class="artifact-panel" data-detail-key="runs.evidence_summary" open>
-        <summary>Show evidence summary details</summary>
-        <table class="runs-table">
+        <summary>Show verifier and screenshot evidence</summary>
+        <table class="data-table runs-table">
           <thead>
             <tr>
               <th>Stage</th>
@@ -354,25 +391,31 @@ export function renderRunDetail(ui, run, options = {}) {
         </table>
       </details>
     </div>
+    <div class="metric">
+      <div class="title">3. Approval Linkage</div>
+      <div class="meta metric-note">Check for a related approval record before escalating, exporting, or closing the workflow.</div>
+      ${approvalSummary}
+      <div class="approval-actions action-hierarchy">
+        <div class="action-group action-group-primary">
+          <button
+            class="btn btn-primary btn-small"
+            type="button"
+            data-open-approval-run-id="${escapeHTML(run?.runId || "")}"
+          >Open Approval Detail</button>
+        </div>
+      </div>
+    </div>
     <div class="metric" data-advanced-section="runs">
-      <div class="title">Run Evidence Drill-In</div>
+      <div class="title">4. Payload Drill-In</div>
+      <div class="meta metric-note">Use payload drill-in only when the structured timeline and evidence summaries are not sufficient.</div>
+      <div class="meta">artifactPayloads=${escapeHTML(String(artifactEntries.length))}</div>
       <div class="stack">
         ${artifactPanels || '<div class="meta">No artifact payloads are available.</div>'}
       </div>
     </div>
-    <div class="metric">
-      <div class="title">Approval Linkage</div>
-      ${approvalSummary}
-      <div class="approval-actions">
-        <button
-          class="btn btn-secondary btn-small"
-          type="button"
-          data-open-approval-run-id="${escapeHTML(run?.runId || "")}"
-        >Open Related Approval</button>
-      </div>
-    </div>
     <div class="metric" data-advanced-section="runs">
-      <div class="title">Run Detail: ${escapeHTML(run?.runId || "-")}</div>
+      <div class="title">5. Raw Run Record</div>
+      <div class="meta metric-note">Raw record is intentionally last. Review it only after the structured sections above.</div>
       <details class="artifact-panel" data-detail-key="runs.raw_record">
         <summary>Show raw run record</summary>
         <pre class="monospace">${escapeHTML(JSON.stringify(run || {}, null, 2))}</pre>

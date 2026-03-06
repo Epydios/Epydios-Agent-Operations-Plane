@@ -5,16 +5,23 @@ import {
   formatTime,
   paginateItems,
   parsePositiveInt,
+  renderPanelStateMetric,
+  renderTraceabilityMetric,
   resolveTimeBounds,
   withinTimeBounds
 } from "./common.js";
+
+function tableCell(label, content, attrs = "") {
+  return `<td data-label="${escapeHTML(label)}"${attrs}>${content}</td>`;
+}
 
 function ttlInfo(expiresAt) {
   if (!expiresAt) {
     return {
       label: "-",
       chipClass: "chip chip-warn chip-compact",
-      expiresAtLabel: "-"
+      expiresAtLabel: "-",
+      expired: false
     };
   }
   const ts = new Date(expiresAt).getTime();
@@ -22,7 +29,8 @@ function ttlInfo(expiresAt) {
     return {
       label: "-",
       chipClass: "chip chip-warn chip-compact",
-      expiresAtLabel: "-"
+      expiresAtLabel: "-",
+      expired: false
     };
   }
   const deltaMs = ts - Date.now();
@@ -30,7 +38,8 @@ function ttlInfo(expiresAt) {
     return {
       label: "expired",
       chipClass: "chip chip-danger chip-compact",
-      expiresAtLabel: formatTime(expiresAt)
+      expiresAtLabel: formatTime(expiresAt),
+      expired: true
     };
   }
   const totalSeconds = Math.floor(deltaMs / 1000);
@@ -55,7 +64,8 @@ function ttlInfo(expiresAt) {
   return {
     label,
     chipClass,
-    expiresAtLabel: formatTime(expiresAt)
+    expiresAtLabel: formatTime(expiresAt),
+    expired: false
   };
 }
 
@@ -125,12 +135,8 @@ export function renderApprovalFeedback(ui, tone, message) {
     return;
   }
   const title = tone === "error" ? "Approval decision failed" : tone === "ok" ? "Approval decision submitted" : "Approvals";
-  ui.approvalsFeedback.innerHTML = `
-    <div class="metric">
-      <div class="title">${escapeHTML(title)}</div>
-      <div class="meta">${escapeHTML(message || "")}</div>
-    </div>
-  `;
+  const state = tone === "error" ? "error" : tone === "ok" ? "success" : tone === "warn" ? "warn" : "info";
+  ui.approvalsFeedback.innerHTML = renderPanelStateMetric(state, title, message || "");
 }
 
 function capabilityCountLabel(item) {
@@ -156,18 +162,27 @@ export function renderApprovals(ui, store, approvalPayload, filters, selectedRun
 
   if (filteredItems.length === 0) {
     const warning = approvalPayload?.warning
-      ? `<div class="metric"><div class="meta">${escapeHTML(approvalPayload.warning)}</div></div>`
+      ? renderPanelStateMetric("warn", "Approvals Source", approvalPayload.warning)
       : "";
-    ui.approvalsContent.innerHTML = `${warning}<div class="metric"><div class="meta">No approval requests match current filters. Adjust status/time scope and click Apply.</div></div>`;
+    ui.approvalsContent.innerHTML = `${warning}${renderPanelStateMetric(
+      "empty",
+      "Approvals Queue",
+      "No approval requests match current filters.",
+      "Adjust status, scope, or time filters, then click Apply."
+    )}`;
     if (ui.approvalsDetailContent) {
-      ui.approvalsDetailContent.innerHTML = '<div class="metric"><div class="meta">Select an approval row to review requested capabilities and decision controls.</div></div>';
+      ui.approvalsDetailContent.innerHTML = renderPanelStateMetric(
+        "info",
+        "Approval Detail",
+        "Select an approval row to review requested capabilities and decision controls."
+      );
       delete ui.approvalsDetailContent.dataset.selectedRunId;
     }
     return;
   }
 
   const warning = approvalPayload?.warning
-    ? `<div class="metric"><div class="meta">${escapeHTML(approvalPayload.warning)}</div></div>`
+    ? renderPanelStateMetric("warn", "Approvals Source", approvalPayload.warning)
     : "";
 
   const rows = pageItems
@@ -180,37 +195,50 @@ export function renderApprovals(ui, store, approvalPayload, filters, selectedRun
       const toggleMarker = isSelected ? "v" : ">";
       const reviewButton = `
         <button
-          class="btn btn-secondary btn-small approval-review-run"
+          class="btn btn-primary btn-small approval-review-run"
           data-approval-select-run-id="${escapeHTML(item.runId || "")}"
-        >${isSelected ? "Hide" : "Review"}</button>
+          aria-controls="approvals-detail-content"
+          aria-expanded="${isSelected ? "true" : "false"}"
+        >${isSelected ? "Hide Detail" : "Review Approval"}</button>
       `;
       const openRunButton = `
         <button
           class="btn btn-secondary btn-small approval-open-run"
           data-approval-open-run-id="${escapeHTML(item.runId || "")}"
-        >Open Run</button>
+        >Open Run Detail</button>
       `;
-      const actions = `<div class="approval-actions">${reviewButton}${openRunButton}</div>`;
+      const actions = `
+        <div class="approval-actions action-hierarchy">
+          <div class="action-group action-group-primary">${reviewButton}</div>
+          <div class="action-group action-group-secondary">${openRunButton}</div>
+        </div>
+      `;
 
       return `
         <tr${isSelected ? ' class="settings-row-focus"' : ""}>
-          <td>
-            <button class="row-action approval-row-action" type="button" data-approval-select-run-id="${escapeHTML(runId)}">
+          ${tableCell(
+            "Run ID",
+            `
+            <button class="row-action approval-row-action" type="button" data-approval-select-run-id="${escapeHTML(runId)}" aria-controls="approvals-detail-content" aria-expanded="${isSelected ? "true" : "false"}">
               <span class="approval-row-toggle">${escapeHTML(toggleMarker)}</span>
               <span>${escapeHTML(item.runId || "-")}</span>
             </button>
-          </td>
-          <td>${escapeHTML(item.tenantId || "-")}</td>
-          <td>${escapeHTML(item.projectId || "-")}</td>
-          <td>${escapeHTML(String(item.tier || "-"))}</td>
-          <td>${escapeHTML(item.targetExecutionProfile || "-")}</td>
-          <td>
+          `
+          )}
+          ${tableCell("Tenant", escapeHTML(item.tenantId || "-"))}
+          ${tableCell("Project", escapeHTML(item.projectId || "-"))}
+          ${tableCell("Tier", escapeHTML(String(item.tier || "-")))}
+          ${tableCell("Profile", escapeHTML(item.targetExecutionProfile || "-"))}
+          ${tableCell(
+            "TTL",
+            `
             <span class="${escapeHTML(ttl.chipClass)}">${escapeHTML(ttl.label)}</span>
             <div class="meta">${escapeHTML(ttl.expiresAtLabel)}</div>
-          </td>
-          <td><span class="${chipClassForStatus(status)} chip-compact">${escapeHTML(status || "-")}</span></td>
-          <td>${escapeHTML(capabilitiesLabel)}</td>
-          <td>${actions}</td>
+          `
+          )}
+          ${tableCell("Status", `<span class="${chipClassForStatus(status)} chip-compact">${escapeHTML(status || "-")}</span>`)}
+          ${tableCell("Capabilities", escapeHTML(capabilitiesLabel))}
+          ${tableCell("Actions", actions)}
         </tr>
       `;
     })
@@ -224,18 +252,19 @@ export function renderApprovals(ui, store, approvalPayload, filters, selectedRun
       <button class="btn btn-secondary btn-small" type="button" data-approvals-page-action="prev" ${pageState.page <= 1 ? "disabled" : ""}>Prev</button>
       <button class="btn btn-secondary btn-small" type="button" data-approvals-page-action="next" ${pageState.page >= pageState.totalPages ? "disabled" : ""}>Next</button>
     </div>
-    <table class="approvals-table">
+    <table class="data-table approvals-table">
+      <caption class="sr-only">Approval decision queue table for the current approval filters, including run identity, scope, tier, profile, TTL, status, and actions.</caption>
       <thead>
         <tr>
-          <th>Run ID</th>
-          <th>Tenant</th>
-          <th>Project</th>
-          <th>Tier</th>
-          <th>Profile</th>
-          <th>TTL</th>
-          <th>Status</th>
-          <th>Capabilities</th>
-          <th>Actions</th>
+          <th scope="col">Run ID</th>
+          <th scope="col">Tenant</th>
+          <th scope="col">Project</th>
+          <th scope="col">Tier</th>
+          <th scope="col">Profile</th>
+          <th scope="col">TTL</th>
+          <th scope="col">Status</th>
+          <th scope="col">Capabilities</th>
+          <th scope="col">Actions</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
@@ -248,7 +277,11 @@ export function renderApprovalsDetail(ui, approval) {
     return;
   }
   if (!approval || typeof approval !== "object") {
-    ui.approvalsDetailContent.innerHTML = '<div class="metric"><div class="meta">Select an approval row to review requested capabilities and decision controls.</div></div>';
+    ui.approvalsDetailContent.innerHTML = renderPanelStateMetric(
+      "info",
+      "Approval Detail",
+      "Select an approval row to review requested capabilities and decision controls."
+    );
     delete ui.approvalsDetailContent.dataset.selectedRunId;
     return;
   }
@@ -258,52 +291,111 @@ export function renderApprovalsDetail(ui, approval) {
   const capabilities = Array.isArray(approval?.requestedCapabilities)
     ? approval.requestedCapabilities
     : [];
+  const rawApprovalRecord = JSON.stringify(approval || {}, null, 2);
   const capabilityRows = capabilities.length
     ? capabilities.map((value) => `<li>${escapeHTML(value)}</li>`).join("")
     : "<li>None specified.</li>";
   const statusChip = chipClassForStatus(status);
-  const pending = status === "PENDING";
+  const actionable = status === "PENDING" && !ttl.expired;
+  const scopeLabel = `${String(approval?.tenantId || "").trim() || "-"}/${String(approval?.projectId || "").trim() || "-"}`;
+  const traceabilityMetric = renderTraceabilityMetric(
+    "1A. Decision Traceability",
+    [
+      { label: "source", value: "approval-queue" },
+      { label: "scope", value: scopeLabel },
+      { label: "runId", value: runId || "-" },
+      { label: "recordStatus", value: status || "UNKNOWN", tone: actionable ? "ok" : ttl.expired ? "danger" : "warn" }
+    ],
+    "Use these identifiers when handing off or verifying the resulting decision record.",
+    [
+      `createdAt=${formatTime(approval?.createdAt)}`,
+      `expiresAt=${ttl.expiresAtLabel}`,
+      `reasonRequired=true; operatorDecisionSurface=approval-detail`
+    ]
+  );
+  const guardrails = [
+    actionable
+      ? "Decision controls are active because the request is pending and still within TTL."
+      : `Decision controls are locked because status=${status || "UNKNOWN"} or the TTL is no longer actionable.`,
+    ttl.expired
+      ? `Approval expired at ${ttl.expiresAtLabel}; review historical context only.`
+      : `Approval expires at ${ttl.expiresAtLabel}; complete the decision before TTL reaches zero.`,
+    "Decision reason is required and becomes audit context for approve or deny actions.",
+    capabilities.length > 0
+      ? `Requested capabilities listed=${capabilities.length}; confirm each one is necessary before approving.`
+      : "No requested capabilities were supplied; verify the related run detail before deciding."
+  ];
   if (runId) {
     ui.approvalsDetailContent.dataset.selectedRunId = runId;
   }
   ui.approvalsDetailContent.innerHTML = `
     <div class="metric">
-      <div class="title">Approval Detail: ${escapeHTML(runId || "-")}</div>
-      <div class="meta">tenant=${escapeHTML(approval?.tenantId || "-")}; project=${escapeHTML(approval?.projectId || "-")}; tier=${escapeHTML(String(approval?.tier || "-"))}; profile=${escapeHTML(approval?.targetExecutionProfile || "-")}</div>
-      <div class="meta">status=<span class="${statusChip} chip-compact">${escapeHTML(status || "-")}</span>; ttl=<span class="${escapeHTML(ttl.chipClass)}">${escapeHTML(ttl.label)}</span>; expiresAt=${escapeHTML(ttl.expiresAtLabel)}</div>
+      <div class="metric-title-row">
+        <div class="title focus-anchor" tabindex="-1" data-focus-anchor="approval-detail">1. Decision Context</div>
+        <span class="${statusChip} chip-compact">status=${escapeHTML(status || "UNKNOWN")}</span>
+        <span class="${escapeHTML(ttl.chipClass)}">${escapeHTML(`ttl=${ttl.label}`)}</span>
+      </div>
+      <div class="meta metric-note">Review operator context first so the decision is tied to the correct run, scope, and expiry window.</div>
+      <div class="run-detail-chips">
+        <span class="chip chip-neutral chip-compact">runId=${escapeHTML(runId || "-")}</span>
+        <span class="chip chip-neutral chip-compact">tenant=${escapeHTML(approval?.tenantId || "-")}</span>
+        <span class="chip chip-neutral chip-compact">project=${escapeHTML(approval?.projectId || "-")}</span>
+        <span class="chip chip-neutral chip-compact">tier=${escapeHTML(String(approval?.tier || "-"))}</span>
+        <span class="chip chip-neutral chip-compact">profile=${escapeHTML(approval?.targetExecutionProfile || "-")}</span>
+        <span class="chip chip-neutral chip-compact">capabilities=${escapeHTML(String(capabilities.length))}</span>
+      </div>
+      <div class="meta">expiresAt=${escapeHTML(ttl.expiresAtLabel)}; createdAt=${escapeHTML(formatTime(approval?.createdAt))}</div>
       <div class="meta">reason=${escapeHTML(String(approval?.reason || "").trim() || "-")}</div>
     </div>
+    ${traceabilityMetric}
     <div class="metric">
-      <div class="title">Requested Capabilities</div>
+      <div class="title">2. Requested Capabilities</div>
+      <div class="meta metric-note">Confirm the capability scope matches the requested operation before making a decision.</div>
       <ul class="quickstart-list">${capabilityRows}</ul>
     </div>
     <div class="metric">
-      <div class="title">Decision</div>
+      <div class="title">3. Decision Guardrails</div>
+      <div class="meta metric-note">Guardrails come before actions. If any guardrail fails, stop and review the related run detail.</div>
+      <ul class="workflow-guide-list">${guardrails.map((item) => `<li>${escapeHTML(item)}</li>`).join("")}</ul>
       <div class="field">
         <span class="label">Decision Reason</span>
-        <input id="approval-detail-reason" class="filter-input" type="text" placeholder="required for audit context" />
+        <input id="approval-detail-reason" class="filter-input" type="text" placeholder="required; explain why approve or deny is justified" />
       </div>
-      <div class="approval-actions">
-        <button
-          class="btn btn-ok btn-small"
-          type="button"
-          data-approval-detail-run-id="${escapeHTML(runId)}"
-          data-approval-detail-decision="APPROVE"
-          ${pending ? "" : "disabled"}
-        >Approve</button>
-        <button
-          class="btn btn-danger btn-small"
-          type="button"
-          data-approval-detail-run-id="${escapeHTML(runId)}"
-          data-approval-detail-decision="DENY"
-          ${pending ? "" : "disabled"}
-        >Deny</button>
-        <button
-          class="btn btn-secondary btn-small"
-          type="button"
-          data-approval-open-run-id="${escapeHTML(runId)}"
-        >Open Run</button>
+      <div class="approval-actions action-hierarchy">
+        <div class="action-group action-group-primary">
+          <button
+            class="btn btn-ok btn-small"
+            type="button"
+            data-approval-detail-run-id="${escapeHTML(runId)}"
+            data-approval-detail-decision="APPROVE"
+            ${actionable ? "" : "disabled"}
+          >Approve</button>
+        </div>
+        <div class="action-group action-group-secondary">
+          <button
+            class="btn btn-secondary btn-small"
+            type="button"
+            data-approval-open-run-id="${escapeHTML(runId)}"
+          >Open Run Detail</button>
+        </div>
+        <div class="action-group action-group-destructive">
+          <button
+            class="btn btn-danger btn-small"
+            type="button"
+            data-approval-detail-run-id="${escapeHTML(runId)}"
+            data-approval-detail-decision="DENY"
+            ${actionable ? "" : "disabled"}
+          >Deny</button>
+        </div>
       </div>
+    </div>
+    <div class="metric" data-advanced-section="approvals">
+      <div class="title">4. Approval Record</div>
+      <div class="meta metric-note">Use the raw approval record only after the context and guardrail sections above.</div>
+      <details class="artifact-panel" data-detail-key="approvals.raw_record">
+        <summary>Show raw approval record</summary>
+        <pre class="monospace">${escapeHTML(rawApprovalRecord)}</pre>
+      </details>
     </div>
   `;
 }

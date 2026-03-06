@@ -1,4 +1,4 @@
-import { escapeHTML } from "./common.js";
+import { escapeHTML, renderPanelStateMetric } from "./common.js";
 
 function parseList(raw) {
   const values = String(raw || "")
@@ -158,22 +158,20 @@ export function renderRunBuilderPolicyHints(ui, input, issues) {
 
   const issueMetrics =
     issues.length === 0
-      ? '<div class="metric"><div class="meta">No blocking validation issues detected in form input.</div></div>'
+      ? renderPanelStateMetric("success", "Validation", "No blocking validation issues detected in form input.")
       : issues
           .map((issue) => {
             const level = issue.severity === "error" ? "ERROR" : "WARN";
+            const state = issue.severity === "error" ? "error" : "warn";
             return `
-              <div class="metric">
-                <div class="title">${escapeHTML(level)}</div>
-                <div class="meta">${escapeHTML(issue.message)}</div>
-              </div>
+              ${renderPanelStateMetric(state, level, issue.message)}
             `;
           })
           .join("");
 
   ui.runBuilderPolicyHints.innerHTML = `
-    <div class="metric"><div class="meta">${escapeHTML(tierHint)}</div></div>
-    <div class="metric"><div class="meta">${escapeHTML(profileHint)}</div></div>
+    ${renderPanelStateMetric("info", "Tier Policy", tierHint)}
+    ${renderPanelStateMetric("info", "Execution Profile Policy", profileHint)}
     ${issueMetrics}
   `;
 }
@@ -182,11 +180,7 @@ export function renderRunBuilderFeedback(ui, tone, message) {
   if (!ui.runBuilderFeedback) {
     return;
   }
-  const title = tone === "error" ? "Run submission failed" : tone === "ok" ? "Run submitted" : "Run Builder";
-  ui.runBuilderFeedback.innerHTML = `
-    <div class="metric">
-      <div class="title">${escapeHTML(title)}</div>
-      <div class="meta">${escapeHTML(message || "")}</div>
-    </div>
-  `;
+  const title = tone === "error" ? "Run Submission Failed" : tone === "ok" ? "Run Submitted" : "Run Builder";
+  const state = tone === "error" ? "error" : tone === "ok" ? "success" : tone === "warn" ? "warn" : "info";
+  ui.runBuilderFeedback.innerHTML = renderPanelStateMetric(state, title, message || "");
 }
