@@ -313,6 +313,119 @@ Runs a Linux-first desktop execution-plane verifier without requiring cluster ac
 ./platform/local/bin/verify-m13-desktop-provider.sh
 ```
 
+### M13 Openfang adapter guardrail verifier
+
+Runs Openfang adapter guardrail checks without enabling live desktop actuation:
+- validates default provider registration remains disabled (`selection.enabled=false`)
+- validates Linux-first + sandbox-first defaults remain in config
+- validates `restricted_host` stays blocked by default
+- validates secure endpoint template remains disabled by default and requires `MTLSAndBearerTokenSecret`
+
+```bash
+./platform/local/bin/verify-m13-openfang-adapter.sh
+```
+
+### M13 Openfang runtime integration verifier
+
+Runs Openfang-path runtime integration tests:
+- validates runtime executes governed desktop `observe -> actuate -> verify` on sandbox profile
+- validates runtime receives and enforces `restricted_host_blocked` deny on restricted-host path
+- validates runtime -> Openfang adapter -> upstream contract flow using in-process handler integration (no host-autonomous enablement)
+
+```bash
+./platform/local/bin/verify-m13-openfang-runtime-integration.sh
+```
+
+### M13 runtime approvals verifier
+
+Runs runtime approval queue/decision contract tests:
+- validates `GET /v1alpha1/runtime/approvals` queue behavior and status filtering
+- validates `POST /v1alpha1/runtime/approvals/{runId}/decision` approve/deny semantics
+- validates expired approval requests are rejected with expected error signaling
+
+```bash
+./platform/local/bin/verify-m13-runtime-approvals.sh
+```
+
+### M14 runtime terminal integration verifier
+
+Runs runtime terminal endpoint integration tests:
+- validates `POST /v1alpha1/runtime/terminal/sessions` execution for deterministic allowlisted commands
+- validates forced `restricted_host` deny behavior (`POLICY_BLOCKED`)
+- validates disallowed-command deny handling and missing-run error path
+
+```bash
+./platform/local/bin/verify-m14-runtime-terminal-integration.sh
+```
+
+### M14 runtime integration settings verifier
+
+Runs runtime integration settings endpoint contract tests:
+- validates `PUT /v1alpha1/runtime/integrations/settings` + `GET /v1alpha1/runtime/integrations/settings` project-scoped round-trip behavior
+- validates `ref://` reference enforcement and raw-secret-like deny behavior
+- validates scope/authz mismatch and missing-scope rejection paths
+
+```bash
+./platform/local/bin/verify-m14-runtime-integration-settings.sh
+```
+
+### M14.6 Windows restricted-profile readiness verifier
+
+Runs Windows restricted-profile readiness assertions (`V-M14-WIN-001`):
+- validates windows restricted provider template remains disabled-by-default
+- validates runtime keeps non-Linux blocked by default unless explicitly enabled
+- validates Linux adapter rejects windows target requests and preserves restricted-host block behavior
+
+```bash
+./platform/local/bin/verify-m14-win-restricted-readiness.sh
+```
+
+### M14.6 macOS restricted-profile readiness verifier
+
+Runs macOS restricted-profile readiness assertions (`V-M14-MAC-001`):
+- validates macOS restricted provider template remains disabled-by-default
+- validates runtime keeps non-Linux blocked by default unless explicitly enabled
+- validates Linux adapter rejects macOS target requests and preserves restricted-host block behavior
+
+```bash
+./platform/local/bin/verify-m14-mac-restricted-readiness.sh
+```
+
+### M14.7 cross-OS parity and closeout evidence verifier
+
+Runs the M14.7 closeout bundle (`V-M14-XOS-001`):
+- runs `V-M14-WIN-001` and `V-M14-MAC-001` verifiers as prerequisites
+- asserts cross-OS parity for restricted templates (contract/auth/path/capability shape)
+- emits machine-readable evidence JSON + SHA under non-GitHub provenance path
+
+```bash
+./platform/local/bin/verify-m14-xos-parity.sh
+```
+
+### M14.7 Openfang cross-OS adapter verifier
+
+Runs Openfang Path B scaffold assertions (`V-M14-WIN-002`, `V-M14-MAC-002`, `V-M14-XOS-002`):
+- validates Windows/macOS adapter config scaffolds remain present and restricted-by-default
+- validates platform-provider Windows/macOS restricted manifests remain staged and disabled-by-default (`selection.enabled=false`)
+- validates runtime desktop provider selection is target-OS-aware (Windows -> windows adapter, macOS -> macOS adapter)
+- validates Linux-first restricted-host block posture remains enforced in adapter tests
+
+```bash
+./platform/local/bin/verify-m14-openfang-xos-adapters.sh
+```
+
+### M14.7 Openfang secure enablement gate verifier
+
+Runs secure activation gate assertions (`V-M14-WIN-003`, `V-M14-MAC-003`, `V-M14-XOS-003`):
+- validates Windows/macOS restricted provider manifests keep `MTLSAndBearerTokenSecret` auth and required secret refs
+- validates secure activation runbook criteria remain present
+- validates selection stays disabled-by-default until explicit activation approval
+- optional cluster secret checks can be enabled with `RUN_OPENFANG_ENABLEMENT_CLUSTER_CHECK=1`
+
+```bash
+./platform/local/bin/verify-m14-openfang-enablement-gate.sh
+```
+
 ### M13 desktop runtime tiering + Linux-first verifier
 
 Runs runtime guardrail checks for desktop execution planning:
@@ -324,6 +437,86 @@ Runs runtime guardrail checks for desktop execution planning:
 
 ```bash
 ./platform/local/bin/verify-m13-desktop-runtime.sh
+```
+
+### M13 desktop daily loop (recommended local guardrail pass)
+
+Runs the full daily M13 verifier loop in one command:
+- DesktopProvider contract verifier
+- Openfang adapter guardrail verifier
+- Openfang runtime integration verifier
+- runtime approvals verifier
+- runtime terminal integration verifier
+- runtime integration settings verifier
+- optional Openfang sandbox rehearsal (`RUN_M13_OPENFANG_SANDBOX_REHEARSAL=1`)
+- optional Windows restricted-profile readiness (`RUN_M14_WIN_RESTRICTED_READINESS=1`)
+- optional macOS restricted-profile readiness (`RUN_M14_MAC_RESTRICTED_READINESS=1`)
+- optional cross-OS parity closeout evidence pack (`RUN_M14_XOS_PARITY=1`)
+- always-on Openfang cross-OS adapter verifier (`verify-m14-openfang-xos-adapters.sh`)
+- always-on Openfang secure enablement gate verifier (`verify-m14-openfang-enablement-gate.sh`)
+- runtime tiering/autonomy verifier
+- QC preflight
+
+```bash
+./platform/local/bin/verify-m13-desktop-daily-loop.sh
+
+# Optional rehearsal against kind/k3d with CRD compatibility pre-req
+RUN_M13_OPENFANG_SANDBOX_REHEARSAL=1 ./platform/local/bin/verify-m13-desktop-daily-loop.sh
+
+# Optional M14.6 restricted-profile readiness checks
+RUN_M14_WIN_RESTRICTED_READINESS=1 RUN_M14_MAC_RESTRICTED_READINESS=1 ./platform/local/bin/verify-m13-desktop-daily-loop.sh
+
+# Optional M14.7 closeout evidence bundle
+RUN_M14_XOS_PARITY=1 ./platform/local/bin/verify-m13-desktop-daily-loop.sh
+```
+
+### M13/M14 closeout bundle (single-command closeout pass)
+
+Runs the coordinated closeout bundle and writes timestamped logs + summary under non-GitHub provenance:
+- M13 desktop daily loop
+- M14 UI daily loop
+- M14.6 Windows/macOS restricted-readiness verifiers
+- M14.7 cross-OS parity verifier
+- M14.7 Openfang cross-OS adapter verifier
+- M14.7 Openfang secure enablement gate verifier
+- qc-preflight
+
+```bash
+./platform/local/bin/verify-m13-m14-closeout-bundle.sh
+```
+
+Default output location:
+- `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/desktop-closeout/`
+
+### Openfang upstream drift check
+
+Compares `providers/desktop/openfang/upstream-pin.json` with latest upstream semver tag:
+
+```bash
+./platform/local/bin/check-openfang-upstream-drift.sh
+
+# Strict mode: non-zero exit if drift is detected
+FAIL_ON_DRIFT=1 ./platform/local/bin/check-openfang-upstream-drift.sh
+```
+
+Openfang update workflow:
+- `docs/runbooks/openfang-upstream-update.md`
+
+Secure endpoint activation checklist/runbook:
+- `docs/runbooks/openfang-secure-endpoint-activation.md`
+
+### M13 Openfang sandbox rehearsal (kind/k3d context)
+
+Runs a controlled Linux sandbox rehearsal against a local kind/k3d cluster context:
+- applies Openfang scaffold manifests with selection disabled by default
+- confirms `targetOS=linux`, `allowRestrictedHost=false`, and `upstream.enabled=false`
+- runs runtime -> adapter integration assertions
+
+Prerequisite:
+- cluster CRD in target context must accept `providerType: DesktopProvider`
+
+```bash
+./platform/local/bin/verify-m13-openfang-sandbox-rehearsal.sh
 ```
 
 ### M9.1 runtime API authn/authz skeleton verification
@@ -864,6 +1057,19 @@ WITH_SYSTEM_SMOKETEST=1 ./platform/local/bin/bootstrap-k3d.sh
 - `platform/local/bin/verify-m10-no-egress-local-aimxs.sh` validates customer-hosted local AIMXS mode under scoped no-egress network policy constraints
 - `platform/local/bin/verify-m10-entitlement-deny.sh` validates runtime entitlement deny-path assertions and licensed ALLOW behavior on AIMXS policy routing
 - `platform/local/bin/verify-m10-customer-hosted-packaging.sh` validates customer-hosted AIMXS packaging evidence requirements (signed package refs, SBOM/signature refs, air-gapped install/update bundles, and support/SLA references)
+- `platform/local/bin/verify-m13-openfang-adapter.sh` validates Openfang adapter guardrails (Linux-first + sandbox profile + restricted-host blocked default + secure template posture)
+- `platform/local/bin/verify-m13-openfang-runtime-integration.sh` validates runtime observe->actuate->verify and runtime->adapter->upstream contract flow + restricted-host deny assertion
+- `platform/local/bin/verify-m13-runtime-approvals.sh` validates runtime approval queue/decision API semantics (`PENDING|APPROVED|DENIED|EXPIRED`, approve/deny transitions, expired request rejection)
+- `platform/local/bin/verify-m14-runtime-terminal-integration.sh` validates runtime terminal endpoint execution path + restricted-host deny + disallowed-command deny assertions
+- `platform/local/bin/verify-m14-win-restricted-readiness.sh` validates Windows restricted-profile readiness gate assertions (`V-M14-WIN-001`)
+- `platform/local/bin/verify-m14-mac-restricted-readiness.sh` validates macOS restricted-profile readiness gate assertions (`V-M14-MAC-001`)
+- `platform/local/bin/verify-m14-xos-parity.sh` validates cross-OS template/runtime parity and writes M14.7 machine-readable closeout evidence (`V-M14-XOS-001`)
+- `platform/local/bin/verify-m14-openfang-xos-adapters.sh` validates Openfang Windows/macOS adapter scaffolds + runtime target-OS-aware desktop provider selection (`V-M14-WIN-002`, `V-M14-MAC-002`, `V-M14-XOS-002`)
+- `platform/local/bin/verify-m14-openfang-enablement-gate.sh` validates Openfang secure endpoint enablement gate posture for Windows/macOS restricted manifests and runbook criteria (`V-M14-WIN-003`, `V-M14-MAC-003`, `V-M14-XOS-003`)
+- `platform/local/bin/verify-m13-openfang-sandbox-rehearsal.sh` validates kind/k3d sandbox rehearsal posture (selection disabled, linux/sandbox defaults, restricted-host blocked)
+- `platform/local/bin/verify-m13-desktop-daily-loop.sh` runs the recommended local daily M13/M14 verifier loop (including qc-preflight)
+- `platform/local/bin/verify-m13-m14-closeout-bundle.sh` runs the coordinated M13/M14 closeout pass and writes logs/summary to non-GitHub provenance
+- `platform/local/bin/check-openfang-upstream-drift.sh` compares pinned Openfang upstream tag/commit to latest remote semver tag and reports drift
 - `platform/local/bin/verify-m7-integration.sh` runs an end-to-end M0->M5 critical-path integration gate (optionally includes M7.2)
 - `platform/local/bin/verify-m7-cnpg-backup-restore.sh` runs the M7.2 CNPG backup/restore drill
 - `platform/local/bin/verify-m7-upgrade-safety.sh` runs the M7.3 N-1->N upgrade safety gate
@@ -876,6 +1082,14 @@ WITH_SYSTEM_SMOKETEST=1 ./platform/local/bin/bootstrap-k3d.sh
 - `platform/local/bin/verify-aimxs-boundary.sh` verifies AIMXS stays an external HTTPS plug-in boundary (slot contract + import boundary + manifest auth constraints)
 - `platform/local/bin/verify-provenance-lockfiles.sh` validates chart/image/CRD/license lockfiles (development and strict modes)
 - `platform/local/bin/sync-provenance-image-digests.sh` fills `provenance/images.lock.yaml` digests from running cluster image IDs and optional registry pulls
+
+To include optional desktop provider images in local build/load flows:
+
+```bash
+INCLUDE_DESKTOP_PROVIDER=1 ./platform/local/bin/build-local-images.sh
+INCLUDE_DESKTOP_OPENFANG_PROVIDER=1 ./platform/local/bin/build-local-images.sh
+INCLUDE_DESKTOP_OPENFANG_PROVIDER=1 ./platform/local/bin/load-local-images-kind.sh
+```
 
 For release-aligned Intel targets, use:
 

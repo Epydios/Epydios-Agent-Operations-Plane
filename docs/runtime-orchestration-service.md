@@ -9,6 +9,7 @@ This service moves policy/evidence/profile execution flow out of ad-hoc scripts 
 ## Persistence
 
 - Backed by Postgres table `orchestration_runs`
+- Project-scoped integration settings persisted in Postgres table `orchestration_integration_settings`
 - Automatically creates schema on startup
 
 ## Provider Selection
@@ -31,7 +32,22 @@ This service moves policy/evidence/profile execution flow out of ad-hoc scripts 
 - `GET /v1alpha1/runtime/runs/export?format=jsonl|csv` (supports the same filters as list)
 - `POST /v1alpha1/runtime/runs/retention/prune` (`dryRun`, `before`, `retentionClass`, `limit`)
 - `GET /v1alpha1/runtime/runs/{runId}`
+- `GET /v1alpha1/runtime/approvals?limit=100&tenantId=...&projectId=...&status=PENDING|APPROVED|DENIED|EXPIRED`
+- `POST /v1alpha1/runtime/approvals/{runId}/decision` (`decision=APPROVE|DENY`, optional `reason`, optional `ttlSeconds`, optional `grantToken`)
 - `GET /v1alpha1/runtime/audit/events?limit=100&tenantId=...&projectId=...&providerId=...&decision=...&event=...`
+- `POST /v1alpha1/runtime/terminal/sessions` (run-scoped terminal command request with deterministic command allowlist, policy guardrails, and audit linkage)
+- `GET /v1alpha1/runtime/integrations/settings?tenantId=...&projectId=...` (project-scoped integration settings read)
+- `PUT /v1alpha1/runtime/integrations/settings` (`meta.tenantId`, `meta.projectId`, `settings` JSON object)
+
+## Integration Settings Contract (M14.9)
+
+- Endpoint scope is tenant/project constrained and enforced through the same runtime authn/authz and scope rules as run endpoints.
+- `settings` payload is normalized as a JSON object and stored by `(tenantId, projectId)`.
+- Any key ending in `Ref` must use `ref://...` format.
+- Raw secret-like values are blocked (`sk-*`, AWS key patterns, PEM headers, JWT-like fragments, and similar token patterns).
+- Read and update actions emit runtime audit events:
+  - `runtime.integrations.settings.read`
+  - `runtime.integrations.settings.update`
 
 ## Runtime Metrics (M12.1)
 
@@ -48,7 +64,7 @@ Runtime exposes SLO/SLI metrics at `/metrics`:
 
 - Disabled by default (`AUTHN_ENABLED=false`)
 - When enabled:
-  - requires `Authorization: Bearer <jwt>` on `/v1alpha1/runtime/runs*`
+  - requires `Authorization: Bearer <jwt>` on runtime API endpoints (`/v1alpha1/runtime/*`)
   - enforces create/list/read permissions by role mapping
   - supports OIDC/JWKS (`RS256`) and local shared-secret mode (`HS256`)
 - Environment/flags:
@@ -146,6 +162,7 @@ Runtime exposes SLO/SLI metrics at `/metrics`:
 1. Resolve profile
 2. Evaluate policy
 3. Optional desktop execution step loop (`observe -> actuate -> verify`) when `desktop` request block is present and policy decision is `ALLOW`
+   - For Tier 3 requests that need explicit operator decision, approval queue metadata is exposed via `/v1alpha1/runtime/approvals` and operator decision is recorded via `/v1alpha1/runtime/approvals/{runId}/decision`
 4. Record evidence
 5. Finalize evidence bundle
 6. Persist stage transitions and outputs in Postgres
@@ -210,3 +227,18 @@ Runtime exposes SLO/SLI metrics at `/metrics`:
 - `platform/local/bin/verify-m10-entitlement-deny.sh`
   - optional baseline bootstrap via M5 verifier
   - validates AIMXS entitlement deny paths (missing token, bad SKU, missing feature) and licensed ALLOW path
+- `platform/local/bin/verify-m13-openfang-runtime-integration.sh`
+  - validates runtime fixture integration and adapter path (`observe -> actuate -> verify` + `restricted_host` deny)
+- `platform/local/bin/verify-m13-runtime-approvals.sh`
+  - validates runtime approval queue/decision API contract (`GET /runtime/approvals`, `POST /runtime/approvals/{runId}/decision`, including expired-request rejection)
+  - validates tier-3 approval status model transitions (`PENDING|APPROVED|DENIED|EXPIRED`)
+- `platform/local/bin/verify-m14-runtime-terminal-integration.sh`
+  - validates runtime terminal endpoint contract (`POST /runtime/terminal/sessions`) including allowlisted command execution and forced `restricted_host` deny-path behavior
+- `platform/local/bin/verify-m14-runtime-integration-settings.sh`
+  - validates runtime integration settings contract (`GET/PUT /runtime/integrations/settings`) including scope/authz checks and `ref://` / raw-secret deny paths
+- `platform/local/bin/verify-m14-win-restricted-readiness.sh`
+  - validates `V-M14-WIN-001` restricted-profile readiness assertions (`windows` template disabled-by-default + non-linux default block + linux-adapter deny path)
+- `platform/local/bin/verify-m14-mac-restricted-readiness.sh`
+  - validates `V-M14-MAC-001` restricted-profile readiness assertions (`macos` template disabled-by-default + non-linux default block + linux-adapter deny path)
+- `platform/local/bin/verify-m14-xos-parity.sh`
+  - validates `V-M14-XOS-001` cross-OS parity assertions and writes machine-readable M14.7 closeout evidence bundle

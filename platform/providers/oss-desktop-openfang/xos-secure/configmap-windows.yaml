@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openfang-provider-windows-config
+data:
+  config.json: |
+    {
+      "providerId": "oss-desktop-openfang-windows",
+      "providerVersion": "0.3.0-preview",
+      "targetOS": "windows",
+      "allowRestrictedHost": false,
+      "capabilities": [
+        "observe.window_metadata",
+        "observe.screenshot_hash",
+        "actuate.window_focus",
+        "actuate.input.type_click",
+        "verify.post_action_state"
+      ],
+      "tlsCertFile": "/tls/server/tls.crt",
+      "tlsKeyFile": "/tls/server/tls.key",
+      "clientCAFile": "/tls/ca/ca.crt",
+      "requireClientCert": true,
+      "requireBearer": true,
+      "bearerTokenFile": "/auth/token",
+      "upstream": {
+        "enabled": false,
+        "baseUrl": "https://openfang-provider-windows.epydios.local",
+        "observePath": "/v1alpha1/desktop-provider/observe",
+        "actuatePath": "/v1alpha1/desktop-provider/actuate",
+        "verifyPath": "/v1alpha1/desktop-provider/verify",
+        "healthPath": "/healthz",
+        "timeoutSeconds": 10,
+        "headers": {
+          "x-epydios-provider": "openfang-windows"
+        }
+      }
+    }

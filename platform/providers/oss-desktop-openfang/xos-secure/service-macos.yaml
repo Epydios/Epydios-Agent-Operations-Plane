@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: openfang-provider-macos
+spec:
+  selector:
+    app.kubernetes.io/name: openfang-provider-macos
+  ports:
+    - name: https
+      port: 8443
+      targetPort: https

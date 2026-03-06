@@ -1,0 +1,24 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: agentops-desktop
+  namespace: epydios-system
+  labels:
+    app.kubernetes.io/name: agentops-desktop
+    app.kubernetes.io/component: ui
+    app.kubernetes.io/part-of: epydios-agentops-control-plane
+spec:
+  parentRefs:
+    - name: epydios-shared-gateway
+      namespace: gateway-system
+      sectionName: https
+  hostnames:
+    - agentops.epydios.com
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: agentops-desktop
+          port: 80

@@ -18,10 +18,20 @@ const (
 	desktopTierHighRisk    = 3
 )
 
-var desktopDefaultVerifierIDs = []string{
-	"V-M13-LNX-001",
-	"V-M13-LNX-002",
-	"V-M13-LNX-003",
+var desktopDefaultVerifierIDsByTargetOS = map[string][]string{
+	desktopOSLinux: {
+		"V-M13-LNX-001",
+		"V-M13-LNX-002",
+		"V-M13-LNX-003",
+	},
+	desktopOSWindows: {
+		"V-M14-WIN-001",
+		"V-M14-XOS-001",
+	},
+	desktopOSMacOS: {
+		"V-M14-MAC-001",
+		"V-M14-XOS-001",
+	},
 }
 
 type desktopExecutionPlan struct {
@@ -78,7 +88,7 @@ func deriveDesktopExecutionPlan(req RunCreateRequest, runID, policyGrantToken st
 
 	requiredVerifierIDs := normalizeStringList(desktopReq.RequiredVerifierIDs)
 	if len(requiredVerifierIDs) == 0 {
-		requiredVerifierIDs = append([]string(nil), desktopDefaultVerifierIDs...)
+		requiredVerifierIDs = defaultDesktopVerifierIDs(targetOS)
 	}
 
 	step := DesktopStepEnvelope{
@@ -163,6 +173,14 @@ func normalizeDesktopTier(tier int) int {
 		return desktopTierUIActuation
 	}
 	return tier
+}
+
+func defaultDesktopVerifierIDs(targetOS string) []string {
+	verifiers, ok := desktopDefaultVerifierIDsByTargetOS[targetOS]
+	if !ok {
+		verifiers = desktopDefaultVerifierIDsByTargetOS[desktopOSLinux]
+	}
+	return append([]string(nil), verifiers...)
 }
 
 func normalizeStringList(values []string) []string {

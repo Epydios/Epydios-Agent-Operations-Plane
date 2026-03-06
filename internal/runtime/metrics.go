@@ -125,11 +125,17 @@ func normalizeRuntimeHTTPPath(path string) string {
 		"/v1alpha1/runtime/runs",
 		"/v1alpha1/runtime/runs/export",
 		"/v1alpha1/runtime/runs/retention/prune",
-		"/v1alpha1/runtime/audit/events":
+		"/v1alpha1/runtime/approvals",
+		"/v1alpha1/runtime/audit/events",
+		"/v1alpha1/runtime/terminal/sessions",
+		"/v1alpha1/runtime/integrations/settings":
 		return normalized
 	}
 	if strings.HasPrefix(normalized, "/v1alpha1/runtime/runs/") {
 		return "/v1alpha1/runtime/runs/:id"
+	}
+	if strings.HasPrefix(normalized, "/v1alpha1/runtime/approvals/") {
+		return "/v1alpha1/runtime/approvals/:runId/decision"
 	}
 	if strings.HasPrefix(normalized, "/v1alpha1/runtime/") {
 		return "/v1alpha1/runtime/other"

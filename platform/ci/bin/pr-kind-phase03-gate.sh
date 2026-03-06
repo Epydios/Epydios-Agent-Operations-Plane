@@ -26,6 +26,13 @@ RUN_M9_POLICY_LIFECYCLE="${RUN_M9_POLICY_LIFECYCLE:-}"
 RUN_M10_PROVIDER_CONFORMANCE="${RUN_M10_PROVIDER_CONFORMANCE:-}"
 RUN_M13_DESKTOP_PROVIDER="${RUN_M13_DESKTOP_PROVIDER:-}"
 RUN_M13_DESKTOP_RUNTIME="${RUN_M13_DESKTOP_RUNTIME:-}"
+RUN_M13_OPENFANG_ADAPTER="${RUN_M13_OPENFANG_ADAPTER:-}"
+RUN_M13_OPENFANG_RUNTIME_INTEGRATION="${RUN_M13_OPENFANG_RUNTIME_INTEGRATION:-}"
+RUN_M13_RUNTIME_APPROVALS="${RUN_M13_RUNTIME_APPROVALS:-}"
+RUN_M13_OPENFANG_SANDBOX_REHEARSAL="${RUN_M13_OPENFANG_SANDBOX_REHEARSAL:-}"
+RUN_M14_WIN_RESTRICTED_READINESS="${RUN_M14_WIN_RESTRICTED_READINESS:-}"
+RUN_M14_MAC_RESTRICTED_READINESS="${RUN_M14_MAC_RESTRICTED_READINESS:-}"
+RUN_M14_XOS_PARITY="${RUN_M14_XOS_PARITY:-}"
 RUN_M10_POLICY_GRANT_ENFORCEMENT="${RUN_M10_POLICY_GRANT_ENFORCEMENT:-}"
 RUN_M10_DEPLOYMENT_MODES="${RUN_M10_DEPLOYMENT_MODES:-}"
 RUN_M10_NO_EGRESS_LOCAL_AIMXS="${RUN_M10_NO_EGRESS_LOCAL_AIMXS:-}"
@@ -99,6 +106,13 @@ apply_gate_mode_defaults() {
       set_default_if_unset RUN_M10_PROVIDER_CONFORMANCE 1
       set_default_if_unset RUN_M13_DESKTOP_PROVIDER 1
       set_default_if_unset RUN_M13_DESKTOP_RUNTIME 1
+      set_default_if_unset RUN_M13_OPENFANG_ADAPTER 1
+      set_default_if_unset RUN_M13_OPENFANG_RUNTIME_INTEGRATION 1
+      set_default_if_unset RUN_M13_RUNTIME_APPROVALS 1
+      set_default_if_unset RUN_M13_OPENFANG_SANDBOX_REHEARSAL 0
+      set_default_if_unset RUN_M14_WIN_RESTRICTED_READINESS 0
+      set_default_if_unset RUN_M14_MAC_RESTRICTED_READINESS 0
+      set_default_if_unset RUN_M14_XOS_PARITY 0
       set_default_if_unset RUN_M10_POLICY_GRANT_ENFORCEMENT 1
       set_default_if_unset RUN_M10_DEPLOYMENT_MODES 1
       set_default_if_unset RUN_M10_NO_EGRESS_LOCAL_AIMXS 1
@@ -160,6 +174,13 @@ apply_gate_mode_defaults() {
       set_default_if_unset RUN_M10_PROVIDER_CONFORMANCE 0
       set_default_if_unset RUN_M13_DESKTOP_PROVIDER 0
       set_default_if_unset RUN_M13_DESKTOP_RUNTIME 0
+      set_default_if_unset RUN_M13_OPENFANG_ADAPTER 0
+      set_default_if_unset RUN_M13_OPENFANG_RUNTIME_INTEGRATION 0
+      set_default_if_unset RUN_M13_RUNTIME_APPROVALS 0
+      set_default_if_unset RUN_M13_OPENFANG_SANDBOX_REHEARSAL 0
+      set_default_if_unset RUN_M14_WIN_RESTRICTED_READINESS 0
+      set_default_if_unset RUN_M14_MAC_RESTRICTED_READINESS 0
+      set_default_if_unset RUN_M14_XOS_PARITY 0
       set_default_if_unset RUN_M10_POLICY_GRANT_ENFORCEMENT 0
       set_default_if_unset RUN_M10_DEPLOYMENT_MODES 0
       set_default_if_unset RUN_M10_NO_EGRESS_LOCAL_AIMXS 0
@@ -235,6 +256,9 @@ enforce_full_mode_contract() {
   check_required RUN_M10_PROVIDER_CONFORMANCE 1
   check_required RUN_M13_DESKTOP_PROVIDER 1
   check_required RUN_M13_DESKTOP_RUNTIME 1
+  check_required RUN_M13_OPENFANG_ADAPTER 1
+  check_required RUN_M13_OPENFANG_RUNTIME_INTEGRATION 1
+  check_required RUN_M13_RUNTIME_APPROVALS 1
   check_required RUN_M10_POLICY_GRANT_ENFORCEMENT 1
   check_required RUN_M10_DEPLOYMENT_MODES 1
   check_required RUN_M10_NO_EGRESS_LOCAL_AIMXS 1
@@ -348,6 +372,34 @@ main() {
   if [ "${RUN_M13_DESKTOP_RUNTIME}" = "1" ]; then
     echo "Running M13 gate (runtime desktop tiering + Linux-first/autonomy guardrails)..."
     "${REPO_ROOT}/platform/local/bin/verify-m13-desktop-runtime.sh"
+  fi
+  if [ "${RUN_M13_OPENFANG_ADAPTER}" = "1" ]; then
+    echo "Running M13 gate (Openfang adapter guardrails + secure-profile posture)..."
+    "${REPO_ROOT}/platform/local/bin/verify-m13-openfang-adapter.sh"
+  fi
+  if [ "${RUN_M13_OPENFANG_RUNTIME_INTEGRATION}" = "1" ]; then
+    echo "Running M13 gate (Openfang runtime integration through adapter path)..."
+    "${REPO_ROOT}/platform/local/bin/verify-m13-openfang-runtime-integration.sh"
+  fi
+  if [ "${RUN_M13_RUNTIME_APPROVALS}" = "1" ]; then
+    echo "Running M13 gate (runtime approval queue/decision API contract)..."
+    "${REPO_ROOT}/platform/local/bin/verify-m13-runtime-approvals.sh"
+  fi
+  if [ "${RUN_M13_OPENFANG_SANDBOX_REHEARSAL}" = "1" ]; then
+    echo "Running M13 gate (Openfang sandbox rehearsal on kind/k3d context)..."
+    "${REPO_ROOT}/platform/local/bin/verify-m13-openfang-sandbox-rehearsal.sh"
+  fi
+  if [ "${RUN_M14_WIN_RESTRICTED_READINESS}" = "1" ]; then
+    echo "Running M14.6 gate (Windows restricted-profile readiness)..."
+    "${REPO_ROOT}/platform/local/bin/verify-m14-win-restricted-readiness.sh"
+  fi
+  if [ "${RUN_M14_MAC_RESTRICTED_READINESS}" = "1" ]; then
+    echo "Running M14.6 gate (macOS restricted-profile readiness)..."
+    "${REPO_ROOT}/platform/local/bin/verify-m14-mac-restricted-readiness.sh"
+  fi
+  if [ "${RUN_M14_XOS_PARITY}" = "1" ]; then
+    echo "Running M14.7 gate (cross-OS payload parity + evidence pack)..."
+    "${REPO_ROOT}/platform/local/bin/verify-m14-xos-parity.sh"
   fi
 
   require_cmd docker

@@ -131,6 +131,72 @@ type RunPruneResult struct {
 	RunIDs         []string  `json:"runIds,omitempty"`
 }
 
+type IntegrationSettingsRecord struct {
+	TenantID  string          `json:"tenantId,omitempty"`
+	ProjectID string          `json:"projectId,omitempty"`
+	Settings  json.RawMessage `json:"settings"`
+	CreatedAt time.Time       `json:"createdAt"`
+	UpdatedAt time.Time       `json:"updatedAt"`
+}
+
+type IntegrationSettingsUpsertRequest struct {
+	Meta     ObjectMeta      `json:"meta"`
+	Settings json.RawMessage `json:"settings"`
+}
+
+type IntegrationSettingsResponse struct {
+	Source      string          `json:"source,omitempty"`
+	TenantID    string          `json:"tenantId,omitempty"`
+	ProjectID   string          `json:"projectId,omitempty"`
+	HasSettings bool            `json:"hasSettings"`
+	Settings    json.RawMessage `json:"settings"`
+	CreatedAt   *time.Time      `json:"createdAt,omitempty"`
+	UpdatedAt   *time.Time      `json:"updatedAt,omitempty"`
+}
+
+type ApprovalStatus string
+
+const (
+	ApprovalStatusPending  ApprovalStatus = "PENDING"
+	ApprovalStatusApproved ApprovalStatus = "APPROVED"
+	ApprovalStatusDenied   ApprovalStatus = "DENIED"
+	ApprovalStatusExpired  ApprovalStatus = "EXPIRED"
+)
+
+type ApprovalRecord struct {
+	ApprovalID             string         `json:"approvalId"`
+	RunID                  string         `json:"runId"`
+	RequestID              string         `json:"requestId,omitempty"`
+	TenantID               string         `json:"tenantId,omitempty"`
+	ProjectID              string         `json:"projectId,omitempty"`
+	Tier                   int            `json:"tier"`
+	TargetOS               string         `json:"targetOS,omitempty"`
+	TargetExecutionProfile string         `json:"targetExecutionProfile,omitempty"`
+	RequestedCapabilities  []string       `json:"requestedCapabilities,omitempty"`
+	RequiredVerifierIDs    []string       `json:"requiredVerifierIds,omitempty"`
+	Status                 ApprovalStatus `json:"status"`
+	Reason                 string         `json:"reason,omitempty"`
+	CreatedAt              time.Time      `json:"createdAt"`
+	ExpiresAt              *time.Time     `json:"expiresAt,omitempty"`
+	ReviewedAt             *time.Time     `json:"reviewedAt,omitempty"`
+}
+
+type ApprovalDecisionRequest struct {
+	Decision   string `json:"decision"`
+	Reason     string `json:"reason,omitempty"`
+	TTLSeconds int    `json:"ttlSeconds,omitempty"`
+	GrantToken string `json:"grantToken,omitempty"`
+}
+
+type ApprovalDecisionResponse struct {
+	Applied    bool           `json:"applied"`
+	RunID      string         `json:"runId"`
+	Decision   string         `json:"decision"`
+	Status     ApprovalStatus `json:"status"`
+	Reason     string         `json:"reason,omitempty"`
+	ReviewedAt string         `json:"reviewedAt,omitempty"`
+}
+
 type PolicyBundleRef struct {
 	PolicyID      string `json:"policyId,omitempty"`
 	PolicyVersion string `json:"policyVersion,omitempty"`
@@ -218,6 +284,68 @@ type DesktopVerifyRequest struct {
 type DesktopVerifyResponse struct {
 	DesktopDecisionResponse
 	EvidenceBundle DesktopEvidenceBundle `json:"evidenceBundle"`
+}
+
+type TerminalSessionScope struct {
+	RunID       string `json:"runId"`
+	TenantID    string `json:"tenantId,omitempty"`
+	ProjectID   string `json:"projectId,omitempty"`
+	Environment string `json:"environment,omitempty"`
+}
+
+type TerminalCommandRequest struct {
+	Text              string `json:"text"`
+	CWD               string `json:"cwd,omitempty"`
+	TimeoutSeconds    int    `json:"timeoutSeconds,omitempty"`
+	ReadOnlyRequested bool   `json:"readOnlyRequested,omitempty"`
+}
+
+type TerminalSafetyRequest struct {
+	TerminalMode          string `json:"terminalMode,omitempty"`
+	RestrictedHostMode    string `json:"restrictedHostMode,omitempty"`
+	RestrictedHostRequest bool   `json:"restrictedHostRequest,omitempty"`
+}
+
+type TerminalProvenance struct {
+	Source         string `json:"source,omitempty"`
+	CommandTag     string `json:"commandTag,omitempty"`
+	AgentProfileID string `json:"agentProfileId,omitempty"`
+}
+
+type TerminalAuditLink struct {
+	Event      string `json:"event,omitempty"`
+	RunID      string `json:"runId,omitempty"`
+	ProviderID string `json:"providerId,omitempty"`
+}
+
+type TerminalSessionCreateRequest struct {
+	Meta       ObjectMeta             `json:"meta"`
+	Scope      TerminalSessionScope   `json:"scope"`
+	Command    TerminalCommandRequest `json:"command"`
+	Safety     TerminalSafetyRequest  `json:"safety"`
+	Provenance TerminalProvenance     `json:"provenance,omitempty"`
+	AuditLink  TerminalAuditLink      `json:"auditLink,omitempty"`
+}
+
+type TerminalExecutionResult struct {
+	ExitCode     int    `json:"exitCode"`
+	Output       string `json:"output,omitempty"`
+	OutputSHA256 string `json:"outputSha256,omitempty"`
+	TimedOut     bool   `json:"timedOut,omitempty"`
+	Truncated    bool   `json:"truncated,omitempty"`
+}
+
+type TerminalSessionCreateResponse struct {
+	Source        string                   `json:"source,omitempty"`
+	Applied       bool                     `json:"applied"`
+	SessionID     string                   `json:"sessionId,omitempty"`
+	RequestedAt   string                   `json:"requestedAt,omitempty"`
+	Status        string                   `json:"status,omitempty"`
+	RunID         string                   `json:"runId,omitempty"`
+	ProvenanceTag string                   `json:"provenanceTag,omitempty"`
+	AuditLink     TerminalAuditLink        `json:"auditLink,omitempty"`
+	Warning       string                   `json:"warning,omitempty"`
+	Result        *TerminalExecutionResult `json:"result,omitempty"`
 }
 
 type APIError struct {

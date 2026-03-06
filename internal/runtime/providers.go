@@ -41,12 +41,18 @@ type ProviderTarget struct {
 	EndpointURL    string
 	TimeoutSeconds int64
 	Priority       int64
+	TargetOS       string
 	AuthMode       string
 
 	BearerSecretName string
 	BearerSecretKey  string
 	ClientTLSSecret  string
 	CASecret         string
+}
+
+type ProviderClient interface {
+	SelectProvider(ctx context.Context, namespace, providerType, requiredCapability, targetOS string, minPriority int64) (*ProviderTarget, error)
+	PostJSON(ctx context.Context, target *ProviderTarget, path string, reqBody interface{}, out interface{}) error
 }
 
 type ProviderRegistry struct {
@@ -57,12 +63,13 @@ func NewProviderRegistry(k8s client.Client) *ProviderRegistry {
 	return &ProviderRegistry{k8s: k8s}
 }
 
-func (r *ProviderRegistry) SelectProvider(ctx context.Context, namespace, providerType, requiredCapability string, minPriority int64) (*ProviderTarget, error) {
+func (r *ProviderRegistry) SelectProvider(ctx context.Context, namespace, providerType, requiredCapability, targetOS string, minPriority int64) (*ProviderTarget, error) {
 	list := &unstructured.UnstructuredList{}
 	list.SetGroupVersionKind(extensionProviderListGVK)
 	if err := r.k8s.List(ctx, list, client.InNamespace(namespace)); err != nil {
 		return nil, fmt.Errorf("list ExtensionProvider: %w", err)
 	}
+	normalizedTargetOS := normalizeProviderTargetOS(targetOS)
 
 	candidates := make([]ProviderTarget, 0, len(list.Items))
 	for _, item := range list.Items {
@@ -71,6 +78,17 @@ func (r *ProviderRegistry) SelectProvider(ctx context.Context, namespace, provid
 
 		ptype, _, _ := unstructured.NestedString(spec, "providerType")
 		if ptype != providerType {
+			continue
+		}
+		providerID, _, _ := unstructured.NestedString(status, "resolved", "providerId")
+		if strings.TrimSpace(providerID) == "" {
+			providerID, _, _ = unstructured.NestedString(spec, "providerId")
+		}
+		if strings.TrimSpace(providerID) == "" {
+			providerID = item.GetName()
+		}
+		providerTargetOS := resolveProviderTargetOS(item, spec, status, providerID)
+		if ptype == "DesktopProvider" && normalizedTargetOS != "" && !providerTargetOSMatches(providerTargetOS, normalizedTargetOS) {
 			continue
 		}
 
@@ -111,14 +129,6 @@ func (r *ProviderRegistry) SelectProvider(ctx context.Context, namespace, provid
 			timeoutSeconds = 10
 		}
 
-		providerID, _, _ := unstructured.NestedString(status, "resolved", "providerId")
-		if strings.TrimSpace(providerID) == "" {
-			providerID, _, _ = unstructured.NestedString(spec, "providerId")
-		}
-		if strings.TrimSpace(providerID) == "" {
-			providerID = item.GetName()
-		}
-
 		authMode, _, _ := unstructured.NestedString(spec, "auth", "mode")
 		bearerName, _, _ := unstructured.NestedString(spec, "auth", "bearerTokenSecretRef", "name")
 		bearerKey, found, _ := unstructured.NestedString(spec, "auth", "bearerTokenSecretRef", "key")
@@ -136,6 +146,7 @@ func (r *ProviderRegistry) SelectProvider(ctx context.Context, namespace, provid
 			EndpointURL:      endpointURL,
 			TimeoutSeconds:   timeoutSeconds,
 			Priority:         priority,
+			TargetOS:         providerTargetOS,
 			AuthMode:         firstNonEmpty(authMode, "None"),
 			BearerSecretName: bearerName,
 			BearerSecretKey:  bearerKey,
@@ -145,6 +156,9 @@ func (r *ProviderRegistry) SelectProvider(ctx context.Context, namespace, provid
 	}
 
 	if len(candidates) == 0 {
+		if providerType == "DesktopProvider" && normalizedTargetOS != "" {
+			return nil, fmt.Errorf("no provider found (type=%s capability=%s targetOS=%s minPriority=%d)", providerType, requiredCapability, normalizedTargetOS, minPriority)
+		}
 		return nil, fmt.Errorf("no provider found (type=%s capability=%s minPriority=%d)", providerType, requiredCapability, minPriority)
 	}
 
@@ -409,4 +423,64 @@ func joinURLPath(basePath, p string) string {
 		return "/" + p
 	}
 	return basePath + "/" + p
+}
+
+func resolveProviderTargetOS(item unstructured.Unstructured, spec, status map[string]interface{}, providerID string) string {
+	resolvedTargetOS, _, _ := unstructured.NestedString(status, "resolved", "targetOS")
+	specTargetOS, _, _ := unstructured.NestedString(spec, "targetOS")
+	specAnnotationTargetOS, _, _ := unstructured.NestedString(spec, "annotations", "epydios.ai/target-os")
+	metaAnnotationTargetOS := item.GetAnnotations()["epydios.ai/target-os"]
+	return firstNonEmpty(
+		normalizeProviderTargetOS(resolvedTargetOS),
+		normalizeProviderTargetOS(specTargetOS),
+		normalizeProviderTargetOS(specAnnotationTargetOS),
+		normalizeProviderTargetOS(metaAnnotationTargetOS),
+		inferProviderTargetOSFromID(providerID, item.GetName()),
+	)
+}
+
+func providerTargetOSMatches(providerTargetOS, requestedTargetOS string) bool {
+	requestedTargetOS = normalizeProviderTargetOS(requestedTargetOS)
+	if requestedTargetOS == "" {
+		return true
+	}
+	providerTargetOS = normalizeProviderTargetOS(providerTargetOS)
+	if providerTargetOS == "" {
+		// Preserve Linux-first behavior for legacy desktop provider manifests that predate explicit target-os metadata.
+		providerTargetOS = desktopOSLinux
+	}
+	return providerTargetOS == requestedTargetOS
+}
+
+func inferProviderTargetOSFromID(values ...string) string {
+	for _, value := range values {
+		normalized := strings.ToLower(strings.TrimSpace(value))
+		if normalized == "" {
+			continue
+		}
+		switch {
+		case strings.Contains(normalized, "windows"):
+			return desktopOSWindows
+		case strings.Contains(normalized, "macos"), strings.Contains(normalized, "darwin"):
+			return desktopOSMacOS
+		case strings.Contains(normalized, "linux"):
+			return desktopOSLinux
+		}
+	}
+	return ""
+}
+
+func normalizeProviderTargetOS(raw string) string {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "", "any", "*":
+		return ""
+	case "linux":
+		return desktopOSLinux
+	case "windows", "win":
+		return desktopOSWindows
+	case "macos", "mac", "darwin", "osx":
+		return desktopOSMacOS
+	default:
+		return strings.ToLower(strings.TrimSpace(raw))
+	}
 }

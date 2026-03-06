@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: epydios-system
+resources:
+  - serviceaccount-windows.yaml
+  - serviceaccount-macos.yaml
+  - configmap-windows.yaml
+  - configmap-macos.yaml
+  - service-windows.yaml
+  - service-macos.yaml
+  - deployment-windows.yaml
+  - deployment-macos.yaml
+labels:
+  - pairs:
+      app.kubernetes.io/component: provider
+      app.kubernetes.io/part-of: epydios-ai-control-plane
+      epydios.ai/provider-family: oss-desktop-openfang
+    includeSelectors: true
+    includeTemplates: true

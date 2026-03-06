@@ -17,7 +17,7 @@ import (
 type Orchestrator struct {
 	Namespace             string
 	Store                 RunStore
-	ProviderRegistry      *ProviderRegistry
+	ProviderRegistry      ProviderClient
 	ProfileMinPriority    int64
 	PolicyMinPriority     int64
 	EvidenceMinPriority   int64
@@ -153,7 +153,7 @@ func (o *Orchestrator) ExecuteRun(ctx context.Context, req RunCreateRequest) (*R
 		return err
 	}
 
-	profileProvider, err := o.ProviderRegistry.SelectProvider(ctx, o.Namespace, "ProfileResolver", "profile.resolve", o.ProfileMinPriority)
+	profileProvider, err := o.ProviderRegistry.SelectProvider(ctx, o.Namespace, "ProfileResolver", "profile.resolve", "", o.ProfileMinPriority)
 	if err != nil {
 		return failRun(fmt.Errorf("select profile provider: %w", err))
 	}
@@ -196,7 +196,7 @@ func (o *Orchestrator) ExecuteRun(ctx context.Context, req RunCreateRequest) (*R
 		return failRun(fmt.Errorf("persist profile stage: %w", err))
 	}
 
-	policyProvider, err := o.ProviderRegistry.SelectProvider(ctx, o.Namespace, "PolicyProvider", "policy.evaluate", o.PolicyMinPriority)
+	policyProvider, err := o.ProviderRegistry.SelectProvider(ctx, o.Namespace, "PolicyProvider", "policy.evaluate", "", o.PolicyMinPriority)
 	if err != nil {
 		return failRun(fmt.Errorf("select policy provider: %w", err))
 	}
@@ -338,7 +338,7 @@ func (o *Orchestrator) ExecuteRun(ctx context.Context, req RunCreateRequest) (*R
 					"tier":      desktopPlan.Tier,
 				})
 			} else {
-				desktopProvider, selErr := o.ProviderRegistry.SelectProvider(ctx, o.Namespace, "DesktopProvider", "observe.window_metadata", o.DesktopMinPriority)
+				desktopProvider, selErr := o.ProviderRegistry.SelectProvider(ctx, o.Namespace, "DesktopProvider", "observe.window_metadata", desktopPlan.Step.TargetOS, o.DesktopMinPriority)
 				if selErr != nil {
 					return failRun(fmt.Errorf("select desktop provider: %w", selErr))
 				}
@@ -459,7 +459,7 @@ func (o *Orchestrator) ExecuteRun(ctx context.Context, req RunCreateRequest) (*R
 		}
 	}
 
-	evidenceProvider, err := o.ProviderRegistry.SelectProvider(ctx, o.Namespace, "EvidenceProvider", "evidence.record", o.EvidenceMinPriority)
+	evidenceProvider, err := o.ProviderRegistry.SelectProvider(ctx, o.Namespace, "EvidenceProvider", "evidence.record", "", o.EvidenceMinPriority)
 	if err != nil {
 		return failRun(fmt.Errorf("select evidence provider: %w", err))
 	}

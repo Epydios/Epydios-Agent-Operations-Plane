@@ -1,0 +1,24 @@
+apiVersion: controlplane.epydios.ai/v1alpha1
+kind: ExtensionProvider
+metadata:
+  name: oss-desktop-openfang-linux
+  annotations:
+    epydios.ai/target-os: linux
+spec:
+  providerType: DesktopProvider
+  providerId: oss-desktop-openfang-linux
+  contractVersion: v1alpha1
+  endpoint:
+    url: http://epydios-oss-desktop-openfang-provider.epydios-system.svc.cluster.local:8080
+    timeoutSeconds: 10
+  auth:
+    mode: None
+  selection:
+    enabled: false
+    priority: 70
+  advertisedCapabilities:
+    - observe.window_metadata
+    - observe.screenshot_hash
+    - actuate.window_focus
+    - actuate.input.type_click
+    - verify.post_action_state

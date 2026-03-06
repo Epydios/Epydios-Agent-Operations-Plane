@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: agentops-desktop
+  labels:
+    app.kubernetes.io/name: agentops-desktop
+    app.kubernetes.io/component: ui
+    app.kubernetes.io/part-of: epydios-agentops-control-plane
+spec:
+  selector:
+    app.kubernetes.io/name: agentops-desktop
+    app.kubernetes.io/component: ui
+  ports:
+    - name: http
+      port: 80
+      protocol: TCP
+      targetPort: http

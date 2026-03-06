@@ -1,0 +1,551 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Epydios AgentOps Desktop</title>
+    <link rel="stylesheet" href="./css/main.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark">
+          <img src="./assets/epydios-logo.png" alt="" class="brand-logo" />
+        </span>
+        <div class="brand-text">
+          <h1 id="app-title">Epydios AgentOps Desktop</h1>
+          <p id="app-subtitle">Operator Console</p>
+        </div>
+      </div>
+      <div class="session-controls">
+        <span id="refresh-status" class="chip chip-neutral chip-compact" aria-live="polite">Data: idle</span>
+        <button id="login-button" class="btn btn-primary">Sign In</button>
+        <button id="logout-button" class="btn btn-secondary">Sign Out</button>
+      </div>
+    </header>
+
+    <nav class="workspace-nav" aria-label="Workspace sections" role="tablist">
+      <button class="workspace-tab is-active" type="button" role="tab" aria-selected="true" data-workspace-tab="operations">
+        Operations
+      </button>
+      <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="runs">
+        Runs
+      </button>
+      <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="approvals">
+        Approvals
+      </button>
+      <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="incidents">
+        Incidents
+      </button>
+      <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="settings">
+        Settings
+      </button>
+    </nav>
+
+    <main id="workspace-layout" class="layout" data-workspace-view="operations">
+      <section class="panel panel-session" data-workspace-section="operations">
+        <h2>Session</h2>
+        <div class="session-grid">
+          <div>
+            <span class="label">Auth</span>
+            <span id="auth-status" class="chip chip-neutral">Unknown</span>
+          </div>
+          <div>
+            <span class="label">Tenant</span>
+            <span id="tenant-value">-</span>
+          </div>
+          <div>
+            <span class="label">Project</span>
+            <span id="project-value">-</span>
+          </div>
+          <div>
+            <span class="label">Client ID</span>
+            <span id="client-id-value">-</span>
+          </div>
+          <div>
+            <span class="label">Subject</span>
+            <span id="subject-value">-</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel panel-context" data-workspace-section="operations">
+        <div class="panel-header">
+          <h2 class="heading-inline">
+            Workspace Context
+            <button
+              class="help-tip"
+              type="button"
+              title="Project filter and endpoint status drive active scope for runs, approvals, audit, and settings."
+              aria-label="Workspace context help"
+            >?</button>
+          </h2>
+          <button
+            id="operations-advanced-toggle"
+            class="btn btn-secondary btn-small"
+            type="button"
+            data-advanced-toggle-section="operations"
+          >Show advanced details</button>
+        </div>
+        <div class="context-grid">
+          <label class="field">
+            <span class="label">Project Filter</span>
+            <select id="context-project-select" class="filter-input">
+              <option value="">project:any</option>
+            </select>
+            <span class="field-help">Filters active project scope across operations and settings editors.</span>
+          </label>
+          <div class="metric">
+            <div class="title">Active Agent Profile</div>
+            <div id="context-agent-profile" class="meta">-</div>
+          </div>
+          <div class="metric">
+            <div class="title">Endpoint Health</div>
+            <div id="context-endpoint-badges" class="context-badges"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel panel-quickstart" data-workspace-section="operations">
+        <div class="panel-header">
+          <h2>Quick Start</h2>
+        </div>
+        <ol class="quickstart-list">
+          <li>Select project filter and agent profile.</li>
+          <li>Use Run Builder or Terminal for execution requests.</li>
+          <li>Track approvals, run state, and incident packages in dedicated tabs.</li>
+          <li>Use Settings for provider contracts, endpoints, storage, and retention defaults.</li>
+        </ol>
+      </section>
+
+      <section class="panel panel-execution" data-workspace-section="operations" data-advanced-section="operations">
+        <h2>Execution Defaults</h2>
+        <div id="execution-defaults-content" class="stack"></div>
+      </section>
+
+      <section class="panel panel-triage" data-workspace-section="operations">
+        <div class="panel-header">
+          <h2>Ops Triage</h2>
+        </div>
+        <div id="triage-content" class="triage-grid"></div>
+      </section>
+
+      <section class="panel panel-settings" data-workspace-section="settings">
+        <div class="panel-header">
+          <h2>Settings &amp; Integration Contracts</h2>
+          <div class="filter-row">
+            <select id="settings-agent-profile" class="filter-input"></select>
+            <select id="settings-theme-mode" class="filter-input">
+              <option value="system">theme:system</option>
+              <option value="light">theme:light</option>
+              <option value="dark">theme:dark</option>
+            </select>
+            <button
+              id="settings-advanced-toggle"
+              class="btn btn-secondary btn-small"
+              type="button"
+              data-advanced-toggle-section="settings"
+            >Show advanced details</button>
+            <button id="settings-open-audit-events-button" class="btn btn-secondary" type="button">Open Audit Events</button>
+          </div>
+        </div>
+        <div id="settings-content" class="stack"></div>
+      </section>
+
+      <section class="panel panel-run-builder" data-workspace-section="operations">
+        <div class="panel-header">
+          <h2 class="heading-inline">
+            Run Builder
+            <button
+              class="help-tip"
+              type="button"
+              title="Use API-native Tier 1 first, desktop Tier 2 only when needed, and explicit approvals for Tier 3."
+              aria-label="Run builder help"
+            >?</button>
+          </h2>
+        </div>
+        <form id="run-builder-form" class="run-builder-grid">
+          <label class="field">
+            <span class="label">Request ID</span>
+            <input id="rb-request-id" class="filter-input" type="text" placeholder="auto if empty" />
+          </label>
+          <label class="field">
+            <span class="label">Tenant</span>
+            <input id="rb-tenant-id" class="filter-input" type="text" placeholder="tenant id" />
+          </label>
+          <label class="field">
+            <span class="label">Project</span>
+            <input id="rb-project-id" class="filter-input" type="text" placeholder="project id" />
+          </label>
+          <label class="field">
+            <span class="label">Environment</span>
+            <input id="rb-environment" class="filter-input" type="text" value="staging" />
+          </label>
+          <label class="field">
+            <span class="label">Tier</span>
+            <select id="rb-tier" class="filter-input">
+              <option value="1">Tier 1 (connectors/api)</option>
+              <option value="2" selected>Tier 2 (desktop fallback)</option>
+              <option value="3">Tier 3 (approval + grant)</option>
+            </select>
+          </label>
+          <label class="field">
+            <span class="label">Target OS</span>
+            <select id="rb-target-os" class="filter-input">
+              <option value="linux" selected>linux</option>
+              <option value="windows">windows</option>
+              <option value="macos">macos</option>
+            </select>
+          </label>
+          <label class="field">
+            <span class="label">Execution Profile</span>
+            <select id="rb-target-profile" class="filter-input">
+              <option value="sandbox_vm_autonomous" selected>sandbox_vm_autonomous</option>
+              <option value="restricted_host">restricted_host</option>
+            </select>
+          </label>
+          <label class="field">
+            <span class="label">Step ID</span>
+            <input id="rb-step-id" class="filter-input" type="text" value="desktop-step-1" />
+          </label>
+          <label class="field field-wide">
+            <span class="label">Requested Capabilities (comma-separated)</span>
+            <input
+              id="rb-capabilities"
+              class="filter-input"
+              type="text"
+              value="observe.window_metadata,actuate.window_focus,verify.post_action_state"
+            />
+          </label>
+          <label class="field field-wide">
+            <span class="label">Required Verifier IDs (comma-separated)</span>
+            <input id="rb-verifier-ids" class="filter-input" type="text" value="V-M13-LNX-001,V-M13-LNX-002,V-M13-LNX-003" />
+          </label>
+          <label class="field">
+            <span class="label">Action Type</span>
+            <input id="rb-action-type" class="filter-input" type="text" value="click" />
+          </label>
+          <label class="field">
+            <span class="label">Action Selector</span>
+            <input id="rb-action-selector" class="filter-input" type="text" value="#approve" />
+          </label>
+          <label class="field">
+            <span class="label">Post-Action Check</span>
+            <input id="rb-post-action" class="filter-input" type="text" value="post_action_state" />
+          </label>
+          <label class="field">
+            <span class="label">Action Target</span>
+            <input id="rb-action-target" class="filter-input" type="text" value="desktop-sandbox" />
+          </label>
+          <label class="field field-checkbox">
+            <input id="rb-human-approval-granted" type="checkbox" />
+            <span>Human approval granted</span>
+          </label>
+          <label class="field field-checkbox">
+            <input id="rb-restricted-host-opt-in" type="checkbox" />
+            <span>Restricted-host opt-in</span>
+          </label>
+          <label class="field field-checkbox">
+            <input id="rb-dry-run" type="checkbox" />
+            <span>Dry run</span>
+          </label>
+          <div class="field field-actions">
+            <button id="run-builder-submit-button" class="btn btn-primary" type="submit">Submit Run</button>
+          </div>
+        </form>
+        <div id="run-builder-policy-hints" class="stack"></div>
+        <div id="run-builder-feedback" class="stack" aria-live="polite"></div>
+        <pre id="run-builder-payload" class="monospace"></pre>
+      </section>
+
+      <section class="panel panel-terminal" data-workspace-section="operations" data-advanced-section="operations">
+        <div class="panel-header">
+          <h2>Terminal Control</h2>
+        </div>
+        <form id="terminal-form" class="terminal-grid">
+          <label class="field">
+            <span class="label">Run ID Scope</span>
+            <input id="terminal-run-id" class="filter-input" type="text" placeholder="run-..." />
+          </label>
+          <label class="field field-wide">
+            <span class="label">Command</span>
+            <input id="terminal-command" class="filter-input" type="text" value="kubectl get pods -n epydios-system" />
+          </label>
+          <label class="field">
+            <span class="label">Working Dir</span>
+            <input id="terminal-cwd" class="filter-input" type="text" value="/workspace" />
+          </label>
+          <label class="field">
+            <span class="label">Timeout (sec)</span>
+            <input id="terminal-timeout-seconds" class="filter-input filter-input-small" type="number" min="1" max="900" value="60" />
+          </label>
+          <label class="field field-checkbox">
+            <input id="terminal-read-only" type="checkbox" checked />
+            <span>Read-only request</span>
+          </label>
+          <label class="field field-checkbox">
+            <input id="terminal-restricted-host-request" type="checkbox" />
+            <span>Restricted-host request</span>
+          </label>
+          <div class="field field-actions">
+            <button id="terminal-submit-button" class="btn btn-primary" type="submit">Queue Command</button>
+          </div>
+        </form>
+        <div id="terminal-policy-hints" class="stack"></div>
+        <div id="terminal-feedback" class="stack" aria-live="polite"></div>
+        <div class="panel-header">
+          <h2>Terminal History</h2>
+          <div class="filter-row">
+            <input id="terminal-history-run-filter" class="filter-input" type="text" placeholder="runId filter" />
+            <select id="terminal-history-status-filter" class="filter-input">
+              <option value="">status:any</option>
+              <option value="COMPLETED">status:completed</option>
+              <option value="POLICY_BLOCKED">status:policy_blocked</option>
+              <option value="FAILED">status:failed</option>
+            </select>
+            <button id="terminal-history-clear-button" class="btn btn-secondary" type="button">Clear</button>
+          </div>
+        </div>
+        <div id="terminal-history" class="stack"></div>
+        <pre id="terminal-payload" class="monospace"></pre>
+      </section>
+
+      <section class="panel panel-health" data-workspace-section="operations">
+        <div class="panel-header">
+          <h2>Platform Health</h2>
+          <button id="refresh-button" class="btn btn-secondary">Refresh</button>
+        </div>
+        <div id="health-content" class="stack"></div>
+      </section>
+
+      <section class="panel panel-providers" data-workspace-section="settings">
+        <h2>Extension Providers</h2>
+        <div id="providers-content" class="stack"></div>
+      </section>
+
+      <section class="panel panel-approvals" data-workspace-section="approvals">
+        <div class="panel-header">
+          <h2>Approvals Queue</h2>
+          <div class="filter-row">
+            <input id="approvals-tenant-filter" class="filter-input" type="text" placeholder="tenant filter" />
+            <input id="approvals-project-filter" class="filter-input" type="text" placeholder="project filter" />
+            <select id="approvals-status-filter" class="filter-input">
+              <option value="">status:any</option>
+              <option value="PENDING">status:pending</option>
+              <option value="APPROVED">status:approved</option>
+              <option value="DENIED">status:denied</option>
+              <option value="EXPIRED">status:expired</option>
+            </select>
+            <select id="approvals-time-range" class="filter-input">
+              <option value="">time:any</option>
+              <option value="1h">time:last-1h</option>
+              <option value="24h">time:last-24h</option>
+              <option value="7d">time:last-7d</option>
+              <option value="30d">time:last-30d</option>
+              <option value="custom">time:custom</option>
+            </select>
+            <input id="approvals-time-from" class="filter-input" type="datetime-local" aria-label="approvals from time" />
+            <input id="approvals-time-to" class="filter-input" type="datetime-local" aria-label="approvals to time" />
+            <select id="approvals-sort" class="filter-input">
+              <option value="ttl_asc">sort:ttl-soonest</option>
+              <option value="ttl_desc">sort:ttl-latest</option>
+              <option value="created_desc">sort:newest</option>
+              <option value="status">sort:status</option>
+            </select>
+            <select id="approvals-page-size" class="filter-input">
+              <option value="10">page:10</option>
+              <option value="25" selected>page:25</option>
+              <option value="50">page:50</option>
+              <option value="100">page:100</option>
+            </select>
+            <input id="approvals-page" class="filter-input filter-input-small" type="number" min="1" value="1" />
+            <input id="approvals-ttl-seconds" class="filter-input filter-input-small" type="number" min="60" max="86400" value="900" data-advanced-section="approvals" />
+            <button
+              id="approvals-advanced-toggle"
+              class="btn btn-secondary btn-small"
+              type="button"
+              data-advanced-toggle-section="approvals"
+            >Show advanced details</button>
+            <button id="approvals-apply-button" class="btn btn-secondary">Apply</button>
+          </div>
+        </div>
+        <div id="approvals-feedback" class="stack" aria-live="polite"></div>
+        <div id="approvals-content" class="stack"></div>
+        <div id="approvals-detail-content" class="stack"></div>
+      </section>
+
+      <section class="panel panel-runs" data-workspace-section="runs">
+        <div class="panel-header">
+          <h2>Runs</h2>
+          <div class="filter-row">
+            <input id="runs-runid-filter" class="filter-input" type="text" placeholder="runId filter" />
+            <input id="runs-tenant-filter" class="filter-input" type="text" placeholder="tenant filter" />
+            <input id="runs-project-filter" class="filter-input" type="text" placeholder="project filter" />
+            <select id="runs-status-filter" class="filter-input">
+              <option value="">status:any</option>
+              <option value="COMPLETED">status:completed</option>
+              <option value="FAILED">status:failed</option>
+              <option value="POLICY_BLOCKED">status:policy_blocked</option>
+              <option value="POLICY_EVALUATED">status:policy_evaluated</option>
+              <option value="DESKTOP_VERIFIED">status:desktop_verified</option>
+            </select>
+            <select id="runs-decision-filter" class="filter-input">
+              <option value="">decision:any</option>
+              <option value="ALLOW">decision:allow</option>
+              <option value="DENY">decision:deny</option>
+            </select>
+            <select id="runs-time-range" class="filter-input">
+              <option value="">time:any</option>
+              <option value="1h">time:last-1h</option>
+              <option value="24h">time:last-24h</option>
+              <option value="7d">time:last-7d</option>
+              <option value="30d">time:last-30d</option>
+              <option value="custom">time:custom</option>
+            </select>
+            <input id="runs-time-from" class="filter-input" type="datetime-local" aria-label="runs from time" />
+            <input id="runs-time-to" class="filter-input" type="datetime-local" aria-label="runs to time" />
+            <select id="runs-sort" class="filter-input">
+              <option value="updated_desc">sort:updated-newest</option>
+              <option value="updated_asc">sort:updated-oldest</option>
+              <option value="created_desc">sort:created-newest</option>
+              <option value="status">sort:status</option>
+            </select>
+            <input id="runs-limit-filter" class="filter-input filter-input-small" type="number" min="1" max="500" value="25" data-advanced-section="runs" />
+            <select id="runs-page-size" class="filter-input">
+              <option value="10">page:10</option>
+              <option value="25" selected>page:25</option>
+              <option value="50">page:50</option>
+              <option value="100">page:100</option>
+            </select>
+            <input id="runs-page" class="filter-input filter-input-small" type="number" min="1" value="1" />
+            <button
+              id="runs-advanced-toggle"
+              class="btn btn-secondary btn-small"
+              type="button"
+              data-advanced-toggle-section="runs"
+            >Show advanced details</button>
+            <button id="runs-apply-button" class="btn btn-secondary">Apply</button>
+          </div>
+        </div>
+        <div id="runs-content" class="stack"></div>
+        <div id="run-detail-content" class="stack"></div>
+      </section>
+
+      <section class="panel panel-audit" data-workspace-section="incidents">
+        <div class="panel-header">
+          <h2>Incidents</h2>
+          <div class="incident-subtabs" role="tablist" aria-label="Incidents views">
+            <button class="incident-subtab is-active" type="button" data-incident-subtab="queue">Incident Queue</button>
+            <button class="incident-subtab" type="button" data-incident-subtab="audit">Audit Events</button>
+          </div>
+          <button
+            id="incidents-advanced-toggle"
+            class="btn btn-secondary btn-small"
+            type="button"
+            data-advanced-toggle-section="incidents"
+          >Show advanced details</button>
+        </div>
+        <section class="incident-subpanel is-active" data-incident-subpanel="queue">
+          <div class="panel-header">
+            <h2>Incident Filing Queue</h2>
+            <div class="incident-toolbar">
+              <div class="filter-row incident-filter-row">
+                <select id="incident-history-status-filter" class="filter-input" aria-label="incident status filter">
+                  <option value="">status:any</option>
+                  <option value="drafted">status:drafted</option>
+                  <option value="filed">status:filed</option>
+                  <option value="closed">status:closed</option>
+                </select>
+                <select id="incident-history-sort" class="filter-input" aria-label="incident sort">
+                  <option value="newest">sort:newest</option>
+                  <option value="oldest">sort:oldest</option>
+                  <option value="status">sort:status</option>
+                </select>
+                <select id="incident-history-time-range" class="filter-input">
+                  <option value="">time:any</option>
+                  <option value="1h">time:last-1h</option>
+                  <option value="24h">time:last-24h</option>
+                  <option value="7d">time:last-7d</option>
+                  <option value="30d">time:last-30d</option>
+                  <option value="custom">time:custom</option>
+                </select>
+                <input id="incident-history-time-from" class="filter-input" type="datetime-local" aria-label="incident from time" />
+                <input id="incident-history-time-to" class="filter-input" type="datetime-local" aria-label="incident to time" />
+                <select id="incident-history-page-size" class="filter-input">
+                  <option value="10">page:10</option>
+                  <option value="25" selected>page:25</option>
+                  <option value="50">page:50</option>
+                  <option value="100">page:100</option>
+                </select>
+                <input id="incident-history-page" class="filter-input filter-input-small" type="number" min="1" value="1" />
+                <input id="incident-history-search-input" class="filter-input" type="text" placeholder="search runId/packageId" aria-label="incident search" />
+                <button id="incident-history-search-clear-button" class="btn btn-secondary" type="button">Clear Search</button>
+                <button id="incident-history-quick-all-button" class="btn btn-secondary" type="button">Show All</button>
+                <button id="incident-history-quick-filed-button" class="btn btn-secondary" type="button">Show Filed</button>
+                <button id="incident-history-quick-needs-closure-button" class="btn btn-secondary" type="button">Needs Closure</button>
+              </div>
+              <div class="filter-row incident-action-row" data-advanced-section="incidents">
+                <button id="incident-history-bulk-filed-button" class="btn btn-secondary" type="button">Mark Selected Filed</button>
+                <button id="incident-history-bulk-closed-button" class="btn btn-secondary" type="button">Mark Selected Closed</button>
+                <button id="incident-history-export-selected-button" class="btn btn-secondary" type="button">Export Selected Bundle</button>
+                <button id="incident-history-clear-selection-button" class="btn btn-secondary" type="button">Clear Selection</button>
+                <button id="incident-history-copy-latest-button" class="btn btn-secondary" type="button">Copy Latest Handoff</button>
+                <button id="incident-history-clear-button" class="btn btn-secondary" type="button">Clear Queue</button>
+              </div>
+            </div>
+          </div>
+          <div id="incident-history-summary" class="stack" aria-live="polite"></div>
+          <div id="incident-history-content" class="stack"></div>
+        </section>
+        <section class="incident-subpanel" data-incident-subpanel="audit">
+          <div class="panel-header">
+            <h2>Audit Events</h2>
+            <div class="filter-row">
+              <input id="audit-tenant-filter" class="filter-input" type="text" placeholder="tenant filter" />
+              <input id="audit-project-filter" class="filter-input" type="text" placeholder="project filter" />
+              <input id="audit-provider-filter" class="filter-input" type="text" placeholder="provider filter" />
+              <input id="audit-event-filter" class="filter-input" type="text" placeholder="event filter" />
+              <select id="audit-decision-filter" class="filter-input">
+                <option value="">decision:any</option>
+                <option value="ALLOW">decision:allow</option>
+                <option value="DENY">decision:deny</option>
+              </select>
+              <select id="audit-time-range" class="filter-input">
+                <option value="">time:any</option>
+                <option value="1h">time:last-1h</option>
+                <option value="24h">time:last-24h</option>
+                <option value="7d">time:last-7d</option>
+                <option value="30d">time:last-30d</option>
+                <option value="custom">time:custom</option>
+              </select>
+              <input id="audit-time-from" class="filter-input" type="datetime-local" aria-label="audit from time" />
+              <input id="audit-time-to" class="filter-input" type="datetime-local" aria-label="audit to time" />
+              <select id="audit-page-size" class="filter-input">
+                <option value="10">page:10</option>
+                <option value="25" selected>page:25</option>
+                <option value="50">page:50</option>
+                <option value="100">page:100</option>
+              </select>
+              <input id="audit-page" class="filter-input filter-input-small" type="number" min="1" value="1" />
+              <button id="audit-apply-button" class="btn btn-secondary">Apply</button>
+              <button id="audit-export-json-button" class="btn btn-secondary" type="button">Export Filtered JSON</button>
+              <button id="audit-export-csv-button" class="btn btn-secondary" type="button">Export Filtered CSV</button>
+              <button id="audit-copy-handoff-button" class="btn btn-secondary" type="button" data-advanced-section="incidents">Copy Filtered Handoff</button>
+              <button id="audit-export-incident-button" class="btn btn-primary" type="button" data-advanced-section="incidents">Export Selected Run Incident Package</button>
+            </div>
+            <div class="meta">Export and copy actions use the current audit filters and selected run context.</div>
+          </div>
+          <div id="audit-feedback" class="stack" aria-live="polite"></div>
+          <pre id="audit-handoff-preview" class="monospace audit-handoff-preview" data-advanced-section="incidents">Audit handoff preview appears here after Copy Handoff.</pre>
+          <div id="audit-content" class="stack"></div>
+        </section>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span id="config-summary">Loading configuration...</span>
+    </footer>
+
+    <script type="module" src="./js/main.js"></script>
+  </body>
+</html>

@@ -30,7 +30,7 @@ func TestDeriveDesktopExecutionPlanDefaults(t *testing.T) {
 	if plan.Step.Grant == nil || plan.Step.Grant.CapabilityGrantToken != "grant-token" {
 		t.Fatalf("grant token not propagated in desktop step")
 	}
-	if len(plan.Step.VerifierPolicy.RequiredVerifierIDs) != len(desktopDefaultVerifierIDs) {
+	if len(plan.Step.VerifierPolicy.RequiredVerifierIDs) != len(defaultDesktopVerifierIDs(desktopOSLinux)) {
 		t.Fatalf("required verifier IDs not defaulted")
 	}
 }
@@ -75,6 +75,15 @@ func TestDeriveDesktopExecutionPlanAllowsNonLinuxWhenEnabled(t *testing.T) {
 	if plan.Step.TargetOS != desktopOSWindows {
 		t.Fatalf("targetOS = %q, want %q", plan.Step.TargetOS, desktopOSWindows)
 	}
+	wantVerifiers := defaultDesktopVerifierIDs(desktopOSWindows)
+	if len(plan.Step.VerifierPolicy.RequiredVerifierIDs) != len(wantVerifiers) {
+		t.Fatalf("required verifier ID count = %d, want %d", len(plan.Step.VerifierPolicy.RequiredVerifierIDs), len(wantVerifiers))
+	}
+	for i, want := range wantVerifiers {
+		if plan.Step.VerifierPolicy.RequiredVerifierIDs[i] != want {
+			t.Fatalf("required verifier id[%d] = %q, want %q", i, plan.Step.VerifierPolicy.RequiredVerifierIDs[i], want)
+		}
+	}
 }
 
 func TestDeriveDesktopExecutionPlanRejectsNonLinuxByDefault(t *testing.T) {
@@ -87,6 +96,100 @@ func TestDeriveDesktopExecutionPlanRejectsNonLinuxByDefault(t *testing.T) {
 	}
 	if _, err := deriveDesktopExecutionPlan(req, "run-123", "", false); err == nil {
 		t.Fatalf("expected error for non-linux target when allowNonLinux=false")
+	}
+}
+
+func TestDeriveDesktopExecutionPlanAllowsMacOSWhenEnabled(t *testing.T) {
+	req := RunCreateRequest{
+		Action: JSONObject{"verb": "type", "target": "desktop"},
+		Desktop: &DesktopExecutionRequest{
+			Enabled:  true,
+			TargetOS: "macos",
+		},
+	}
+
+	plan, err := deriveDesktopExecutionPlan(req, "run-123", "", true)
+	if err != nil {
+		t.Fatalf("deriveDesktopExecutionPlan() error = %v", err)
+	}
+	if !plan.Enabled {
+		t.Fatalf("plan.Enabled = false, want true")
+	}
+	if plan.Step.TargetOS != desktopOSMacOS {
+		t.Fatalf("targetOS = %q, want %q", plan.Step.TargetOS, desktopOSMacOS)
+	}
+}
+
+func TestDeriveDesktopExecutionPlanRejectsMacOSByDefault(t *testing.T) {
+	req := RunCreateRequest{
+		Action: JSONObject{"verb": "type", "target": "desktop"},
+		Desktop: &DesktopExecutionRequest{
+			Enabled:  true,
+			TargetOS: "macos",
+		},
+	}
+	if _, err := deriveDesktopExecutionPlan(req, "run-123", "", false); err == nil {
+		t.Fatalf("expected error for macOS target when allowNonLinux=false")
+	}
+}
+
+func TestDeriveDesktopExecutionPlanMacOSVerifierDefaultsWhenEnabled(t *testing.T) {
+	req := RunCreateRequest{
+		Action: JSONObject{"verb": "type", "target": "desktop"},
+		Desktop: &DesktopExecutionRequest{
+			Enabled:  true,
+			TargetOS: "macos",
+		},
+	}
+
+	plan, err := deriveDesktopExecutionPlan(req, "run-123", "", true)
+	if err != nil {
+		t.Fatalf("deriveDesktopExecutionPlan() error = %v", err)
+	}
+	wantVerifiers := defaultDesktopVerifierIDs(desktopOSMacOS)
+	if len(plan.Step.VerifierPolicy.RequiredVerifierIDs) != len(wantVerifiers) {
+		t.Fatalf("required verifier ID count = %d, want %d", len(plan.Step.VerifierPolicy.RequiredVerifierIDs), len(wantVerifiers))
+	}
+	for i, want := range wantVerifiers {
+		if plan.Step.VerifierPolicy.RequiredVerifierIDs[i] != want {
+			t.Fatalf("required verifier id[%d] = %q, want %q", i, plan.Step.VerifierPolicy.RequiredVerifierIDs[i], want)
+		}
+	}
+}
+
+func TestDeriveDesktopExecutionPlanNormalizesWindowsTargetOS(t *testing.T) {
+	req := RunCreateRequest{
+		Action: JSONObject{"verb": "type", "target": "desktop"},
+		Desktop: &DesktopExecutionRequest{
+			Enabled:  true,
+			TargetOS: "  Windows  ",
+		},
+	}
+
+	plan, err := deriveDesktopExecutionPlan(req, "run-123", "", true)
+	if err != nil {
+		t.Fatalf("deriveDesktopExecutionPlan() error = %v", err)
+	}
+	if plan.Step.TargetOS != desktopOSWindows {
+		t.Fatalf("targetOS = %q, want %q", plan.Step.TargetOS, desktopOSWindows)
+	}
+}
+
+func TestDeriveDesktopExecutionPlanNormalizesMacOSTargetOS(t *testing.T) {
+	req := RunCreateRequest{
+		Action: JSONObject{"verb": "type", "target": "desktop"},
+		Desktop: &DesktopExecutionRequest{
+			Enabled:  true,
+			TargetOS: "  MaCoS ",
+		},
+	}
+
+	plan, err := deriveDesktopExecutionPlan(req, "run-123", "", true)
+	if err != nil {
+		t.Fatalf("deriveDesktopExecutionPlan() error = %v", err)
+	}
+	if plan.Step.TargetOS != desktopOSMacOS {
+		t.Fatalf("targetOS = %q, want %q", plan.Step.TargetOS, desktopOSMacOS)
 	}
 }
 
