@@ -9,13 +9,14 @@ rg -n -F 'currentState === "loaded" || currentState === "loaded-empty"' "${MODUL
 rg -n -F 'runtimeIntegrationSyncStateByProject[key] = "scope-unavailable"' "${MODULE_ROOT}/web/js/main.js" >/dev/null
 rg -n -F 'api.getIntegrationSettings(scope)' "${MODULE_ROOT}/web/js/main.js" >/dev/null
 rg -n -F 'response?.source !== "runtime-endpoint"' "${MODULE_ROOT}/web/js/main.js" >/dev/null
-rg -n -F 'Project integration settings loaded from runtime endpoint.' "${MODULE_ROOT}/web/js/main.js" >/dev/null
 rg -n -F 'api.upsertIntegrationSettings(runtimePayload)' "${MODULE_ROOT}/web/js/main.js" >/dev/null
 rg -n -F 'if (result?.applied && result?.source === "runtime-endpoint")' "${MODULE_ROOT}/web/js/main.js" >/dev/null
+rg -n -F 'runtimeIntegrationSyncStateByProject[key] = "loaded";' "${MODULE_ROOT}/web/js/main.js" >/dev/null
 rg -n -F 'result?.source === "endpoint-unavailable"' "${MODULE_ROOT}/web/js/main.js" >/dev/null
-rg -n -F 'Saved draft applied via runtime endpoint and activated for this project scope.' "${MODULE_ROOT}/web/js/main.js" >/dev/null
-rg -n -F 'Runtime integration settings endpoint is unavailable; applied local fallback for this project scope.' "${MODULE_ROOT}/web/js/main.js" >/dev/null
-rg -n -F 'Runtime integration settings endpoint is unavailable; baseline defaults were applied locally only.' "${MODULE_ROOT}/web/js/main.js" >/dev/null
+rg -n -F 'appliedWarnings = [' "${MODULE_ROOT}/web/js/main.js" >/dev/null
+rg -n -F 'warnings: [...validation.warnings, ...appliedWarnings]' "${MODULE_ROOT}/web/js/main.js" >/dev/null
+rg -n -F 'resetWarnings = [' "${MODULE_ROOT}/web/js/main.js" >/dev/null
+rg -n -F 'warnings: resetWarnings' "${MODULE_ROOT}/web/js/main.js" >/dev/null
 
 rg -n -F 'async getIntegrationSettings(scope = {}) {' "${MODULE_ROOT}/web/js/api.js" >/dev/null
 rg -n -F 'async upsertIntegrationSettings(payload = {}) {' "${MODULE_ROOT}/web/js/api.js" >/dev/null

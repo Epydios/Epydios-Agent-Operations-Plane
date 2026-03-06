@@ -1,4 +1,4 @@
-import { chipClassForStatus, escapeHTML } from "./common.js";
+import { chipClassForStatus, escapeHTML, renderPanelStateMetric } from "./common.js";
 
 export function renderHealth(ui, health, pipeline) {
   ui.healthContent.innerHTML = "";
@@ -29,5 +29,10 @@ export function renderHealth(ui, health, pipeline) {
 }
 
 export function renderError(ui, message) {
-  ui.healthContent.innerHTML = `<div class="metric"><div class="meta">${escapeHTML(message)}</div></div>`;
+  ui.healthContent.innerHTML = renderPanelStateMetric(
+    "error",
+    "Platform Health",
+    message || "Unable to load health data.",
+    "Retry refresh. If the error persists, verify runtime, provider, and pipeline inputs before continuing."
+  );
 }
