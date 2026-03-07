@@ -271,6 +271,7 @@ Notes:
   - `RUNTIME_CODEX_WORKDIR=/absolute/path/to/workdir`
   - `RUNTIME_CODEX_SANDBOX_MODE=workspace-write`
   - `RUNTIME_CODEX_EXEC_TIMEOUT=45s`
+- In `process` mode, AgentOps now launches Codex against an AgentOps-owned gateway boundary instead of letting the local Codex process choose a provider path itself. The managed turn review shows that boundary back as `route`, `boundary`, and `endpointRef`.
 - Minimal operator path:
   1. Start the runtime in `live` mode with the Codex process env vars above.
   2. Run the desktop UI in `live` mode.
@@ -279,7 +280,11 @@ Notes:
   5. Start a thread and submit a turn.
   6. Review structured tool proposals in chat.
   7. Approve or deny proposals directly in chat.
-  8. Review resulting tool-action status changes (`AUTHORIZED`, `STARTED`, `COMPLETED`, or `FAILED`) plus evidence and worker progress in the same thread.
+  8. After approval, confirm the same native session continues instead of creating a detached follow-up path.
+  9. Review resulting tool-action status changes (`AUTHORIZED`, `STARTED`, `COMPLETED`, or `FAILED`), managed worker transcript, evidence, and worker progress in the same thread.
+- Policy boundary note:
+  - current process mode governs operator turns, Codex-generated tool proposals, governed tool execution, the resumed worker session, and Codex -> model-provider traffic on one M16 timeline through the AgentOps gateway boundary
+  - the review surfaces expose the mediated boundary explicitly so operator chat can show which gateway path controlled the turn
 
 ## macOS Program Path
 

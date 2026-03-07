@@ -1171,7 +1171,6 @@ func (s *APIServer) handlePostIntegrationInvoke(w http.ResponseWriter, r *http.R
 	injectActorIdentity(&req.Meta, r.Context())
 	invokeStartedAt := time.Now().UTC()
 	invokeDescriptor := invokeExecutionDescriptorForRequest(&req)
-	toolActionID := fmt.Sprintf("%s-tool-%s", "invoke-"+sanitizeIDFragment(normalizeRequestID(req.Meta.RequestID, "invoke", invokeStartedAt)), sanitizeIDFragment(invokeDescriptor.toolActionType))
 	task, session, err := s.ensureInvokeSession(r.Context(), &req, invokeStartedAt)
 	if err != nil {
 		writeAPIError(
@@ -1196,6 +1195,7 @@ func (s *APIServer) handlePostIntegrationInvoke(w http.ResponseWriter, r *http.R
 		)
 		return
 	}
+	toolActionID := invokeSessionToolActionID(session.SessionID, invokeDescriptor.toolActionType, req.Meta.RequestID)
 	s.appendSessionEventBestEffort(r.Context(), &SessionEventRecord{
 		SessionID: session.SessionID,
 		EventType: SessionEventType("tool_action.requested"),
@@ -1220,7 +1220,9 @@ func (s *APIServer) handlePostIntegrationInvoke(w http.ResponseWriter, r *http.R
 		RequestPayload: mustMarshalJSON(map[string]interface{}{
 			"requestId":       req.Meta.RequestID,
 			"agentProfileId":  strings.TrimSpace(req.AgentProfileID),
+			"prompt":          strings.TrimSpace(req.Prompt),
 			"promptPreview":   truncatePromptPreview(req.Prompt),
+			"systemPrompt":    strings.TrimSpace(req.SystemPrompt),
 			"maxOutputTokens": req.MaxOutputTokens,
 			"executionMode":   invokeDescriptor.executionMode,
 		}),

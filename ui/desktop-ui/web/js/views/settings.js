@@ -897,6 +897,7 @@ function renderIntegrationInvokePanel(settings, invokeState = {}) {
   const outputText = String(invokeState.response?.outputText || "").trim();
   const rawResponse = invokeState.response?.rawResponse ? JSON.stringify(invokeState.response.rawResponse, null, 2) : "";
   const route = String(invokeState.response?.route || "").trim();
+  const boundaryProviderId = String(invokeState.response?.boundaryProviderId || "").trim();
   const provider = String(selectedProfile?.provider || invokeState.response?.provider || "-").trim() || "-";
   const transport = String(selectedProfile?.transport || invokeState.response?.transport || "-").trim() || "-";
   const model = String(selectedProfile?.model || invokeState.response?.model || "-").trim() || "-";
@@ -952,7 +953,7 @@ function renderIntegrationInvokePanel(settings, invokeState = {}) {
         ${feedbackLines.join("")}
       </div>
       <div class="settings-agent-test-output">
-        <div class="meta">route=${escapeHTML(route || "-")}; finishReason=${escapeHTML(String(invokeState.response?.finishReason || "-"))}</div>
+        <div class="meta">route=${escapeHTML(route || "-")}; boundary=${escapeHTML(boundaryProviderId || "-")}; finishReason=${escapeHTML(String(invokeState.response?.finishReason || "-"))}</div>
         <pre class="code-block">${escapeHTML(outputText || "No response yet.")}</pre>
         ${rawResponse ? `<details class="details-shell"><summary>Raw Response</summary><pre class="code-block">${escapeHTML(rawResponse)}</pre></details>` : ""}
       </div>

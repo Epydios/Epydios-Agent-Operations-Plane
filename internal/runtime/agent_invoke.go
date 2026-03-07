@@ -52,6 +52,8 @@ type AgentInvokeResponse struct {
 	Route              string          `json:"route,omitempty"`
 	EndpointRef        string          `json:"endpointRef,omitempty"`
 	CredentialRef      string          `json:"credentialRef,omitempty"`
+	BoundaryProviderID string          `json:"boundaryProviderId,omitempty"`
+	BoundaryBaseURL    string          `json:"boundaryBaseUrl,omitempty"`
 	StartedAt          string          `json:"startedAt,omitempty"`
 	CompletedAt        string          `json:"completedAt,omitempty"`
 	OutputText         string          `json:"outputText,omitempty"`
@@ -186,8 +188,16 @@ func (i *AgentInvoker) Invoke(ctx context.Context, req AgentInvokeRequest) (*Age
 	if req.ExecutionMode == AgentInvokeExecutionModeManagedCodexWorker {
 		adapterID := strings.ToLower(normalizeStringOrDefault(profile.ID, req.AgentProfileID))
 		if adapter := i.managed[adapterID]; adapter != nil && !adapter.UsesProviderRoutes() {
+			boundaryRoute, err := i.buildManagedWorkerBoundaryRoute(ctx, settings, profile, req.Meta.TenantID, req.Meta.ProjectID)
+			if err != nil {
+				return nil, err
+			}
+			boundary, err := buildManagedCodexProviderBoundary(boundaryRoute)
+			if err != nil {
+				return nil, err
+			}
 			startedAt := i.now().UTC()
-			managedTurn, err := adapter.RunTurn(ctx, req, profile, nil)
+			managedTurn, err := adapter.RunTurn(ctx, req, profile, boundary, nil)
 			if err != nil {
 				return nil, err
 			}
@@ -205,7 +215,11 @@ func (i *AgentInvoker) Invoke(ctx context.Context, req AgentInvokeRequest) (*Age
 				Provider:           profile.Provider,
 				Transport:          profile.Transport,
 				Model:              profile.Model,
-				Route:              "managed_worker_process",
+				Route:              boundary.RouteName,
+				EndpointRef:        boundary.EndpointRef,
+				CredentialRef:      boundary.CredentialRef,
+				BoundaryProviderID: boundary.ProviderID,
+				BoundaryBaseURL:    boundary.BaseURL,
 				StartedAt:          startedAt.Format(time.RFC3339),
 				CompletedAt:        i.now().UTC().Format(time.RFC3339),
 				OutputText:         result.outputText,
@@ -286,11 +300,122 @@ func (i *AgentInvoker) runManagedWorkerTurn(ctx context.Context, req AgentInvoke
 	if !ok || adapter == nil {
 		return nil, fmt.Errorf("managed worker adapter %q is not configured", adapterID)
 	}
-	enriched, err := adapter.RunTurn(ctx, req, profile, result)
+	enriched, err := adapter.RunTurn(ctx, req, profile, nil, result)
 	if err != nil {
 		return nil, err
 	}
 	return enriched, nil
+}
+
+func (i *AgentInvoker) ContinueManagedWorkerTurn(ctx context.Context, req managedWorkerContinuationRequest) (*AgentInvokeResponse, error) {
+	if i == nil || i.store == nil || i.resolver == nil {
+		return nil, fmt.Errorf("agent invoker is not configured")
+	}
+	if req.Session == nil || req.Task == nil || req.Worker == nil {
+		return nil, fmt.Errorf("task, session, and worker are required")
+	}
+	adapterID := strings.ToLower(normalizeStringOrDefault(req.Worker.AdapterID, req.Profile.ID))
+	adapter, ok := i.managed[adapterID]
+	if !ok || adapter == nil {
+		return nil, fmt.Errorf("managed worker adapter %q is not configured", adapterID)
+	}
+	profile := req.Profile
+	if strings.TrimSpace(profile.ID) == "" || strings.TrimSpace(profile.Model) == "" {
+		settings, err := i.loadAgentIntegrationSettings(ctx, req.Session.TenantID, req.Session.ProjectID)
+		if err == nil {
+			resolved, resolveErr := settings.resolveProfile(normalizeStringOrDefault(req.Worker.AgentProfileID, "codex"))
+			if resolveErr == nil {
+				profile = resolved
+			}
+		}
+	}
+	if strings.TrimSpace(profile.ID) == "" {
+		profile.ID = normalizeStringOrDefault(req.Worker.AgentProfileID, "codex")
+	}
+	if strings.TrimSpace(profile.Provider) == "" {
+		profile.Provider = normalizeStringOrDefault(req.Worker.Provider, "codex")
+	}
+	if strings.TrimSpace(profile.Transport) == "" {
+		profile.Transport = normalizeStringOrDefault(req.Worker.Transport, "native_worker_bridge")
+	}
+	if strings.TrimSpace(profile.Model) == "" {
+		profile.Model = normalizeStringOrDefault(req.Worker.Model, "gpt-5-codex")
+	}
+	req.Profile = profile
+
+	startedAt := i.now().UTC()
+	var (
+		boundary      *managedWorkerProviderBoundary
+		routeName     = "managed_worker_process"
+		endpointRef   string
+		credentialRef string
+		boundaryID    string
+		boundaryURL   string
+	)
+	if !adapter.UsesProviderRoutes() {
+		settings, err := i.loadAgentIntegrationSettings(ctx, req.Session.TenantID, req.Session.ProjectID)
+		if err != nil {
+			return nil, err
+		}
+		boundaryRoute, err := i.buildManagedWorkerBoundaryRoute(ctx, settings, profile, req.Session.TenantID, req.Session.ProjectID)
+		if err != nil {
+			return nil, err
+		}
+		boundary, err = buildManagedCodexProviderBoundary(boundaryRoute)
+		if err != nil {
+			return nil, err
+		}
+		routeName = boundary.RouteName
+		endpointRef = boundary.EndpointRef
+		credentialRef = boundary.CredentialRef
+		boundaryID = boundary.ProviderID
+		boundaryURL = boundary.BaseURL
+	}
+	result, err := adapter.ContinueTurn(ctx, req, boundary)
+	if err != nil {
+		return nil, err
+	}
+	if adapter.UsesProviderRoutes() {
+		routeName = "managed_worker_legacy_resume"
+	}
+	return &AgentInvokeResponse{
+		Source:             "runtime-endpoint",
+		Applied:            true,
+		RequestID:          strings.TrimSpace(req.Meta.RequestID),
+		TaskID:             req.Task.TaskID,
+		SessionID:          req.Session.SessionID,
+		SelectedWorkerID:   req.Worker.WorkerID,
+		TenantID:           req.Session.TenantID,
+		ProjectID:          req.Session.ProjectID,
+		AgentProfileID:     profile.ID,
+		ExecutionMode:      AgentInvokeExecutionModeManagedCodexWorker,
+		WorkerType:         normalizeStringOrDefault(req.Worker.WorkerType, "managed_agent"),
+		WorkerAdapterID:    adapter.AdapterID(),
+		Provider:           profile.Provider,
+		Transport:          profile.Transport,
+		Model:              profile.Model,
+		Route:              routeName,
+		EndpointRef:        endpointRef,
+		CredentialRef:      credentialRef,
+		BoundaryProviderID: boundaryID,
+		BoundaryBaseURL:    boundaryURL,
+		StartedAt:          startedAt.Format(time.RFC3339),
+		CompletedAt:        i.now().UTC().Format(time.RFC3339),
+		OutputText:         result.outputText,
+		FinishReason:       result.finishReason,
+		Usage:              result.usage,
+		WorkerOutputChunks: append([]string(nil), result.workerOutputChunks...),
+		ToolProposals:      append([]JSONObject(nil), result.toolProposals...),
+		RawResponse:        result.rawResponse,
+	}, nil
+}
+
+func (i *AgentInvoker) buildManagedWorkerBoundaryRoute(ctx context.Context, settings agentIntegrationSettings, profile agentProfileConfig, tenantID, projectID string) (*invokeRoute, error) {
+	route, err := i.buildGatewayRoute(ctx, settings, profile, tenantID, projectID)
+	if err != nil {
+		return nil, fmt.Errorf("managed Codex worker process mode requires an AgentOps gateway boundary: %w", err)
+	}
+	return route, nil
 }
 
 func applyManagedWorkerTurnResult(base *invokeResult, managed *managedWorkerTurnResult) *invokeResult {
