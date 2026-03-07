@@ -3,6 +3,14 @@ set -euo pipefail
 
 fail=0
 
+# Support common user-local install locations so the preflight works in
+# controlled environments where PATH startup files are not loaded.
+for candidate in "${HOME}/bin" "${HOME}/.local/bin"; do
+  if [ -d "${candidate}" ] && [[ ":${PATH}:" != *":${candidate}:"* ]]; then
+    PATH="${candidate}:${PATH}"
+  fi
+done
+
 have() {
   command -v "$1" >/dev/null 2>&1
 }
@@ -38,11 +46,11 @@ case "${host}" in
     ;;
   linux)
     require_cmd pkg-config "pkg-config"
-    if have pkg-config && pkg-config --exists gtk+-3.0 webkit2gtk-4.1; then
-      echo "OK   Linux GTK/WebKit deps: gtk+-3.0 + webkit2gtk-4.1"
+    if have pkg-config && pkg-config --exists gtk+-3.0 && { pkg-config --exists webkit2gtk-4.1 || pkg-config --exists webkit2gtk-4.0; }; then
+      echo "OK   Linux GTK/WebKit deps: gtk+-3.0 + webkit2gtk-4.0/4.1"
     else
-      echo "MISS Linux GTK/WebKit deps: gtk+-3.0 + webkit2gtk-4.1"
-      echo "     install: libgtk-3-dev libwebkit2gtk-4.1-dev (package names vary by distro)"
+      echo "MISS Linux GTK/WebKit deps: gtk+-3.0 + webkit2gtk-4.0/4.1"
+      echo "     install: libgtk-3-dev and libwebkit2gtk-4.0-dev or libwebkit2gtk-4.1-dev (package names vary by distro)"
       fail=1
     fi
     ;;

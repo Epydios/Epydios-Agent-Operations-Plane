@@ -14,7 +14,8 @@ const DEFAULT_CONFIG = {
     auditEvents: "/v1alpha1/runtime/audit/events",
     approvalsQueue: "/v1alpha1/runtime/approvals",
     approvalDecisionPrefix: "/v1alpha1/runtime/approvals/",
-    integrationSettings: "/v1alpha1/runtime/integrations/settings"
+    integrationSettings: "/v1alpha1/runtime/integrations/settings",
+    integrationInvoke: "/v1alpha1/runtime/integrations/invoke"
   },
   ui: {
     realtime: {

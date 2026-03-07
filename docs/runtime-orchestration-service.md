@@ -38,6 +38,7 @@ This service moves policy/evidence/profile execution flow out of ad-hoc scripts 
 - `POST /v1alpha1/runtime/terminal/sessions` (run-scoped terminal command request with deterministic command allowlist, policy guardrails, and audit linkage)
 - `GET /v1alpha1/runtime/integrations/settings?tenantId=...&projectId=...` (project-scoped integration settings read)
 - `PUT /v1alpha1/runtime/integrations/settings` (`meta.tenantId`, `meta.projectId`, `settings` JSON object)
+- `POST /v1alpha1/runtime/integrations/invoke` (`meta.tenantId`, `meta.projectId`, optional `agentProfileId`, `prompt`, optional `systemPrompt`, optional `maxOutputTokens`)
 
 ## Integration Settings Contract (M14.9)
 
@@ -48,6 +49,57 @@ This service moves policy/evidence/profile execution flow out of ad-hoc scripts 
 - Read and update actions emit runtime audit events:
   - `runtime.integrations.settings.read`
   - `runtime.integrations.settings.update`
+
+## Integration Invoke Contract (2026-03-07)
+
+- Endpoint scope is tenant/project constrained and enforced through the same runtime authn/authz and scope rules as run endpoints.
+- The runtime loads the selected project-scoped integration settings, merges them with the default agent-profile catalog, and resolves the active profile before invocation.
+- Supported profiles:
+  - `codex`
+  - `openai`
+  - `anthropic`
+  - `google`
+  - `azure_openai`
+  - `bedrock`
+- Supported transports:
+  - `responses_api`
+  - `messages_api`
+  - `gemini_api`
+  - `chat_completions_api`
+  - `bedrock_invoke_model`
+- Route selection:
+  - `gateway_first` uses the configured gateway refs first and optionally falls back to direct provider calls.
+  - `direct_first` uses direct provider calls first, then gateway if still configured.
+  - Gateway mTLS refs are optional; bearer-only gateway routing is allowed when token ref resolution succeeds.
+- Reference resolution:
+  - concrete endpoint and credential material is never accepted in the UI settings payload
+  - runtime resolves `ref://...` values from either `RUNTIME_REF_VALUES_PATH` or `RUNTIME_REF_VALUES_JSON`
+  - `RUNTIME_REF_VALUES_PATH` points to a JSON object mapping `ref://...` keys to resolved string or object values
+  - `RUNTIME_REF_VALUES_JSON` accepts the same JSON object inline
+- Direct endpoint defaults:
+  - `codex` / `openai` default to `https://api.openai.com` when the configured endpoint ref is gateway-shaped
+  - `anthropic` defaults to `https://api.anthropic.com`
+  - `google` defaults to `https://generativelanguage.googleapis.com`
+  - `azure_openai` and `bedrock` require explicit endpoint ref resolution
+- Bedrock credential refs must resolve to a JSON object with:
+  - `region`
+  - either `accessKeyId` + `secretAccessKey`, or `source="env"` so runtime can read AWS env vars
+- Response includes:
+  - `source`
+  - `route`
+  - `provider`
+  - `transport`
+  - `model`
+  - `endpointRef`
+  - `credentialRef`
+  - `outputText`
+  - `finishReason`
+  - `usage`
+  - `rawResponse`
+- Invoke actions emit runtime audit events:
+  - `runtime.integrations.invoke.started`
+  - `runtime.integrations.invoke.failed`
+  - `runtime.integrations.invoke.completed`
 
 ## Runtime Metrics (M12.1)
 

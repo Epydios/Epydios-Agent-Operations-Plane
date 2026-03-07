@@ -69,6 +69,9 @@ type Config struct {
 	PolicyRolloutPercent              int
 	RetentionDefaultClass             string
 	RetentionPolicyJSON               string
+	RefValuesPath                     string
+	RefValuesJSON                     string
+	IntegrationInvokeTimeout          time.Duration
 }
 
 func main() {
@@ -122,6 +125,9 @@ func parseFlags() Config {
 		DesktopAllowNonLinux:              envBoolOrDefault("DESKTOP_ALLOW_NON_LINUX", false),
 		RetentionDefaultClass:             envOrDefault("RETENTION_DEFAULT_CLASS", "standard"),
 		RetentionPolicyJSON:               envOrDefault("RETENTION_POLICY_JSON", ""),
+		RefValuesPath:                     envOrDefault("RUNTIME_REF_VALUES_PATH", ""),
+		RefValuesJSON:                     envOrDefault("RUNTIME_REF_VALUES_JSON", ""),
+		IntegrationInvokeTimeout:          envDurationOrDefault("RUNTIME_INTEGRATION_INVOKE_TIMEOUT", 45*time.Second),
 	}
 
 	flag.StringVar(&cfg.ListenAddr, "listen", cfg.ListenAddr, "HTTP listen address")
@@ -168,6 +174,9 @@ func parseFlags() Config {
 	flag.IntVar(&cfg.PolicyRolloutPercent, "policy-rollout-percent", cfg.PolicyRolloutPercent, "Policy bundle rollout percentage (0-100)")
 	flag.StringVar(&cfg.RetentionDefaultClass, "retention-default-class", cfg.RetentionDefaultClass, "Default retention class for runs")
 	flag.StringVar(&cfg.RetentionPolicyJSON, "retention-policy-json", cfg.RetentionPolicyJSON, "JSON map of retentionClass to duration (for example {\"standard\":\"168h\",\"short\":\"24h\"})")
+	flag.StringVar(&cfg.RefValuesPath, "runtime-ref-values-path", cfg.RefValuesPath, "Path to JSON file mapping ref:// values to concrete endpoint or credential values")
+	flag.StringVar(&cfg.RefValuesJSON, "runtime-ref-values-json", cfg.RefValuesJSON, "Inline JSON object mapping ref:// values to concrete endpoint or credential values")
+	flag.DurationVar(&cfg.IntegrationInvokeTimeout, "integration-invoke-timeout", cfg.IntegrationInvokeTimeout, "Timeout for runtime integration invoke HTTP requests")
 	flag.Parse()
 
 	return cfg
@@ -262,7 +271,12 @@ func run(cfg Config) error {
 	if err != nil {
 		return fmt.Errorf("configure runtime authn/authz: %w", err)
 	}
-	api := cpruntime.NewAPIServer(store, orchestrator, authEnforcer)
+	agentInvoker := cpruntime.NewAgentInvoker(store, cpruntime.AgentInvokerConfig{
+		RefValuesPath: cfg.RefValuesPath,
+		RefValuesJSON: cfg.RefValuesJSON,
+		HTTPTimeout:   cfg.IntegrationInvokeTimeout,
+	})
+	api := cpruntime.NewAPIServer(store, orchestrator, authEnforcer).WithAgentInvoker(agentInvoker)
 
 	log.Printf(
 		"runtime orchestration service listening on %s namespace=%s authnEnabled=%t requirePolicyGrant=%t requireAIMXSEntitlement=%t policyLifecycleEnabled=%t policyLifecycleMode=%s desktopMinPriority=%d desktopAllowNonLinux=%t",

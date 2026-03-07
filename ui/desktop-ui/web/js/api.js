@@ -630,6 +630,36 @@ function mockPutIntegrationSettings(payload = {}) {
   });
 }
 
+function mockInvokeIntegrationAgent(payload = {}) {
+  const meta = payload.meta || {};
+  const agentProfileId = String(payload.agentProfileId || "codex").trim().toLowerCase() || "codex";
+  const prompt = String(payload.prompt || "").trim();
+  const outputText = prompt
+    ? `Mock invocation completed for ${agentProfileId}: ${prompt.slice(0, 180)}`
+    : `Mock invocation completed for ${agentProfileId}.`;
+  return deepClone({
+    source: "mock",
+    applied: true,
+    tenantId: String(meta.tenantId || "").trim(),
+    projectId: String(meta.projectId || "").trim(),
+    requestId: String(meta.requestId || "").trim(),
+    agentProfileId,
+    provider: agentProfileId,
+    transport: "mock",
+    model: "mock-model",
+    route: "mock",
+    outputText,
+    finishReason: "completed",
+    startedAt: nowISO(),
+    completedAt: nowISO(),
+    rawResponse: {
+      mock: true,
+      prompt,
+      systemPrompt: String(payload.systemPrompt || "").trim()
+    }
+  });
+}
+
 function mockCreateTerminalSession(payload) {
   const requestedAt = nowISO();
   const restrictedHostRequest = Boolean(payload?.safety?.restrictedHostRequest);
@@ -771,6 +801,11 @@ export class AgentOpsApi {
         state: "unknown",
         detail: "Not checked yet.",
         updatedAt: ""
+      },
+      integrationInvoke: {
+        state: "unknown",
+        detail: "Not checked yet.",
+        updatedAt: ""
       }
     };
   }
@@ -904,6 +939,12 @@ export class AgentOpsApi {
           label: "Runtime Integration Settings",
           path: this.config?.endpoints?.integrationSettings || "",
           ...(endpointSnapshot.integrationSettings || {})
+        },
+        {
+          id: "integrationInvoke",
+          label: "Runtime Integration Invoke",
+          path: this.config?.endpoints?.integrationInvoke || "",
+          ...(endpointSnapshot.integrationInvoke || {})
         }
       ],
       integrations: {
@@ -1301,6 +1342,79 @@ export class AgentOpsApi {
         "integrationSettings",
         "error",
         `Runtime integration settings update failed (${error.message}).`
+      );
+      throw error;
+    }
+  }
+
+  async invokeIntegrationAgent(payload = {}) {
+    const meta = payload?.meta || {};
+    const tenantID = String(meta.tenantId || "").trim();
+    const projectID = String(meta.projectId || "").trim();
+    if (!tenantID || !projectID) {
+      return {
+        applied: false,
+        source: "scope-unavailable",
+        warning: "tenantId and projectId are required to invoke an agent profile.",
+        tenantId: tenantID,
+        projectId: projectID
+      };
+    }
+
+    if (this.config.mockMode) {
+      this.updateEndpointStatus("integrationInvoke", "mock", "Mock mode enabled.");
+      return mockInvokeIntegrationAgent(payload);
+    }
+
+    const endpoint = this.config?.endpoints?.integrationInvoke;
+    if (!endpoint) {
+      this.updateEndpointStatus(
+        "integrationInvoke",
+        "unavailable",
+        "No integration invoke endpoint configured."
+      );
+      return {
+        applied: false,
+        source: "endpoint-unavailable",
+        warning: "Runtime integration invoke endpoint is not configured.",
+        tenantId: tenantID,
+        projectId: projectID
+      };
+    }
+
+    try {
+      const response = await this.request(this.config.runtimeApiBaseUrl, endpoint, undefined, {
+        method: "POST",
+        body: payload
+      });
+      this.updateEndpointStatus(
+        "integrationInvoke",
+        "available",
+        "Runtime integration invoke endpoint responded."
+      );
+      return {
+        ...response,
+        source: "runtime-endpoint"
+      };
+    } catch (error) {
+      if (error.status === 404 || error.status === 405 || error.status === 501) {
+        this.updateEndpointStatus(
+          "integrationInvoke",
+          "unavailable",
+          `Runtime integration invoke endpoint returned HTTP ${error.status}.`
+        );
+        return {
+          applied: false,
+          source: "endpoint-unavailable",
+          warning: `Runtime integration invoke endpoint returned HTTP ${error.status}.`,
+          tenantId: tenantID,
+          projectId: projectID
+        };
+      }
+      this.updateEndpointStatus(
+        "integrationInvoke",
+        "error",
+        `Runtime integration invoke failed (${error.message}).`
       );
       throw error;
     }
