@@ -129,7 +129,9 @@ func normalizeRuntimeHTTPPath(path string) string {
 		"/v1alpha1/runtime/audit/events",
 		"/v1alpha1/runtime/terminal/sessions",
 		"/v1alpha1/runtime/integrations/settings",
-		"/v1alpha1/runtime/integrations/invoke":
+		"/v1alpha1/runtime/integrations/invoke",
+		"/v1alpha2/runtime/tasks",
+		"/v1alpha2/runtime/sessions":
 		return normalized
 	}
 	if strings.HasPrefix(normalized, "/v1alpha1/runtime/runs/") {
@@ -138,8 +140,59 @@ func normalizeRuntimeHTTPPath(path string) string {
 	if strings.HasPrefix(normalized, "/v1alpha1/runtime/approvals/") {
 		return "/v1alpha1/runtime/approvals/:runId/decision"
 	}
+	if strings.HasPrefix(normalized, "/v1alpha2/runtime/tasks/") {
+		if strings.HasSuffix(normalized, "/sessions") {
+			return "/v1alpha2/runtime/tasks/:taskId/sessions"
+		}
+		return "/v1alpha2/runtime/tasks/:taskId"
+	}
+	if strings.HasPrefix(normalized, "/v1alpha2/runtime/sessions/") {
+		if strings.Contains(normalized, "/events/stream") {
+			return "/v1alpha2/runtime/sessions/:sessionId/events/stream"
+		}
+		if strings.HasSuffix(normalized, "/events") {
+			return "/v1alpha2/runtime/sessions/:sessionId/events"
+		}
+		if strings.Contains(normalized, "/workers/") && strings.HasSuffix(normalized, "/events") {
+			return "/v1alpha2/runtime/sessions/:sessionId/workers/:workerId/events"
+		}
+		if strings.Contains(normalized, "/approval-checkpoints/") && strings.HasSuffix(normalized, "/decision") {
+			return "/v1alpha2/runtime/sessions/:sessionId/approval-checkpoints/:checkpointId/decision"
+		}
+		if strings.HasSuffix(normalized, "/approval-checkpoints") {
+			return "/v1alpha2/runtime/sessions/:sessionId/approval-checkpoints"
+		}
+		if strings.Contains(normalized, "/approvals/") && strings.HasSuffix(normalized, "/decision") {
+			return "/v1alpha2/runtime/sessions/:sessionId/approvals/:checkpointId/decision"
+		}
+		if strings.HasSuffix(normalized, "/approvals") {
+			return "/v1alpha2/runtime/sessions/:sessionId/approvals"
+		}
+		if strings.HasSuffix(normalized, "/tool-actions") {
+			return "/v1alpha2/runtime/sessions/:sessionId/tool-actions"
+		}
+		if strings.HasSuffix(normalized, "/evidence") {
+			return "/v1alpha2/runtime/sessions/:sessionId/evidence"
+		}
+		if strings.HasSuffix(normalized, "/close") {
+			return "/v1alpha2/runtime/sessions/:sessionId/close"
+		}
+		if strings.HasSuffix(normalized, "/workers") {
+			return "/v1alpha2/runtime/sessions/:sessionId/workers"
+		}
+		if strings.HasSuffix(normalized, "/timeline") {
+			return "/v1alpha2/runtime/sessions/:sessionId/timeline"
+		}
+		return "/v1alpha2/runtime/sessions/:sessionId"
+	}
+	if strings.HasPrefix(normalized, "/v1alpha2/runtime/approvals/") && strings.HasSuffix(normalized, "/decision") {
+		return "/v1alpha2/runtime/approvals/:checkpointId/decision"
+	}
 	if strings.HasPrefix(normalized, "/v1alpha1/runtime/") {
 		return "/v1alpha1/runtime/other"
+	}
+	if strings.HasPrefix(normalized, "/v1alpha2/runtime/") {
+		return "/v1alpha2/runtime/other"
 	}
 	return normalized
 }

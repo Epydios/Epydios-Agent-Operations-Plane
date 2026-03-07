@@ -335,7 +335,9 @@ function createMockState() {
     runs,
     runByID,
     approvals: seedMockApprovals(),
-    integrationSettingsByScope: {}
+    integrationSettingsByScope: {},
+    tasksById: {},
+    sessionTimelinesById: {}
   };
 }
 
@@ -630,34 +632,1093 @@ function mockPutIntegrationSettings(payload = {}) {
   });
 }
 
+function mockCreateRuntimeTask(payload = {}) {
+  const meta = payload?.meta || {};
+  const now = nowISO();
+  const taskId = `task-mock-${Date.now()}`;
+  const task = {
+    taskId,
+    requestId: String(meta.requestId || "").trim(),
+    tenantId: String(meta.tenantId || "").trim(),
+    projectId: String(meta.projectId || "").trim(),
+    source: String(payload.source || "mock.operator_chat").trim() || "mock.operator_chat",
+    title: String(payload.title || "Operator chat thread").trim() || "Operator chat thread",
+    intent: String(payload.intent || "Run an operator-guided agent conversation.").trim(),
+    requestedBy: meta.actor || {},
+    status: "NEW",
+    annotations: payload.annotations || {},
+    createdAt: now,
+    updatedAt: now,
+    latestSessionId: ""
+  };
+  MOCK_STATE.tasksById[taskId] = deepClone(task);
+  return deepClone(task);
+}
+
+function mockListRuntimeTasks(query = {}) {
+  const tenantId = String(query.tenantId || "").trim();
+  const projectId = String(query.projectId || "").trim();
+  const status = String(query.status || "").trim().toUpperCase();
+  const search = String(query.search || "").trim().toLowerCase();
+  const limit = Number.parseInt(String(query.limit || "25"), 10) || 25;
+  const offset = Number.parseInt(String(query.offset || "0"), 10) || 0;
+  let items = Object.values(MOCK_STATE.tasksById || {}).map((item) => deepClone(item));
+  if (tenantId) {
+    items = items.filter((item) => String(item?.tenantId || "").trim() === tenantId);
+  }
+  if (projectId) {
+    items = items.filter((item) => String(item?.projectId || "").trim() === projectId);
+  }
+  if (status) {
+    items = items.filter((item) => String(item?.status || "").trim().toUpperCase() === status);
+  }
+  if (search) {
+    items = items.filter((item) =>
+      [item?.title, item?.intent, item?.source, item?.taskId]
+        .map((value) => String(value || "").toLowerCase())
+        .some((value) => value.includes(search))
+    );
+  }
+  items.sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
+  const paged = items.slice(offset, offset + limit);
+  return {
+    count: items.length,
+    limit,
+    offset,
+    items: paged
+  };
+}
+
+function mockListRuntimeSessions(query = {}) {
+  const taskId = String(query.taskId || "").trim();
+  const tenantId = String(query.tenantId || "").trim();
+  const projectId = String(query.projectId || "").trim();
+  const status = String(query.status || "").trim().toUpperCase();
+  const sessionType = String(query.sessionType || "").trim().toLowerCase();
+  const limit = Number.parseInt(String(query.limit || "25"), 10) || 25;
+  const offset = Number.parseInt(String(query.offset || "0"), 10) || 0;
+  let items = Object.values(MOCK_STATE.sessionTimelinesById || {})
+    .map((timeline) => deepClone(timeline?.session))
+    .filter(Boolean);
+  if (taskId) {
+    items = items.filter((item) => String(item?.taskId || "").trim() === taskId);
+  }
+  if (tenantId) {
+    items = items.filter((item) => String(item?.tenantId || "").trim() === tenantId);
+  }
+  if (projectId) {
+    items = items.filter((item) => String(item?.projectId || "").trim() === projectId);
+  }
+  if (status) {
+    items = items.filter((item) => String(item?.status || "").trim().toUpperCase() === status);
+  }
+  if (sessionType) {
+    items = items.filter((item) => String(item?.sessionType || "").trim().toLowerCase() === sessionType);
+  }
+  items.sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
+  const paged = items.slice(offset, offset + limit);
+  return {
+    count: items.length,
+    limit,
+    offset,
+    items: paged
+  };
+}
+
+function mockSessionStatusForWorkerStatus(status, current) {
+  const normalizedStatus = String(status || "").trim().toUpperCase();
+  const normalizedCurrent = String(current || "").trim().toUpperCase();
+  if (!normalizedStatus || ["COMPLETED", "FAILED", "BLOCKED", "CANCELLED"].includes(normalizedCurrent)) {
+    return normalizedCurrent;
+  }
+  switch (normalizedStatus) {
+    case "ATTACHED":
+    case "READY":
+      return normalizedCurrent === "AWAITING_APPROVAL" ? normalizedCurrent : "READY";
+    case "WAITING":
+    case "DETACHED":
+      return normalizedCurrent === "AWAITING_APPROVAL" ? normalizedCurrent : "AWAITING_WORKER";
+    case "RUNNING":
+      return normalizedCurrent === "AWAITING_APPROVAL" ? normalizedCurrent : "RUNNING";
+    case "BLOCKED":
+      return "BLOCKED";
+    case "COMPLETED":
+      return "COMPLETED";
+    case "FAILED":
+      return "FAILED";
+    default:
+      return normalizedCurrent;
+  }
+}
+
+function mockTaskStatusForSessionStatus(status, current) {
+  const normalizedStatus = String(status || "").trim().toUpperCase();
+  switch (normalizedStatus) {
+    case "READY":
+    case "AWAITING_WORKER":
+    case "AWAITING_APPROVAL":
+    case "RUNNING":
+      return "IN_PROGRESS";
+    case "COMPLETED":
+      return "COMPLETED";
+    case "FAILED":
+      return "FAILED";
+    case "BLOCKED":
+      return "BLOCKED";
+    case "CANCELLED":
+      return "CANCELLED";
+    default:
+      return String(current || "").trim().toUpperCase() || "NEW";
+  }
+}
+
+function mockCreateRuntimeSessionForTask(taskId, payload = {}) {
+  const normalizedTaskId = String(taskId || "").trim();
+  const task = normalizedTaskId ? deepClone(MOCK_STATE.tasksById?.[normalizedTaskId]) : null;
+  if (!task) {
+    throw new Error("task not found");
+  }
+  const meta = payload?.meta || {};
+  const now = nowISO();
+  const sessionId = `session-mock-${Date.now()}`;
+  const session = {
+    sessionId,
+    taskId: normalizedTaskId,
+    requestId: String(meta.requestId || "").trim(),
+    legacyRunId: String(payload.legacyRunId || "").trim(),
+    tenantId: String(task.tenantId || "").trim(),
+    projectId: String(task.projectId || "").trim(),
+    sessionType: String(payload.sessionType || "operator_request").trim() || "operator_request",
+    status: "PENDING",
+    source: String(payload.source || "mock.runtime.session").trim() || "mock.runtime.session",
+    selectedWorkerId: "",
+    summary: payload.summary && typeof payload.summary === "object" ? deepClone(payload.summary) : {},
+    annotations: payload.annotations && typeof payload.annotations === "object" ? deepClone(payload.annotations) : {},
+    createdAt: now,
+    startedAt: now,
+    updatedAt: now
+  };
+  const timeline = {
+    session,
+    task: {
+      ...task,
+      latestSessionId: sessionId,
+      status: "IN_PROGRESS",
+      updatedAt: now
+    },
+    selectedWorker: null,
+    workers: [],
+    approvalCheckpoints: [],
+    toolActions: [],
+    evidenceRecords: [],
+    events: [],
+    openApprovalCount: 0,
+    latestEventSequence: 0
+  };
+  appendMockSessionEvent(timeline, "session.created", {
+    taskId: normalizedTaskId,
+    status: session.status,
+    legacyRunId: session.legacyRunId
+  }, now);
+  MOCK_STATE.sessionTimelinesById[sessionId] = deepClone(timeline);
+  syncMockTaskFromTimeline(timeline);
+  return deepClone(session);
+}
+
+function mockAttachRuntimeSessionWorker(sessionId, payload = {}) {
+  const timeline = MOCK_STATE.sessionTimelinesById[String(sessionId || "").trim()];
+  if (!timeline) {
+    throw new Error("session not found");
+  }
+  const meta = payload?.meta || {};
+  const workerType = String(payload.workerType || "").trim();
+  const adapterId = String(payload.adapterId || "").trim();
+  if (!workerType || !adapterId) {
+    throw new Error("workerType and adapterId are required");
+  }
+  const now = nowISO();
+  const worker = {
+    workerId: `worker-mock-${Date.now()}`,
+    sessionId: String(sessionId || "").trim(),
+    taskId: String(timeline?.session?.taskId || "").trim(),
+    tenantId: String(timeline?.session?.tenantId || "").trim(),
+    projectId: String(timeline?.session?.projectId || "").trim(),
+    workerType,
+    adapterId,
+    status: "ATTACHED",
+    source: String(payload.source || "mock.runtime.worker.attach").trim() || "mock.runtime.worker.attach",
+    capabilities: Array.isArray(payload.capabilities) ? deepClone(payload.capabilities) : [],
+    routing: String(payload.routing || "").trim(),
+    agentProfileId: String(payload.agentProfileId || "").trim(),
+    provider: String(payload.provider || "").trim(),
+    transport: String(payload.transport || "").trim(),
+    model: String(payload.model || "").trim(),
+    targetEnvironment: String(payload.targetEnvironment || "").trim(),
+    annotations: {
+      ...(payload.annotations && typeof payload.annotations === "object" ? deepClone(payload.annotations) : {}),
+      actor: meta.actor || {}
+    },
+    createdAt: now,
+    updatedAt: now
+  };
+  timeline.workers = Array.isArray(timeline.workers) ? timeline.workers : [];
+  timeline.workers.push(worker);
+  timeline.selectedWorker = deepClone(worker);
+  const previousSessionStatus = String(timeline?.session?.status || "").trim().toUpperCase();
+  timeline.session.selectedWorkerId = worker.workerId;
+  if (previousSessionStatus === "PENDING" || previousSessionStatus === "AWAITING_WORKER") {
+    timeline.session.status = "READY";
+  }
+  timeline.session.updatedAt = now;
+  timeline.task.latestSessionId = String(sessionId || "").trim();
+  timeline.task.status = mockTaskStatusForSessionStatus(timeline.session.status, timeline.task.status);
+  timeline.task.updatedAt = now;
+  appendMockSessionEvent(timeline, "worker.attached", {
+    workerId: worker.workerId,
+    workerType: worker.workerType,
+    adapterId: worker.adapterId,
+    status: worker.status,
+    selectedWorkerId: worker.workerId,
+    targetEnvironment: worker.targetEnvironment
+  }, now);
+  appendMockSessionEvent(timeline, "worker.status.changed", {
+    workerId: worker.workerId,
+    workerType: worker.workerType,
+    adapterId: worker.adapterId,
+    status: worker.status
+  }, now);
+  if (previousSessionStatus !== timeline.session.status) {
+    appendMockSessionEvent(timeline, "session.status.changed", {
+      previousStatus: previousSessionStatus,
+      status: timeline.session.status,
+      selectedWorker: worker.workerId
+    }, now);
+  }
+  syncMockTaskFromTimeline(timeline);
+  return deepClone(worker);
+}
+
+function mockCreateRuntimeSessionWorkerEvent(sessionId, workerId, payload = {}) {
+  const timeline = MOCK_STATE.sessionTimelinesById[String(sessionId || "").trim()];
+  if (!timeline) {
+    throw new Error("session not found");
+  }
+  const workers = Array.isArray(timeline.workers) ? timeline.workers : [];
+  const worker = workers.find((item) => String(item?.workerId || "").trim() === String(workerId || "").trim());
+  if (!worker) {
+    throw new Error("session worker not found");
+  }
+  const eventType = String(payload.eventType || "").trim() || (payload.status ? "worker.status.changed" : "");
+  if (!eventType) {
+    throw new Error("eventType is required when status is not provided");
+  }
+  const now = nowISO();
+  const requestedStatus = String(payload.status || "").trim().toUpperCase();
+  const previousWorkerStatus = String(worker.status || "").trim().toUpperCase();
+  const statusChanged = Boolean(requestedStatus) && requestedStatus !== previousWorkerStatus;
+  if (statusChanged) {
+    worker.status = requestedStatus;
+    worker.updatedAt = now;
+    if (String(timeline?.selectedWorker?.workerId || "").trim() === String(workerId || "").trim()) {
+      timeline.selectedWorker = {
+        ...deepClone(timeline.selectedWorker || {}),
+        status: requestedStatus,
+        updatedAt: now
+      };
+    }
+  }
+  const eventPayload = {
+    workerId: String(workerId || "").trim(),
+    workerType: String(worker.workerType || "").trim(),
+    adapterId: String(worker.adapterId || "").trim(),
+    eventType
+  };
+  if (payload.summary) {
+    eventPayload.summary = String(payload.summary).trim();
+  }
+  if (payload.severity) {
+    eventPayload.severity = String(payload.severity).trim();
+  }
+  if (requestedStatus) {
+    eventPayload.status = requestedStatus;
+    eventPayload.previousStatus = previousWorkerStatus;
+  }
+  if (payload.payload && typeof payload.payload === "object") {
+    eventPayload.payload = deepClone(payload.payload);
+  }
+  appendMockSessionEvent(timeline, eventType, eventPayload, now);
+  if (statusChanged && eventType !== "worker.status.changed") {
+    appendMockSessionEvent(timeline, "worker.status.changed", {
+      workerId: String(workerId || "").trim(),
+      workerType: String(worker.workerType || "").trim(),
+      adapterId: String(worker.adapterId || "").trim(),
+      previousStatus: previousWorkerStatus,
+      status: requestedStatus
+    }, now);
+  }
+
+  const previousSessionStatus = String(timeline?.session?.status || "").trim().toUpperCase();
+  const nextSessionStatus = requestedStatus
+    ? mockSessionStatusForWorkerStatus(requestedStatus, previousSessionStatus)
+    : previousSessionStatus;
+  if (nextSessionStatus !== previousSessionStatus) {
+    timeline.session.status = nextSessionStatus;
+    timeline.session.updatedAt = now;
+    if (["COMPLETED", "FAILED", "BLOCKED", "CANCELLED"].includes(nextSessionStatus)) {
+      timeline.session.completedAt = now;
+    }
+    appendMockSessionEvent(timeline, "session.status.changed", {
+      previousStatus: previousSessionStatus,
+      status: nextSessionStatus,
+      workerId: String(workerId || "").trim()
+    }, now);
+    if (nextSessionStatus === "COMPLETED") {
+      appendMockSessionEvent(timeline, "session.completed", {
+        status: nextSessionStatus,
+        workerId: String(workerId || "").trim()
+      }, now);
+    } else if (nextSessionStatus === "FAILED") {
+      appendMockSessionEvent(timeline, "session.failed", {
+        status: nextSessionStatus,
+        workerId: String(workerId || "").trim()
+      }, now);
+    } else if (nextSessionStatus === "BLOCKED") {
+      appendMockSessionEvent(timeline, "session.blocked", {
+        status: nextSessionStatus,
+        workerId: String(workerId || "").trim()
+      }, now);
+    } else if (nextSessionStatus === "CANCELLED") {
+      appendMockSessionEvent(timeline, "session.cancelled", {
+        status: nextSessionStatus,
+        workerId: String(workerId || "").trim()
+      }, now);
+    }
+  }
+  timeline.task.latestSessionId = String(sessionId || "").trim();
+  timeline.task.status = mockTaskStatusForSessionStatus(timeline.session.status, timeline.task.status);
+  timeline.task.updatedAt = now;
+  syncMockTaskFromTimeline(timeline);
+  return deepClone({
+    sessionId: String(sessionId || "").trim(),
+    workerId: String(workerId || "").trim(),
+    eventType,
+    workerStatus: String(worker.status || "").trim().toUpperCase(),
+    sessionStatus: String(timeline?.session?.status || "").trim().toUpperCase(),
+    recordedAt: now
+  });
+}
+
 function mockInvokeIntegrationAgent(payload = {}) {
   const meta = payload.meta || {};
   const agentProfileId = String(payload.agentProfileId || "codex").trim().toLowerCase() || "codex";
+  const executionMode = String(payload.executionMode || "").trim().toLowerCase() === "managed_codex_worker"
+    ? "managed_codex_worker"
+    : "raw_model_invoke";
   const prompt = String(payload.prompt || "").trim();
-  const outputText = prompt
-    ? `Mock invocation completed for ${agentProfileId}: ${prompt.slice(0, 180)}`
-    : `Mock invocation completed for ${agentProfileId}.`;
+  const now = nowISO();
+  const stamp = Date.now();
+  const sessionId = `session-mock-${stamp}`;
+  const requestedTaskId = String(payload.taskId || "").trim();
+  const existingTask =
+    requestedTaskId && MOCK_STATE.tasksById[requestedTaskId]
+      ? deepClone(MOCK_STATE.tasksById[requestedTaskId])
+      : null;
+  const taskId = existingTask?.taskId || `task-mock-${stamp}`;
+  const workerId = `worker-mock-${stamp}`;
+  const toolActionId = `tool-mock-${stamp}`;
+  const evidenceId = `evidence-mock-${stamp}`;
+  const managedCodex = executionMode === "managed_codex_worker";
+  const workerType = managedCodex ? "managed_agent" : "model_invoke";
+  const workerAdapterId = managedCodex ? "codex" : agentProfileId;
+  const workerSource = managedCodex ? "mock.managed.codex_bridge" : "mock.integration.invoke";
+  const workerCapabilities = managedCodex
+    ? ["agent_turn", "tool_proposal", "approval_checkpoint", "evidence_capture"]
+    : ["invoke"];
+  const route = managedCodex ? "mock-managed-bridge" : "mock";
+  const outputText = managedCodex
+    ? `${prompt ? `Mock managed Codex bridge completed: ${prompt.slice(0, 140)}` : "Mock managed Codex bridge completed."}\n\n\`\`\`bash\ngo test ./...\n\`\`\``
+    : prompt
+      ? `Mock invocation completed for ${agentProfileId}: ${prompt.slice(0, 180)}`
+      : `Mock invocation completed for ${agentProfileId}.`;
+  const workerOutputChunks = managedCodex
+    ? [outputText.split("\n\n")[0], "```bash\ngo test ./...\n```"]
+    : [outputText];
+  const toolProposals = managedCodex
+    ? [{
+        proposalId: `proposal-terminal-${stamp}`,
+        type: "terminal_command",
+        summary: "Mock managed Codex suggested a terminal command.",
+        command: "go test ./...",
+        confidence: "mock"
+      }]
+    : [];
+  const task = existingTask || {
+    taskId,
+    requestId: String(meta.requestId || "").trim(),
+    tenantId: String(meta.tenantId || "").trim(),
+    projectId: String(meta.projectId || "").trim(),
+      source: "mock.integration.invoke",
+      title: `Integration invoke: ${agentProfileId}`,
+      intent: prompt || `Invoke ${agentProfileId}`,
+      status: "IN_PROGRESS",
+      annotations: {
+        executionMode,
+        preferredWorkerType: workerType,
+        preferredWorkerAdapterId: workerAdapterId
+      },
+      createdAt: now,
+      updatedAt: now,
+      latestSessionId: sessionId
+  };
+  task.status = "COMPLETED";
+  task.updatedAt = now;
+  task.latestSessionId = sessionId;
+  MOCK_STATE.tasksById[taskId] = deepClone(task);
+  const timeline = {
+    session: {
+      sessionId,
+      taskId,
+      requestId: String(meta.requestId || "").trim(),
+      tenantId: String(meta.tenantId || "").trim(),
+      projectId: String(meta.projectId || "").trim(),
+      sessionType: "interactive",
+      status: "COMPLETED",
+      source: workerSource,
+      selectedWorkerId: workerId,
+      createdAt: now,
+      startedAt: now,
+      updatedAt: now,
+      completedAt: now
+    },
+    task: {
+      ...deepClone(task),
+      latestSessionId: sessionId
+    },
+    selectedWorker: {
+      workerId,
+      sessionId,
+      taskId,
+      tenantId: String(meta.tenantId || "").trim(),
+      projectId: String(meta.projectId || "").trim(),
+      workerType,
+      adapterId: workerAdapterId,
+      status: "COMPLETED",
+      source: workerSource,
+      capabilities: workerCapabilities,
+      routing: route,
+      agentProfileId,
+      provider: agentProfileId,
+      transport: "mock",
+      model: "mock-model",
+      targetEnvironment: managedCodex ? "codex" : "local-desktop",
+      createdAt: now,
+      updatedAt: now
+    },
+    workers: [],
+    approvalCheckpoints: [],
+    toolActions: [
+      {
+        toolActionId,
+        sessionId,
+        workerId,
+        tenantId: String(meta.tenantId || "").trim(),
+        projectId: String(meta.projectId || "").trim(),
+        toolType: managedCodex ? "managed_agent_turn" : "model_invoke",
+        status: "COMPLETED",
+        source: workerSource,
+        requestPayload: {
+          prompt,
+          systemPrompt: String(payload.systemPrompt || "").trim(),
+          maxOutputTokens: payload.maxOutputTokens,
+          executionMode
+        },
+        resultPayload: {
+          outputText,
+          executionMode
+        },
+        createdAt: now,
+        updatedAt: now
+      }
+    ],
+    evidenceRecords: [
+      {
+        evidenceId,
+        sessionId,
+        toolActionId,
+        tenantId: String(meta.tenantId || "").trim(),
+        projectId: String(meta.projectId || "").trim(),
+        kind: managedCodex ? "managed_worker_output" : "model_output",
+        checksum: "sha256:mock-output",
+        metadata: {
+          finishReason: "completed",
+          chunkCount: workerOutputChunks.length,
+          toolProposalCount: toolProposals.length
+        },
+        createdAt: now,
+        updatedAt: now
+      }
+    ],
+    events: [
+      {
+        eventId: `${sessionId}-event-1`,
+        sessionId,
+        sequence: 1,
+        eventType: "session.created",
+        payload: {
+          source: "mock.integration.invoke"
+        },
+        timestamp: now
+      },
+      {
+        eventId: `${sessionId}-event-2`,
+        sessionId,
+        sequence: 2,
+        eventType: "worker.attached",
+        payload: {
+          workerId,
+          workerType,
+          adapterId: workerAdapterId,
+          executionMode,
+          status: "COMPLETED"
+        },
+        timestamp: now
+      },
+      {
+        eventId: `${sessionId}-event-3`,
+        sessionId,
+        sequence: 3,
+        eventType: managedCodex ? "worker.bridge.started" : "worker.status.changed",
+        payload: managedCodex
+          ? {
+              workerId,
+              workerType,
+              adapterId: workerAdapterId,
+              executionMode,
+              summary: "Mock managed Codex worker bridge attached to the session."
+            }
+          : {
+              workerId,
+              executionMode,
+              status: "COMPLETED",
+              summary: "Mock worker moved to completed."
+            },
+        timestamp: now
+      },
+      {
+        eventId: `${sessionId}-event-4`,
+        sessionId,
+        sequence: 4,
+        eventType: "worker.output.delta",
+        payload: {
+          workerId,
+          executionMode,
+          summary: managedCodex ? "Mock managed Codex worker emitted a response delta." : "Mock worker emitted a response delta.",
+          payload: {
+            delta: workerOutputChunks[0],
+            chunkIndex: 1,
+            chunkCount: workerOutputChunks.length
+          }
+        },
+        timestamp: now
+      },
+      ...(managedCodex
+        ? [
+            {
+              eventId: `${sessionId}-event-5`,
+              sessionId,
+              sequence: 5,
+              eventType: "tool_proposal.generated",
+              payload: {
+                workerId,
+                proposalId: toolProposals[0].proposalId,
+                proposalType: toolProposals[0].type,
+                summary: toolProposals[0].summary,
+                payload: {
+                  ...toolProposals[0]
+                }
+              },
+              timestamp: now
+            }
+          ]
+        : []),
+      {
+        eventId: `${sessionId}-event-${managedCodex ? 6 : 5}`,
+        sessionId,
+        sequence: managedCodex ? 6 : 5,
+        eventType: "tool_action.completed",
+        payload: {
+          workerId,
+          toolType: managedCodex ? "managed_agent_turn" : "model_invoke",
+          executionMode,
+          status: "COMPLETED"
+        },
+        timestamp: now
+      },
+      {
+        eventId: `${sessionId}-event-${managedCodex ? 7 : 6}`,
+        sessionId,
+        sequence: managedCodex ? 7 : 6,
+        eventType: "evidence.recorded",
+        payload: {
+          evidenceId,
+          kind: managedCodex ? "managed_worker_output" : "model_output"
+        },
+        timestamp: now
+      },
+      {
+        eventId: `${sessionId}-event-${managedCodex ? 8 : 7}`,
+        sessionId,
+        sequence: managedCodex ? 8 : 7,
+        eventType: "session.completed",
+        payload: {
+          status: "COMPLETED"
+        },
+        timestamp: now
+      }
+    ],
+    openApprovalCount: 0,
+    latestEventSequence: managedCodex ? 8 : 7
+  };
+  timeline.workers = [deepClone(timeline.selectedWorker)];
+  MOCK_STATE.sessionTimelinesById[sessionId] = deepClone(timeline);
+
   return deepClone({
     source: "mock",
     applied: true,
+    taskId,
+    sessionId,
     tenantId: String(meta.tenantId || "").trim(),
     projectId: String(meta.projectId || "").trim(),
     requestId: String(meta.requestId || "").trim(),
     agentProfileId,
+    executionMode,
+    selectedWorkerId: workerId,
+    workerType,
+    workerAdapterId: workerAdapterId,
     provider: agentProfileId,
     transport: "mock",
     model: "mock-model",
-    route: "mock",
+    route,
     outputText,
+    workerOutputChunks,
+    toolProposals,
     finishReason: "completed",
-    startedAt: nowISO(),
-    completedAt: nowISO(),
+    startedAt: now,
+    completedAt: now,
     rawResponse: {
       mock: true,
       prompt,
       systemPrompt: String(payload.systemPrompt || "").trim()
     }
   });
+}
+
+function appendMockSessionEvent(timeline, eventType, payload = {}, timestamp = nowISO()) {
+  if (!timeline || typeof timeline !== "object") {
+    return null;
+  }
+  const events = Array.isArray(timeline.events) ? timeline.events : [];
+  const nextSequence = Math.max(
+    Number(timeline.latestEventSequence || 0) || 0,
+    ...events.map((item) => Number(item?.sequence || 0) || 0)
+  ) + 1;
+  const sessionId = String(timeline?.session?.sessionId || "").trim();
+  const entry = {
+    eventId: `${sessionId || "session"}-event-${nextSequence}`,
+    sessionId,
+    sequence: nextSequence,
+    eventType: String(eventType || "").trim() || "session.event",
+    payload: deepClone(payload),
+    timestamp
+  };
+  timeline.events = events.concat(entry);
+  timeline.latestEventSequence = nextSequence;
+  return entry;
+}
+
+function syncMockTaskFromTimeline(timeline) {
+  if (!timeline || typeof timeline !== "object") {
+    return;
+  }
+  const taskId = String(timeline?.task?.taskId || timeline?.session?.taskId || "").trim();
+  if (!taskId) {
+    return;
+  }
+  const task = {
+    ...(deepClone(MOCK_STATE.tasksById?.[taskId]) || {}),
+    ...(deepClone(timeline.task || {}) || {})
+  };
+  task.taskId = taskId;
+  task.latestSessionId = String(timeline?.session?.sessionId || timeline?.latestSessionId || task.latestSessionId || "").trim();
+  task.updatedAt = String(timeline?.task?.updatedAt || timeline?.session?.updatedAt || nowISO()).trim();
+  MOCK_STATE.tasksById[taskId] = task;
+}
+
+function mockSubmitRuntimeSessionToolProposalDecision(sessionId, proposalId, decision, options = {}) {
+  const timeline = MOCK_STATE.sessionTimelinesById[String(sessionId || "").trim()];
+  if (!timeline) {
+    throw new Error("session tool proposal not found");
+  }
+  const normalizedProposalId = String(proposalId || "").trim();
+  const events = Array.isArray(timeline.events) ? timeline.events : [];
+  const generatedEvent = events.find(
+    (item) =>
+      String(item?.eventType || "").trim() === "tool_proposal.generated" &&
+      String(item?.payload?.proposalId || "").trim() === normalizedProposalId
+  );
+  if (!generatedEvent) {
+    throw new Error("session tool proposal not found");
+  }
+  const priorDecision = [...events].reverse().find(
+    (item) =>
+      String(item?.eventType || "").trim() === "tool_proposal.decided" &&
+      String(item?.payload?.proposalId || "").trim() === normalizedProposalId
+  );
+  const normalizedDecision = String(decision || "").trim().toUpperCase() === "DENY" ? "DENY" : "APPROVE";
+  if (priorDecision) {
+    return {
+      applied: false,
+      source: "mock",
+      sessionId: String(sessionId || "").trim(),
+      proposalId: normalizedProposalId,
+      decision: String(priorDecision?.payload?.decision || "").trim().toUpperCase(),
+      status: String(priorDecision?.payload?.status || "").trim().toUpperCase() || "PENDING",
+      reason: String(priorDecision?.payload?.reason || "").trim(),
+      toolActionId: String(priorDecision?.payload?.toolActionId || "").trim(),
+      workerId: String(priorDecision?.payload?.workerId || "").trim(),
+      toolType: String(priorDecision?.payload?.proposalType || "").trim(),
+      actionStatus: String(priorDecision?.payload?.toolActionId || "").trim() ? "AUTHORIZED" : "",
+      reviewedAt: String(priorDecision?.timestamp || "").trim()
+    };
+  }
+
+  const generatedPayload = generatedEvent?.payload && typeof generatedEvent.payload === "object" ? generatedEvent.payload : {};
+  const proposalPayload = generatedPayload?.payload && typeof generatedPayload.payload === "object" ? generatedPayload.payload : {};
+  const now = nowISO();
+  let toolActionId = "";
+  let actionStatus = "";
+  if (normalizedDecision === "APPROVE") {
+    toolActionId = `tool-proposal-mock-${Date.now()}`;
+    timeline.toolActions = Array.isArray(timeline.toolActions) ? timeline.toolActions : [];
+    const toolAction = {
+      toolActionId,
+      sessionId: String(sessionId || "").trim(),
+      workerId: String(generatedPayload?.workerId || "").trim(),
+      tenantId: String(timeline?.session?.tenantId || "").trim(),
+      projectId: String(timeline?.session?.projectId || "").trim(),
+      toolType: String(generatedPayload?.proposalType || "").trim() || "tool_proposal",
+      status: "AUTHORIZED",
+      source: "mock.runtime.tool-proposal-decision",
+      requestPayload: {
+        proposalId: normalizedProposalId,
+        proposalType: String(generatedPayload?.proposalType || "").trim(),
+        summary: String(generatedPayload?.summary || "").trim(),
+        proposal: deepClone(proposalPayload),
+        decision: normalizedDecision,
+        reason: String(options.reason || "").trim()
+      },
+      resultPayload: {
+        decision: normalizedDecision,
+        reviewedAt: now,
+        reason: String(options.reason || "").trim()
+      },
+      createdAt: now,
+      updatedAt: now
+    };
+    timeline.toolActions.push(toolAction);
+    appendMockSessionEvent(timeline, "tool_action.authorized", {
+      toolActionId,
+      workerId: String(generatedPayload?.workerId || "").trim(),
+      toolType: String(generatedPayload?.proposalType || "").trim() || "tool_proposal",
+      status: "AUTHORIZED",
+      proposalId: normalizedProposalId,
+      summary: "Approved proposal promoted into a governed tool action."
+    }, now);
+    const previousSessionStatus = String(timeline?.session?.status || "").trim().toUpperCase();
+    if (["PENDING", "READY", "AWAITING_WORKER"].includes(previousSessionStatus)) {
+      timeline.session.status = "RUNNING";
+      timeline.session.updatedAt = now;
+      timeline.task.status = "IN_PROGRESS";
+      timeline.task.updatedAt = now;
+      appendMockSessionEvent(timeline, "session.status.changed", {
+        previousStatus: previousSessionStatus,
+        status: "RUNNING",
+        proposalId: normalizedProposalId,
+        toolActionId
+      }, now);
+    }
+    actionStatus = "AUTHORIZED";
+    const command = String(proposalPayload?.command || "").trim();
+    if (command) {
+      toolAction.status = "STARTED";
+      toolAction.updatedAt = now;
+      appendMockSessionEvent(timeline, "tool_action.started", {
+        toolActionId,
+        workerId: String(generatedPayload?.workerId || "").trim(),
+        toolType: String(generatedPayload?.proposalType || "").trim() || "tool_proposal",
+        status: "STARTED",
+        proposalId: normalizedProposalId,
+        command,
+        summary: "Approved tool proposal started execution."
+      }, now);
+      appendMockSessionEvent(timeline, "worker.progress", {
+        workerId: String(generatedPayload?.workerId || "").trim(),
+        status: "RUNNING",
+        summary: "Approved tool action is running.",
+        payload: {
+          stage: "tool_action_started",
+          percent: 70,
+          toolActionId,
+          proposalId: normalizedProposalId
+        }
+      }, now);
+
+      const finishedAt = nowISO();
+      const failed = /(^|\\s)(rm|mv|chmod|chown|cp)(\\s|$)/.test(command);
+      toolAction.status = failed ? "FAILED" : "COMPLETED";
+      toolAction.updatedAt = finishedAt;
+      toolAction.resultPayload = {
+        decision: normalizedDecision,
+        reviewedAt: now,
+        startedAt: now,
+        completedAt: finishedAt,
+        command,
+        status: toolAction.status,
+        exitCode: failed ? 1 : 0,
+        timedOut: false,
+        outputSha256: failed ? "" : "sha256:mock-tool-output",
+        outputTruncated: false,
+        output: failed ? "" : `mock executed: ${command}`,
+        error: failed ? "mock deterministic policy rejected command execution" : ""
+      };
+      appendMockSessionEvent(timeline, failed ? "tool_action.failed" : "tool_action.completed", {
+        toolActionId,
+        workerId: String(generatedPayload?.workerId || "").trim(),
+        toolType: String(generatedPayload?.proposalType || "").trim() || "tool_proposal",
+        status: toolAction.status,
+        proposalId: normalizedProposalId,
+        command,
+        exitCode: failed ? 1 : 0,
+        outputSha256: failed ? "" : "sha256:mock-tool-output",
+        error: failed ? "mock deterministic policy rejected command execution" : "",
+        summary: failed ? "Approved tool action failed during execution." : "Approved tool action completed."
+      }, finishedAt);
+      appendMockSessionEvent(timeline, "worker.progress", {
+        workerId: String(generatedPayload?.workerId || "").trim(),
+        status: "RUNNING",
+        summary: failed ? "Approved tool action failed during execution." : "Approved tool action completed.",
+        payload: {
+          stage: failed ? "tool_action_failed" : "tool_action_completed",
+          percent: 100,
+          toolActionId,
+          proposalId: normalizedProposalId,
+          exitCode: failed ? 1 : 0,
+          error: failed ? "mock deterministic policy rejected command execution" : ""
+        }
+      }, finishedAt);
+      if (!failed) {
+        timeline.evidenceRecords = Array.isArray(timeline.evidenceRecords) ? timeline.evidenceRecords : [];
+        const evidenceId = `evidence-tool-proposal-mock-${Date.now()}`;
+        timeline.evidenceRecords.push({
+          evidenceId,
+          sessionId: String(sessionId || "").trim(),
+          toolActionId,
+          tenantId: String(timeline?.session?.tenantId || "").trim(),
+          projectId: String(timeline?.session?.projectId || "").trim(),
+          kind: "tool_output",
+          checksum: "sha256:mock-tool-output",
+          metadata: {
+            proposalId: normalizedProposalId,
+            toolActionId,
+            status: "COMPLETED",
+            exitCode: 0,
+            timedOut: false,
+            outputTruncated: false,
+            executedCommand: command
+          },
+          createdAt: finishedAt,
+          updatedAt: finishedAt
+        });
+        appendMockSessionEvent(timeline, "evidence.recorded", {
+          evidenceId,
+          toolActionId,
+          kind: "tool_output",
+          checksum: "sha256:mock-tool-output",
+          proposalId: normalizedProposalId
+        }, finishedAt);
+      }
+      actionStatus = toolAction.status;
+    }
+  }
+  appendMockSessionEvent(timeline, "tool_proposal.decided", {
+    proposalId: normalizedProposalId,
+    proposalType: String(generatedPayload?.proposalType || "").trim(),
+    workerId: String(generatedPayload?.workerId || "").trim(),
+    decision: normalizedDecision,
+    status: normalizedDecision === "DENY" ? "DENIED" : "APPROVED",
+    reason: String(options.reason || "").trim(),
+    toolActionId,
+    actionStatus,
+    summary: normalizedDecision === "DENY"
+      ? "Tool proposal denied by the operator."
+      : "Tool proposal approved and promoted into a governed tool action."
+  }, now);
+  syncMockTaskFromTimeline(timeline);
+  return {
+    applied: true,
+    source: "mock",
+    sessionId: String(sessionId || "").trim(),
+    proposalId: normalizedProposalId,
+    decision: normalizedDecision,
+    status: normalizedDecision === "DENY" ? "DENIED" : "APPROVED",
+    reason: String(options.reason || "").trim(),
+    toolActionId,
+    workerId: String(generatedPayload?.workerId || "").trim(),
+    toolType: String(generatedPayload?.proposalType || "").trim(),
+    actionStatus,
+    reviewedAt: now
+  };
+}
+
+function mockSubmitRuntimeSessionApprovalDecision(sessionId, checkpointId, decision, options = {}) {
+  const timeline = MOCK_STATE.sessionTimelinesById[String(sessionId || "").trim()];
+  if (!timeline) {
+    throw new Error("session approval checkpoint not found");
+  }
+  const checkpoints = Array.isArray(timeline.approvalCheckpoints) ? timeline.approvalCheckpoints : [];
+  const checkpoint = checkpoints.find((item) => String(item?.checkpointId || "").trim() === String(checkpointId || "").trim());
+  if (!checkpoint) {
+    throw new Error("session approval checkpoint not found");
+  }
+  const normalizedDecision = String(decision || "").trim().toUpperCase() === "DENY" ? "DENY" : "APPROVE";
+  const targetStatus = normalizedDecision === "DENY" ? "DENIED" : "APPROVED";
+  const now = nowISO();
+  if (String(checkpoint.status || "").trim().toUpperCase() === targetStatus) {
+    return {
+      applied: false,
+      source: "mock",
+      sessionId: String(sessionId || "").trim(),
+      checkpointId: String(checkpointId || "").trim(),
+      decision: normalizedDecision,
+      status: targetStatus,
+      reason: String(options.reason || "").trim(),
+      reviewedAt: now
+    };
+  }
+
+  checkpoint.status = targetStatus;
+  checkpoint.reason = String(options.reason || "").trim() || (normalizedDecision === "DENY" ? "denied by operator" : "approved by operator");
+  checkpoint.reviewedAt = now;
+  checkpoint.updatedAt = now;
+  const previousStatus = String(timeline?.session?.status || "").trim().toUpperCase();
+  if (normalizedDecision === "DENY") {
+    timeline.session.status = "BLOCKED";
+    timeline.session.completedAt = now;
+    timeline.task.status = "BLOCKED";
+  } else {
+    timeline.session.status = String(timeline?.session?.selectedWorkerId || "").trim() ? "READY" : "AWAITING_WORKER";
+    timeline.task.status = "IN_PROGRESS";
+  }
+  timeline.session.updatedAt = now;
+  timeline.task.updatedAt = now;
+  timeline.openApprovalCount = checkpoints.filter((item) => String(item?.status || "").trim().toUpperCase() === "PENDING").length;
+
+  appendMockSessionEvent(timeline, "approval.status.changed", {
+    checkpointId: String(checkpointId || "").trim(),
+    decision: normalizedDecision,
+    status: checkpoint.status,
+    reason: checkpoint.reason
+  }, now);
+  if (previousStatus !== String(timeline?.session?.status || "").trim().toUpperCase()) {
+    appendMockSessionEvent(timeline, "session.status.changed", {
+      previousStatus,
+      status: timeline.session.status,
+      checkpointId: String(checkpointId || "").trim()
+    }, now);
+    if (String(timeline?.session?.status || "").trim().toUpperCase() === "BLOCKED") {
+      appendMockSessionEvent(timeline, "session.blocked", {
+        status: timeline.session.status,
+        reason: checkpoint.reason
+      }, now);
+    }
+  }
+  syncMockTaskFromTimeline(timeline);
+
+  return {
+    applied: true,
+    source: "mock",
+    sessionId: String(sessionId || "").trim(),
+    checkpointId: String(checkpointId || "").trim(),
+    decision: normalizedDecision,
+    status: checkpoint.status,
+    reason: checkpoint.reason,
+    reviewedAt: now
+  };
+}
+
+function mockCloseRuntimeSession(sessionId, payload = {}) {
+  const timeline = MOCK_STATE.sessionTimelinesById[String(sessionId || "").trim()];
+  if (!timeline) {
+    throw new Error("session not found");
+  }
+  const normalizedStatus = String(payload.status || "COMPLETED").trim().toUpperCase() || "COMPLETED";
+  if (!["COMPLETED", "FAILED", "CANCELLED", "BLOCKED"].includes(normalizedStatus)) {
+    throw new Error("invalid session status");
+  }
+  const previousStatus = String(timeline?.session?.status || "").trim().toUpperCase();
+  const now = nowISO();
+  timeline.session.status = normalizedStatus;
+  timeline.session.updatedAt = now;
+  timeline.session.completedAt = now;
+  timeline.task.status = normalizedStatus === "COMPLETED"
+    ? "COMPLETED"
+    : normalizedStatus === "FAILED"
+      ? "FAILED"
+      : normalizedStatus === "CANCELLED"
+        ? "CANCELLED"
+        : "BLOCKED";
+  timeline.task.updatedAt = now;
+  if (previousStatus !== normalizedStatus) {
+    appendMockSessionEvent(timeline, "session.status.changed", {
+      previousStatus,
+      status: normalizedStatus,
+      reason: String(payload.reason || "").trim()
+    }, now);
+  }
+  appendMockSessionEvent(timeline, normalizedStatus === "COMPLETED"
+    ? "session.completed"
+    : normalizedStatus === "FAILED"
+      ? "session.failed"
+      : normalizedStatus === "CANCELLED"
+        ? "session.cancelled"
+        : "session.blocked", {
+    status: normalizedStatus,
+    reason: String(payload.reason || "").trim()
+  }, now);
+  syncMockTaskFromTimeline(timeline);
+  return deepClone(timeline.session);
+}
+
+function mockGetRuntimeSessionTimeline(sessionId) {
+  const hit = MOCK_STATE.sessionTimelinesById[String(sessionId || "").trim()];
+  return hit ? deepClone(hit) : null;
+}
+
+function mockGetRuntimeSessionEventStream(sessionId, options = {}) {
+  const hit = MOCK_STATE.sessionTimelinesById[String(sessionId || "").trim()];
+  if (!hit) {
+    return null;
+  }
+  const afterSequence = Number.parseInt(String(options.afterSequence || "0"), 10) || 0;
+  const items = (Array.isArray(hit.events) ? hit.events : []).filter(
+    (item) => Number(item?.sequence || 0) > afterSequence
+  );
+  return {
+    source: "mock",
+    sessionId: String(sessionId || "").trim(),
+    count: items.length,
+    items: deepClone(items)
+  };
 }
 
 function mockCreateTerminalSession(payload) {
@@ -762,17 +1823,78 @@ function withQueryParams(url, query) {
   }
 }
 
+function parseSessionEventStream(raw) {
+  const text = String(raw || "").trim();
+  if (!text) {
+    return [];
+  }
+  return text
+    .split(/\n\n+/)
+    .map((chunk) => chunk.trim())
+    .filter(Boolean)
+    .map((chunk) => {
+      const lines = chunk.split("\n");
+      const item = {
+        id: "",
+        event: "",
+        data: ""
+      };
+      for (const line of lines) {
+        if (line.startsWith("id:")) {
+          item.id = line.slice(3).trim();
+        } else if (line.startsWith("event:")) {
+          item.event = line.slice(6).trim();
+        } else if (line.startsWith("data:")) {
+          item.data += `${line.slice(5).trim()}\n`;
+        }
+      }
+      const payloadText = item.data.trim();
+      if (!payloadText) {
+        return null;
+      }
+      try {
+        return JSON.parse(payloadText);
+      } catch (_) {
+        return {
+          eventType: item.event || "unknown",
+          raw: payloadText
+        };
+      }
+    })
+    .filter(Boolean);
+}
+
 export class AgentOpsApi {
   constructor(config, getToken) {
     this.config = config;
     this.getToken = getToken;
     this.endpointStatus = {
+    tasks: {
+      state: "unknown",
+      detail: "Not checked yet.",
+      updatedAt: ""
+    },
+      sessions: {
+        state: "unknown",
+        detail: "Not checked yet.",
+        updatedAt: ""
+      },
       runs: {
         state: "unknown",
         detail: "Not checked yet.",
         updatedAt: ""
       },
       runById: {
+        state: "unknown",
+        detail: "Not checked yet.",
+        updatedAt: ""
+      },
+      sessionTimeline: {
+        state: "unknown",
+        detail: "Not checked yet.",
+        updatedAt: ""
+      },
+      sessionEventStream: {
         state: "unknown",
         detail: "Not checked yet.",
         updatedAt: ""
@@ -788,6 +1910,16 @@ export class AgentOpsApi {
         updatedAt: ""
       },
       approvalDecision: {
+        state: "unknown",
+        detail: "Not checked yet.",
+        updatedAt: ""
+      },
+      sessionApprovalDecision: {
+        state: "unknown",
+        detail: "Not checked yet.",
+        updatedAt: ""
+      },
+      sessionClose: {
         state: "unknown",
         detail: "Not checked yet.",
         updatedAt: ""
@@ -899,6 +2031,18 @@ export class AgentOpsApi {
       },
       endpoints: [
         {
+          id: "tasks",
+          label: "Runtime Tasks",
+          path: this.config?.endpoints?.tasks || "",
+          ...(endpointSnapshot.tasks || {})
+        },
+        {
+          id: "sessions",
+          label: "Runtime Sessions",
+          path: this.config?.endpoints?.sessions || "",
+          ...(endpointSnapshot.sessions || {})
+        },
+        {
           id: "runs",
           label: "Runtime Runs",
           path: this.config?.endpoints?.runs || "",
@@ -909,6 +2053,18 @@ export class AgentOpsApi {
           label: "Runtime Run Detail",
           path: this.config?.endpoints?.runByIdPrefix || "",
           ...(endpointSnapshot.runById || {})
+        },
+        {
+          id: "sessionTimeline",
+          label: "Runtime Session Timeline",
+          path: `${this.config?.endpoints?.sessionByIdPrefix || ""}{sessionId}/timeline`,
+          ...(endpointSnapshot.sessionTimeline || {})
+        },
+        {
+          id: "sessionEventStream",
+          label: "Runtime Session Event Stream",
+          path: `${this.config?.endpoints?.sessionByIdPrefix || ""}{sessionId}/events/stream`,
+          ...(endpointSnapshot.sessionEventStream || {})
         },
         {
           id: "auditEvents",
@@ -927,6 +2083,18 @@ export class AgentOpsApi {
           label: "Runtime Approval Decision",
           path: this.config?.endpoints?.approvalDecisionPrefix || "",
           ...(endpointSnapshot.approvalDecision || {})
+        },
+        {
+          id: "sessionApprovalDecision",
+          label: "Runtime Session Approval Decision",
+          path: `${this.config?.endpoints?.sessionByIdPrefix || ""}{sessionId}/approval-checkpoints/{checkpointId}/decision`,
+          ...(endpointSnapshot.sessionApprovalDecision || {})
+        },
+        {
+          id: "sessionClose",
+          label: "Runtime Session Close",
+          path: `${this.config?.endpoints?.sessionByIdPrefix || ""}{sessionId}/close`,
+          ...(endpointSnapshot.sessionClose || {})
         },
         {
           id: "terminalSessions",
@@ -1154,6 +2322,585 @@ export class AgentOpsApi {
           `Runtime run-detail request failed (${error.message}).`
         );
       }
+      throw error;
+    }
+  }
+
+  async createRuntimeTask(payload = {}) {
+    const meta = payload?.meta || {};
+    const tenantID = String(meta.tenantId || "").trim();
+    const projectID = String(meta.projectId || "").trim();
+    if (!tenantID || !projectID) {
+      throw new Error("meta.tenantId and meta.projectId are required");
+    }
+
+    if (this.config.mockMode) {
+      this.updateEndpointStatus("tasks", "mock", "Mock mode enabled.");
+      return mockCreateRuntimeTask(payload);
+    }
+
+    const endpoint = this.config?.endpoints?.tasks;
+    if (!endpoint) {
+      this.updateEndpointStatus("tasks", "unavailable", "No runtime task endpoint configured.");
+      throw new Error("Runtime task endpoint is not configured.");
+    }
+
+    try {
+      const response = await this.request(this.config.runtimeApiBaseUrl, endpoint, undefined, {
+        method: "POST",
+        body: payload
+      });
+      this.updateEndpointStatus("tasks", "available", "Runtime task endpoint responded.");
+      return response;
+    } catch (error) {
+      if (error.status === 404 || error.status === 405 || error.status === 501) {
+        this.updateEndpointStatus("tasks", "unavailable", `Runtime task endpoint returned HTTP ${error.status}.`);
+      } else {
+        this.updateEndpointStatus("tasks", "error", `Runtime task request failed (${error.message}).`);
+      }
+      throw error;
+    }
+  }
+
+  async listRuntimeTasks(query = {}) {
+    if (this.config.mockMode) {
+      this.updateEndpointStatus("tasks", "mock", "Mock mode enabled.");
+      return mockListRuntimeTasks(query);
+    }
+
+    const endpoint = this.config?.endpoints?.tasks;
+    if (!endpoint) {
+      this.updateEndpointStatus("tasks", "unavailable", "No runtime task endpoint configured.");
+      throw new Error("Runtime task endpoint is not configured.");
+    }
+
+    try {
+      const response = await this.request(this.config.runtimeApiBaseUrl, endpoint, query);
+      this.updateEndpointStatus("tasks", "available", "Runtime task endpoint responded.");
+      return response;
+    } catch (error) {
+      if (error.status === 404 || error.status === 405 || error.status === 501) {
+        this.updateEndpointStatus("tasks", "unavailable", `Runtime task list endpoint returned HTTP ${error.status}.`);
+      } else {
+        this.updateEndpointStatus("tasks", "error", `Runtime task list request failed (${error.message}).`);
+      }
+      throw error;
+    }
+  }
+
+  async listRuntimeSessions(query = {}) {
+    if (this.config.mockMode) {
+      this.updateEndpointStatus("sessions", "mock", "Mock mode enabled.");
+      return mockListRuntimeSessions(query);
+    }
+
+    const endpoint = this.config?.endpoints?.sessions;
+    if (!endpoint) {
+      this.updateEndpointStatus("sessions", "unavailable", "No runtime session endpoint configured.");
+      throw new Error("Runtime session endpoint is not configured.");
+    }
+
+    try {
+      const response = await this.request(this.config.runtimeApiBaseUrl, endpoint, query);
+      this.updateEndpointStatus("sessions", "available", "Runtime session endpoint responded.");
+      return response;
+    } catch (error) {
+      if (error.status === 404 || error.status === 405 || error.status === 501) {
+        this.updateEndpointStatus("sessions", "unavailable", `Runtime session list endpoint returned HTTP ${error.status}.`);
+      } else {
+        this.updateEndpointStatus("sessions", "error", `Runtime session list request failed (${error.message}).`);
+      }
+      throw error;
+    }
+  }
+
+  async createRuntimeSessionForTask(taskID, payload = {}) {
+    const normalizedTaskID = String(taskID || "").trim();
+    if (!normalizedTaskID) {
+      throw new Error("taskId is required");
+    }
+    if (this.config.mockMode) {
+      this.updateEndpointStatus("sessionCreate", "mock", "Mock mode enabled.");
+      return mockCreateRuntimeSessionForTask(normalizedTaskID, payload);
+    }
+
+    const endpoint = this.config?.endpoints?.tasks;
+    if (!endpoint) {
+      this.updateEndpointStatus("sessionCreate", "unavailable", "No runtime task endpoint configured.");
+      throw new Error("Runtime task endpoint is not configured.");
+    }
+
+    try {
+      const response = await this.request(
+        this.config.runtimeApiBaseUrl,
+        `${endpoint}/${encodeURIComponent(normalizedTaskID)}/sessions`,
+        undefined,
+        {
+          method: "POST",
+          body: payload
+        }
+      );
+      this.updateEndpointStatus("sessionCreate", "available", "Runtime session create endpoint responded.");
+      return response;
+    } catch (error) {
+      if (error.status === 404 || error.status === 405 || error.status === 501) {
+        this.updateEndpointStatus("sessionCreate", "unavailable", `Runtime session create endpoint returned HTTP ${error.status}.`);
+      } else {
+        this.updateEndpointStatus("sessionCreate", "error", `Runtime session create request failed (${error.message}).`);
+      }
+      throw error;
+    }
+  }
+
+  async attachRuntimeSessionWorker(sessionID, payload = {}) {
+    const normalizedSessionID = String(sessionID || "").trim();
+    if (!normalizedSessionID) {
+      throw new Error("sessionId is required");
+    }
+    if (this.config.mockMode) {
+      this.updateEndpointStatus("sessionWorkers", "mock", "Mock mode enabled.");
+      return mockAttachRuntimeSessionWorker(normalizedSessionID, payload);
+    }
+
+    const prefix = this.config?.endpoints?.sessionByIdPrefix || "";
+    if (!prefix) {
+      this.updateEndpointStatus("sessionWorkers", "unavailable", "No runtime session worker endpoint configured.");
+      throw new Error("Runtime session worker endpoint is not configured.");
+    }
+
+    try {
+      const response = await this.request(
+        this.config.runtimeApiBaseUrl,
+        `${prefix}${encodeURIComponent(normalizedSessionID)}/workers`,
+        undefined,
+        {
+          method: "POST",
+          body: payload
+        }
+      );
+      this.updateEndpointStatus("sessionWorkers", "available", "Runtime session worker endpoint responded.");
+      return response;
+    } catch (error) {
+      if (error.status === 404 || error.status === 405 || error.status === 501) {
+        this.updateEndpointStatus("sessionWorkers", "unavailable", `Runtime session worker endpoint returned HTTP ${error.status}.`);
+      } else {
+        this.updateEndpointStatus("sessionWorkers", "error", `Runtime session worker request failed (${error.message}).`);
+      }
+      throw error;
+    }
+  }
+
+  async createRuntimeSessionWorkerEvent(sessionID, workerID, payload = {}) {
+    const normalizedSessionID = String(sessionID || "").trim();
+    const normalizedWorkerID = String(workerID || "").trim();
+    if (!normalizedSessionID || !normalizedWorkerID) {
+      throw new Error("sessionId and workerId are required");
+    }
+    if (this.config.mockMode) {
+      this.updateEndpointStatus("sessionWorkerEvent", "mock", "Mock mode enabled.");
+      return mockCreateRuntimeSessionWorkerEvent(normalizedSessionID, normalizedWorkerID, payload);
+    }
+
+    const prefix = this.config?.endpoints?.sessionByIdPrefix || "";
+    if (!prefix) {
+      this.updateEndpointStatus("sessionWorkerEvent", "unavailable", "No runtime session worker event endpoint configured.");
+      throw new Error("Runtime session worker event endpoint is not configured.");
+    }
+
+    try {
+      const response = await this.request(
+        this.config.runtimeApiBaseUrl,
+        `${prefix}${encodeURIComponent(normalizedSessionID)}/workers/${encodeURIComponent(normalizedWorkerID)}/events`,
+        undefined,
+        {
+          method: "POST",
+          body: payload
+        }
+      );
+      this.updateEndpointStatus("sessionWorkerEvent", "available", "Runtime session worker event endpoint responded.");
+      return response;
+    } catch (error) {
+      if (error.status === 404 || error.status === 405 || error.status === 501) {
+        this.updateEndpointStatus("sessionWorkerEvent", "unavailable", `Runtime session worker event endpoint returned HTTP ${error.status}.`);
+      } else {
+        this.updateEndpointStatus("sessionWorkerEvent", "error", `Runtime session worker event request failed (${error.message}).`);
+      }
+      throw error;
+    }
+  }
+
+  async getRuntimeSessionTimeline(sessionID) {
+    const normalizedSessionID = String(sessionID || "").trim();
+    if (!normalizedSessionID) {
+      throw new Error("sessionId is required");
+    }
+    if (this.config.mockMode) {
+      this.updateEndpointStatus("sessionTimeline", "mock", "Mock mode enabled.");
+      const hit = mockGetRuntimeSessionTimeline(normalizedSessionID);
+      if (!hit) {
+        throw new Error("session timeline not found");
+      }
+      return hit;
+    }
+
+    const prefix = this.config?.endpoints?.sessionByIdPrefix || "";
+    if (!prefix) {
+      this.updateEndpointStatus(
+        "sessionTimeline",
+        "unavailable",
+        "No runtime session timeline endpoint configured."
+      );
+      throw new Error("Runtime session timeline endpoint is not configured.");
+    }
+
+    try {
+      const response = await this.request(
+        this.config.runtimeApiBaseUrl,
+        `${prefix}${encodeURIComponent(normalizedSessionID)}/timeline`
+      );
+      this.updateEndpointStatus(
+        "sessionTimeline",
+        "available",
+        "Runtime session timeline endpoint responded."
+      );
+      return response;
+    } catch (error) {
+      if (error.status === 404) {
+        this.updateEndpointStatus(
+          "sessionTimeline",
+          "fallback",
+          "Runtime session timeline endpoint returned 404."
+        );
+      } else if (error.status === 405 || error.status === 501) {
+        this.updateEndpointStatus(
+          "sessionTimeline",
+          "unavailable",
+          `Runtime session timeline endpoint returned HTTP ${error.status}.`
+        );
+      } else {
+        this.updateEndpointStatus(
+          "sessionTimeline",
+          "error",
+          `Runtime session timeline request failed (${error.message}).`
+        );
+      }
+      throw error;
+    }
+  }
+
+  async getRuntimeSessionEventStream(sessionID, options = {}) {
+    const normalizedSessionID = String(sessionID || "").trim();
+    if (!normalizedSessionID) {
+      throw new Error("sessionId is required");
+    }
+    if (this.config.mockMode) {
+      this.updateEndpointStatus("sessionEventStream", "mock", "Mock mode enabled.");
+      const hit = mockGetRuntimeSessionEventStream(normalizedSessionID, options);
+      if (!hit) {
+        throw new Error("session event stream not found");
+      }
+      return hit;
+    }
+
+    const prefix = this.config?.endpoints?.sessionByIdPrefix || "";
+    if (!prefix) {
+      this.updateEndpointStatus(
+        "sessionEventStream",
+        "unavailable",
+        "No runtime session event-stream endpoint configured."
+      );
+      throw new Error("Runtime session event-stream endpoint is not configured.");
+    }
+
+    const token = this.getToken();
+    const headers = {
+      Accept: "text/event-stream"
+    };
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    const url = new URL(
+      `${prefix}${encodeURIComponent(normalizedSessionID)}/events/stream`,
+      this.resolveBaseUrl(this.config.runtimeApiBaseUrl)
+    );
+    withQueryParams(url, {
+      afterSequence: options.afterSequence,
+      waitSeconds: options.waitSeconds,
+      follow: options.follow ? "true" : ""
+    });
+
+    const response = await fetch(url.toString(), {
+      method: "GET",
+      headers
+    });
+    if (!response.ok) {
+      if (response.status === 404) {
+        this.updateEndpointStatus(
+          "sessionEventStream",
+          "fallback",
+          "Runtime session event-stream endpoint returned 404."
+        );
+      } else if (response.status === 405 || response.status === 501) {
+        this.updateEndpointStatus(
+          "sessionEventStream",
+          "unavailable",
+          `Runtime session event-stream endpoint returned HTTP ${response.status}.`
+        );
+      } else {
+        this.updateEndpointStatus(
+          "sessionEventStream",
+          "error",
+          `Runtime session event-stream request failed (HTTP ${response.status}).`
+        );
+      }
+      const error = new Error(`HTTP ${response.status} ${response.statusText}`);
+      error.status = response.status;
+      throw error;
+    }
+
+    const raw = await response.text();
+    this.updateEndpointStatus(
+      "sessionEventStream",
+      "available",
+      "Runtime session event-stream endpoint responded."
+    );
+    const items = parseSessionEventStream(raw);
+    return {
+      source: "runtime-endpoint",
+      sessionId: normalizedSessionID,
+      count: items.length,
+      items
+    };
+  }
+
+  async submitRuntimeSessionApprovalDecision(sessionID, checkpointID, decision, options = {}) {
+    const normalizedSessionID = String(sessionID || "").trim();
+    const normalizedCheckpointID = String(checkpointID || "").trim();
+    if (!normalizedSessionID) {
+      throw new Error("sessionId is required for session approval decision");
+    }
+    if (!normalizedCheckpointID) {
+      throw new Error("checkpointId is required for session approval decision");
+    }
+    const normalizedDecision = String(decision || "").trim().toUpperCase() === "DENY" ? "DENY" : "APPROVE";
+
+    if (this.config.mockMode) {
+      this.updateEndpointStatus("sessionApprovalDecision", "mock", "Mock mode enabled.");
+      return mockSubmitRuntimeSessionApprovalDecision(normalizedSessionID, normalizedCheckpointID, normalizedDecision, options);
+    }
+
+    const prefix = this.config?.endpoints?.sessionByIdPrefix || "";
+    if (!prefix) {
+      this.updateEndpointStatus(
+        "sessionApprovalDecision",
+        "unavailable",
+        "No runtime session approval decision endpoint configured."
+      );
+      return {
+        applied: false,
+        source: "endpoint-unavailable",
+        sessionId: normalizedSessionID,
+        checkpointId: normalizedCheckpointID,
+        decision: normalizedDecision,
+        warning: "Runtime session approval decision endpoint is not configured."
+      };
+    }
+
+    try {
+      const response = await this.request(
+        this.config.runtimeApiBaseUrl,
+        `${prefix}${encodeURIComponent(normalizedSessionID)}/approval-checkpoints/${encodeURIComponent(normalizedCheckpointID)}/decision`,
+        undefined,
+        {
+          method: "POST",
+          body: {
+            meta: options.meta || {},
+            decision: normalizedDecision,
+            reason: options.reason || ""
+          }
+        }
+      );
+      this.updateEndpointStatus(
+        "sessionApprovalDecision",
+        "available",
+        "Runtime session approval decision endpoint responded."
+      );
+      return {
+        ...response,
+        source: "runtime-endpoint"
+      };
+    } catch (error) {
+      if (error.status === 404 || error.status === 405 || error.status === 501) {
+        this.updateEndpointStatus(
+          "sessionApprovalDecision",
+          "unavailable",
+          `Runtime session approval decision endpoint returned HTTP ${error.status}.`
+        );
+        return {
+          applied: false,
+          source: "endpoint-unavailable",
+          sessionId: normalizedSessionID,
+          checkpointId: normalizedCheckpointID,
+          decision: normalizedDecision,
+          warning: `Runtime session approval decision endpoint returned HTTP ${error.status}.`
+        };
+      }
+      this.updateEndpointStatus(
+        "sessionApprovalDecision",
+        "error",
+        `Runtime session approval decision request failed (${error.message}).`
+      );
+      throw error;
+    }
+  }
+
+  async submitRuntimeSessionToolProposalDecision(sessionID, proposalID, decision, options = {}) {
+    const normalizedSessionID = String(sessionID || "").trim();
+    const normalizedProposalID = String(proposalID || "").trim();
+    if (!normalizedSessionID) {
+      throw new Error("sessionId is required for tool proposal decision");
+    }
+    if (!normalizedProposalID) {
+      throw new Error("proposalId is required for tool proposal decision");
+    }
+    const normalizedDecision = String(decision || "").trim().toUpperCase() === "DENY" ? "DENY" : "APPROVE";
+
+    if (this.config.mockMode) {
+      this.updateEndpointStatus("sessionToolProposalDecision", "mock", "Mock mode enabled.");
+      return mockSubmitRuntimeSessionToolProposalDecision(normalizedSessionID, normalizedProposalID, normalizedDecision, options);
+    }
+
+    const prefix = this.config?.endpoints?.sessionByIdPrefix || "";
+    if (!prefix) {
+      this.updateEndpointStatus(
+        "sessionToolProposalDecision",
+        "unavailable",
+        "No runtime session tool-proposal decision endpoint configured."
+      );
+      return {
+        applied: false,
+        source: "endpoint-unavailable",
+        sessionId: normalizedSessionID,
+        proposalId: normalizedProposalID,
+        decision: normalizedDecision,
+        warning: "Runtime session tool-proposal decision endpoint is not configured."
+      };
+    }
+
+    try {
+      const response = await this.request(
+        this.config.runtimeApiBaseUrl,
+        `${prefix}${encodeURIComponent(normalizedSessionID)}/tool-proposals/${encodeURIComponent(normalizedProposalID)}/decision`,
+        undefined,
+        {
+          method: "POST",
+          body: {
+            meta: options.meta || {},
+            decision: normalizedDecision,
+            reason: options.reason || ""
+          }
+        }
+      );
+      this.updateEndpointStatus(
+        "sessionToolProposalDecision",
+        "available",
+        "Runtime session tool-proposal decision endpoint responded."
+      );
+      return {
+        ...response,
+        source: "runtime-endpoint"
+      };
+    } catch (error) {
+      if (error.status === 404 || error.status === 405 || error.status === 501) {
+        this.updateEndpointStatus(
+          "sessionToolProposalDecision",
+          "unavailable",
+          `Runtime session tool-proposal decision endpoint returned HTTP ${error.status}.`
+        );
+        return {
+          applied: false,
+          source: "endpoint-unavailable",
+          sessionId: normalizedSessionID,
+          proposalId: normalizedProposalID,
+          decision: normalizedDecision,
+          warning: `Runtime session tool-proposal decision endpoint returned HTTP ${error.status}.`
+        };
+      }
+      this.updateEndpointStatus(
+        "sessionToolProposalDecision",
+        "error",
+        `Runtime session tool-proposal decision request failed (${error.message}).`
+      );
+      throw error;
+    }
+  }
+
+  async closeRuntimeSession(sessionID, payload = {}) {
+    const normalizedSessionID = String(sessionID || "").trim();
+    if (!normalizedSessionID) {
+      throw new Error("sessionId is required to close a runtime session");
+    }
+
+    if (this.config.mockMode) {
+      this.updateEndpointStatus("sessionClose", "mock", "Mock mode enabled.");
+      return mockCloseRuntimeSession(normalizedSessionID, payload);
+    }
+
+    const prefix = this.config?.endpoints?.sessionByIdPrefix || "";
+    if (!prefix) {
+      this.updateEndpointStatus(
+        "sessionClose",
+        "unavailable",
+        "No runtime session close endpoint configured."
+      );
+      return {
+        applied: false,
+        source: "endpoint-unavailable",
+        sessionId: normalizedSessionID,
+        warning: "Runtime session close endpoint is not configured."
+      };
+    }
+
+    try {
+      const response = await this.request(
+        this.config.runtimeApiBaseUrl,
+        `${prefix}${encodeURIComponent(normalizedSessionID)}/close`,
+        undefined,
+        {
+          method: "POST",
+          body: payload
+        }
+      );
+      this.updateEndpointStatus(
+        "sessionClose",
+        "available",
+        "Runtime session close endpoint responded."
+      );
+      return {
+        ...response,
+        applied: true,
+        source: "runtime-endpoint"
+      };
+    } catch (error) {
+      if (error.status === 404 || error.status === 405 || error.status === 501) {
+        this.updateEndpointStatus(
+          "sessionClose",
+          "unavailable",
+          `Runtime session close endpoint returned HTTP ${error.status}.`
+        );
+        return {
+          applied: false,
+          source: "endpoint-unavailable",
+          sessionId: normalizedSessionID,
+          warning: `Runtime session close endpoint returned HTTP ${error.status}.`
+        };
+      }
+      this.updateEndpointStatus(
+        "sessionClose",
+        "error",
+        `Runtime session close request failed (${error.message}).`
+      );
       throw error;
     }
   }

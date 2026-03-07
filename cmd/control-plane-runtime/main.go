@@ -72,6 +72,11 @@ type Config struct {
 	RefValuesPath                     string
 	RefValuesJSON                     string
 	IntegrationInvokeTimeout          time.Duration
+	ManagedCodexMode                  string
+	CodexCLIPath                      string
+	CodexWorkdir                      string
+	CodexSandboxMode                  string
+	CodexExecTimeout                  time.Duration
 }
 
 func main() {
@@ -128,6 +133,11 @@ func parseFlags() Config {
 		RefValuesPath:                     envOrDefault("RUNTIME_REF_VALUES_PATH", ""),
 		RefValuesJSON:                     envOrDefault("RUNTIME_REF_VALUES_JSON", ""),
 		IntegrationInvokeTimeout:          envDurationOrDefault("RUNTIME_INTEGRATION_INVOKE_TIMEOUT", 45*time.Second),
+		ManagedCodexMode:                  envOrDefault("RUNTIME_MANAGED_CODEX_MODE", "legacy"),
+		CodexCLIPath:                      envOrDefault("RUNTIME_CODEX_CLI_PATH", ""),
+		CodexWorkdir:                      envOrDefault("RUNTIME_CODEX_WORKDIR", ""),
+		CodexSandboxMode:                  envOrDefault("RUNTIME_CODEX_SANDBOX_MODE", "read-only"),
+		CodexExecTimeout:                  envDurationOrDefault("RUNTIME_CODEX_EXEC_TIMEOUT", 2*time.Minute),
 	}
 
 	flag.StringVar(&cfg.ListenAddr, "listen", cfg.ListenAddr, "HTTP listen address")
@@ -177,6 +187,11 @@ func parseFlags() Config {
 	flag.StringVar(&cfg.RefValuesPath, "runtime-ref-values-path", cfg.RefValuesPath, "Path to JSON file mapping ref:// values to concrete endpoint or credential values")
 	flag.StringVar(&cfg.RefValuesJSON, "runtime-ref-values-json", cfg.RefValuesJSON, "Inline JSON object mapping ref:// values to concrete endpoint or credential values")
 	flag.DurationVar(&cfg.IntegrationInvokeTimeout, "integration-invoke-timeout", cfg.IntegrationInvokeTimeout, "Timeout for runtime integration invoke HTTP requests")
+	flag.StringVar(&cfg.ManagedCodexMode, "runtime-managed-codex-mode", cfg.ManagedCodexMode, "Managed Codex mode: legacy or process")
+	flag.StringVar(&cfg.CodexCLIPath, "runtime-codex-cli-path", cfg.CodexCLIPath, "Path to the local Codex CLI binary")
+	flag.StringVar(&cfg.CodexWorkdir, "runtime-codex-workdir", cfg.CodexWorkdir, "Workspace root for managed Codex exec")
+	flag.StringVar(&cfg.CodexSandboxMode, "runtime-codex-sandbox-mode", cfg.CodexSandboxMode, "Sandbox mode for managed Codex exec")
+	flag.DurationVar(&cfg.CodexExecTimeout, "runtime-codex-exec-timeout", cfg.CodexExecTimeout, "Timeout for managed Codex exec turns")
 	flag.Parse()
 
 	return cfg
@@ -272,9 +287,14 @@ func run(cfg Config) error {
 		return fmt.Errorf("configure runtime authn/authz: %w", err)
 	}
 	agentInvoker := cpruntime.NewAgentInvoker(store, cpruntime.AgentInvokerConfig{
-		RefValuesPath: cfg.RefValuesPath,
-		RefValuesJSON: cfg.RefValuesJSON,
-		HTTPTimeout:   cfg.IntegrationInvokeTimeout,
+		RefValuesPath:    cfg.RefValuesPath,
+		RefValuesJSON:    cfg.RefValuesJSON,
+		HTTPTimeout:      cfg.IntegrationInvokeTimeout,
+		ManagedCodexMode: cfg.ManagedCodexMode,
+		CodexCLIPath:     cfg.CodexCLIPath,
+		CodexWorkdir:     cfg.CodexWorkdir,
+		CodexSandboxMode: cfg.CodexSandboxMode,
+		CodexExecTimeout: cfg.CodexExecTimeout,
 	})
 	api := cpruntime.NewAPIServer(store, orchestrator, authEnforcer).WithAgentInvoker(agentInvoker)
 

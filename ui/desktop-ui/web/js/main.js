@@ -41,7 +41,23 @@ import {
   renderTerminalHistory
 } from "./views/terminal.js";
 import { renderSettings } from "./views/settings.js";
+import { renderChat } from "./views/chat.js";
 import { renderExecutionDefaults } from "./views/execution-defaults.js";
+import {
+  closeManagedCodexWorkerSession,
+  createOperatorChatThread,
+  deriveOperatorChatThreadState,
+  emitManagedCodexWorkerHeartbeat,
+  followOperatorChatThread,
+  invokeOperatorChatTurn,
+  launchManagedCodexWorker,
+  listOperatorChatThreads,
+  loadOperatorChatThread,
+  normalizeOperatorChatDraft,
+  reattachManagedCodexWorker,
+  recoverManagedCodexWorker,
+  refreshOperatorChatThreadSession
+} from "./runtime/session-client.js";
 import {
   escapeHTML,
   formatTime,
@@ -61,6 +77,7 @@ const ui = {
   workspaceLayout: document.getElementById("workspace-layout"),
   workspaceTabs: Array.from(document.querySelectorAll("[data-workspace-tab]")),
   workspacePanels: [],
+  chatContent: document.getElementById("chat-content"),
   triageContent: document.getElementById("triage-content"),
   executionDefaultsContent: document.getElementById("execution-defaults-content"),
   settingsContent: document.getElementById("settings-content"),
@@ -201,8 +218,9 @@ const AIMXS_OVERRIDE_KEY = "epydios.agentops.desktop.aimxs.override.v1";
 const INTEGRATION_OVERRIDES_KEY = "epydios.agentops.desktop.integrations.project_overrides.v1";
 const INCIDENT_HISTORY_KEY = "epydios.agentops.desktop.incident.history.v1";
 const CONFIG_CHANGE_HISTORY_KEY = "epydios.agentops.desktop.settings.change.history.v1";
+const OPERATOR_CHAT_ARCHIVE_KEY = "epydios.agentops.desktop.chat.archive.v1";
 const PROJECT_ANY_SCOPE_KEY = "__project_any__";
-const WORKSPACE_VIEW_IDS = new Set(["operations", "runs", "approvals", "incidents", "settings"]);
+const WORKSPACE_VIEW_IDS = new Set(["operations", "chat", "runs", "approvals", "incidents", "settings"]);
 const INCIDENT_SUBVIEW_IDS = new Set(["queue", "audit"]);
 const SETTINGS_SUBVIEW_IDS = new Set(["configuration", "diagnostics"]);
 const ADVANCED_SECTION_IDS = new Set(["operations", "runs", "approvals", "incidents", "settings"]);
@@ -249,8 +267,37 @@ let agentInvokeState = {
   maxOutputTokens: 1024,
   status: "clean",
   message: "",
-  response: null
+  response: null,
+  sessionView: null
 };
+let operatorChatState = {
+  title: "",
+  intent: "",
+  agentProfileId: "",
+  executionMode: "raw_model_invoke",
+  systemPrompt: "",
+  prompt: "",
+  maxOutputTokens: 1024,
+  status: "idle",
+  message: "",
+  thread: null,
+  history: {
+    source: "not-loaded",
+    count: 0,
+    archivedCount: 0,
+    showArchived: false,
+    message: "",
+    items: []
+  }
+};
+let operatorChatArchiveState = normalizeOperatorChatArchiveState(readSavedJSON(OPERATOR_CHAT_ARCHIVE_KEY));
+let operatorChatFollowState = {
+  token: 0,
+  timerId: 0,
+  sessionId: ""
+};
+const CHAT_FOLLOW_RETRY_MS = 1250;
+const CHAT_FOLLOW_CONTINUE_MS = 160;
 
 const SECRET_LIKE_PATTERNS = [
   /sk-[a-zA-Z0-9]{12,}/,
@@ -284,6 +331,174 @@ function saveJSON(key, value) {
   } catch (_) {
     // Local storage is optional.
   }
+}
+
+function normalizeOperatorChatArchiveState(value) {
+  const archivedByScope = value?.archivedByScope && typeof value.archivedByScope === "object"
+    ? value.archivedByScope
+    : {};
+  const next = { archivedByScope: {} };
+  Object.entries(archivedByScope).forEach(([scopeKey, taskIds]) => {
+    if (!Array.isArray(taskIds)) {
+      return;
+    }
+    const normalizedTaskIds = Array.from(new Set(taskIds.map((item) => String(item || "").trim()).filter(Boolean)));
+    if (normalizedTaskIds.length > 0) {
+      next.archivedByScope[String(scopeKey || "").trim()] = normalizedTaskIds;
+    }
+  });
+  return next;
+}
+
+function operatorChatScopeKey(scope = {}) {
+  const tenantId = String(scope?.tenantId || "").trim();
+  const projectId = String(scope?.projectId || "").trim();
+  return tenantId && projectId ? `${tenantId}::${projectId}` : "";
+}
+
+function archivedOperatorChatTaskIds(scope = {}) {
+  const scopeKey = operatorChatScopeKey(scope);
+  if (!scopeKey) {
+    return new Set();
+  }
+  return new Set(operatorChatArchiveState.archivedByScope?.[scopeKey] || []);
+}
+
+function setOperatorChatArchivedTask(scope = {}, taskId, archived) {
+  const scopeKey = operatorChatScopeKey(scope);
+  const normalizedTaskID = String(taskId || "").trim();
+  if (!scopeKey || !normalizedTaskID) {
+    return;
+  }
+  operatorChatArchiveState = normalizeOperatorChatArchiveState(operatorChatArchiveState);
+  const current = new Set(operatorChatArchiveState.archivedByScope?.[scopeKey] || []);
+  if (archived) {
+    current.add(normalizedTaskID);
+  } else {
+    current.delete(normalizedTaskID);
+  }
+  if (current.size > 0) {
+    operatorChatArchiveState.archivedByScope[scopeKey] = Array.from(current).sort();
+  } else {
+    delete operatorChatArchiveState.archivedByScope[scopeKey];
+  }
+  saveJSON(OPERATOR_CHAT_ARCHIVE_KEY, operatorChatArchiveState);
+}
+
+function activeWorkspaceView() {
+  return normalizeWorkspaceView(ui.workspaceLayout?.dataset?.workspaceView, "operations");
+}
+
+function clearOperatorChatFollowLoop() {
+  operatorChatFollowState.token += 1;
+  if (operatorChatFollowState.timerId) {
+    window.clearTimeout(operatorChatFollowState.timerId);
+  }
+  operatorChatFollowState = {
+    token: operatorChatFollowState.token,
+    timerId: 0,
+    sessionId: ""
+  };
+}
+
+function patchOperatorChatThreadState(thread, overrides = {}) {
+  const derived = deriveOperatorChatThreadState(thread);
+  operatorChatState = {
+    ...operatorChatState,
+    thread,
+    status: String(overrides.status || derived.uiStatus || operatorChatState.status || "idle").trim().toLowerCase() || "idle",
+    message: String(overrides.message || derived.message || operatorChatState.message || "").trim()
+  };
+  return derived;
+}
+
+function buildFollowUpOperatorChatDraft(draft = {}, thread = {}) {
+  const baseTitle = String(draft.title || thread.title || "").trim();
+  const normalizedTitle = baseTitle
+    ? /^follow-up:/i.test(baseTitle)
+      ? baseTitle
+      : `Follow-up: ${baseTitle}`
+    : `Follow-up: ${String(draft.agentProfileId || thread.agentProfileId || "agent").trim() || "agent"} thread`;
+  return {
+    ...draft,
+    title: normalizedTitle,
+    intent: String(draft.intent || thread.intent || "").trim(),
+    agentProfileId: String(draft.agentProfileId || thread.agentProfileId || "").trim().toLowerCase(),
+    executionMode: String(draft.executionMode || thread.executionMode || "raw_model_invoke").trim().toLowerCase(),
+    prompt: ""
+  };
+}
+
+function scheduleOperatorChatFollow(delayMs, token) {
+  if (operatorChatFollowState.token !== token) {
+    return;
+  }
+  if (operatorChatFollowState.timerId) {
+    window.clearTimeout(operatorChatFollowState.timerId);
+  }
+  operatorChatFollowState.timerId = window.setTimeout(() => {
+    runOperatorChatFollowLoop(token).catch(() => {});
+  }, delayMs);
+}
+
+function shouldOperatorChatFollow() {
+  const derived = deriveOperatorChatThreadState(operatorChatState.thread);
+  return activeWorkspaceView() === "chat" && document.visibilityState !== "hidden" && derived.shouldFollow;
+}
+
+async function runOperatorChatFollowLoop(token) {
+  if (operatorChatFollowState.token !== token || !shouldOperatorChatFollow()) {
+    return;
+  }
+  try {
+    const result = await followOperatorChatThread(api, operatorChatState.thread, {
+      tailCount: 8,
+      waitSeconds: 10
+    });
+    if (operatorChatFollowState.token !== token) {
+      return;
+    }
+    if (result?.changed && result?.thread) {
+      patchOperatorChatThreadState(result.thread);
+      if (result?.state?.isResolvedThread) {
+        await refreshOperatorChatHistory(getSession());
+      }
+      await refresh();
+    }
+    if (shouldOperatorChatFollow()) {
+      scheduleOperatorChatFollow(CHAT_FOLLOW_CONTINUE_MS, token);
+    }
+  } catch (error) {
+    if (operatorChatFollowState.token !== token) {
+      return;
+    }
+    operatorChatState = {
+      ...operatorChatState,
+      status: "warn",
+      message: `Live thread follow paused: ${error.message}`
+    };
+    await refresh();
+    if (shouldOperatorChatFollow()) {
+      scheduleOperatorChatFollow(CHAT_FOLLOW_RETRY_MS, token);
+    }
+  }
+}
+
+function reconcileOperatorChatFollowLoop() {
+  const derived = deriveOperatorChatThreadState(operatorChatState.thread);
+  if (activeWorkspaceView() !== "chat" || document.visibilityState === "hidden" || !derived.shouldFollow) {
+    if (operatorChatFollowState.timerId || operatorChatFollowState.sessionId) {
+      clearOperatorChatFollowLoop();
+    }
+    return;
+  }
+  if (operatorChatFollowState.sessionId === derived.sessionId && operatorChatFollowState.timerId) {
+    return;
+  }
+  clearOperatorChatFollowLoop();
+  operatorChatFollowState.sessionId = derived.sessionId;
+  const token = operatorChatFollowState.token;
+  scheduleOperatorChatFollow(40, token);
 }
 
 function normalizeProjectScopeKey(projectID) {
@@ -674,6 +889,35 @@ function readAgentInvokeInput() {
   });
 }
 
+function readOperatorChatInput() {
+  const read = (selector) => ui.chatContent?.querySelector(selector);
+  const title = read("#chat-thread-title");
+  const agentProfile = read("#chat-agent-profile");
+  const executionMode = read("#chat-execution-mode");
+  const intent = read("#chat-thread-intent");
+  const systemPrompt = read("#chat-system-prompt");
+  const prompt = read("#chat-prompt");
+  if (
+    !(title instanceof HTMLInputElement) ||
+    !(agentProfile instanceof HTMLSelectElement) ||
+    !(executionMode instanceof HTMLSelectElement) ||
+    !(intent instanceof HTMLInputElement) ||
+    !(systemPrompt instanceof HTMLTextAreaElement) ||
+    !(prompt instanceof HTMLTextAreaElement)
+  ) {
+    return null;
+  }
+  return normalizeOperatorChatDraft({
+    title: title.value,
+    intent: intent.value,
+    agentProfileId: agentProfile.value,
+    executionMode: executionMode.value,
+    systemPrompt: systemPrompt.value,
+    prompt: prompt.value,
+    maxOutputTokens: operatorChatState.maxOutputTokens
+  });
+}
+
 function validateAgentInvokeDraft(draft, choices) {
   const errors = [];
   const profiles = Array.isArray(choices?.integrations?.agentProfiles)
@@ -691,6 +935,102 @@ function validateAgentInvokeDraft(draft, choices) {
   return {
     valid: errors.length === 0,
     errors
+  };
+}
+
+async function hydrateAgentInvokeSessionView(sessionId) {
+  return loadNativeSessionView(api, sessionId, { tailCount: 6, waitSeconds: 1 });
+}
+
+async function refreshOperatorChatHistory(sessionValue) {
+  const scope = {
+    tenantId: activeTenantScope(sessionValue),
+    projectId: activeProjectScope(sessionValue)
+  };
+  if (!scope.tenantId || !scope.projectId) {
+    operatorChatState = {
+      ...operatorChatState,
+      history: {
+        source: "scope-unavailable",
+        count: 0,
+        message: "Tenant and project scope are required before native chat threads can be loaded.",
+        items: []
+      }
+    };
+    return;
+  }
+  try {
+    const history = await listOperatorChatThreads(api, scope, { limit: 12 });
+    const archivedTaskIds = archivedOperatorChatTaskIds(scope);
+    const allItems = (Array.isArray(history?.items) ? history.items : []).map((item) => ({
+      ...item,
+      archived: archivedTaskIds.has(String(item?.taskId || "").trim())
+    }));
+    const showArchived = Boolean(operatorChatState.history?.showArchived);
+    const visibleItems = showArchived ? allItems : allItems.filter((item) => !item.archived);
+    const archivedCount = allItems.filter((item) => item.archived).length;
+    operatorChatState = {
+      ...operatorChatState,
+      history: {
+        ...history,
+        count: visibleItems.length,
+        archivedCount,
+        showArchived,
+        message:
+          allItems.length > 0
+            ? `Resume any prior operator chat thread directly from native M16 task/session records.${archivedCount > 0 ? ` ${showArchived ? "Archived threads are visible." : "Archived threads are hidden until you show them."}` : ""}`
+            : "No native operator chat threads exist yet for the current scope.",
+        items: visibleItems
+      }
+    };
+  } catch (error) {
+    operatorChatState = {
+      ...operatorChatState,
+      history: {
+        source: "error",
+        count: 0,
+        message: `Native thread history failed to load: ${error.message}`,
+        items: []
+      }
+    };
+  }
+}
+
+function findOperatorChatTurn(thread = {}, sessionId) {
+  const normalizedSessionID = String(sessionId || "").trim();
+  const turns = Array.isArray(thread?.turns) ? thread.turns : [];
+  return turns.find((turn) => String(turn?.sessionView?.timeline?.session?.sessionId || turn?.response?.sessionId || "").trim() === normalizedSessionID) || null;
+}
+
+function buildOperatorChatToolActionExport(thread = {}, sessionId, toolActionId) {
+  const turn = findOperatorChatTurn(thread, sessionId);
+  const timeline = turn?.sessionView?.timeline && typeof turn.sessionView.timeline === "object" ? turn.sessionView.timeline : {};
+  const toolActions = Array.isArray(timeline?.toolActions) ? timeline.toolActions : [];
+  const toolAction = toolActions.find((item) => String(item?.toolActionId || "").trim() === String(toolActionId || "").trim());
+  if (!toolAction) {
+    return null;
+  }
+  return {
+    task: timeline?.task || null,
+    session: timeline?.session || null,
+    selectedWorker: timeline?.selectedWorker || null,
+    toolAction
+  };
+}
+
+function buildOperatorChatEvidenceExport(thread = {}, sessionId, evidenceId) {
+  const turn = findOperatorChatTurn(thread, sessionId);
+  const timeline = turn?.sessionView?.timeline && typeof turn.sessionView.timeline === "object" ? turn.sessionView.timeline : {};
+  const evidenceRecords = Array.isArray(timeline?.evidenceRecords) ? timeline.evidenceRecords : [];
+  const evidence = evidenceRecords.find((item) => String(item?.evidenceId || "").trim() === String(evidenceId || "").trim());
+  if (!evidence) {
+    return null;
+  }
+  return {
+    task: timeline?.task || null,
+    session: timeline?.session || null,
+    selectedWorker: timeline?.selectedWorker || null,
+    evidence
   };
 }
 
@@ -913,6 +1253,7 @@ function setWorkspaceView(view, persist = false) {
   if (persist) {
     saveValue(WORKSPACE_VIEW_PREF_KEY, selectedView);
   }
+  reconcileOperatorChatFollowLoop();
   return selectedView;
 }
 
@@ -2264,6 +2605,13 @@ function clearDataPanels() {
     "Extension Providers",
     "No provider data loaded."
   );
+  if (ui.chatContent) {
+    ui.chatContent.innerHTML = renderPanelStateMetric(
+      "info",
+      "Operator Chat",
+      "Chat becomes available after workspace scope and runtime choices load."
+    );
+  }
   ui.settingsContent.innerHTML = renderPanelStateMetric(
     "empty",
     "Settings",
@@ -3247,6 +3595,9 @@ async function main() {
       );
     });
   }
+  document.addEventListener("visibilitychange", () => {
+    reconcileOperatorChatFollowLoop();
+  });
   document.addEventListener("click", (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) {
@@ -3522,6 +3873,7 @@ async function main() {
         ...settings,
         configChanges: buildSettingsConfigChanges(configChangeHistory, audit)
       };
+      await refreshOperatorChatHistory(session);
 
       latestSettingsSnapshot = settingsWithConfigChanges;
       triageSnapshot = { runs, approvals, audit };
@@ -3530,6 +3882,18 @@ async function main() {
       renderContextPanel();
       renderHealth(ui, health, pipeline);
       renderProviders(ui, providers);
+      renderChat(ui, settingsWithConfigChanges, {
+        ...operatorChatState,
+        agentProfileId:
+          String(
+            operatorChatState.agentProfileId ||
+              selectedAgentProfileId ||
+              settingsWithConfigChanges?.integrations?.selectedAgentProfileId ||
+              ""
+          )
+            .trim()
+            .toLowerCase()
+      });
       const editorState = buildSettingsEditorState(
         activeProjectScope(session),
         settingsWithConfigChanges,
@@ -3572,6 +3936,7 @@ async function main() {
       renderError(ui, `Refresh failed: ${error.message}`);
       setRefreshStatus("error", "refresh failed");
     } finally {
+      reconcileOperatorChatFollowLoop();
       refreshInFlight = false;
       if (refreshSucceeded) {
         setRefreshStatus("ok", `synced ${formatRefreshClock()}`);
@@ -3987,6 +4352,811 @@ async function main() {
     });
     refresh().catch(() => {});
   });
+  ui.chatContent?.addEventListener("input", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement) || !target.closest("[data-chat-field]")) {
+      return;
+    }
+    const draft = readOperatorChatInput();
+    if (!draft) {
+      return;
+    }
+    operatorChatState = {
+      ...operatorChatState,
+      ...draft,
+      status: operatorChatState.thread?.taskId ? "dirty" : "idle",
+      message: operatorChatState.thread?.taskId
+        ? "Chat draft changed. Send Turn to append a new M16 session to this thread."
+        : "Chat draft changed. Start Thread to create the M16 task for this conversation."
+    };
+  });
+  ui.chatContent?.addEventListener("click", async (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    const actionNode = target.closest("[data-chat-action]");
+    if (!(actionNode instanceof HTMLElement)) {
+      return;
+    }
+    const action = String(actionNode.dataset.chatAction || "").trim().toLowerCase();
+    if (!action) {
+      return;
+    }
+    const session = getSession();
+    const scope = {
+      tenantId: activeTenantScope(session),
+      projectId: activeProjectScope(session)
+    };
+    const draft =
+      readOperatorChatInput() ||
+      normalizeOperatorChatDraft(operatorChatState, getRuntimeChoices()?.integrations?.selectedAgentProfileId || "");
+
+    if (action === "reset-thread") {
+      clearOperatorChatFollowLoop();
+      operatorChatState = {
+        ...operatorChatState,
+        ...draft,
+        prompt: "",
+        status: "idle",
+        message: "Chat thread cleared. Start a new thread when ready.",
+        thread: null
+      };
+      await refresh();
+      return;
+    }
+
+    if (action === "refresh-threads") {
+      operatorChatState = {
+        ...operatorChatState,
+        ...draft,
+        status: "running",
+        message: `Refreshing native operator chat threads for ${scope.projectId || "current scope"}...`
+      };
+      await refresh();
+      await refreshOperatorChatHistory(session);
+      operatorChatState = {
+        ...operatorChatState,
+        ...draft,
+        status: "ready",
+        message: "Native operator chat thread history refreshed."
+      };
+      await refresh();
+      return;
+    }
+
+    if (action === "toggle-archived-threads") {
+      operatorChatState = {
+        ...operatorChatState,
+        history: {
+          ...operatorChatState.history,
+          showArchived: !operatorChatState.history?.showArchived
+        }
+      };
+      await refreshOperatorChatHistory(session);
+      operatorChatState = {
+        ...operatorChatState,
+        ...draft,
+        status: "ready",
+        message: operatorChatState.history?.showArchived
+          ? "Archived operator chat threads are now visible in the history rail."
+          : "Archived operator chat threads are now hidden from the history rail."
+      };
+      await refresh();
+      return;
+    }
+
+    if (!scope.tenantId || !scope.projectId) {
+      operatorChatState = {
+        ...operatorChatState,
+        ...draft,
+        status: "invalid",
+        message: "Tenant and project scope are required before using operator chat."
+      };
+      await refresh();
+      return;
+    }
+
+    if (action === "archive-thread" || action === "archive-thread-from-history") {
+      const taskId = action === "archive-thread"
+        ? String(operatorChatState.thread?.taskId || "").trim()
+        : String(actionNode.dataset.chatTaskId || "").trim();
+      if (!taskId) {
+        return;
+      }
+      setOperatorChatArchivedTask(scope, taskId, true);
+      if (String(operatorChatState.thread?.taskId || "").trim() === taskId) {
+        clearOperatorChatFollowLoop();
+        operatorChatState = {
+          ...operatorChatState,
+          ...draft,
+          prompt: "",
+          status: "success",
+          message: `Thread ${taskId} archived locally. Resume it from history only when you intentionally restore it.`,
+          thread: null
+        };
+      } else {
+        operatorChatState = {
+          ...operatorChatState,
+          ...draft,
+          status: "success",
+          message: `Thread ${taskId} archived locally.`
+        };
+      }
+      await refreshOperatorChatHistory(session);
+      await refresh();
+      return;
+    }
+
+    if (action === "restore-archived-thread") {
+      const taskId = String(actionNode.dataset.chatTaskId || "").trim();
+      if (!taskId) {
+        return;
+      }
+      setOperatorChatArchivedTask(scope, taskId, false);
+      operatorChatState = {
+        ...operatorChatState,
+        ...draft,
+        status: "success",
+        message: `Thread ${taskId} restored to the active history rail.`
+      };
+      await refreshOperatorChatHistory(session);
+      await refresh();
+      return;
+    }
+
+    if (action === "resume-thread") {
+      const taskId = String(actionNode.dataset.chatTaskId || "").trim();
+      if (!taskId) {
+        return;
+      }
+      const taskEntry = (Array.isArray(operatorChatState.history?.items) ? operatorChatState.history.items : []).find(
+        (item) => String(item?.taskId || "").trim() === taskId
+      );
+      operatorChatState = {
+        ...operatorChatState,
+        ...draft,
+        status: "running",
+        message: `Loading native chat thread ${taskId}...`
+      };
+      await refresh();
+      try {
+        const thread = await loadOperatorChatThread(api, scope, taskEntry || taskId, { limit: 12 });
+        const derived = patchOperatorChatThreadState(thread, {
+          status: "success",
+          message: `Native chat thread ${taskId} loaded from M16 task/session history. ${deriveOperatorChatThreadState(thread).message}`
+        });
+        operatorChatState = {
+          ...operatorChatState,
+          ...draft,
+          title: thread.title || draft.title,
+          intent: thread.intent || draft.intent,
+          agentProfileId: thread.agentProfileId || draft.agentProfileId,
+          executionMode: thread.executionMode || draft.executionMode,
+          prompt: "",
+          status: derived.uiStatus === "success" ? "success" : operatorChatState.status,
+          message: operatorChatState.message,
+          thread
+        };
+      } catch (error) {
+        operatorChatState = {
+          ...operatorChatState,
+          ...draft,
+          status: "error",
+          message: `Thread resume failed: ${error.message}`
+        };
+      }
+      await refresh();
+      return;
+    }
+
+    if (action === "close-thread-view") {
+      clearOperatorChatFollowLoop();
+      operatorChatState = {
+        ...operatorChatState,
+        ...draft,
+        prompt: "",
+        status: "ready",
+        message: "Resolved thread view closed. Resume it from history or start a follow-up thread when needed.",
+        thread: null
+      };
+      await refresh();
+      return;
+    }
+
+    if (action === "start-thread") {
+      if (operatorChatState.thread?.taskId) {
+        operatorChatState = {
+          ...operatorChatState,
+          ...draft,
+          status: "warn",
+          message: "A thread is already active. Reset it before starting a new one."
+        };
+        await refresh();
+        return;
+      }
+      operatorChatState = {
+        ...operatorChatState,
+        ...draft,
+        status: "running",
+        message: `Creating operator chat task for ${scope.projectId}...`
+      };
+      await refresh();
+      try {
+        const thread = await createOperatorChatThread(api, scope, draft);
+        operatorChatState = {
+          ...operatorChatState,
+          ...draft,
+          status: "success",
+          message: `Operator chat thread ${thread.taskId} created. Send the first turn when ready.`,
+          thread: {
+            ...thread,
+            agentProfileId: draft.agentProfileId,
+            executionMode: draft.executionMode,
+            turns: []
+          }
+        };
+      } catch (error) {
+        operatorChatState = {
+          ...operatorChatState,
+          ...draft,
+          status: "error",
+          message: `Thread creation failed: ${error.message}`
+        };
+      }
+      await refresh();
+      return;
+    }
+
+    if (action === "start-followup-thread") {
+      if (!operatorChatState.thread?.taskId) {
+        operatorChatState = {
+          ...operatorChatState,
+          ...draft,
+          status: "invalid",
+          message: "An active resolved thread is required before starting a follow-up thread."
+        };
+        await refresh();
+        return;
+      }
+      clearOperatorChatFollowLoop();
+      const followUpDraft = buildFollowUpOperatorChatDraft(draft, operatorChatState.thread);
+      operatorChatState = {
+        ...operatorChatState,
+        ...followUpDraft,
+        status: "running",
+        message: `Creating follow-up operator chat task for ${scope.projectId}...`
+      };
+      await refresh();
+      try {
+        const thread = await createOperatorChatThread(api, scope, followUpDraft);
+        operatorChatState = {
+          ...operatorChatState,
+          ...followUpDraft,
+          prompt: "",
+          status: "success",
+          message: `Follow-up thread ${thread.taskId} created. Send the next governed turn when ready.`,
+          thread: {
+            ...thread,
+            agentProfileId: followUpDraft.agentProfileId,
+            executionMode: followUpDraft.executionMode,
+            turns: []
+          }
+        };
+        await refreshOperatorChatHistory(session);
+      } catch (error) {
+        operatorChatState = {
+          ...operatorChatState,
+          ...followUpDraft,
+          status: "error",
+          message: `Follow-up thread creation failed: ${error.message}`
+        };
+      }
+      await refresh();
+      return;
+    }
+
+    if (action === "send-turn") {
+      if (!operatorChatState.thread?.taskId) {
+        operatorChatState = {
+          ...operatorChatState,
+          ...draft,
+          status: "invalid",
+          message: "Start a thread first so the turn has an M16 task to attach to."
+        };
+        await refresh();
+        return;
+      }
+      if (!String(draft.prompt || "").trim()) {
+        operatorChatState = {
+          ...operatorChatState,
+          ...draft,
+          status: "invalid",
+          message: "Operator prompt is required before sending a chat turn."
+        };
+        await refresh();
+        return;
+      }
+      operatorChatState = {
+        ...operatorChatState,
+        ...draft,
+        status: "running",
+        message: `Invoking ${draft.agentProfileId} on thread ${operatorChatState.thread.taskId}...`
+      };
+      await refresh();
+      try {
+        const result = await invokeOperatorChatTurn(api, scope, operatorChatState.thread, draft);
+        const turn = {
+          requestId: String(result?.response?.requestId || "").trim(),
+          taskId: String(result?.response?.taskId || operatorChatState.thread.taskId || "").trim(),
+          prompt: draft.prompt,
+          systemPrompt: draft.systemPrompt,
+          createdAt: String(result?.response?.startedAt || new Date().toISOString()).trim(),
+          response: result?.response || null,
+          sessionView: result?.sessionView || null
+        };
+        const nextThread = {
+          ...operatorChatState.thread,
+          agentProfileId: draft.agentProfileId,
+          latestSessionId: String(result?.response?.sessionId || "").trim(),
+          turns: [...(Array.isArray(operatorChatState.thread.turns) ? operatorChatState.thread.turns : []), turn]
+        };
+        const derived = deriveOperatorChatThreadState(nextThread);
+        operatorChatState = {
+          ...operatorChatState,
+          ...draft,
+          prompt: "",
+          status:
+            derived.uiStatus ||
+            (result?.response?.applied && result?.response?.source === "runtime-endpoint"
+              ? "success"
+              : result?.response?.applied
+                ? "warn"
+                : "error"),
+          message:
+            result?.response?.applied && result?.response?.source === "runtime-endpoint"
+              ? derived.message
+              : String(result?.response?.warning || "").trim() || "Turn did not complete.",
+          thread: nextThread
+        };
+        await refreshOperatorChatHistory(session);
+      } catch (error) {
+        operatorChatState = {
+          ...operatorChatState,
+          ...draft,
+          status: "error",
+          message: `Send turn failed: ${error.message}`
+        };
+      }
+      await refresh();
+      return;
+    }
+
+    if (action === "launch-managed-worker") {
+      if (!operatorChatState.thread?.taskId) {
+        operatorChatState = {
+          ...operatorChatState,
+          ...draft,
+          status: "invalid",
+          message: "Start a managed-worker thread first so the worker launch has an M16 task to attach to."
+        };
+        await refresh();
+        return;
+      }
+      if (String(draft.executionMode || operatorChatState.thread?.executionMode || "").trim().toLowerCase() !== "managed_codex_worker") {
+        operatorChatState = {
+          ...operatorChatState,
+          ...draft,
+          status: "invalid",
+          message: "Switch Execution Path to Managed Codex Worker before launching the bridge."
+        };
+        await refresh();
+        return;
+      }
+      operatorChatState = {
+        ...operatorChatState,
+        ...draft,
+        status: "running",
+        message: `Launching managed Codex worker for ${operatorChatState.thread.taskId}...`
+      };
+      await refresh();
+      try {
+        const result = await launchManagedCodexWorker(api, scope, operatorChatState.thread, draft);
+        const derived = deriveOperatorChatThreadState(result.thread);
+        operatorChatState = {
+          ...operatorChatState,
+          ...draft,
+          prompt: "",
+          status: derived.uiStatus || "success",
+          message: derived.message || "Managed Codex worker launched.",
+          thread: result.thread
+        };
+        await refreshOperatorChatHistory(session);
+      } catch (error) {
+        operatorChatState = {
+          ...operatorChatState,
+          ...draft,
+          status: "error",
+          message: `Managed worker launch failed: ${error.message}`
+        };
+      }
+      await refresh();
+      return;
+    }
+
+    if (action === "emit-worker-heartbeat") {
+      operatorChatState = {
+        ...operatorChatState,
+        ...draft,
+        status: "running",
+        message: "Recording managed worker heartbeat..."
+      };
+      await refresh();
+      try {
+        const result = await emitManagedCodexWorkerHeartbeat(api, scope, operatorChatState.thread, {
+          summary: "Managed Codex worker heartbeat recorded from the chat control surface."
+        });
+        const derived = deriveOperatorChatThreadState(result.thread);
+        operatorChatState = {
+          ...operatorChatState,
+          ...draft,
+          status: derived.uiStatus || "success",
+          message: derived.message || "Managed worker heartbeat recorded.",
+          thread: result.thread
+        };
+      } catch (error) {
+        operatorChatState = {
+          ...operatorChatState,
+          ...draft,
+          status: "error",
+          message: `Managed worker heartbeat failed: ${error.message}`
+        };
+      }
+      await refresh();
+      return;
+    }
+
+    if (action === "reattach-managed-worker") {
+      operatorChatState = {
+        ...operatorChatState,
+        ...draft,
+        status: "running",
+        message: "Reattaching managed Codex worker to the active native session..."
+      };
+      await refresh();
+      try {
+        const result = await reattachManagedCodexWorker(api, scope, operatorChatState.thread, draft);
+        const derived = deriveOperatorChatThreadState(result.thread);
+        operatorChatState = {
+          ...operatorChatState,
+          ...draft,
+          status: derived.uiStatus || "success",
+          message: derived.message || "Managed Codex worker reattached.",
+          thread: result.thread
+        };
+      } catch (error) {
+        operatorChatState = {
+          ...operatorChatState,
+          ...draft,
+          status: "error",
+          message: `Managed worker reattach failed: ${error.message}`
+        };
+      }
+      await refresh();
+      return;
+    }
+
+    if (action === "recover-managed-worker") {
+      operatorChatState = {
+        ...operatorChatState,
+        ...draft,
+        status: "running",
+        message: "Recovering managed Codex worker onto a fresh native session..."
+      };
+      await refresh();
+      try {
+        const result = await recoverManagedCodexWorker(api, scope, operatorChatState.thread, draft);
+        const derived = deriveOperatorChatThreadState(result.thread);
+        operatorChatState = {
+          ...operatorChatState,
+          ...draft,
+          status: derived.uiStatus || "success",
+          message: derived.message || "Managed Codex worker recovered onto a fresh native session.",
+          thread: result.thread
+        };
+        await refreshOperatorChatHistory(session);
+      } catch (error) {
+        operatorChatState = {
+          ...operatorChatState,
+          ...draft,
+          status: "error",
+          message: `Managed worker recover failed: ${error.message}`
+        };
+      }
+      await refresh();
+      return;
+    }
+
+    if (action === "close-managed-worker") {
+      operatorChatState = {
+        ...operatorChatState,
+        ...draft,
+        status: "running",
+        message: "Closing the active managed Codex worker session..."
+      };
+      await refresh();
+      try {
+        const result = await closeManagedCodexWorkerSession(api, scope, operatorChatState.thread, {
+          status: "CANCELLED",
+          reason: "Managed Codex worker session closed from chat controls."
+        });
+        const derived = deriveOperatorChatThreadState(result.thread);
+        operatorChatState = {
+          ...operatorChatState,
+          ...draft,
+          status: derived.uiStatus || "warn",
+          message: derived.message || "Managed Codex worker session closed.",
+          thread: result.thread
+        };
+        await refreshOperatorChatHistory(session);
+      } catch (error) {
+        operatorChatState = {
+          ...operatorChatState,
+          ...draft,
+          status: "error",
+          message: `Managed worker close failed: ${error.message}`
+        };
+      }
+      await refresh();
+      return;
+    }
+
+    if (action === "refresh-last-turn") {
+      const turns = Array.isArray(operatorChatState.thread?.turns) ? operatorChatState.thread.turns : [];
+      const lastTurn = turns.length > 0 ? turns[turns.length - 1] : null;
+      const sessionId = String(lastTurn?.response?.sessionId || lastTurn?.sessionView?.sessionId || "").trim();
+      if (!sessionId) {
+        return;
+      }
+      operatorChatState = {
+        ...operatorChatState,
+        ...draft,
+        status: "running",
+        message: `Refreshing native M16 session ${sessionId} for the latest chat turn...`
+      };
+      await refresh();
+      try {
+        const result = await refreshOperatorChatThreadSession(api, operatorChatState.thread, sessionId, {
+          tailCount: 8,
+          waitSeconds: 1
+        });
+        operatorChatState = {
+          ...operatorChatState,
+          ...draft,
+          status: result?.state?.uiStatus || "ready",
+          message: result?.state?.message || "Latest chat turn refreshed from the native session contract.",
+          thread: result?.thread || operatorChatState.thread
+        };
+        if (result?.state?.isResolvedThread) {
+          await refreshOperatorChatHistory(session);
+        }
+      } catch (error) {
+        operatorChatState = {
+          ...operatorChatState,
+          ...draft,
+          status: "error",
+          message: `Refresh last turn failed: ${error.message}`
+        };
+      }
+      await refresh();
+      return;
+    }
+
+    if (action === "copy-tool-action-json" || action === "download-tool-action-json") {
+      const sessionId = String(actionNode.dataset.chatSessionId || "").trim();
+      const toolActionId = String(actionNode.dataset.chatToolActionId || "").trim();
+      if (!sessionId || !toolActionId) {
+        return;
+      }
+      const payload = buildOperatorChatToolActionExport(operatorChatState.thread, sessionId, toolActionId);
+      if (!payload) {
+        operatorChatState = {
+          ...operatorChatState,
+          ...draft,
+          status: "warn",
+          message: `Tool action ${toolActionId} is no longer available in the loaded thread view.`
+        };
+        await refresh();
+        return;
+      }
+      const serialized = JSON.stringify(payload, null, 2);
+      try {
+        if (action === "copy-tool-action-json") {
+          await copyTextToClipboard(serialized);
+          operatorChatState = {
+            ...operatorChatState,
+            ...draft,
+            status: "success",
+            message: `Copied tool action ${toolActionId} review JSON to the clipboard.`
+          };
+        } else {
+          const fileName = `epydios-agentops-chat-tool-action-${toolActionId}.json`;
+          triggerTextDownload(serialized, fileName, "application/json;charset=utf-8");
+          operatorChatState = {
+            ...operatorChatState,
+            ...draft,
+            status: "success",
+            message: `Downloaded tool action ${toolActionId} review JSON as ${fileName}.`
+          };
+        }
+      } catch (error) {
+        operatorChatState = {
+          ...operatorChatState,
+          ...draft,
+          status: "error",
+          message: `Tool action export failed: ${error.message}`
+        };
+      }
+      await refresh();
+      return;
+    }
+
+    if (action === "copy-evidence-json" || action === "download-evidence-json") {
+      const sessionId = String(actionNode.dataset.chatSessionId || "").trim();
+      const evidenceId = String(actionNode.dataset.chatEvidenceId || "").trim();
+      if (!sessionId || !evidenceId) {
+        return;
+      }
+      const payload = buildOperatorChatEvidenceExport(operatorChatState.thread, sessionId, evidenceId);
+      if (!payload) {
+        operatorChatState = {
+          ...operatorChatState,
+          ...draft,
+          status: "warn",
+          message: `Evidence record ${evidenceId} is no longer available in the loaded thread view.`
+        };
+        await refresh();
+        return;
+      }
+      const serialized = JSON.stringify(payload, null, 2);
+      try {
+        if (action === "copy-evidence-json") {
+          await copyTextToClipboard(serialized);
+          operatorChatState = {
+            ...operatorChatState,
+            ...draft,
+            status: "success",
+            message: `Copied evidence record ${evidenceId} review JSON to the clipboard.`
+          };
+        } else {
+          const fileName = `epydios-agentops-chat-evidence-${evidenceId}.json`;
+          triggerTextDownload(serialized, fileName, "application/json;charset=utf-8");
+          operatorChatState = {
+            ...operatorChatState,
+            ...draft,
+            status: "success",
+            message: `Downloaded evidence record ${evidenceId} review JSON as ${fileName}.`
+          };
+        }
+      } catch (error) {
+        operatorChatState = {
+          ...operatorChatState,
+          ...draft,
+          status: "error",
+          message: `Evidence export failed: ${error.message}`
+        };
+      }
+      await refresh();
+      return;
+    }
+
+    if (action === "approve-tool-proposal" || action === "deny-tool-proposal") {
+      const sessionId = String(actionNode.dataset.chatSessionId || "").trim();
+      const proposalId = String(actionNode.dataset.chatProposalId || "").trim();
+      if (!sessionId || !proposalId || !operatorChatState.thread) {
+        return;
+      }
+      const proposalRow = actionNode.closest("[data-chat-tool-proposal-row]");
+      const reasonInput = proposalRow instanceof HTMLElement ? proposalRow.querySelector("[data-chat-proposal-reason]") : null;
+      const reason = reasonInput instanceof HTMLInputElement ? String(reasonInput.value || "").trim() : "";
+      const decision = action === "deny-tool-proposal" ? "DENY" : "APPROVE";
+      operatorChatState = {
+        ...operatorChatState,
+        ...draft,
+        status: "running",
+        message: `Submitting ${decision} for tool proposal ${proposalId} on session ${sessionId}...`
+      };
+      await refresh();
+      try {
+        const result = await api.submitRuntimeSessionToolProposalDecision(sessionId, proposalId, decision, {
+          meta: {
+            tenantId: scope.tenantId,
+            projectId: scope.projectId,
+            requestId: `chat-tool-proposal-${Date.now()}`
+          },
+          reason
+        });
+        const refreshed = await refreshOperatorChatThreadSession(api, operatorChatState.thread, sessionId, {
+          tailCount: 8,
+          waitSeconds: 1
+        });
+        const nextThread = refreshed?.thread || operatorChatState.thread;
+        const derived = deriveOperatorChatThreadState(nextThread);
+        operatorChatState = {
+          ...operatorChatState,
+          ...draft,
+          status: derived.uiStatus || (result?.applied ? "success" : "warn"),
+          message: result?.applied
+            ? `Tool proposal ${proposalId} ${decision === "DENY" ? "denied" : "approved"}. ${derived.message}`
+            : String(result?.warning || "").trim() || `Tool proposal ${proposalId} was not changed.`,
+          thread: nextThread
+        };
+        await refreshOperatorChatHistory(session);
+      } catch (error) {
+        operatorChatState = {
+          ...operatorChatState,
+          ...draft,
+          status: "error",
+          message: `Tool proposal decision failed: ${error.message}`
+        };
+      }
+      await refresh();
+      return;
+    }
+
+    if (action === "approve-checkpoint" || action === "deny-checkpoint") {
+      const sessionId = String(actionNode.dataset.chatSessionId || "").trim();
+      const checkpointId = String(actionNode.dataset.chatCheckpointId || "").trim();
+      if (!sessionId || !checkpointId || !operatorChatState.thread) {
+        return;
+      }
+      const approvalRow = actionNode.closest("[data-chat-approval-row]");
+      const reasonInput = approvalRow instanceof HTMLElement ? approvalRow.querySelector("[data-chat-approval-reason]") : null;
+      const reason = reasonInput instanceof HTMLInputElement ? String(reasonInput.value || "").trim() : "";
+      const decision = action === "deny-checkpoint" ? "DENY" : "APPROVE";
+      operatorChatState = {
+        ...operatorChatState,
+        ...draft,
+        status: "running",
+        message: `Submitting ${decision} for checkpoint ${checkpointId} on session ${sessionId}...`
+      };
+      await refresh();
+      try {
+        const result = await api.submitRuntimeSessionApprovalDecision(sessionId, checkpointId, decision, {
+          meta: {
+            tenantId: scope.tenantId,
+            projectId: scope.projectId,
+            requestId: `chat-approval-${Date.now()}`
+          },
+          reason
+        });
+        const refreshed = await refreshOperatorChatThreadSession(api, operatorChatState.thread, sessionId, {
+          tailCount: 8,
+          waitSeconds: 1
+        });
+        const nextThread = refreshed?.thread || operatorChatState.thread;
+        const derived = deriveOperatorChatThreadState(nextThread);
+        operatorChatState = {
+          ...operatorChatState,
+          ...draft,
+          status: derived.uiStatus || (result?.applied ? "success" : "warn"),
+          message: result?.applied
+            ? `Checkpoint ${checkpointId} ${decision === "DENY" ? "denied" : "approved"}. ${derived.message}`
+            : String(result?.warning || "").trim() || `Checkpoint ${checkpointId} was not changed.`,
+          thread: nextThread
+        };
+        await refreshOperatorChatHistory(session);
+      } catch (error) {
+        operatorChatState = {
+          ...operatorChatState,
+          ...draft,
+          status: "error",
+          message: `Approval decision failed: ${error.message}`
+        };
+      }
+      await refresh();
+    }
+  });
   ui.settingsContent?.addEventListener("input", (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) {
@@ -4011,7 +5181,8 @@ async function main() {
         message: validation.valid
           ? "Agent test draft changed. Run Invoke Selected Agent to exercise the live runtime integration path."
           : validation.errors.join(" "),
-        response: validation.valid ? agentInvokeState.response : null
+        response: null,
+        sessionView: null
       };
       return;
     }
@@ -4173,6 +5344,31 @@ async function main() {
       const action = String(agentTestActionNode.dataset.settingsAgentTestAction || "")
         .trim()
         .toLowerCase();
+      if (action === "refresh-session") {
+        const sessionId = String(
+          agentInvokeState?.sessionView?.sessionId || agentInvokeState?.response?.sessionId || ""
+        ).trim();
+        if (!sessionId) {
+          return;
+        }
+        agentInvokeState = {
+          ...agentInvokeState,
+          sessionView: {
+            ...(agentInvokeState.sessionView || {}),
+            sessionId,
+            source: "refreshing",
+            status: "loading",
+            message: `Refreshing native session ${sessionId}...`
+          }
+        };
+        await refresh();
+        agentInvokeState = {
+          ...agentInvokeState,
+          sessionView: await hydrateAgentInvokeSessionView(sessionId)
+        };
+        await refresh();
+        return;
+      }
       if (action !== "invoke") {
         return;
       }
@@ -4185,7 +5381,8 @@ async function main() {
           ...draft,
           status: "invalid",
           message: validation.errors.join(" "),
-          response: null
+          response: null,
+          sessionView: null
         };
         await refresh();
         return;
@@ -4200,7 +5397,8 @@ async function main() {
           ...draft,
           status: "invalid",
           message: "Tenant and project scope are required before invoking a configured agent profile.",
-          response: null
+          response: null,
+          sessionView: null
         };
         await refresh();
         return;
@@ -4211,7 +5409,8 @@ async function main() {
         ...draft,
         status: "running",
         message: `Invoking ${draft.agentProfileId} through the runtime integration path...`,
-        response: null
+        response: null,
+        sessionView: null
       };
       await refresh();
 
@@ -4227,6 +5426,9 @@ async function main() {
           systemPrompt: draft.systemPrompt,
           maxOutputTokens: draft.maxOutputTokens
         });
+        const sessionView = result?.applied && result?.sessionId
+          ? await hydrateAgentInvokeSessionView(result.sessionId)
+          : null;
         agentInvokeState = {
           ...agentInvokeState,
           ...draft,
@@ -4240,7 +5442,8 @@ async function main() {
             result?.applied && result?.source === "runtime-endpoint"
               ? `Invocation completed via ${String(result.route || "runtime").trim() || "runtime"} route.`
               : String(result?.warning || "").trim() || "Invocation did not complete.",
-          response: result || null
+          response: result || null,
+          sessionView
         };
       } catch (error) {
         agentInvokeState = {
@@ -4248,7 +5451,8 @@ async function main() {
           ...draft,
           status: "error",
           message: `Invocation failed: ${error.message}`,
-          response: null
+          response: null,
+          sessionView: null
         };
       }
       await refresh();

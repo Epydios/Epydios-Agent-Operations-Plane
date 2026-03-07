@@ -157,10 +157,11 @@ type IntegrationSettingsResponse struct {
 type ApprovalStatus string
 
 const (
-	ApprovalStatusPending  ApprovalStatus = "PENDING"
-	ApprovalStatusApproved ApprovalStatus = "APPROVED"
-	ApprovalStatusDenied   ApprovalStatus = "DENIED"
-	ApprovalStatusExpired  ApprovalStatus = "EXPIRED"
+	ApprovalStatusPending   ApprovalStatus = "PENDING"
+	ApprovalStatusApproved  ApprovalStatus = "APPROVED"
+	ApprovalStatusDenied    ApprovalStatus = "DENIED"
+	ApprovalStatusExpired   ApprovalStatus = "EXPIRED"
+	ApprovalStatusCancelled ApprovalStatus = "CANCELLED"
 )
 
 type ApprovalRecord struct {

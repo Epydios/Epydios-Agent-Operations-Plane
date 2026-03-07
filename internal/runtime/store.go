@@ -17,6 +17,22 @@ type RunStore interface {
 	PruneRuns(context.Context, RunPruneQuery) (*RunPruneResult, error)
 	UpsertIntegrationSettings(context.Context, *IntegrationSettingsRecord) error
 	GetIntegrationSettings(context.Context, string, string) (*IntegrationSettingsRecord, error)
+	UpsertTask(context.Context, *TaskRecord) error
+	GetTask(context.Context, string) (*TaskRecord, error)
+	ListTasks(context.Context, TaskListQuery) ([]TaskRecord, error)
+	UpsertSession(context.Context, *SessionRecord) error
+	GetSession(context.Context, string) (*SessionRecord, error)
+	ListSessions(context.Context, SessionListQuery) ([]SessionRecord, error)
+	UpsertSessionWorker(context.Context, *SessionWorkerRecord) error
+	ListSessionWorkers(context.Context, SessionWorkerListQuery) ([]SessionWorkerRecord, error)
+	UpsertToolAction(context.Context, *ToolActionRecord) error
+	ListToolActions(context.Context, ToolActionListQuery) ([]ToolActionRecord, error)
+	AppendSessionEvent(context.Context, *SessionEventRecord) error
+	ListSessionEvents(context.Context, SessionEventListQuery) ([]SessionEventRecord, error)
+	UpsertApprovalCheckpoint(context.Context, *ApprovalCheckpointRecord) error
+	ListApprovalCheckpoints(context.Context, ApprovalCheckpointListQuery) ([]ApprovalCheckpointRecord, error)
+	UpsertEvidenceRecord(context.Context, *EvidenceRecord) error
+	ListEvidenceRecords(context.Context, EvidenceRecordListQuery) ([]EvidenceRecord, error)
 }
 
 type PostgresRunStore struct {
@@ -91,6 +107,7 @@ func (s *PostgresRunStore) EnsureSchema(ctx context.Context) error {
 		`ALTER TABLE orchestration_integration_settings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`,
 		`CREATE INDEX IF NOT EXISTS idx_orchestration_integration_settings_updated_at ON orchestration_integration_settings (updated_at DESC)`,
 	}
+	stmts = append(stmts, m16SchemaStatements()...)
 
 	for _, stmt := range stmts {
 		if _, err := s.db.ExecContext(ctx, stmt); err != nil {

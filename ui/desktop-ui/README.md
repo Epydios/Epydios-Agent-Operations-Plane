@@ -261,6 +261,26 @@ Notes:
   - `bedrock`
 - A non-repo template for the ref-values JSON is kept under `EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/integration-invoke/`.
 
+## Managed Codex Worker Testing
+
+- `Execution Path = Raw Model Invoke` keeps the request on the provider API path.
+- `Execution Path = Managed Codex Worker` uses the native M16 session or worker contract and managed worker review surfaces in `Chat`.
+- For the real Codex CLI bridge instead of the legacy provider-route-backed bridge, start the runtime with:
+  - `RUNTIME_MANAGED_CODEX_MODE=process`
+  - `RUNTIME_CODEX_CLI_PATH=/Applications/Codex.app/Contents/Resources/codex`
+  - `RUNTIME_CODEX_WORKDIR=/absolute/path/to/workdir`
+  - `RUNTIME_CODEX_SANDBOX_MODE=workspace-write`
+  - `RUNTIME_CODEX_EXEC_TIMEOUT=45s`
+- Minimal operator path:
+  1. Start the runtime in `live` mode with the Codex process env vars above.
+  2. Run the desktop UI in `live` mode.
+  3. Open `Chat`.
+  4. Set `Execution Path` to `Managed Codex Worker`.
+  5. Start a thread and submit a turn.
+  6. Review structured tool proposals in chat.
+  7. Approve or deny proposals directly in chat.
+  8. Review resulting tool-action status changes (`AUTHORIZED`, `STARTED`, `COMPLETED`, or `FAILED`) plus evidence and worker progress in the same thread.
+
 ## macOS Program Path
 
 - Bootstrap checks:
