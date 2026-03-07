@@ -99,6 +99,11 @@ func (s *APIServer) Routes() http.Handler {
 	mux.HandleFunc("/v1alpha1/runtime/terminal/sessions", s.handleTerminalSessions)
 	mux.HandleFunc("/v1alpha1/runtime/integrations/settings", s.handleIntegrationSettings)
 	mux.HandleFunc("/v1alpha1/runtime/integrations/invoke", s.handleIntegrationInvoke)
+	mux.HandleFunc("/v1alpha2/runtime/tasks", s.handleTasksV1Alpha2)
+	mux.HandleFunc("/v1alpha2/runtime/tasks/", s.handleTaskByIDV1Alpha2)
+	mux.HandleFunc("/v1alpha2/runtime/sessions", s.handleSessionsV1Alpha2)
+	mux.HandleFunc("/v1alpha2/runtime/sessions/", s.handleSessionByIDV1Alpha2)
+	mux.HandleFunc("/v1alpha2/runtime/approvals/", s.handleApprovalCheckpointByIDV1Alpha2)
 	return loggingMiddleware(mux)
 }
 
@@ -226,7 +231,7 @@ func (s *APIServer) handleListRuns(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, http.StatusBadRequest, "INVALID_QUERY", err.Error(), false, nil)
 		return
 	}
-	items, err := s.store.ListRuns(r.Context(), query)
+	items, err := s.listRunSummariesWithSessionProjection(r.Context(), query)
 	if err != nil {
 		writeAPIError(w, http.StatusInternalServerError, "STORE_QUERY_FAILED", "failed to list runs", true, map[string]interface{}{"error": err.Error()})
 		return
@@ -289,7 +294,7 @@ func (s *APIServer) handleRunExport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	items, err := s.store.ListRuns(r.Context(), query)
+	items, err := s.listRunSummariesWithSessionProjection(r.Context(), query)
 	if err != nil {
 		writeAPIError(w, http.StatusInternalServerError, "STORE_QUERY_FAILED", "failed to list runs for export", true, map[string]interface{}{"error": err.Error()})
 		return
@@ -458,7 +463,7 @@ func (s *APIServer) handleRunByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	run, err := s.store.GetRun(r.Context(), runID)
+	run, err := s.getRunRecordWithSessionProjection(r.Context(), runID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			writeAPIError(w, http.StatusNotFound, "RUN_NOT_FOUND", "run not found", false, map[string]interface{}{"runId": runID})
@@ -741,6 +746,23 @@ func (s *APIServer) handleApprovalDecisionByRunID(w http.ResponseWriter, r *http
 		writeAPIError(w, http.StatusInternalServerError, "STORE_UPDATE_FAILED", "failed to persist approval decision", true, map[string]interface{}{"error": err.Error(), "runId": runID})
 		return
 	}
+	if checkpoints := projectLegacyRunToApprovalCheckpoints(run); len(checkpoints) > 0 {
+		checkpoint := checkpoints[0]
+		checkpoint.UpdatedAt = now
+		s.upsertApprovalCheckpointBestEffort(r.Context(), &checkpoint)
+	}
+	s.appendSessionEventBestEffort(r.Context(), &SessionEventRecord{
+		SessionID: runID,
+		EventType: SessionEventType("approval.status.changed"),
+		Payload: mustMarshalJSON(map[string]interface{}{
+			"runId":      runID,
+			"decision":   decision,
+			"status":     targetStatus,
+			"reason":     reason,
+			"approvalId": "approval-" + runID,
+		}),
+		Timestamp: now,
+	})
 
 	emitAuditEvent(r.Context(), "runtime.approval.decision", map[string]interface{}{
 		"path":      r.URL.Path,
@@ -860,6 +882,7 @@ func (s *APIServer) handleCreateTerminalSession(w http.ResponseWriter, r *http.R
 	injectActorIdentity(&req.Meta, r.Context())
 	issuedAt := time.Now().UTC()
 	auditLink := normalizeTerminalAuditLink(req.AuditLink, runID)
+	toolActionID := fmt.Sprintf("tool-terminal-%d", issuedAt.UnixNano())
 	response := TerminalSessionCreateResponse{
 		Source:        "runtime-endpoint",
 		Applied:       false,
@@ -872,6 +895,35 @@ func (s *APIServer) handleCreateTerminalSession(w http.ResponseWriter, r *http.R
 	if reason := terminalPolicyBlockReason(&req); reason != "" {
 		response.Status = "POLICY_BLOCKED"
 		response.Warning = reason
+		s.upsertToolActionBestEffort(r.Context(), &ToolActionRecord{
+			ToolActionID:          toolActionID,
+			SessionID:             runID,
+			TenantID:              tenantID,
+			ProjectID:             projectID,
+			ToolType:              "terminal_command",
+			Status:                ToolActionStatusPolicyBlocked,
+			Source:                "v1alpha1.runtime.terminal",
+			RequestPayload:        mustMarshalJSON(map[string]interface{}{"command": req.Command.Text, "cwd": req.Command.CWD, "timeoutSeconds": req.Command.TimeoutSeconds}),
+			ResultPayload:         mustMarshalJSON(map[string]interface{}{"reason": reason}),
+			PolicyDecision:        "DENY",
+			AuditLink:             mustMarshalJSON(auditLink),
+			ReadOnly:              req.Command.ReadOnlyRequested,
+			RestrictedHostRequest: req.Safety.RestrictedHostRequest,
+			CreatedAt:             issuedAt,
+			UpdatedAt:             issuedAt,
+		})
+		s.appendSessionEventBestEffort(r.Context(), &SessionEventRecord{
+			SessionID: runID,
+			EventType: SessionEventType("tool_action.blocked"),
+			Payload: mustMarshalJSON(map[string]interface{}{
+				"toolActionId":  toolActionID,
+				"toolType":      "terminal_command",
+				"command":       req.Command.Text,
+				"provenanceTag": response.ProvenanceTag,
+				"reason":        reason,
+			}),
+			Timestamp: issuedAt,
+		})
 		emitAuditEvent(r.Context(), auditLink.Event, map[string]interface{}{
 			"runId":         runID,
 			"tenantId":      tenantID,
@@ -891,6 +943,35 @@ func (s *APIServer) handleCreateTerminalSession(w http.ResponseWriter, r *http.R
 	if err != nil {
 		response.Status = "POLICY_BLOCKED"
 		response.Warning = err.Error()
+		s.upsertToolActionBestEffort(r.Context(), &ToolActionRecord{
+			ToolActionID:          toolActionID,
+			SessionID:             runID,
+			TenantID:              tenantID,
+			ProjectID:             projectID,
+			ToolType:              "terminal_command",
+			Status:                ToolActionStatusPolicyBlocked,
+			Source:                "v1alpha1.runtime.terminal",
+			RequestPayload:        mustMarshalJSON(map[string]interface{}{"command": req.Command.Text, "cwd": req.Command.CWD, "timeoutSeconds": req.Command.TimeoutSeconds}),
+			ResultPayload:         mustMarshalJSON(map[string]interface{}{"reason": err.Error()}),
+			PolicyDecision:        "DENY",
+			AuditLink:             mustMarshalJSON(auditLink),
+			ReadOnly:              req.Command.ReadOnlyRequested,
+			RestrictedHostRequest: req.Safety.RestrictedHostRequest,
+			CreatedAt:             issuedAt,
+			UpdatedAt:             issuedAt,
+		})
+		s.appendSessionEventBestEffort(r.Context(), &SessionEventRecord{
+			SessionID: runID,
+			EventType: SessionEventType("tool_action.blocked"),
+			Payload: mustMarshalJSON(map[string]interface{}{
+				"toolActionId":  toolActionID,
+				"toolType":      "terminal_command",
+				"command":       req.Command.Text,
+				"provenanceTag": response.ProvenanceTag,
+				"reason":        err.Error(),
+			}),
+			Timestamp: issuedAt,
+		})
 		emitAuditEvent(r.Context(), auditLink.Event, map[string]interface{}{
 			"runId":         runID,
 			"tenantId":      tenantID,
@@ -916,6 +997,70 @@ func (s *APIServer) handleCreateTerminalSession(w http.ResponseWriter, r *http.R
 	} else {
 		response.Status = "COMPLETED"
 	}
+	eventType := SessionEventType("tool_action.completed")
+	toolActionStatus := ToolActionStatusCompleted
+	if execErr != nil {
+		eventType = SessionEventType("tool_action.failed")
+		toolActionStatus = ToolActionStatusFailed
+	}
+	s.upsertToolActionBestEffort(r.Context(), &ToolActionRecord{
+		ToolActionID:          toolActionID,
+		SessionID:             runID,
+		TenantID:              tenantID,
+		ProjectID:             projectID,
+		ToolType:              "terminal_command",
+		Status:                toolActionStatus,
+		Source:                "v1alpha1.runtime.terminal",
+		RequestPayload:        mustMarshalJSON(map[string]interface{}{"command": commandName, "commandArgs": commandArgs, "cwd": req.Command.CWD, "timeoutSeconds": req.Command.TimeoutSeconds}),
+		ResultPayload:         mustMarshalJSON(map[string]interface{}{"status": response.Status, "exitCode": execResult.ExitCode, "timedOut": execResult.TimedOut, "outputSha256": execResult.OutputSHA256, "error": response.Warning}),
+		PolicyDecision:        "ALLOW",
+		AuditLink:             mustMarshalJSON(auditLink),
+		ReadOnly:              req.Command.ReadOnlyRequested,
+		RestrictedHostRequest: req.Safety.RestrictedHostRequest,
+		CreatedAt:             issuedAt,
+		UpdatedAt:             time.Now().UTC(),
+	})
+	evidenceID := fmt.Sprintf("%s-evidence", toolActionID)
+	s.upsertEvidenceRecordBestEffort(r.Context(), &EvidenceRecord{
+		EvidenceID:   evidenceID,
+		SessionID:    runID,
+		ToolActionID: toolActionID,
+		TenantID:     tenantID,
+		ProjectID:    projectID,
+		Kind:         "tool_output",
+		Checksum:     execResult.OutputSHA256,
+		Metadata:     mustMarshalJSON(map[string]interface{}{"status": response.Status, "exitCode": execResult.ExitCode, "timedOut": execResult.TimedOut, "outputTruncated": execResult.Truncated, "auditEvent": auditLink.Event}),
+		CreatedAt:    time.Now().UTC(),
+		UpdatedAt:    time.Now().UTC(),
+	})
+	s.appendSessionEventBestEffort(r.Context(), &SessionEventRecord{
+		SessionID: runID,
+		EventType: SessionEventType("evidence.recorded"),
+		Payload: mustMarshalJSON(map[string]interface{}{
+			"evidenceId":   evidenceID,
+			"toolActionId": toolActionID,
+			"kind":         "tool_output",
+			"checksum":     execResult.OutputSHA256,
+		}),
+		Timestamp: time.Now().UTC(),
+	})
+	s.appendSessionEventBestEffort(r.Context(), &SessionEventRecord{
+		SessionID: runID,
+		EventType: eventType,
+		Payload: mustMarshalJSON(map[string]interface{}{
+			"toolActionId":      toolActionID,
+			"toolType":          "terminal_command",
+			"terminalSessionId": response.SessionID,
+			"command":           commandName,
+			"commandArgs":       commandArgs,
+			"provenanceTag":     response.ProvenanceTag,
+			"status":            response.Status,
+			"exitCode":          execResult.ExitCode,
+			"timedOut":          execResult.TimedOut,
+			"outputSha256":      execResult.OutputSHA256,
+		}),
+		Timestamp: time.Now().UTC(),
+	})
 
 	emitAuditEvent(r.Context(), auditLink.Event, map[string]interface{}{
 		"runId":           runID,
@@ -985,6 +1130,18 @@ func (s *APIServer) handlePostIntegrationInvoke(w http.ResponseWriter, r *http.R
 		writeAPIError(w, http.StatusBadRequest, "INVALID_JSON", "invalid JSON body", false, map[string]interface{}{"error": err.Error()})
 		return
 	}
+	req.ExecutionMode = normalizedAgentInvokeExecutionMode(req.ExecutionMode)
+	if req.ExecutionMode == AgentInvokeExecutionModeManagedCodexWorker && strings.TrimSpace(strings.ToLower(req.AgentProfileID)) != "codex" {
+		writeAPIError(
+			w,
+			http.StatusBadRequest,
+			"INVALID_EXECUTION_MODE",
+			"managed_codex_worker requires agentProfileId=codex",
+			false,
+			map[string]interface{}{"agentProfileId": req.AgentProfileID, "executionMode": req.ExecutionMode},
+		)
+		return
+	}
 
 	identity, _ := RuntimeIdentityFromContext(r.Context())
 	if err := enforceRequestMetaScope(&req.Meta, identity); err != nil {
@@ -1012,6 +1169,64 @@ func (s *APIServer) handlePostIntegrationInvoke(w http.ResponseWriter, r *http.R
 		return
 	}
 	injectActorIdentity(&req.Meta, r.Context())
+	invokeStartedAt := time.Now().UTC()
+	invokeDescriptor := invokeExecutionDescriptorForRequest(&req)
+	toolActionID := fmt.Sprintf("%s-tool-%s", "invoke-"+sanitizeIDFragment(normalizeRequestID(req.Meta.RequestID, "invoke", invokeStartedAt)), sanitizeIDFragment(invokeDescriptor.toolActionType))
+	task, session, err := s.ensureInvokeSession(r.Context(), &req, invokeStartedAt)
+	if err != nil {
+		writeAPIError(
+			w,
+			http.StatusInternalServerError,
+			"STORE_UPDATE_FAILED",
+			"failed to initialize invoke session",
+			true,
+			map[string]interface{}{"error": err.Error()},
+		)
+		return
+	}
+	worker, err := s.ensureInvokeWorker(r.Context(), session, &req, invokeStartedAt)
+	if err != nil {
+		writeAPIError(
+			w,
+			http.StatusInternalServerError,
+			"STORE_UPDATE_FAILED",
+			"failed to initialize invoke worker",
+			true,
+			map[string]interface{}{"error": err.Error(), "sessionId": session.SessionID},
+		)
+		return
+	}
+	s.appendSessionEventBestEffort(r.Context(), &SessionEventRecord{
+		SessionID: session.SessionID,
+		EventType: SessionEventType("tool_action.requested"),
+		Payload: mustMarshalJSON(map[string]interface{}{
+			"toolActionId":   toolActionID,
+			"toolType":       invokeDescriptor.toolActionType,
+			"requestId":      req.Meta.RequestID,
+			"agentProfileId": strings.TrimSpace(req.AgentProfileID),
+			"promptPreview":  truncatePromptPreview(req.Prompt),
+			"executionMode":  invokeDescriptor.executionMode,
+		}),
+		Timestamp: invokeStartedAt,
+	})
+	s.upsertToolActionBestEffort(r.Context(), &ToolActionRecord{
+		ToolActionID: toolActionID,
+		SessionID:    session.SessionID,
+		TenantID:     session.TenantID,
+		ProjectID:    session.ProjectID,
+		ToolType:     invokeDescriptor.toolActionType,
+		Status:       ToolActionStatusRequested,
+		Source:       invokeDescriptor.toolActionSource,
+		RequestPayload: mustMarshalJSON(map[string]interface{}{
+			"requestId":       req.Meta.RequestID,
+			"agentProfileId":  strings.TrimSpace(req.AgentProfileID),
+			"promptPreview":   truncatePromptPreview(req.Prompt),
+			"maxOutputTokens": req.MaxOutputTokens,
+			"executionMode":   invokeDescriptor.executionMode,
+		}),
+		CreatedAt: invokeStartedAt,
+		UpdatedAt: invokeStartedAt,
+	})
 	emitAuditEvent(r.Context(), "runtime.authz.policy.allow", map[string]interface{}{
 		"path":       r.URL.Path,
 		"method":     r.Method,
@@ -1030,6 +1245,33 @@ func (s *APIServer) handlePostIntegrationInvoke(w http.ResponseWriter, r *http.R
 	})
 	response, err := s.agentInvoker.Invoke(r.Context(), req)
 	if err != nil {
+		s.markInvokeSessionResult(r.Context(), task, session, &AgentInvokeResponse{
+			RequestID: req.Meta.RequestID,
+			TaskID:    task.TaskID,
+			SessionID: session.SessionID,
+			SelectedWorkerID: func() string {
+				if worker == nil {
+					return session.SelectedWorkerID
+				}
+				return worker.WorkerID
+			}(),
+			TenantID:       req.Meta.TenantID,
+			ProjectID:      req.Meta.ProjectID,
+			AgentProfileID: strings.TrimSpace(req.AgentProfileID),
+			ExecutionMode:  req.ExecutionMode,
+			WorkerType: func() string {
+				if worker == nil {
+					return ""
+				}
+				return worker.WorkerType
+			}(),
+			WorkerAdapterID: func() string {
+				if worker == nil {
+					return ""
+				}
+				return worker.AdapterID
+			}(),
+		}, err, time.Now().UTC())
 		emitAuditEvent(r.Context(), "runtime.integrations.invoke.failed", map[string]interface{}{
 			"path":           r.URL.Path,
 			"method":         r.Method,
@@ -1049,6 +1291,13 @@ func (s *APIServer) handlePostIntegrationInvoke(w http.ResponseWriter, r *http.R
 		)
 		return
 	}
+	response.TaskID = task.TaskID
+	response.SessionID = session.SessionID
+	response.SelectedWorkerID = worker.WorkerID
+	response.ExecutionMode = req.ExecutionMode
+	response.WorkerType = worker.WorkerType
+	response.WorkerAdapterID = worker.AdapterID
+	s.markInvokeSessionResult(r.Context(), task, session, response, nil, time.Now().UTC())
 
 	emitAuditEvent(r.Context(), "runtime.integrations.invoke.completed", map[string]interface{}{
 		"path":           r.URL.Path,
@@ -1064,6 +1313,14 @@ func (s *APIServer) handlePostIntegrationInvoke(w http.ResponseWriter, r *http.R
 		"finishReason":   response.FinishReason,
 	})
 	writeJSON(w, http.StatusOK, response)
+}
+
+func truncatePromptPreview(value string) string {
+	value = strings.TrimSpace(value)
+	if len(value) <= 160 {
+		return value
+	}
+	return value[:160] + "..."
 }
 
 func (s *APIServer) handleGetIntegrationSettings(w http.ResponseWriter, r *http.Request) {

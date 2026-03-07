@@ -25,44 +25,60 @@ import (
 
 type AgentInvokeRequest struct {
 	Meta            ObjectMeta `json:"meta"`
+	TaskID          string     `json:"taskId,omitempty"`
 	AgentProfileID  string     `json:"agentProfileId,omitempty"`
+	ExecutionMode   string     `json:"executionMode,omitempty"`
 	Prompt          string     `json:"prompt"`
 	SystemPrompt    string     `json:"systemPrompt,omitempty"`
 	MaxOutputTokens int        `json:"maxOutputTokens,omitempty"`
 }
 
 type AgentInvokeResponse struct {
-	Source          string          `json:"source,omitempty"`
-	Applied         bool            `json:"applied"`
-	RequestID       string          `json:"requestId,omitempty"`
-	TenantID        string          `json:"tenantId,omitempty"`
-	ProjectID       string          `json:"projectId,omitempty"`
-	AgentProfileID  string          `json:"agentProfileId,omitempty"`
-	Provider        string          `json:"provider,omitempty"`
-	Transport       string          `json:"transport,omitempty"`
-	Model           string          `json:"model,omitempty"`
-	Route           string          `json:"route,omitempty"`
-	EndpointRef     string          `json:"endpointRef,omitempty"`
-	CredentialRef   string          `json:"credentialRef,omitempty"`
-	StartedAt       string          `json:"startedAt,omitempty"`
-	CompletedAt     string          `json:"completedAt,omitempty"`
-	OutputText      string          `json:"outputText,omitempty"`
-	FinishReason    string          `json:"finishReason,omitempty"`
-	Warning         string          `json:"warning,omitempty"`
-	Usage           JSONObject      `json:"usage,omitempty"`
-	RawResponse     json.RawMessage `json:"rawResponse,omitempty"`
+	Source             string          `json:"source,omitempty"`
+	Applied            bool            `json:"applied"`
+	RequestID          string          `json:"requestId,omitempty"`
+	TaskID             string          `json:"taskId,omitempty"`
+	SessionID          string          `json:"sessionId,omitempty"`
+	SelectedWorkerID   string          `json:"selectedWorkerId,omitempty"`
+	TenantID           string          `json:"tenantId,omitempty"`
+	ProjectID          string          `json:"projectId,omitempty"`
+	AgentProfileID     string          `json:"agentProfileId,omitempty"`
+	ExecutionMode      string          `json:"executionMode,omitempty"`
+	WorkerType         string          `json:"workerType,omitempty"`
+	WorkerAdapterID    string          `json:"workerAdapterId,omitempty"`
+	Provider           string          `json:"provider,omitempty"`
+	Transport          string          `json:"transport,omitempty"`
+	Model              string          `json:"model,omitempty"`
+	Route              string          `json:"route,omitempty"`
+	EndpointRef        string          `json:"endpointRef,omitempty"`
+	CredentialRef      string          `json:"credentialRef,omitempty"`
+	StartedAt          string          `json:"startedAt,omitempty"`
+	CompletedAt        string          `json:"completedAt,omitempty"`
+	OutputText         string          `json:"outputText,omitempty"`
+	FinishReason       string          `json:"finishReason,omitempty"`
+	Warning            string          `json:"warning,omitempty"`
+	Usage              JSONObject      `json:"usage,omitempty"`
+	WorkerOutputChunks []string        `json:"workerOutputChunks,omitempty"`
+	ToolProposals      []JSONObject    `json:"toolProposals,omitempty"`
+	RawResponse        json.RawMessage `json:"rawResponse,omitempty"`
 }
 
 type AgentInvokerConfig struct {
-	RefValuesPath string
-	RefValuesJSON string
-	HTTPTimeout   time.Duration
+	RefValuesPath    string
+	RefValuesJSON    string
+	HTTPTimeout      time.Duration
+	ManagedCodexMode string
+	CodexCLIPath     string
+	CodexWorkdir     string
+	CodexSandboxMode string
+	CodexExecTimeout time.Duration
 }
 
 type AgentInvoker struct {
 	store      RunStore
 	resolver   *runtimeRefResolver
 	httpClient *http.Client
+	managed    map[string]managedWorkerAdapter
 	now        func() time.Time
 }
 
@@ -76,23 +92,25 @@ type runtimeRefResolver struct {
 }
 
 type invokeRoute struct {
-	name           string
-	profile        agentProfileConfig
-	endpoint       string
-	endpointRef    string
-	credentialRef  string
-	authMode       string
-	authValue      string
-	mtlsCertPEM    []byte
-	mtlsKeyPEM     []byte
-	bedrockAuth    *bedrockCredentialBundle
+	name          string
+	profile       agentProfileConfig
+	endpoint      string
+	endpointRef   string
+	credentialRef string
+	authMode      string
+	authValue     string
+	mtlsCertPEM   []byte
+	mtlsKeyPEM    []byte
+	bedrockAuth   *bedrockCredentialBundle
 }
 
 type invokeResult struct {
-	outputText    string
-	finishReason  string
-	usage         JSONObject
-	rawResponse   json.RawMessage
+	outputText         string
+	finishReason       string
+	usage              JSONObject
+	workerOutputChunks []string
+	toolProposals      []JSONObject
+	rawResponse        json.RawMessage
 }
 
 type bedrockCredentialBundle struct {
@@ -103,11 +121,27 @@ type bedrockCredentialBundle struct {
 	SessionToken    string `json:"sessionToken,omitempty"`
 }
 
+const (
+	AgentInvokeExecutionModeRawModelInvoke     = "raw_model_invoke"
+	AgentInvokeExecutionModeManagedCodexWorker = "managed_codex_worker"
+)
+
 func DefaultAgentInvokerConfigFromEnv() AgentInvokerConfig {
+	codexExecTimeout := 2 * time.Minute
+	if raw := strings.TrimSpace(os.Getenv("RUNTIME_CODEX_EXEC_TIMEOUT")); raw != "" {
+		if parsed, err := time.ParseDuration(raw); err == nil && parsed > 0 {
+			codexExecTimeout = parsed
+		}
+	}
 	return AgentInvokerConfig{
-		RefValuesPath: strings.TrimSpace(os.Getenv("RUNTIME_REF_VALUES_PATH")),
-		RefValuesJSON: strings.TrimSpace(os.Getenv("RUNTIME_REF_VALUES_JSON")),
-		HTTPTimeout:   45 * time.Second,
+		RefValuesPath:    strings.TrimSpace(os.Getenv("RUNTIME_REF_VALUES_PATH")),
+		RefValuesJSON:    strings.TrimSpace(os.Getenv("RUNTIME_REF_VALUES_JSON")),
+		HTTPTimeout:      45 * time.Second,
+		ManagedCodexMode: strings.TrimSpace(os.Getenv("RUNTIME_MANAGED_CODEX_MODE")),
+		CodexCLIPath:     strings.TrimSpace(os.Getenv("RUNTIME_CODEX_CLI_PATH")),
+		CodexWorkdir:     strings.TrimSpace(os.Getenv("RUNTIME_CODEX_WORKDIR")),
+		CodexSandboxMode: strings.TrimSpace(os.Getenv("RUNTIME_CODEX_SANDBOX_MODE")),
+		CodexExecTimeout: codexExecTimeout,
 	}
 }
 
@@ -120,7 +154,10 @@ func NewAgentInvoker(store RunStore, cfg AgentInvokerConfig) *AgentInvoker {
 		store:      store,
 		resolver:   &runtimeRefResolver{path: strings.TrimSpace(cfg.RefValuesPath), inlineJSON: strings.TrimSpace(cfg.RefValuesJSON)},
 		httpClient: &http.Client{Timeout: timeout},
-		now:        time.Now,
+		managed: map[string]managedWorkerAdapter{
+			"codex": newCodexManagedWorkerAdapter(cfg),
+		},
+		now: time.Now,
 	}
 }
 
@@ -146,6 +183,40 @@ func (i *AgentInvoker) Invoke(ctx context.Context, req AgentInvokeRequest) (*Age
 	if !profile.Enabled {
 		return nil, fmt.Errorf("agent profile %q is disabled", profile.ID)
 	}
+	if req.ExecutionMode == AgentInvokeExecutionModeManagedCodexWorker {
+		adapterID := strings.ToLower(normalizeStringOrDefault(profile.ID, req.AgentProfileID))
+		if adapter := i.managed[adapterID]; adapter != nil && !adapter.UsesProviderRoutes() {
+			startedAt := i.now().UTC()
+			managedTurn, err := adapter.RunTurn(ctx, req, profile, nil)
+			if err != nil {
+				return nil, err
+			}
+			result := applyManagedWorkerTurnResult(nil, managedTurn)
+			return &AgentInvokeResponse{
+				Source:             "runtime-endpoint",
+				Applied:            true,
+				RequestID:          strings.TrimSpace(req.Meta.RequestID),
+				TenantID:           strings.TrimSpace(req.Meta.TenantID),
+				ProjectID:          strings.TrimSpace(req.Meta.ProjectID),
+				AgentProfileID:     profile.ID,
+				ExecutionMode:      req.ExecutionMode,
+				WorkerType:         "managed_agent",
+				WorkerAdapterID:    adapter.AdapterID(),
+				Provider:           profile.Provider,
+				Transport:          profile.Transport,
+				Model:              profile.Model,
+				Route:              "managed_worker_process",
+				StartedAt:          startedAt.Format(time.RFC3339),
+				CompletedAt:        i.now().UTC().Format(time.RFC3339),
+				OutputText:         result.outputText,
+				FinishReason:       result.finishReason,
+				Usage:              result.usage,
+				WorkerOutputChunks: append([]string(nil), result.workerOutputChunks...),
+				ToolProposals:      append([]JSONObject(nil), result.toolProposals...),
+				RawResponse:        result.rawResponse,
+			}, nil
+		}
+	}
 
 	routes, err := i.buildRoutes(ctx, settings, profile, req.Meta.TenantID, req.Meta.ProjectID)
 	if err != nil {
@@ -167,30 +238,83 @@ func (i *AgentInvoker) Invoke(ctx context.Context, req AgentInvokeRequest) (*Age
 		if idx > 0 && len(routeErrors) > 0 {
 			warning = fmt.Sprintf("Invocation succeeded on %s route after fallback. Prior failures: %s", route.name, strings.Join(routeErrors, "; "))
 		}
+		if req.ExecutionMode == AgentInvokeExecutionModeManagedCodexWorker {
+			managedResult, err := i.runManagedWorkerTurn(ctx, req, profile, result)
+			if err != nil {
+				routeErrors = append(routeErrors, fmt.Sprintf("%s adapter enrich: %v", route.name, err))
+				continue
+			}
+			result = applyManagedWorkerTurnResult(result, managedResult)
+		}
 		return &AgentInvokeResponse{
-			Source:         "runtime-endpoint",
-			Applied:        true,
-			RequestID:      strings.TrimSpace(req.Meta.RequestID),
-			TenantID:       strings.TrimSpace(req.Meta.TenantID),
-			ProjectID:      strings.TrimSpace(req.Meta.ProjectID),
-			AgentProfileID: profile.ID,
-			Provider:       profile.Provider,
-			Transport:      profile.Transport,
-			Model:          profile.Model,
-			Route:          route.name,
-			EndpointRef:    route.endpointRef,
-			CredentialRef:  route.credentialRef,
-			StartedAt:      startedAt.Format(time.RFC3339),
-			CompletedAt:    i.now().UTC().Format(time.RFC3339),
-			OutputText:     result.outputText,
-			FinishReason:   result.finishReason,
-			Warning:        warning,
-			Usage:          result.usage,
-			RawResponse:    result.rawResponse,
+			Source:             "runtime-endpoint",
+			Applied:            true,
+			RequestID:          strings.TrimSpace(req.Meta.RequestID),
+			TenantID:           strings.TrimSpace(req.Meta.TenantID),
+			ProjectID:          strings.TrimSpace(req.Meta.ProjectID),
+			AgentProfileID:     profile.ID,
+			Provider:           profile.Provider,
+			Transport:          profile.Transport,
+			Model:              profile.Model,
+			Route:              route.name,
+			EndpointRef:        route.endpointRef,
+			CredentialRef:      route.credentialRef,
+			StartedAt:          startedAt.Format(time.RFC3339),
+			CompletedAt:        i.now().UTC().Format(time.RFC3339),
+			OutputText:         result.outputText,
+			FinishReason:       result.finishReason,
+			Warning:            warning,
+			Usage:              result.usage,
+			WorkerOutputChunks: append([]string(nil), result.workerOutputChunks...),
+			ToolProposals:      append([]JSONObject(nil), result.toolProposals...),
+			RawResponse:        result.rawResponse,
 		}, nil
 	}
 
 	return nil, fmt.Errorf("invoke agent profile %q failed: %s", profile.ID, strings.Join(routeErrors, "; "))
+}
+
+func (i *AgentInvoker) runManagedWorkerTurn(ctx context.Context, req AgentInvokeRequest, profile agentProfileConfig, result *invokeResult) (*managedWorkerTurnResult, error) {
+	if i == nil {
+		return nil, fmt.Errorf("agent invoker is not configured")
+	}
+	adapterID := strings.TrimSpace(profile.ID)
+	if adapterID == "" {
+		adapterID = strings.TrimSpace(req.AgentProfileID)
+	}
+	adapter, ok := i.managed[strings.ToLower(adapterID)]
+	if !ok || adapter == nil {
+		return nil, fmt.Errorf("managed worker adapter %q is not configured", adapterID)
+	}
+	enriched, err := adapter.RunTurn(ctx, req, profile, result)
+	if err != nil {
+		return nil, err
+	}
+	return enriched, nil
+}
+
+func applyManagedWorkerTurnResult(base *invokeResult, managed *managedWorkerTurnResult) *invokeResult {
+	if managed == nil {
+		return base
+	}
+	if base == nil {
+		base = &invokeResult{}
+	}
+	if strings.TrimSpace(managed.outputText) != "" {
+		base.outputText = managed.outputText
+	}
+	if strings.TrimSpace(managed.finishReason) != "" {
+		base.finishReason = managed.finishReason
+	}
+	if len(managed.usage) > 0 {
+		base.usage = managed.usage
+	}
+	if len(managed.rawResponse) > 0 {
+		base.rawResponse = managed.rawResponse
+	}
+	base.workerOutputChunks = append([]string(nil), managed.workerOutputChunks...)
+	base.toolProposals = append([]JSONObject(nil), managed.toolProposals...)
+	return base
 }
 
 func (i *AgentInvoker) loadAgentIntegrationSettings(ctx context.Context, tenantID, projectID string) (agentIntegrationSettings, error) {

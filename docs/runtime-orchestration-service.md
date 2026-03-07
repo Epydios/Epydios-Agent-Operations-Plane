@@ -39,6 +39,7 @@ This service moves policy/evidence/profile execution flow out of ad-hoc scripts 
 - `GET /v1alpha1/runtime/integrations/settings?tenantId=...&projectId=...` (project-scoped integration settings read)
 - `PUT /v1alpha1/runtime/integrations/settings` (`meta.tenantId`, `meta.projectId`, `settings` JSON object)
 - `POST /v1alpha1/runtime/integrations/invoke` (`meta.tenantId`, `meta.projectId`, optional `agentProfileId`, `prompt`, optional `systemPrompt`, optional `maxOutputTokens`)
+- `POST /v1alpha2/runtime/sessions/{sessionId}/tool-proposals/{proposalId}/decision` (`meta.tenantId`, `meta.projectId`, `decision=APPROVE|DENY`, optional `reason`)
 
 ## Integration Settings Contract (M14.9)
 
@@ -96,10 +97,48 @@ This service moves policy/evidence/profile execution flow out of ad-hoc scripts 
   - `finishReason`
   - `usage`
   - `rawResponse`
+- Invoke request also supports:
+  - `executionMode=raw_model_invoke|managed_codex_worker`
+- Managed-worker response includes:
+  - `sessionId`
+  - `taskId`
+  - `selectedWorkerId`
+  - `executionMode`
+  - `workerType`
+  - `workerAdapterId`
 - Invoke actions emit runtime audit events:
   - `runtime.integrations.invoke.started`
   - `runtime.integrations.invoke.failed`
   - `runtime.integrations.invoke.completed`
+
+## Managed Codex Worker Bridge (M18)
+
+- `executionMode=managed_codex_worker` keeps raw provider invocation distinct from managed worker execution.
+- `managed_codex_worker` can now run in two modes:
+  - `legacy`: existing provider-route-backed bridge path
+  - `process`: direct local Codex CLI boundary
+- `process` mode is configured with:
+  - `RUNTIME_MANAGED_CODEX_MODE=process`
+  - `RUNTIME_CODEX_CLI_PATH=/absolute/path/to/codex`
+  - `RUNTIME_CODEX_WORKDIR=/absolute/path/to/workdir`
+  - `RUNTIME_CODEX_SANDBOX_MODE=read-only|workspace-write|danger-full-access`
+  - `RUNTIME_CODEX_EXEC_TIMEOUT=45s`
+- In `process` mode, the runtime launches:
+  - `codex exec --json --output-schema ...`
+- The runtime captures:
+  - structured operator-facing output text
+  - structured governed `tool_proposals`
+  - raw Codex JSONL transcript in `rawResponse`
+  - worker output chunks as native `worker.output.delta` events
+- Approved `terminal_command` proposals are promoted into governed tool actions and now move through:
+  - `AUTHORIZED`
+  - `STARTED`
+  - `COMPLETED` or `FAILED`
+- Proposal execution also records:
+  - `tool_action.started`
+  - `tool_action.completed` or `tool_action.failed`
+  - `worker.progress`
+  - `evidence.recorded` (`tool_output`) when command output exists
 
 ## Runtime Metrics (M12.1)
 

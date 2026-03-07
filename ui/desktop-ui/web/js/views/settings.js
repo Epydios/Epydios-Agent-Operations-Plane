@@ -118,6 +118,121 @@ function renderAimxsStatus(settings) {
   `;
 }
 
+function chipClassForNativeSessionStatus(value) {
+  const status = String(value || "").trim().toUpperCase();
+  if (status === "COMPLETED" || status === "READY") {
+    return "chip chip-ok chip-compact";
+  }
+  if (status === "RUNNING" || status === "AWAITING_APPROVAL" || status === "AWAITING_WORKER") {
+    return "chip chip-warn chip-compact";
+  }
+  if (status === "FAILED" || status === "BLOCKED" || status === "CANCELLED") {
+    return "chip chip-danger chip-compact";
+  }
+  return "chip chip-neutral chip-compact";
+}
+
+function summarizeNativeSessionEvent(item) {
+  const payload = item?.payload && typeof item.payload === "object" ? item.payload : {};
+  if (String(payload.summary || "").trim()) {
+    return String(payload.summary || "").trim();
+  }
+  if (String(payload.reason || "").trim()) {
+    return String(payload.reason || "").trim();
+  }
+  if (String(payload.status || "").trim()) {
+    return `status=${String(payload.status || "").trim()}`;
+  }
+  if (String(payload.decision || "").trim()) {
+    return `decision=${String(payload.decision || "").trim()}`;
+  }
+  if (String(payload.toolType || "").trim()) {
+    return `toolType=${String(payload.toolType || "").trim()}`;
+  }
+  if (String(payload.kind || "").trim()) {
+    return `kind=${String(payload.kind || "").trim()}`;
+  }
+  if (String(item?.eventType || "").trim()) {
+    return `event=${String(item.eventType || "").trim()}`;
+  }
+  return "-";
+}
+
+function renderNativeSessionConsumerPanel(invokeState = {}) {
+  const sessionView = invokeState?.sessionView || {};
+  const timeline = sessionView?.timeline && typeof sessionView.timeline === "object" ? sessionView.timeline : null;
+  const sessionId =
+    String(sessionView?.sessionId || invokeState?.response?.sessionId || "").trim();
+  const source = String(sessionView?.source || "not-loaded").trim();
+  const state = String(sessionView?.status || "idle").trim().toLowerCase();
+  const message = String(sessionView?.message || "").trim();
+  const sessionStatus = String(timeline?.session?.status || "-").trim().toUpperCase() || "-";
+  const selectedWorker = timeline?.selectedWorker || null;
+  const latestEventSequence = Number(timeline?.latestEventSequence || 0) || 0;
+  const streamItems = Array.isArray(sessionView?.streamItems) ? sessionView.streamItems : [];
+  const events = streamItems.length > 0 ? streamItems : Array.isArray(timeline?.events) ? timeline.events.slice(-6) : [];
+  const eventRows =
+    events.length === 0
+      ? `<tr>${tableCell("Status", "No native M16 events have been loaded yet.", ' colspan="4"')}</tr>`
+      : events
+          .map(
+            (item) => `
+              <tr>
+                ${tableCell("Sequence", escapeHTML(String(item?.sequence || "-")))}
+                ${tableCell("Type", escapeHTML(String(item?.eventType || "-")))}
+                ${tableCell("Timestamp", escapeHTML(formatTime(item?.timestamp)))}
+                ${tableCell("Summary", escapeHTML(summarizeNativeSessionEvent(item)))}
+              </tr>
+            `
+          )
+          .join("");
+  const rawTimeline = timeline ? JSON.stringify(timeline, null, 2) : "";
+
+  return `
+    <div class="metric settings-metric settings-metric-agent-session">
+      <div class="metric-title-row">
+        <div class="title">Native Session Consumer</div>
+        <span class="${chipClassForNativeSessionStatus(sessionStatus)}">${escapeHTML(sessionStatus)}</span>
+      </div>
+      <div class="meta">source=${escapeHTML(source || "-")}; sessionId=${escapeHTML(sessionId || "-")}; consumerState=${escapeHTML(state || "-")}</div>
+      <div class="meta">This panel reads M16 session state directly from <code>/v1alpha2/runtime/sessions/{sessionId}/timeline</code> and <code>/events/stream</code>.</div>
+      <div class="filter-row settings-editor-actions">
+        <div class="action-hierarchy">
+          <div class="action-group action-group-secondary">
+            <button class="btn btn-secondary btn-small" type="button" data-settings-agent-test-action="refresh-session" ${sessionId ? "" : "disabled"}>Refresh Native Session</button>
+          </div>
+        </div>
+      </div>
+      <div class="stack" role="status" aria-live="polite" aria-atomic="true">
+        <div class="meta">${escapeHTML(message || "Invoke a profile first, then this panel will read the native M16 session contract instead of the legacy run compatibility surface.")}</div>
+      </div>
+      <div class="run-detail-chips">
+        <span class="chip chip-neutral chip-compact">openApprovals=${escapeHTML(String(timeline?.openApprovalCount ?? "-"))}</span>
+        <span class="chip chip-neutral chip-compact">workers=${escapeHTML(String(Array.isArray(timeline?.workers) ? timeline.workers.length : 0))}</span>
+        <span class="chip chip-neutral chip-compact">toolActions=${escapeHTML(String(Array.isArray(timeline?.toolActions) ? timeline.toolActions.length : 0))}</span>
+        <span class="chip chip-neutral chip-compact">evidence=${escapeHTML(String(Array.isArray(timeline?.evidenceRecords) ? timeline.evidenceRecords.length : 0))}</span>
+        <span class="chip chip-neutral chip-compact">latestEventSequence=${escapeHTML(String(latestEventSequence || "-"))}</span>
+        <span class="chip chip-neutral chip-compact">selectedWorker=${escapeHTML(String(selectedWorker?.adapterId || selectedWorker?.workerId || "-"))}</span>
+      </div>
+      <details class="artifact-panel" data-detail-key="settings.agent_session_events" open>
+        <summary>Recent native session events</summary>
+        <table class="data-table runs-table">
+          <thead>
+            <tr>
+              <th scope="col">Sequence</th>
+              <th scope="col">Type</th>
+              <th scope="col">Timestamp</th>
+              <th scope="col">Summary</th>
+            </tr>
+          </thead>
+          <tbody>${eventRows}</tbody>
+        </table>
+      </details>
+      ${rawTimeline ? `<details class="details-shell"><summary>Native Timeline JSON</summary><pre class="code-block">${escapeHTML(rawTimeline)}</pre></details>` : ""}
+    </div>
+  `;
+}
+
 function chipClassForConfigChangeStatus(value) {
   const status = String(value || "").trim().toLowerCase();
   if (status === "applied" || status === "saved" || status === "synced") {
@@ -785,6 +900,7 @@ function renderIntegrationInvokePanel(settings, invokeState = {}) {
   const provider = String(selectedProfile?.provider || invokeState.response?.provider || "-").trim() || "-";
   const transport = String(selectedProfile?.transport || invokeState.response?.transport || "-").trim() || "-";
   const model = String(selectedProfile?.model || invokeState.response?.model || "-").trim() || "-";
+  const nativeSessionPanel = renderNativeSessionConsumerPanel(invokeState);
 
   const feedbackLines = [];
   if (message) {
@@ -840,6 +956,7 @@ function renderIntegrationInvokePanel(settings, invokeState = {}) {
         <pre class="code-block">${escapeHTML(outputText || "No response yet.")}</pre>
         ${rawResponse ? `<details class="details-shell"><summary>Raw Response</summary><pre class="code-block">${escapeHTML(rawResponse)}</pre></details>` : ""}
       </div>
+      ${nativeSessionPanel}
     </div>
   `;
 }

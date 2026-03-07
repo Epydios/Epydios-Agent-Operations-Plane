@@ -1,0 +1,220 @@
+{
+  "id": "m16_control_plane_contract_spec_20260307",
+  "status": "architecture_spec_parallelized_while_m15_blocked",
+  "created_on": "2026-03-07",
+  "scope": {
+    "purpose": "define the stable control-plane contract for future chat, ide, cli, workflow, and worker surfaces",
+    "non_goals": [
+      "final chat UX",
+      "final ide UX",
+      "vendor-specific worker internals",
+      "storage schema implementation details beyond required records"
+    ]
+  },
+  "design_principles": [
+    "AgentOps remains the control plane",
+    "clients are thin surfaces over a shared contract",
+    "workers are adapters behind that contract",
+    "raw model invocation and managed worker execution stay distinct",
+    "audit and evidence are first-class records",
+    "existing run APIs remain available during migration"
+  ],
+  "entities": [
+    {
+      "name": "task",
+      "states": [
+        "NEW",
+        "READY",
+        "BLOCKED",
+        "IN_PROGRESS",
+        "COMPLETED",
+        "FAILED",
+        "CANCELLED"
+      ],
+      "required_fields": [
+        "taskId",
+        "tenantId",
+        "projectId",
+        "source",
+        "title",
+        "intent",
+        "requestedBy",
+        "createdAt",
+        "status"
+      ]
+    },
+    {
+      "name": "session",
+      "states": [
+        "PENDING",
+        "READY",
+        "AWAITING_WORKER",
+        "RUNNING",
+        "AWAITING_APPROVAL",
+        "BLOCKED",
+        "COMPLETED",
+        "FAILED",
+        "CANCELLED"
+      ],
+      "required_fields": [
+        "sessionId",
+        "taskId",
+        "tenantId",
+        "projectId",
+        "sessionType",
+        "status",
+        "startedAt",
+        "updatedAt"
+      ]
+    },
+    {
+      "name": "worker",
+      "states": [
+        "ATTACHED",
+        "READY",
+        "RUNNING",
+        "WAITING",
+        "BLOCKED",
+        "COMPLETED",
+        "FAILED",
+        "DETACHED"
+      ],
+      "required_fields": [
+        "workerId",
+        "sessionId",
+        "workerType",
+        "adapterId",
+        "status",
+        "createdAt"
+      ]
+    },
+    {
+      "name": "approval_checkpoint",
+      "states": [
+        "PENDING",
+        "APPROVED",
+        "DENIED",
+        "EXPIRED",
+        "CANCELLED"
+      ],
+      "required_fields": [
+        "checkpointId",
+        "sessionId",
+        "scope",
+        "status",
+        "reason",
+        "createdAt"
+      ]
+    },
+    {
+      "name": "tool_action",
+      "states": [
+        "REQUESTED",
+        "AUTHORIZED",
+        "STARTED",
+        "COMPLETED",
+        "POLICY_BLOCKED",
+        "FAILED",
+        "CANCELLED"
+      ],
+      "required_fields": [
+        "toolActionId",
+        "sessionId",
+        "workerId",
+        "toolType",
+        "status",
+        "createdAt"
+      ]
+    },
+    {
+      "name": "evidence_record",
+      "required_fields": [
+        "evidenceId",
+        "sessionId",
+        "kind",
+        "createdAt"
+      ]
+    },
+    {
+      "name": "event_stream",
+      "required_fields": [
+        "eventId",
+        "sessionId",
+        "sequence",
+        "eventType",
+        "timestamp"
+      ]
+    }
+  ],
+  "event_types": [
+    "task.created",
+    "task.status.changed",
+    "session.created",
+    "session.started",
+    "session.status.changed",
+    "worker.attached",
+    "worker.status.changed",
+    "worker.output.delta",
+    "approval.requested",
+    "approval.status.changed",
+    "tool_action.requested",
+    "tool_action.authorized",
+    "tool_action.started",
+    "tool_action.completed",
+    "tool_action.blocked",
+    "tool_action.failed",
+    "evidence.recorded",
+    "audit.linked",
+    "session.completed",
+    "session.failed",
+    "session.cancelled"
+  ],
+  "recommended_api_family": [
+    "POST /v1alpha2/runtime/tasks",
+    "GET /v1alpha2/runtime/tasks/{taskId}",
+    "GET /v1alpha2/runtime/tasks",
+    "POST /v1alpha2/runtime/tasks/{taskId}/sessions",
+    "GET /v1alpha2/runtime/sessions/{sessionId}",
+    "GET /v1alpha2/runtime/sessions",
+    "GET /v1alpha2/runtime/sessions/{sessionId}/timeline",
+    "POST /v1alpha2/runtime/sessions/{sessionId}/workers",
+    "GET /v1alpha2/runtime/sessions/{sessionId}/workers",
+    "POST /v1alpha2/runtime/sessions/{sessionId}/workers/{workerId}/events",
+    "GET /v1alpha2/runtime/sessions/{sessionId}/events",
+    "GET /v1alpha2/runtime/sessions/{sessionId}/events/stream",
+    "POST /v1alpha2/runtime/sessions/{sessionId}/approvals",
+    "GET /v1alpha2/runtime/sessions/{sessionId}/approval-checkpoints",
+    "POST /v1alpha2/runtime/sessions/{sessionId}/approval-checkpoints",
+    "POST /v1alpha2/runtime/sessions/{sessionId}/approval-checkpoints/{checkpointId}/decision",
+    "POST /v1alpha2/runtime/approvals/{checkpointId}/decision",
+    "POST /v1alpha2/runtime/sessions/{sessionId}/tool-actions",
+    "GET /v1alpha2/runtime/sessions/{sessionId}/tool-actions",
+    "POST /v1alpha2/runtime/sessions/{sessionId}/evidence",
+    "GET /v1alpha2/runtime/sessions/{sessionId}/evidence",
+    "POST /v1alpha2/runtime/sessions/{sessionId}/close"
+  ],
+  "event_stream_consumption_notes": [
+    "GET /v1alpha2/runtime/sessions/{sessionId}/events remains the cursor-based JSON list surface.",
+    "GET /v1alpha2/runtime/sessions/{sessionId}/events/stream is the explicit event-stream surface for chat and IDE clients.",
+    "Accept: text/event-stream or format=event-stream on the session events route is also valid.",
+    "GET /v1alpha2/runtime/sessions/{sessionId}/timeline is the first native aggregated read model for future chat and IDE clients.",
+    "POST /v1alpha2/runtime/sessions/{sessionId}/workers/{workerId}/events is the first worker-scoped write surface for native progress emission such as worker.output.delta."
+  ],
+  "backward_compatibility_mapping": {
+    "RunRecord": "legacy-compatible Session",
+    "RunCreateRequest": "Task plus Session bootstrap request",
+    "ApprovalRecord": "ApprovalCheckpoint",
+    "POST /runtime/terminal/sessions": "ToolAction(toolType=terminal_command)",
+    "POST /runtime/integrations/invoke": "ToolAction(toolType=model_invoke) or Worker(model_invoke)",
+    "EvidenceRecordResponse and EvidenceBundleResponse": "EvidenceRecord"
+  },
+  "migration_sequence": [
+    "Add task, session, session_event, session_worker, approval_checkpoint, tool_action, and evidence_record records while keeping orchestration_runs intact.",
+    "Create compatibility projection so new sessions can still expose current run summaries.",
+    "Move approval, terminal, and integration-invoke actions to emit session events and tool-action records.",
+    "Build chat on top of session/event streams rather than directly on run.",
+    "Build Codex worker adapter against the worker contract.",
+    "Build VS Code client against the same session/task contract."
+  ],
+  "exit_gate": "task/session/worker/event entities are real runtime records, current approval-terminal-invoke flows emit session-linked events, and one chat client plus one IDE client could use the same contract without special-case backend behavior"
+}

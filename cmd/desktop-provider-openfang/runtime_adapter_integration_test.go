@@ -24,12 +24,26 @@ type runtimeAdapterRunStore struct {
 	mu                  sync.RWMutex
 	runs                map[string]*rt.RunRecord
 	integrationSettings map[string]*rt.IntegrationSettingsRecord
+	tasks               map[string]*rt.TaskRecord
+	sessions            map[string]*rt.SessionRecord
+	sessionWorkers      map[string]*rt.SessionWorkerRecord
+	toolActions         map[string]*rt.ToolActionRecord
+	sessionEvents       map[string][]rt.SessionEventRecord
+	approvalCheckpoints map[string]*rt.ApprovalCheckpointRecord
+	evidenceRecords     map[string]*rt.EvidenceRecord
 }
 
 func newRuntimeAdapterRunStore() *runtimeAdapterRunStore {
 	return &runtimeAdapterRunStore{
 		runs:                make(map[string]*rt.RunRecord),
 		integrationSettings: make(map[string]*rt.IntegrationSettingsRecord),
+		tasks:               make(map[string]*rt.TaskRecord),
+		sessions:            make(map[string]*rt.SessionRecord),
+		sessionWorkers:      make(map[string]*rt.SessionWorkerRecord),
+		toolActions:         make(map[string]*rt.ToolActionRecord),
+		sessionEvents:       make(map[string][]rt.SessionEventRecord),
+		approvalCheckpoints: make(map[string]*rt.ApprovalCheckpointRecord),
+		evidenceRecords:     make(map[string]*rt.EvidenceRecord),
 	}
 }
 
@@ -136,6 +150,278 @@ func (s *runtimeAdapterRunStore) GetIntegrationSettings(_ context.Context, tenan
 	return cloneRuntimeIntegrationSettingsRecord(record), nil
 }
 
+func (s *runtimeAdapterRunStore) UpsertTask(_ context.Context, record *rt.TaskRecord) error {
+	if record == nil {
+		return fmt.Errorf("task record is required")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.tasks[record.TaskID] = cloneRuntimeTaskRecord(record)
+	return nil
+}
+
+func (s *runtimeAdapterRunStore) GetTask(_ context.Context, taskID string) (*rt.TaskRecord, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	record, ok := s.tasks[strings.TrimSpace(taskID)]
+	if !ok {
+		return nil, sql.ErrNoRows
+	}
+	return cloneRuntimeTaskRecord(record), nil
+}
+
+func (s *runtimeAdapterRunStore) ListTasks(_ context.Context, query rt.TaskListQuery) ([]rt.TaskRecord, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	items := make([]rt.TaskRecord, 0, len(s.tasks))
+	for _, record := range s.tasks {
+		if query.TenantID != "" && record.TenantID != query.TenantID {
+			continue
+		}
+		if query.ProjectID != "" && record.ProjectID != query.ProjectID {
+			continue
+		}
+		if query.Status != "" && string(record.Status) != query.Status {
+			continue
+		}
+		items = append(items, *cloneRuntimeTaskRecord(record))
+	}
+	return items, nil
+}
+
+func (s *runtimeAdapterRunStore) UpsertSession(_ context.Context, record *rt.SessionRecord) error {
+	if record == nil {
+		return fmt.Errorf("session record is required")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.sessions[record.SessionID] = cloneRuntimeSessionRecord(record)
+	return nil
+}
+
+func (s *runtimeAdapterRunStore) GetSession(_ context.Context, sessionID string) (*rt.SessionRecord, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	record, ok := s.sessions[strings.TrimSpace(sessionID)]
+	if !ok {
+		return nil, sql.ErrNoRows
+	}
+	return cloneRuntimeSessionRecord(record), nil
+}
+
+func (s *runtimeAdapterRunStore) ListSessions(_ context.Context, query rt.SessionListQuery) ([]rt.SessionRecord, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	items := make([]rt.SessionRecord, 0, len(s.sessions))
+	for _, record := range s.sessions {
+		if query.TaskID != "" && record.TaskID != query.TaskID {
+			continue
+		}
+		if query.TenantID != "" && record.TenantID != query.TenantID {
+			continue
+		}
+		if query.ProjectID != "" && record.ProjectID != query.ProjectID {
+			continue
+		}
+		if query.Status != "" && string(record.Status) != query.Status {
+			continue
+		}
+		if query.SessionType != "" && record.SessionType != query.SessionType {
+			continue
+		}
+		items = append(items, *cloneRuntimeSessionRecord(record))
+	}
+	return items, nil
+}
+
+func (s *runtimeAdapterRunStore) UpsertSessionWorker(_ context.Context, record *rt.SessionWorkerRecord) error {
+	if record == nil {
+		return fmt.Errorf("session worker record is required")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.sessionWorkers[record.WorkerID] = cloneRuntimeSessionWorkerRecord(record)
+	return nil
+}
+
+func (s *runtimeAdapterRunStore) ListSessionWorkers(_ context.Context, query rt.SessionWorkerListQuery) ([]rt.SessionWorkerRecord, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	items := make([]rt.SessionWorkerRecord, 0, len(s.sessionWorkers))
+	for _, record := range s.sessionWorkers {
+		if query.SessionID != "" && record.SessionID != query.SessionID {
+			continue
+		}
+		if query.TenantID != "" && record.TenantID != query.TenantID {
+			continue
+		}
+		if query.ProjectID != "" && record.ProjectID != query.ProjectID {
+			continue
+		}
+		if query.Status != "" && string(record.Status) != query.Status {
+			continue
+		}
+		if query.WorkerType != "" && record.WorkerType != query.WorkerType {
+			continue
+		}
+		items = append(items, *cloneRuntimeSessionWorkerRecord(record))
+	}
+	if query.Limit > 0 && len(items) > query.Limit {
+		items = items[:query.Limit]
+	}
+	return items, nil
+}
+
+func (s *runtimeAdapterRunStore) UpsertToolAction(_ context.Context, record *rt.ToolActionRecord) error {
+	if record == nil {
+		return fmt.Errorf("tool action record is required")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.toolActions[record.ToolActionID] = cloneRuntimeToolActionRecord(record)
+	return nil
+}
+
+func (s *runtimeAdapterRunStore) ListToolActions(_ context.Context, query rt.ToolActionListQuery) ([]rt.ToolActionRecord, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	items := make([]rt.ToolActionRecord, 0, len(s.toolActions))
+	for _, record := range s.toolActions {
+		if query.SessionID != "" && record.SessionID != query.SessionID {
+			continue
+		}
+		if query.TenantID != "" && record.TenantID != query.TenantID {
+			continue
+		}
+		if query.ProjectID != "" && record.ProjectID != query.ProjectID {
+			continue
+		}
+		if query.WorkerID != "" && record.WorkerID != query.WorkerID {
+			continue
+		}
+		if query.ToolType != "" && record.ToolType != query.ToolType {
+			continue
+		}
+		if query.Status != "" && record.Status != query.Status {
+			continue
+		}
+		items = append(items, *cloneRuntimeToolActionRecord(record))
+	}
+	if query.Limit > 0 && len(items) > query.Limit {
+		items = items[:query.Limit]
+	}
+	return items, nil
+}
+
+func (s *runtimeAdapterRunStore) AppendSessionEvent(_ context.Context, record *rt.SessionEventRecord) error {
+	if record == nil {
+		return fmt.Errorf("session event record is required")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	event := cloneRuntimeSessionEventRecord(record)
+	if event.Sequence <= 0 {
+		event.Sequence = int64(len(s.sessionEvents[event.SessionID]) + 1)
+	}
+	if strings.TrimSpace(event.EventID) == "" {
+		event.EventID = fmt.Sprintf("%s-event-%d", event.SessionID, event.Sequence)
+	}
+	s.sessionEvents[event.SessionID] = append(s.sessionEvents[event.SessionID], *event)
+	return nil
+}
+
+func (s *runtimeAdapterRunStore) ListSessionEvents(_ context.Context, query rt.SessionEventListQuery) ([]rt.SessionEventRecord, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	items := make([]rt.SessionEventRecord, 0, len(s.sessionEvents[query.SessionID]))
+	for _, record := range s.sessionEvents[query.SessionID] {
+		if query.AfterSequence > 0 && record.Sequence <= query.AfterSequence {
+			continue
+		}
+		items = append(items, *cloneRuntimeSessionEventRecord(&record))
+	}
+	if query.Limit > 0 && len(items) > query.Limit {
+		items = items[:query.Limit]
+	}
+	return items, nil
+}
+
+func (s *runtimeAdapterRunStore) UpsertApprovalCheckpoint(_ context.Context, record *rt.ApprovalCheckpointRecord) error {
+	if record == nil {
+		return fmt.Errorf("approval checkpoint record is required")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.approvalCheckpoints[record.CheckpointID] = cloneRuntimeApprovalCheckpointRecord(record)
+	return nil
+}
+
+func (s *runtimeAdapterRunStore) ListApprovalCheckpoints(_ context.Context, query rt.ApprovalCheckpointListQuery) ([]rt.ApprovalCheckpointRecord, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	items := make([]rt.ApprovalCheckpointRecord, 0, len(s.approvalCheckpoints))
+	for _, record := range s.approvalCheckpoints {
+		if query.CheckpointID != "" && record.CheckpointID != query.CheckpointID {
+			continue
+		}
+		if query.SessionID != "" && record.SessionID != query.SessionID {
+			continue
+		}
+		if query.TenantID != "" && record.TenantID != query.TenantID {
+			continue
+		}
+		if query.ProjectID != "" && record.ProjectID != query.ProjectID {
+			continue
+		}
+		if query.Status != "" && record.Status != query.Status {
+			continue
+		}
+		items = append(items, *cloneRuntimeApprovalCheckpointRecord(record))
+	}
+	if query.Limit > 0 && len(items) > query.Limit {
+		items = items[:query.Limit]
+	}
+	return items, nil
+}
+
+func (s *runtimeAdapterRunStore) UpsertEvidenceRecord(_ context.Context, record *rt.EvidenceRecord) error {
+	if record == nil {
+		return fmt.Errorf("evidence record is required")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.evidenceRecords[record.EvidenceID] = cloneRuntimeEvidenceRecord(record)
+	return nil
+}
+
+func (s *runtimeAdapterRunStore) ListEvidenceRecords(_ context.Context, query rt.EvidenceRecordListQuery) ([]rt.EvidenceRecord, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	items := make([]rt.EvidenceRecord, 0, len(s.evidenceRecords))
+	for _, record := range s.evidenceRecords {
+		if query.SessionID != "" && record.SessionID != query.SessionID {
+			continue
+		}
+		if query.TenantID != "" && record.TenantID != query.TenantID {
+			continue
+		}
+		if query.ProjectID != "" && record.ProjectID != query.ProjectID {
+			continue
+		}
+		if query.Kind != "" && record.Kind != query.Kind {
+			continue
+		}
+		if query.RetentionClass != "" && record.RetentionClass != query.RetentionClass {
+			continue
+		}
+		items = append(items, *cloneRuntimeEvidenceRecord(record))
+	}
+	if query.Limit > 0 && len(items) > query.Limit {
+		items = items[:query.Limit]
+	}
+	return items, nil
+}
+
 func cloneRuntimeRunRecord(in *rt.RunRecord) *rt.RunRecord {
 	if in == nil {
 		return nil
@@ -171,6 +457,87 @@ func cloneRuntimeIntegrationSettingsRecord(in *rt.IntegrationSettingsRecord) *rt
 	}
 	out := *in
 	out.Settings = cloneRuntimeBytes(in.Settings)
+	return &out
+}
+
+func cloneRuntimeTaskRecord(in *rt.TaskRecord) *rt.TaskRecord {
+	if in == nil {
+		return nil
+	}
+	out := *in
+	out.RequestedBy = cloneRuntimeBytes(in.RequestedBy)
+	out.Annotations = cloneRuntimeBytes(in.Annotations)
+	return &out
+}
+
+func cloneRuntimeSessionRecord(in *rt.SessionRecord) *rt.SessionRecord {
+	if in == nil {
+		return nil
+	}
+	out := *in
+	if in.CompletedAt != nil {
+		t := *in.CompletedAt
+		out.CompletedAt = &t
+	}
+	out.Summary = cloneRuntimeBytes(in.Summary)
+	out.Annotations = cloneRuntimeBytes(in.Annotations)
+	return &out
+}
+
+func cloneRuntimeSessionWorkerRecord(in *rt.SessionWorkerRecord) *rt.SessionWorkerRecord {
+	if in == nil {
+		return nil
+	}
+	out := *in
+	out.Capabilities = append([]string(nil), in.Capabilities...)
+	out.Annotations = cloneRuntimeBytes(in.Annotations)
+	return &out
+}
+
+func cloneRuntimeSessionEventRecord(in *rt.SessionEventRecord) *rt.SessionEventRecord {
+	if in == nil {
+		return nil
+	}
+	out := *in
+	out.Payload = cloneRuntimeBytes(in.Payload)
+	return &out
+}
+
+func cloneRuntimeApprovalCheckpointRecord(in *rt.ApprovalCheckpointRecord) *rt.ApprovalCheckpointRecord {
+	if in == nil {
+		return nil
+	}
+	out := *in
+	out.RequestedCapabilities = append([]string(nil), in.RequestedCapabilities...)
+	out.RequiredVerifierIDs = append([]string(nil), in.RequiredVerifierIDs...)
+	if in.ExpiresAt != nil {
+		t := *in.ExpiresAt
+		out.ExpiresAt = &t
+	}
+	if in.ReviewedAt != nil {
+		t := *in.ReviewedAt
+		out.ReviewedAt = &t
+	}
+	return &out
+}
+
+func cloneRuntimeToolActionRecord(in *rt.ToolActionRecord) *rt.ToolActionRecord {
+	if in == nil {
+		return nil
+	}
+	out := *in
+	out.RequestPayload = cloneRuntimeBytes(in.RequestPayload)
+	out.ResultPayload = cloneRuntimeBytes(in.ResultPayload)
+	out.AuditLink = cloneRuntimeBytes(in.AuditLink)
+	return &out
+}
+
+func cloneRuntimeEvidenceRecord(in *rt.EvidenceRecord) *rt.EvidenceRecord {
+	if in == nil {
+		return nil
+	}
+	out := *in
+	out.Metadata = cloneRuntimeBytes(in.Metadata)
 	return &out
 }
 

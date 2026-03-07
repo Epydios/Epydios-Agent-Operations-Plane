@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"context"
 	"net/http"
 	"strings"
 	"testing"
@@ -80,6 +81,39 @@ func TestRuntimeTerminalSessionCreateExecutesCommand(t *testing.T) {
 	if resp.AuditLink.Event != "runtime.terminal.command" {
 		t.Fatalf("audit event=%q, want runtime.terminal.command", resp.AuditLink.Event)
 	}
+	events, err := store.ListSessionEvents(context.Background(), SessionEventListQuery{SessionID: "run-terminal-ok"})
+	if err != nil {
+		t.Fatalf("list session events: %v", err)
+	}
+	if len(events) != 2 {
+		t.Fatalf("session events=%d want 2", len(events))
+	}
+	if events[0].EventType != SessionEventType("evidence.recorded") {
+		t.Fatalf("event[0] type=%q want evidence.recorded", events[0].EventType)
+	}
+	if events[1].EventType != SessionEventType("tool_action.completed") {
+		t.Fatalf("event[1] type=%q want tool_action.completed", events[1].EventType)
+	}
+	actions, err := store.ListToolActions(context.Background(), ToolActionListQuery{SessionID: "run-terminal-ok"})
+	if err != nil {
+		t.Fatalf("list tool actions: %v", err)
+	}
+	if len(actions) != 1 {
+		t.Fatalf("tool actions=%d want 1", len(actions))
+	}
+	if actions[0].Status != ToolActionStatusCompleted {
+		t.Fatalf("tool action status=%q want %q", actions[0].Status, ToolActionStatusCompleted)
+	}
+	evidence, err := store.ListEvidenceRecords(context.Background(), EvidenceRecordListQuery{SessionID: "run-terminal-ok"})
+	if err != nil {
+		t.Fatalf("list evidence records: %v", err)
+	}
+	if len(evidence) != 1 {
+		t.Fatalf("evidence records=%d want 1", len(evidence))
+	}
+	if evidence[0].Kind != "tool_output" {
+		t.Fatalf("evidence kind=%q want tool_output", evidence[0].Kind)
+	}
 }
 
 func TestRuntimeTerminalSessionCreateBlocksRestrictedHostRequest(t *testing.T) {
@@ -117,6 +151,16 @@ func TestRuntimeTerminalSessionCreateBlocksRestrictedHostRequest(t *testing.T) {
 	}
 	if !strings.Contains(strings.ToLower(resp.Warning), "restricted_host") {
 		t.Fatalf("warning=%q, want restricted_host reason", resp.Warning)
+	}
+	actions, err := store.ListToolActions(context.Background(), ToolActionListQuery{SessionID: "run-terminal-blocked"})
+	if err != nil {
+		t.Fatalf("list blocked tool actions: %v", err)
+	}
+	if len(actions) != 1 {
+		t.Fatalf("blocked tool actions=%d want 1", len(actions))
+	}
+	if actions[0].Status != ToolActionStatusPolicyBlocked {
+		t.Fatalf("blocked tool action status=%q want %q", actions[0].Status, ToolActionStatusPolicyBlocked)
 	}
 }
 

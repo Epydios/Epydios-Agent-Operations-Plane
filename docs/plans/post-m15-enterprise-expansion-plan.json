@@ -1,0 +1,104 @@
+{
+  "id": "post_m15_enterprise_expansion_plan_20260307",
+  "status": "planned_not_active_until_m15_phase_d_and_final_signoff_unless_parallelized",
+  "created_on": "2026-03-07",
+  "product_stance": {
+    "control_plane": "AgentOps",
+    "clients": [
+      "chat",
+      "ide",
+      "cli",
+      "ticket_workflow",
+      "chatops"
+    ],
+    "workers": [
+      "codex",
+      "model_invoke",
+      "terminal",
+      "future_enterprise_workers"
+    ],
+    "rules": [
+      "clients are not the control plane",
+      "workers are adapters behind a governed contract",
+      "terminal is a governed tool surface, not the primary UX",
+      "raw model invoke and managed worker execution stay separate"
+    ]
+  },
+  "recommended_milestones": [
+    {
+      "id": "M16",
+      "name": "session_task_worker_contract",
+      "goal": "define the stable control-plane contract that all future clients and workers must use",
+      "deliverables": [
+        "task entity",
+        "session entity",
+        "worker entity",
+        "tool_action entity",
+        "approval_checkpoint entity",
+        "evidence_record entity",
+        "event_stream entity",
+        "create task api",
+        "start session api",
+        "attach worker api",
+        "stream events api",
+        "request approval api",
+        "approve or deny api",
+        "persist evidence api",
+        "close session api"
+      ],
+      "exit_gate": "one stable control-plane contract exists that chat and IDE clients can use without special-case behavior"
+    },
+    {
+      "id": "M17",
+      "name": "operator_chat_surface",
+      "goal": "build the operator-first chat surface on top of the shared control-plane contract",
+      "deliverables": [
+        "threaded chat UX",
+        "approval prompts in chat",
+        "evidence rendering in chat",
+        "tool action rendering in chat",
+        "session timeline view"
+      ],
+      "exit_gate": "non-technical operators can run governed sessions without using terminal or IDE surfaces"
+    },
+    {
+      "id": "M18",
+      "name": "worker_adapter_pack",
+      "goal": "add managed worker execution behind the control-plane contract",
+      "deliverables": [
+        "codex worker adapter",
+        "managed worker event model",
+        "approval checkpoints for worker actions",
+        "evidence capture for worker outputs"
+      ],
+      "exit_gate": "at least one managed worker can execute tasks through the session contract with approval, audit, and evidence capture"
+    },
+    {
+      "id": "M19",
+      "name": "ide_and_enterprise_ingress_pack",
+      "goal": "extend the same governed system to developer and enterprise ingress surfaces",
+      "deliverables": [
+        "vs_code client",
+        "cli ingress",
+        "ticket workflow ingress",
+        "chatops ingress"
+      ],
+      "exit_gate": "developers and non-developers can enter the same governed system through different surfaces with a shared audit and evidence model"
+    },
+    {
+      "id": "M20",
+      "name": "enterprise_hardening_and_rollout_pack",
+      "goal": "close the enterprise deployment posture gaps after client and worker surfaces exist",
+      "deliverables": [
+        "multi-tenant policy packs",
+        "rbac refinement",
+        "dlp and secret policy enforcement",
+        "worker capability matrices",
+        "reporting and export integration"
+      ],
+      "exit_gate": "Fortune 500 deployment posture is supported across UI, IDE, API, and worker surfaces with clear governance boundaries"
+    }
+  ],
+  "recommended_immediate_next_step": "author the M16 control-plane contract spec and entity/event model before building chat, Codex worker control, VS Code, or ticket/chatops ingress",
+  "parallel_execution_note": "M16 architecture/spec work may begin while M15 remains blocked on Windows execution-host proof, but M15 must not be marked complete until Phase D and final launch sign-off are closed."
+}

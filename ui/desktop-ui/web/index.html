@@ -31,6 +31,9 @@
       <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="runs">
         Runs
       </button>
+      <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="chat">
+        Chat
+      </button>
       <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="approvals">
         Approvals
       </button>
@@ -112,10 +115,14 @@
         </div>
         <ol class="quickstart-list">
           <li>Select project filter and agent profile.</li>
-          <li>Use Run Builder or Terminal for execution requests.</li>
+          <li>Use Operator Chat, Run Builder, or Terminal for governed execution requests.</li>
           <li>Track approvals, run state, and incident packages in dedicated tabs.</li>
           <li>Use Settings for provider contracts, endpoints, storage, and retention defaults.</li>
         </ol>
+      </section>
+
+      <section class="panel panel-chat" data-workspace-section="chat">
+        <div id="chat-content" class="stack"></div>
       </section>
 
       <section class="panel panel-execution" data-workspace-section="operations" data-advanced-section="operations">
