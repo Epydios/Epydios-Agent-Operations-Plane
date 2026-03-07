@@ -19,6 +19,7 @@ type codexProcessRequest struct {
 	Workdir      string
 	SandboxMode  string
 	Timeout      time.Duration
+	Boundary     *managedWorkerProviderBoundary
 }
 
 type codexStructuredProposal struct {
@@ -53,7 +54,7 @@ type codexProcessItem struct {
 	Status           string `json:"status,omitempty"`
 }
 
-func (a codexManagedWorkerAdapter) runCodexProcessTurn(ctx context.Context, req AgentInvokeRequest, profile agentProfileConfig) (*managedWorkerTurnResult, error) {
+func (a codexManagedWorkerAdapter) runCodexProcessTurn(ctx context.Context, req AgentInvokeRequest, profile agentProfileConfig, boundary *managedWorkerProviderBoundary) (*managedWorkerTurnResult, error) {
 	workdir := strings.TrimSpace(a.workdir)
 	if workdir == "" {
 		if cwd, err := os.Getwd(); err == nil {
@@ -68,6 +69,7 @@ func (a codexManagedWorkerAdapter) runCodexProcessTurn(ctx context.Context, req 
 		Workdir:      workdir,
 		SandboxMode:  strings.TrimSpace(a.sandboxMode),
 		Timeout:      a.timeout,
+		Boundary:     boundary,
 	}
 	run := a.runProcess
 	if run == nil {
@@ -106,6 +108,15 @@ func runCodexProcess(parent context.Context, req codexProcessRequest) ([]byte, e
 		"-c", "analytics.enabled=false",
 		"-s", normalizeCodexSandboxMode(req.SandboxMode),
 	}
+	env := os.Environ()
+	if req.Boundary != nil {
+		for _, item := range buildCodexBoundaryConfigArgs(req.Boundary) {
+			args = append(args, "-c", item)
+		}
+		if envVar := strings.TrimSpace(req.Boundary.TokenEnvVar); envVar != "" && strings.TrimSpace(req.Boundary.TokenValue) != "" {
+			env = append(env, envVar+"="+req.Boundary.TokenValue)
+		}
+	}
 	if strings.TrimSpace(req.Workdir) != "" {
 		args = append(args, "-C", strings.TrimSpace(req.Workdir))
 	}
@@ -115,6 +126,7 @@ func runCodexProcess(parent context.Context, req codexProcessRequest) ([]byte, e
 	args = append(args, "--output-schema", schemaPath, buildManagedCodexPrompt(req))
 
 	cmd := exec.CommandContext(ctx, cliPath, args...)
+	cmd.Env = env
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -135,6 +147,64 @@ func runCodexProcess(parent context.Context, req codexProcessRequest) ([]byte, e
 	}
 	joined += stderr.String()
 	return []byte(joined), nil
+}
+
+func buildCodexBoundaryConfigArgs(boundary *managedWorkerProviderBoundary) []string {
+	if boundary == nil {
+		return nil
+	}
+	providerID := normalizeStringOrDefault(boundary.ProviderID, "agentops_gateway")
+	items := []string{
+		fmt.Sprintf("model_provider=%q", providerID),
+		fmt.Sprintf("model_providers.%s.name=%q", providerID, normalizeStringOrDefault(boundary.ProviderName, "AgentOps Gateway")),
+		fmt.Sprintf("model_providers.%s.base_url=%q", providerID, strings.TrimSpace(boundary.BaseURL)),
+		fmt.Sprintf("model_providers.%s.wire_api=%q", providerID, normalizeStringOrDefault(boundary.WireAPI, "responses")),
+	}
+	if envVar := strings.TrimSpace(boundary.TokenEnvVar); envVar != "" {
+		items = append(items, fmt.Sprintf("model_providers.%s.bearer_token_env_var=%q", providerID, envVar))
+	}
+	return items
+}
+
+func buildManagedCodexProviderBoundary(route *invokeRoute) (*managedWorkerProviderBoundary, error) {
+	if route == nil {
+		return nil, fmt.Errorf("managed worker boundary route is required")
+	}
+	if strings.TrimSpace(route.profile.Transport) != "responses_api" {
+		return nil, fmt.Errorf("managed Codex process boundary requires responses_api transport, got %q", route.profile.Transport)
+	}
+	baseURL, err := appendRequestPath(route.endpoint, "/v1")
+	if err != nil {
+		return nil, fmt.Errorf("build managed Codex boundary URL: %w", err)
+	}
+	boundary := &managedWorkerProviderBoundary{
+		RouteName:     managedWorkerProcessRouteName(route),
+		ProviderID:    "agentops_gateway",
+		ProviderName:  "AgentOps Gateway",
+		BaseURL:       baseURL,
+		WireAPI:       "responses",
+		EndpointRef:   strings.TrimSpace(route.endpointRef),
+		CredentialRef: strings.TrimSpace(route.credentialRef),
+	}
+	if route.authMode == "bearer" && strings.TrimSpace(route.authValue) != "" {
+		boundary.TokenEnvVar = "AGENTOPS_CODEX_GATEWAY_TOKEN"
+		boundary.TokenValue = strings.TrimSpace(route.authValue)
+	}
+	return boundary, nil
+}
+
+func managedWorkerProcessRouteName(route *invokeRoute) string {
+	if route == nil {
+		return "managed_worker_process"
+	}
+	switch strings.TrimSpace(strings.ToLower(route.name)) {
+	case "gateway":
+		return "managed_worker_gateway_process"
+	case "direct":
+		return "managed_worker_provider_process"
+	default:
+		return "managed_worker_process"
+	}
 }
 
 func resolveCodexCLIPath(configured string) string {
@@ -187,6 +257,91 @@ func buildManagedCodexPrompt(req codexProcessRequest) string {
 	}, "\n"))
 	sections = append(sections, "Operator request:\n"+strings.TrimSpace(req.Prompt))
 	return strings.Join(sections, "\n\n")
+}
+
+func buildManagedCodexContinuationPrompt(req managedWorkerContinuationRequest) string {
+	sections := make([]string, 0, 8)
+	if strings.TrimSpace(req.SystemPrompt) != "" {
+		sections = append(sections, "System instructions:\n"+strings.TrimSpace(req.SystemPrompt))
+	}
+	sections = append(sections, strings.Join([]string{
+		"You are continuing the same managed Codex worker session under AgentOps after a governed tool action.",
+		"Use the governed tool execution result below to continue the session from the current state.",
+		"Return final operator-facing text in the `message` field.",
+		"Use `tool_proposals` only if another governed tool step is strictly required.",
+		"Never execute mutating or environment-changing commands directly.",
+	}, "\n"))
+	if req.Task != nil && strings.TrimSpace(req.Task.Intent) != "" {
+		sections = append(sections, "Original task intent:\n"+strings.TrimSpace(req.Task.Intent))
+	}
+	if strings.TrimSpace(req.PreviousOutputText) != "" {
+		sections = append(sections, "Previous managed worker output:\n"+truncateManagedCodexContinuationText(req.PreviousOutputText, 1600))
+	}
+	if req.Proposal != nil {
+		details := []string{
+			fmt.Sprintf("- proposalId: %s", strings.TrimSpace(req.Proposal.ProposalID)),
+			fmt.Sprintf("- proposalType: %s", strings.TrimSpace(req.Proposal.ProposalType)),
+			fmt.Sprintf("- summary: %s", strings.TrimSpace(req.Proposal.Summary)),
+			fmt.Sprintf("- command: %s", strings.TrimSpace(req.CommandText)),
+		}
+		if strings.TrimSpace(req.CommandCWD) != "" {
+			details = append(details, fmt.Sprintf("- cwd: %s", strings.TrimSpace(req.CommandCWD)))
+		}
+		if req.TimeoutSeconds > 0 {
+			details = append(details, fmt.Sprintf("- timeoutSeconds: %d", req.TimeoutSeconds))
+		}
+		sections = append(sections, "Approved governed tool proposal:\n"+strings.Join(details, "\n"))
+	}
+	resultLines := []string{
+		fmt.Sprintf("- status: %s", normalizeStringOrDefault(string(req.ToolAction.Status), "UNKNOWN")),
+	}
+	if req.ExecutionResult != nil {
+		resultLines = append(resultLines,
+			fmt.Sprintf("- exitCode: %d", req.ExecutionResult.ExitCode),
+			fmt.Sprintf("- timedOut: %t", req.ExecutionResult.TimedOut),
+			fmt.Sprintf("- outputTruncated: %t", req.ExecutionResult.Truncated),
+		)
+		if strings.TrimSpace(req.ExecutionResult.Output) != "" {
+			resultLines = append(resultLines, "- output:\n"+truncateManagedCodexContinuationText(req.ExecutionResult.Output, 2400))
+		}
+	}
+	if strings.TrimSpace(req.ExecutionError) != "" {
+		resultLines = append(resultLines, fmt.Sprintf("- error: %s", strings.TrimSpace(req.ExecutionError)))
+	}
+	sections = append(sections, "Governed tool execution result:\n"+strings.Join(resultLines, "\n"))
+	sections = append(sections, strings.Join([]string{
+		"Continue the session from this point.",
+		"If no further governed tool step is required, provide the final operator-facing answer.",
+		"If another governed tool step is required, return the minimum necessary next `tool_proposals`.",
+	}, "\n"))
+	return strings.Join(sections, "\n\n")
+}
+
+func buildManagedCodexLegacyContinuationSummary(req managedWorkerContinuationRequest) string {
+	summary := "Managed Codex reviewed the governed tool result and is ready for the next operator turn."
+	if req.ExecutionResult == nil {
+		if strings.TrimSpace(req.ExecutionError) != "" {
+			return fmt.Sprintf("Managed Codex reviewed the governed tool failure: %s", strings.TrimSpace(req.ExecutionError))
+		}
+		return summary
+	}
+	statusText := "completed"
+	if strings.TrimSpace(req.ExecutionError) != "" || req.ToolAction.Status == ToolActionStatusFailed {
+		statusText = "failed"
+	}
+	base := fmt.Sprintf("Managed Codex reviewed the governed tool result (%s, exitCode=%d).", statusText, req.ExecutionResult.ExitCode)
+	if strings.TrimSpace(req.ExecutionResult.Output) == "" {
+		return base
+	}
+	return base + "\n" + truncateManagedCodexContinuationText(req.ExecutionResult.Output, 480)
+}
+
+func truncateManagedCodexContinuationText(value string, maxLen int) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" || maxLen <= 0 || len(trimmed) <= maxLen {
+		return trimmed
+	}
+	return strings.TrimSpace(trimmed[:maxLen-3]) + "..."
 }
 
 func parseCodexProcessTranscript(transcript []byte) (*managedWorkerTurnResult, error) {

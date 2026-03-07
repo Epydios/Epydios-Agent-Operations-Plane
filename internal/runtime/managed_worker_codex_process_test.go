@@ -21,6 +21,15 @@ func TestCodexManagedWorkerAdapterProcessModeParsesStructuredTurn(t *testing.T) 
 			if req.Workdir != "/tmp" {
 				t.Fatalf("workdir=%q want /tmp", req.Workdir)
 			}
+			if req.Boundary == nil {
+				t.Fatal("boundary should be present in process mode")
+			}
+			if req.Boundary.ProviderID != "agentops_gateway" {
+				t.Fatalf("boundary providerId=%q want agentops_gateway", req.Boundary.ProviderID)
+			}
+			if req.Boundary.BaseURL != "https://gateway.local/v1" {
+				t.Fatalf("boundary baseURL=%q want https://gateway.local/v1", req.Boundary.BaseURL)
+			}
 			if !strings.Contains(req.Prompt, "summarize") {
 				t.Fatalf("prompt=%q did not include operator request", req.Prompt)
 			}
@@ -41,6 +50,16 @@ func TestCodexManagedWorkerAdapterProcessModeParsesStructuredTurn(t *testing.T) 
 	}, agentProfileConfig{
 		ID:    "codex",
 		Model: "gpt-5-codex",
+	}, &managedWorkerProviderBoundary{
+		RouteName:     "managed_worker_gateway_process",
+		ProviderID:    "agentops_gateway",
+		ProviderName:  "AgentOps Gateway",
+		BaseURL:       "https://gateway.local/v1",
+		WireAPI:       "responses",
+		EndpointRef:   "ref://gateways/litellm/openai-compatible",
+		CredentialRef: "ref://projects/project-a/gateways/litellm/bearer-token",
+		TokenEnvVar:   "AGENTOPS_CODEX_GATEWAY_TOKEN",
+		TokenValue:    "gateway-token",
 	}, nil)
 	if err != nil {
 		t.Fatalf("RunTurn error: %v", err)

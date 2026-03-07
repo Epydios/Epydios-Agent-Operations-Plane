@@ -125,6 +125,11 @@ This service moves policy/evidence/profile execution flow out of ad-hoc scripts 
   - `RUNTIME_CODEX_EXEC_TIMEOUT=45s`
 - In `process` mode, the runtime launches:
   - `codex exec --json --output-schema ...`
+  - `-c model_provider="agentops_gateway"`
+  - `-c model_providers.agentops_gateway.base_url=".../v1"`
+  - `-c model_providers.agentops_gateway.wire_api="responses"`
+  - `-c model_providers.agentops_gateway.bearer_token_env_var="AGENTOPS_CODEX_GATEWAY_TOKEN"` when a gateway bearer token is configured
+- `process` mode now forces the managed Codex worker through the AgentOps-owned gateway boundary resolved from the runtime `ref://gateways/...` contract instead of letting the local Codex process select a provider path on its own.
 - The runtime captures:
   - structured operator-facing output text
   - structured governed `tool_proposals`
@@ -139,6 +144,14 @@ This service moves policy/evidence/profile execution flow out of ad-hoc scripts 
   - `tool_action.completed` or `tool_action.failed`
   - `worker.progress`
   - `evidence.recorded` (`tool_output`) when command output exists
+- Proposal-bearing managed turns now stay on the same native M16 session:
+  - a managed turn that returns governed `tool_proposals` moves the session to `AWAITING_APPROVAL` instead of terminalizing it
+  - once an operator approves the proposal, the governed tool result is fed back into the same managed Codex worker session
+  - resumed managed turns append new `managed_agent_turn` tool actions, `managed_worker_output` evidence, and `worker.output.delta` events on that same session timeline
+  - raw Codex transcript drill-in remains available through the managed turn `rawResponse`
+- Policy boundary note:
+  - process mode now governs operator -> managed worker turns, managed worker -> governed tool proposals or tool actions, and Codex -> model-provider traffic through the same AgentOps-owned gateway boundary
+  - the boundary is surfaced back into native session state as `route`, `endpointRef`, `credentialRef`, `boundaryProviderId`, and `boundaryBaseUrl` for audit, evidence, and chat review
 
 ## Runtime Metrics (M12.1)
 

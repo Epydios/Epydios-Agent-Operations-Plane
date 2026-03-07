@@ -293,25 +293,33 @@ func (s *APIServer) markInvokeSessionResult(ctx context.Context, task *TaskRecor
 	if task == nil || session == nil {
 		return
 	}
-	previousStatus := session.Status
-	if invokeErr != nil {
-		task.Status = TaskStatusFailed
-		session.Status = SessionStatusFailed
-	} else {
-		task.Status = TaskStatusCompleted
-		session.Status = SessionStatusCompleted
+	if response == nil {
+		response = &AgentInvokeResponse{}
 	}
-	task.UpdatedAt = now
-	session.UpdatedAt = now
-	t := now
-	session.CompletedAt = &t
-	_ = s.store.UpsertTask(ctx, task)
-	_ = s.store.UpsertSession(ctx, session)
+	previousStatus := session.Status
 	req := &AgentInvokeRequest{
 		AgentProfileID: response.AgentProfileID,
 		ExecutionMode:  response.ExecutionMode,
 	}
 	descriptor := invokeExecutionDescriptorForRequest(req)
+	pendingToolProposalReview := invokeErr == nil && descriptor.executionMode == AgentInvokeExecutionModeManagedCodexWorker && len(response.ToolProposals) > 0
+	if invokeErr != nil {
+		task.Status = TaskStatusFailed
+		session.Status = SessionStatusFailed
+		session.CompletedAt = &now
+	} else if pendingToolProposalReview {
+		task.Status = TaskStatusInProgress
+		session.Status = SessionStatusAwaitingApproval
+		session.CompletedAt = nil
+	} else {
+		task.Status = TaskStatusCompleted
+		session.Status = SessionStatusCompleted
+		session.CompletedAt = &now
+	}
+	task.UpdatedAt = now
+	session.UpdatedAt = now
+	_ = s.store.UpsertTask(ctx, task)
+	_ = s.store.UpsertSession(ctx, session)
 	workerID := strings.TrimSpace(session.SelectedWorkerID)
 	if workerID == "" {
 		workerID = fmt.Sprintf("%s-worker-%s", session.SessionID, sanitizeIDFragment(descriptor.workerAdapterID))
@@ -325,24 +333,40 @@ func (s *APIServer) markInvokeSessionResult(ctx context.Context, task *TaskRecor
 		"workerType":      descriptor.workerType,
 		"workerAdapterId": descriptor.workerAdapterID,
 	}
-	toolActionID := fmt.Sprintf("%s-tool-%s", session.SessionID, sanitizeIDFragment(descriptor.toolActionType))
+	toolActionID := invokeSessionToolActionID(session.SessionID, descriptor.toolActionType, response.RequestID)
+	existingAction, _ := s.findSessionToolActionByID(ctx, session.SessionID, toolActionID)
+	requestPayload := mustMarshalJSON(map[string]interface{}{
+		"requestId":      task.RequestID,
+		"agentProfileId": response.AgentProfileID,
+		"executionMode":  descriptor.executionMode,
+		"prompt":         task.Intent,
+	})
+	createdAt := now
+	if startedAt := strings.TrimSpace(response.StartedAt); startedAt != "" {
+		if parsed, err := time.Parse(time.RFC3339, startedAt); err == nil {
+			createdAt = parsed.UTC()
+		}
+	}
+	if existingAction != nil {
+		if len(existingAction.RequestPayload) > 0 {
+			requestPayload = existingAction.RequestPayload
+		}
+		if !existingAction.CreatedAt.IsZero() {
+			createdAt = existingAction.CreatedAt
+		}
+	}
 	toolAction := &ToolActionRecord{
-		ToolActionID: toolActionID,
-		SessionID:    session.SessionID,
-		WorkerID:     workerID,
-		TenantID:     session.TenantID,
-		ProjectID:    session.ProjectID,
-		ToolType:     descriptor.toolActionType,
-		Status:       ToolActionStatusCompleted,
-		Source:       descriptor.toolActionSource,
-		RequestPayload: mustMarshalJSON(map[string]interface{}{
-			"requestId":      task.RequestID,
-			"agentProfileId": response.AgentProfileID,
-			"executionMode":  descriptor.executionMode,
-			"prompt":         task.Intent,
-		}),
-		CreatedAt: session.CreatedAt,
-		UpdatedAt: now,
+		ToolActionID:   toolActionID,
+		SessionID:      session.SessionID,
+		WorkerID:       workerID,
+		TenantID:       session.TenantID,
+		ProjectID:      session.ProjectID,
+		ToolType:       descriptor.toolActionType,
+		Status:         ToolActionStatusCompleted,
+		Source:         descriptor.toolActionSource,
+		RequestPayload: requestPayload,
+		CreatedAt:      createdAt,
+		UpdatedAt:      now,
 	}
 	eventType := SessionEventType("tool_action.completed")
 	workerStatus := WorkerStatusCompleted
@@ -361,11 +385,19 @@ func (s *APIServer) markInvokeSessionResult(ctx context.Context, task *TaskRecor
 		payload["route"] = response.Route
 		payload["finishReason"] = response.FinishReason
 		payload["summary"] = descriptor.completedSummary
+		if pendingToolProposalReview {
+			workerStatus = WorkerStatusWaiting
+			payload["summary"] = "Managed Codex worker completed the turn and is waiting for governed tool proposal review."
+		}
 		toolAction.ResultPayload = mustMarshalJSON(map[string]interface{}{
 			"provider":           response.Provider,
 			"transport":          response.Transport,
 			"model":              response.Model,
 			"route":              response.Route,
+			"endpointRef":        response.EndpointRef,
+			"credentialRef":      response.CredentialRef,
+			"boundaryProviderId": response.BoundaryProviderID,
+			"boundaryBaseUrl":    response.BoundaryBaseURL,
 			"finishReason":       response.FinishReason,
 			"outputText":         response.OutputText,
 			"workerOutputChunks": append([]string(nil), response.WorkerOutputChunks...),
@@ -393,8 +425,12 @@ func (s *APIServer) markInvokeSessionResult(ctx context.Context, task *TaskRecor
 		Model:             response.Model,
 		TargetEnvironment: descriptor.workerTargetEnv,
 		Annotations: mustMarshalJSON(map[string]interface{}{
-			"executionMode": descriptor.executionMode,
-			"bridgeAdapter": descriptor.workerAdapterID,
+			"executionMode":      descriptor.executionMode,
+			"bridgeAdapter":      descriptor.workerAdapterID,
+			"endpointRef":        response.EndpointRef,
+			"credentialRef":      response.CredentialRef,
+			"boundaryProviderId": response.BoundaryProviderID,
+			"boundaryBaseUrl":    response.BoundaryBaseURL,
 		}),
 		CreatedAt: session.CreatedAt,
 		UpdatedAt: now,
@@ -409,7 +445,7 @@ func (s *APIServer) markInvokeSessionResult(ctx context.Context, task *TaskRecor
 				outputChunks = []string{text}
 			}
 		}
-		evidenceID := fmt.Sprintf("%s-evidence-%s", session.SessionID, sanitizeIDFragment(descriptor.evidenceKind))
+		evidenceID := fmt.Sprintf("%s-evidence", toolAction.ToolActionID)
 		s.upsertEvidenceRecordBestEffort(ctx, &EvidenceRecord{
 			EvidenceID:   evidenceID,
 			SessionID:    session.SessionID,
@@ -418,14 +454,18 @@ func (s *APIServer) markInvokeSessionResult(ctx context.Context, task *TaskRecor
 			ProjectID:    session.ProjectID,
 			Kind:         descriptor.evidenceKind,
 			Metadata: mustMarshalJSON(map[string]interface{}{
-				"provider":          response.Provider,
-				"transport":         response.Transport,
-				"model":             response.Model,
-				"route":             response.Route,
-				"finishReason":      response.FinishReason,
-				"requestId":         response.RequestID,
-				"chunkCount":        len(outputChunks),
-				"toolProposalCount": len(response.ToolProposals),
+				"provider":           response.Provider,
+				"transport":          response.Transport,
+				"model":              response.Model,
+				"route":              response.Route,
+				"endpointRef":        response.EndpointRef,
+				"credentialRef":      response.CredentialRef,
+				"boundaryProviderId": response.BoundaryProviderID,
+				"boundaryBaseUrl":    response.BoundaryBaseURL,
+				"finishReason":       response.FinishReason,
+				"requestId":          response.RequestID,
+				"chunkCount":         len(outputChunks),
+				"toolProposalCount":  len(response.ToolProposals),
 			}),
 			CreatedAt: now,
 			UpdatedAt: now,
@@ -461,11 +501,12 @@ func (s *APIServer) markInvokeSessionResult(ctx context.Context, task *TaskRecor
 				Timestamp: now,
 			})
 		}
-		for _, proposal := range response.ToolProposals {
+		for idx, proposal := range response.ToolProposals {
 			proposalID := strings.TrimSpace(fmt.Sprintf("%v", proposal["proposalId"]))
 			if proposalID == "" || proposalID == "<nil>" {
-				proposalID = fmt.Sprintf("%s-proposal-%d", session.SessionID, now.UnixNano())
+				proposalID = fmt.Sprintf("proposal-%d", now.UnixNano())
 			}
+			proposalID = fmt.Sprintf("%s-%s", sanitizeIDFragment(normalizeStringOrDefault(response.RequestID, task.RequestID)), sanitizeIDFragment(proposalID))
 			proposalType := strings.TrimSpace(fmt.Sprintf("%v", proposal["type"]))
 			if proposalType == "" || proposalType == "<nil>" {
 				proposalType = "tool_proposal"
@@ -474,6 +515,10 @@ func (s *APIServer) markInvokeSessionResult(ctx context.Context, task *TaskRecor
 			if proposalSummary == "" || proposalSummary == "<nil>" {
 				proposalSummary = "Managed worker proposed a governed tool action."
 			}
+			proposalPayload := copyJSONObject(proposal)
+			proposalPayload["proposalId"] = proposalID
+			proposalPayload["proposalType"] = normalizeStringOrDefault(proposalType, "tool_proposal")
+			response.ToolProposals[idx] = proposalPayload
 			s.appendSessionEventBestEffort(ctx, &SessionEventRecord{
 				SessionID: session.SessionID,
 				EventType: SessionEventType("tool_proposal.generated"),
@@ -483,7 +528,7 @@ func (s *APIServer) markInvokeSessionResult(ctx context.Context, task *TaskRecor
 					"proposalType":  proposalType,
 					"summary":       proposalSummary,
 					"executionMode": descriptor.executionMode,
-					"payload":       proposal,
+					"payload":       proposalPayload,
 				}),
 				Timestamp: now,
 			})
@@ -491,6 +536,10 @@ func (s *APIServer) markInvokeSessionResult(ctx context.Context, task *TaskRecor
 	} else {
 		progressStage = "failed"
 		progressSummary = descriptor.failedSummary
+	}
+	if pendingToolProposalReview {
+		progressStage = "awaiting_tool_review"
+		progressSummary = "Managed Codex worker is waiting for governed tool proposal review."
 	}
 	s.appendSessionEventBestEffort(ctx, &SessionEventRecord{
 		SessionID: session.SessionID,
@@ -539,15 +588,17 @@ func (s *APIServer) markInvokeSessionResult(ctx context.Context, task *TaskRecor
 			Timestamp: now,
 		})
 	}
-	s.appendSessionEventBestEffort(ctx, &SessionEventRecord{
-		SessionID: session.SessionID,
-		EventType: sessionTerminalEventType(session.Status),
-		Payload: mustMarshalJSON(map[string]interface{}{
-			"status": session.Status,
-			"route":  response.Route,
-		}),
-		Timestamp: now,
-	})
+	if terminalEventType := sessionTerminalEventType(session.Status); terminalEventType != "" {
+		s.appendSessionEventBestEffort(ctx, &SessionEventRecord{
+			SessionID: session.SessionID,
+			EventType: terminalEventType,
+			Payload: mustMarshalJSON(map[string]interface{}{
+				"status": session.Status,
+				"route":  response.Route,
+			}),
+			Timestamp: now,
+		})
+	}
 }
 
 func (s *APIServer) upsertSessionWorkerBestEffort(ctx context.Context, worker *SessionWorkerRecord) {

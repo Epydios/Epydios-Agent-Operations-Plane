@@ -315,7 +315,8 @@ func TestRuntimeIntegrationInvokeManagedCodexWorkerProcessMode(t *testing.T) {
 	)
 	store := newMemoryRunStore()
 	refJSON, err := json.Marshal(map[string]interface{}{
-		"ref://gateways/litellm/openai-compatible": "https://gateway.local",
+		"ref://gateways/litellm/openai-compatible":               "https://gateway.local",
+		"ref://projects/project-a/gateways/litellm/bearer-token": "gateway-token",
 	})
 	if err != nil {
 		t.Fatalf("marshal ref values: %v", err)
@@ -341,6 +342,15 @@ func TestRuntimeIntegrationInvokeManagedCodexWorkerProcessMode(t *testing.T) {
 		runProcess: func(_ context.Context, req codexProcessRequest) ([]byte, error) {
 			if req.Workdir != "/tmp" {
 				t.Fatalf("workdir=%q want /tmp", req.Workdir)
+			}
+			if req.Boundary == nil {
+				t.Fatal("boundary should be populated")
+			}
+			if req.Boundary.BaseURL != "https://gateway.local/v1" {
+				t.Fatalf("boundary baseURL=%q want https://gateway.local/v1", req.Boundary.BaseURL)
+			}
+			if req.Boundary.TokenValue != "gateway-token" {
+				t.Fatalf("boundary token=%q want gateway-token", req.Boundary.TokenValue)
 			}
 			return []byte(strings.Join([]string{
 				`{"type":"thread.started","thread_id":"thread-1"}`,
@@ -368,11 +378,23 @@ func TestRuntimeIntegrationInvokeManagedCodexWorkerProcessMode(t *testing.T) {
 
 	var response AgentInvokeResponse
 	decodeResponseBody(t, rr, &response)
-	if response.Route != "managed_worker_process" {
-		t.Fatalf("route=%q want managed_worker_process", response.Route)
+	if response.Route != "managed_worker_gateway_process" {
+		t.Fatalf("route=%q want managed_worker_gateway_process", response.Route)
 	}
 	if response.OutputText != "Process-backed managed Codex completed the turn." {
 		t.Fatalf("outputText=%q", response.OutputText)
+	}
+	if response.EndpointRef != "ref://gateways/litellm/openai-compatible" {
+		t.Fatalf("endpointRef=%q want gateway ref", response.EndpointRef)
+	}
+	if response.CredentialRef != "ref://projects/project-a/gateways/litellm/bearer-token" {
+		t.Fatalf("credentialRef=%q want gateway token ref", response.CredentialRef)
+	}
+	if response.BoundaryProviderID != "agentops_gateway" {
+		t.Fatalf("boundaryProviderId=%q want agentops_gateway", response.BoundaryProviderID)
+	}
+	if response.BoundaryBaseURL != "https://gateway.local/v1" {
+		t.Fatalf("boundaryBaseUrl=%q want https://gateway.local/v1", response.BoundaryBaseURL)
 	}
 	if len(response.ToolProposals) != 1 {
 		t.Fatalf("toolProposals=%d want 1", len(response.ToolProposals))
@@ -382,6 +404,169 @@ func TestRuntimeIntegrationInvokeManagedCodexWorkerProcessMode(t *testing.T) {
 	}
 	if response.WorkerAdapterID != "codex" {
 		t.Fatalf("workerAdapterId=%q want codex", response.WorkerAdapterID)
+	}
+}
+
+func TestRuntimeIntegrationInvokeManagedCodexWorkerProcessContinuation(t *testing.T) {
+	const (
+		tenantID  = "tenant-a"
+		projectID = "project-a"
+	)
+	store := newMemoryRunStore()
+	refJSON, err := json.Marshal(map[string]interface{}{
+		"ref://gateways/litellm/openai-compatible":               "https://gateway.local",
+		"ref://projects/project-a/gateways/litellm/bearer-token": "gateway-token",
+	})
+	if err != nil {
+		t.Fatalf("marshal ref values: %v", err)
+	}
+	var prompts []string
+	invoker := NewAgentInvoker(store, AgentInvokerConfig{
+		RefValuesJSON:    string(refJSON),
+		HTTPTimeout:      5 * time.Second,
+		ManagedCodexMode: "process",
+		CodexWorkdir:     "/tmp",
+	})
+	invoker.managed["codex"] = codexManagedWorkerAdapter{
+		mode:        "process",
+		workdir:     "/tmp",
+		sandboxMode: "read-only",
+		timeout:     15 * time.Second,
+		runProcess: func(_ context.Context, req codexProcessRequest) ([]byte, error) {
+			prompts = append(prompts, req.Prompt)
+			if req.Boundary == nil {
+				t.Fatal("boundary should be populated")
+			}
+			if req.Boundary.BaseURL != "https://gateway.local/v1" {
+				t.Fatalf("boundary baseURL=%q want https://gateway.local/v1", req.Boundary.BaseURL)
+			}
+			if strings.Contains(req.Prompt, "Governed tool execution result:") {
+				return []byte(strings.Join([]string{
+					`{"type":"turn.started"}`,
+					`{"type":"item.completed","item":{"id":"item_resume","type":"agent_message","text":"{\"message\":\"Managed Codex resumed after governed execution and the workspace looks correct.\",\"tool_proposals\":[]}"}}`,
+					`{"type":"turn.completed","usage":{"input_tokens":12,"output_tokens":18}}`,
+				}, "\n")), nil
+			}
+			return []byte(strings.Join([]string{
+				`{"type":"thread.started","thread_id":"thread-1"}`,
+				`{"type":"turn.started"}`,
+				`{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"{\"message\":\"I need one governed check before I can finish this task.\",\"tool_proposals\":[{\"type\":\"terminal_command\",\"summary\":\"Run pwd to verify the workspace root.\",\"command\":\"pwd\",\"cwd\":\"/tmp\",\"timeoutSeconds\":5,\"readOnlyRequested\":true,\"confidence\":\"structured\"}]}"}}`,
+				`{"type":"turn.completed","usage":{"input_tokens":10,"output_tokens":20}}`,
+			}, "\n")), nil
+		},
+	}
+	handler := NewAPIServer(store, nil, nil).WithAgentInvoker(invoker).Routes()
+
+	rr := requestJSON(t, handler, http.MethodPost, "/v1alpha1/runtime/integrations/invoke", map[string]interface{}{
+		"meta": map[string]interface{}{
+			"tenantId":  tenantID,
+			"projectId": projectID,
+			"requestId": "req-managed-codex-process-resume",
+		},
+		"agentProfileId": "codex",
+		"executionMode":  "managed_codex_worker",
+		"prompt":         "Verify the workspace and continue only after governed approval.",
+	})
+	if rr.Code != http.StatusOK {
+		t.Fatalf("POST integration invoke code=%d body=%s", rr.Code, rr.Body.String())
+	}
+
+	var response AgentInvokeResponse
+	decodeResponseBody(t, rr, &response)
+	if len(response.ToolProposals) != 1 {
+		t.Fatalf("toolProposals=%d want 1", len(response.ToolProposals))
+	}
+	proposalID := normalizedInterfaceString(response.ToolProposals[0]["proposalId"])
+	if proposalID == "" {
+		t.Fatalf("proposalId should be normalized onto the response: %+v", response.ToolProposals)
+	}
+	session, err := store.GetSession(context.Background(), response.SessionID)
+	if err != nil {
+		t.Fatalf("get session after initial invoke: %v", err)
+	}
+	if session.Status != SessionStatusAwaitingApproval {
+		t.Fatalf("session status=%q want %q", session.Status, SessionStatusAwaitingApproval)
+	}
+
+	rr = requestJSON(t, handler, http.MethodPost, "/v1alpha2/runtime/sessions/"+response.SessionID+"/tool-proposals/"+proposalID+"/decision", map[string]interface{}{
+		"meta": map[string]interface{}{
+			"tenantId":  tenantID,
+			"projectId": projectID,
+			"requestId": "proposal-decision-resume-1",
+		},
+		"decision": "APPROVE",
+		"reason":   "approve governed pwd verification",
+	})
+	if rr.Code != http.StatusOK {
+		t.Fatalf("POST tool proposal decision status=%d body=%s", rr.Code, rr.Body.String())
+	}
+	var decision ToolProposalDecisionResponse
+	decodeResponseBody(t, rr, &decision)
+	if decision.ActionStatus != ToolActionStatusCompleted {
+		t.Fatalf("tool proposal actionStatus=%q want %q", decision.ActionStatus, ToolActionStatusCompleted)
+	}
+
+	session, err = store.GetSession(context.Background(), response.SessionID)
+	if err != nil {
+		t.Fatalf("get session after continuation: %v", err)
+	}
+	if session.Status != SessionStatusCompleted {
+		t.Fatalf("session status=%q want %q", session.Status, SessionStatusCompleted)
+	}
+
+	actions, err := store.ListToolActions(context.Background(), ToolActionListQuery{SessionID: response.SessionID})
+	if err != nil {
+		t.Fatalf("list tool actions: %v", err)
+	}
+	managedTurns := 0
+	for _, action := range actions {
+		if action.ToolType == "managed_agent_turn" {
+			managedTurns++
+		}
+	}
+	if managedTurns != 2 {
+		t.Fatalf("managed agent turns=%d want 2: %+v", managedTurns, actions)
+	}
+
+	evidence, err := store.ListEvidenceRecords(context.Background(), EvidenceRecordListQuery{SessionID: response.SessionID})
+	if err != nil {
+		t.Fatalf("list evidence records: %v", err)
+	}
+	managedEvidence := 0
+	for _, record := range evidence {
+		if record.Kind == "managed_worker_output" {
+			managedEvidence++
+		}
+	}
+	if managedEvidence != 2 {
+		t.Fatalf("managed worker evidence count=%d want 2: %+v", managedEvidence, evidence)
+	}
+
+	events, err := store.ListSessionEvents(context.Background(), SessionEventListQuery{SessionID: response.SessionID})
+	if err != nil {
+		t.Fatalf("list session events: %v", err)
+	}
+	sawTerminal := false
+	sawWorkerOutput := 0
+	for _, event := range events {
+		if event.EventType == SessionEventType("worker.output.delta") {
+			sawWorkerOutput++
+		}
+		if event.EventType == SessionEventType("session.completed") {
+			sawTerminal = true
+		}
+	}
+	if !sawTerminal {
+		t.Fatalf("session events missing session.completed: %+v", events)
+	}
+	if sawWorkerOutput < 2 {
+		t.Fatalf("worker output events=%d want >=2: %+v", sawWorkerOutput, events)
+	}
+	if len(prompts) != 2 {
+		t.Fatalf("runProcess prompts=%d want 2", len(prompts))
+	}
+	if !strings.Contains(prompts[1], "Governed tool execution result:") {
+		t.Fatalf("continuation prompt missing governed result section: %s", prompts[1])
 	}
 }
 

@@ -274,6 +274,8 @@ export function buildNativeSessionActivitySummary(sessionView = {}) {
   const session = timeline?.session && typeof timeline.session === "object" ? timeline.session : {};
   const task = timeline?.task && typeof timeline.task === "object" ? timeline.task : {};
   const selectedWorker = timeline?.selectedWorker && typeof timeline.selectedWorker === "object" ? timeline.selectedWorker : {};
+  const proposals = listNativeToolProposals(sessionView);
+  const pendingToolProposalCount = proposals.filter((item) => normalizedString(item?.status, "PENDING").toUpperCase() === "PENDING").length;
   const events = listNativeSessionEvents(sessionView);
   const semanticEvents = events.map((item) => {
     const payload = eventPayloadObject(item);
@@ -330,12 +332,40 @@ export function buildNativeSessionActivitySummary(sessionView = {}) {
     semanticEvents,
     eventCount: semanticEvents.length,
     openApprovalCount: Number(timeline?.openApprovalCount || 0) || 0,
+    pendingToolProposalCount,
     evidenceCount: Array.isArray(timeline?.evidenceRecords) ? timeline.evidenceRecords.length : 0,
     toolActionCount: Array.isArray(timeline?.toolActions) ? timeline.toolActions.length : 0,
     isResolved,
     resolutionStatus,
     resolutionMessage
   };
+}
+
+export function latestManagedWorkerTranscript(sessionView = {}) {
+  const toolActions = Array.isArray(sessionView?.timeline?.toolActions) ? sessionView.timeline.toolActions : [];
+  const managedTurn = [...toolActions]
+    .reverse()
+    .find((item) => normalizedString(item?.toolType).toLowerCase() === "managed_agent_turn");
+  if (!managedTurn?.resultPayload || typeof managedTurn.resultPayload !== "object") {
+    return null;
+  }
+  const rawResponse = managedTurn.resultPayload?.rawResponse;
+  if (!rawResponse) {
+    return null;
+  }
+  try {
+    return {
+      toolActionId: normalizedString(managedTurn?.toolActionId),
+      pretty: JSON.stringify(rawResponse, null, 2),
+      eventCount: Array.isArray(rawResponse) ? rawResponse.length : 0
+    };
+  } catch (_error) {
+    return {
+      toolActionId: normalizedString(managedTurn?.toolActionId),
+      pretty: String(rawResponse),
+      eventCount: 0
+    };
+  }
 }
 
 export function listNativeToolProposals(sessionView = {}) {
@@ -448,6 +478,10 @@ function summarizeTimelineTurn(timeline, sessionView) {
       taskId: normalizedString(session?.taskId),
       sessionId: normalizedString(session?.sessionId),
       route: normalizedString(resultPayload?.route),
+      endpointRef: normalizedString(resultPayload?.endpointRef),
+      credentialRef: normalizedString(resultPayload?.credentialRef),
+      boundaryProviderId: normalizedString(resultPayload?.boundaryProviderId),
+      boundaryBaseUrl: normalizedString(resultPayload?.boundaryBaseUrl),
       provider: normalizedString(resultPayload?.provider),
       transport: normalizedString(resultPayload?.transport),
       model: normalizedString(resultPayload?.model),
@@ -783,6 +817,7 @@ export function deriveOperatorChatThreadState(thread = {}) {
   const activity = buildNativeSessionActivitySummary(sessionView);
   const sessionStatus = activity.sessionStatus;
   const openApprovalCount = activity.openApprovalCount;
+  const pendingToolProposalCount = activity.pendingToolProposalCount;
 
   if (!sessionId) {
     return {
@@ -855,7 +890,11 @@ export function deriveOperatorChatThreadState(thread = {}) {
       return {
         ...baseState,
         uiStatus: "warn",
-        message: `Latest turn ${sessionId} is waiting on ${openApprovalCount || 1} approval checkpoint(s).`,
+        message: openApprovalCount > 0
+          ? `Latest turn ${sessionId} is waiting on ${openApprovalCount} approval checkpoint(s).`
+          : pendingToolProposalCount > 0
+            ? `Latest turn ${sessionId} is waiting on ${pendingToolProposalCount} governed tool proposal review item(s).`
+            : `Latest turn ${sessionId} is waiting on governed review before the worker can continue.`,
         shouldFollow: true,
         isTerminal: false
       };

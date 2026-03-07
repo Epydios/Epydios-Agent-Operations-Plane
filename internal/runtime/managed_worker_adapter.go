@@ -17,10 +17,42 @@ type managedWorkerTurnResult struct {
 	toolProposals      []JSONObject
 }
 
+type managedWorkerProviderBoundary struct {
+	RouteName     string
+	ProviderID    string
+	ProviderName  string
+	BaseURL       string
+	WireAPI       string
+	EndpointRef   string
+	CredentialRef string
+	TokenEnvVar   string
+	TokenValue    string
+}
+
+type managedWorkerContinuationRequest struct {
+	Meta                ObjectMeta
+	Profile             agentProfileConfig
+	Task                *TaskRecord
+	Session             *SessionRecord
+	Worker              *SessionWorkerRecord
+	Proposal            *sessionToolProposal
+	ToolAction          *ToolActionRecord
+	CommandText         string
+	CommandCWD          string
+	TimeoutSeconds      int
+	ExecutionResult     *TerminalExecutionResult
+	ExecutionError      string
+	SystemPrompt        string
+	MaxOutputTokens     int
+	PreviousOutputText  string
+	PreviousRawResponse json.RawMessage
+}
+
 type managedWorkerAdapter interface {
 	AdapterID() string
 	UsesProviderRoutes() bool
-	RunTurn(ctx context.Context, req AgentInvokeRequest, profile agentProfileConfig, fallback *invokeResult) (*managedWorkerTurnResult, error)
+	RunTurn(ctx context.Context, req AgentInvokeRequest, profile agentProfileConfig, boundary *managedWorkerProviderBoundary, fallback *invokeResult) (*managedWorkerTurnResult, error)
+	ContinueTurn(ctx context.Context, req managedWorkerContinuationRequest, boundary *managedWorkerProviderBoundary) (*managedWorkerTurnResult, error)
 }
 
 type codexManagedWorkerAdapter struct {
@@ -62,9 +94,9 @@ func (a codexManagedWorkerAdapter) UsesProviderRoutes() bool {
 	return !strings.EqualFold(strings.TrimSpace(a.mode), "process")
 }
 
-func (a codexManagedWorkerAdapter) RunTurn(ctx context.Context, req AgentInvokeRequest, profile agentProfileConfig, fallback *invokeResult) (*managedWorkerTurnResult, error) {
+func (a codexManagedWorkerAdapter) RunTurn(ctx context.Context, req AgentInvokeRequest, profile agentProfileConfig, boundary *managedWorkerProviderBoundary, fallback *invokeResult) (*managedWorkerTurnResult, error) {
 	if !a.UsesProviderRoutes() {
-		return a.runCodexProcessTurn(ctx, req, profile)
+		return a.runCodexProcessTurn(ctx, req, profile, boundary)
 	}
 	if fallback == nil {
 		return nil, fmt.Errorf("fallback invoke result is required for legacy managed Codex mode")
@@ -76,6 +108,33 @@ func (a codexManagedWorkerAdapter) RunTurn(ctx context.Context, req AgentInvokeR
 		rawResponse:        fallback.rawResponse,
 		workerOutputChunks: splitManagedCodexOutput(fallback.outputText),
 		toolProposals:      detectManagedCodexToolProposals(req.Prompt, fallback.outputText),
+	}, nil
+}
+
+func (a codexManagedWorkerAdapter) ContinueTurn(ctx context.Context, req managedWorkerContinuationRequest, boundary *managedWorkerProviderBoundary) (*managedWorkerTurnResult, error) {
+	if !a.UsesProviderRoutes() {
+		profile := req.Profile
+		if strings.TrimSpace(profile.ID) == "" {
+			profile.ID = normalizeStringOrDefault(req.Worker.AgentProfileID, "codex")
+		}
+		if strings.TrimSpace(profile.Model) == "" {
+			profile.Model = normalizeStringOrDefault(req.Worker.Model, "gpt-5-codex")
+		}
+		return a.runCodexProcessTurn(ctx, AgentInvokeRequest{
+			Meta:            req.Meta,
+			AgentProfileID:  normalizeStringOrDefault(profile.ID, "codex"),
+			ExecutionMode:   AgentInvokeExecutionModeManagedCodexWorker,
+			Prompt:          buildManagedCodexContinuationPrompt(req),
+			SystemPrompt:    strings.TrimSpace(req.SystemPrompt),
+			MaxOutputTokens: req.MaxOutputTokens,
+		}, profile, boundary)
+	}
+	summary := buildManagedCodexLegacyContinuationSummary(req)
+	return &managedWorkerTurnResult{
+		outputText:         summary,
+		finishReason:       "managed_worker_legacy_continuation",
+		workerOutputChunks: splitManagedCodexOutput(summary),
+		toolProposals:      nil,
 	}, nil
 }
 

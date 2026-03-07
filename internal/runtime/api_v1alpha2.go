@@ -1424,8 +1424,9 @@ func (s *APIServer) handleToolProposalDecisionV1Alpha2(w http.ResponseWriter, r 
 			return
 		}
 		previousStatus := session.Status
-		if session.Status == SessionStatusPending || session.Status == SessionStatusReady || session.Status == SessionStatusAwaitingWorker {
+		if session.Status == SessionStatusPending || session.Status == SessionStatusReady || session.Status == SessionStatusAwaitingWorker || session.Status == SessionStatusAwaitingApproval {
 			session.Status = SessionStatusRunning
+			session.CompletedAt = nil
 			session.UpdatedAt = now
 			if err := s.store.UpsertSession(r.Context(), session); err != nil {
 				writeAPIError(w, http.StatusInternalServerError, "STORE_UPDATE_FAILED", "failed to update session status", true, map[string]interface{}{"error": err.Error(), "sessionId": sessionID})
@@ -1616,6 +1617,9 @@ func (s *APIServer) executeApprovedToolProposalAction(ctx context.Context, sessi
 			}),
 			Timestamp: failedAt,
 		})
+		if !s.continueManagedWorkerAfterToolAction(ctx, session, proposal, action, commandText, "", 0, nil, parseErr, decidedAt) {
+			s.transitionSessionAfterStandaloneToolAction(ctx, session, ToolActionStatusFailed, failedAt, proposal, action.ToolActionID)
+		}
 		return ToolActionStatusFailed
 	}
 
@@ -1735,6 +1739,9 @@ func (s *APIServer) executeApprovedToolProposalAction(ctx context.Context, sessi
 		}),
 		Timestamp: finishedAt,
 	})
+	if !s.continueManagedWorkerAfterToolAction(ctx, session, proposal, action, commandText, cwd, timeoutSeconds, execResult, execErr, decidedAt) {
+		s.transitionSessionAfterStandaloneToolAction(ctx, session, finalStatus, finishedAt, proposal, action.ToolActionID)
+	}
 	return finalStatus
 }
 

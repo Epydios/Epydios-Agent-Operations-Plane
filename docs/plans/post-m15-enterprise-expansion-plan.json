@@ -1,6 +1,6 @@
 {
   "id": "post_m15_enterprise_expansion_plan_20260307",
-  "status": "planned_not_active_until_m15_phase_d_and_final_signoff_unless_parallelized",
+  "status": "parallelized_m19_chatops_ingress_in_progress_while_m15_remains_open",
   "created_on": "2026-03-07",
   "product_stance": {
     "control_plane": "AgentOps",
@@ -83,7 +83,25 @@
         "ticket workflow ingress",
         "chatops ingress"
       ],
-      "exit_gate": "developers and non-developers can enter the same governed system through different surfaces with a shared audit and evidence model"
+      "exit_gate": "developers and non-developers can enter the same governed system through different surfaces with a shared audit and evidence model",
+      "current_parallel_progress": [
+        "first VS Code client slice landed in clients/vscode-agentops",
+        "native thread list reads v1alpha2 runtime tasks",
+        "native thread review reads sessions, timeline, and events stream",
+        "managed worker review renders approvals, tool actions, evidence, and worker events from native session state",
+        "IDE-native approval and tool-proposal decisions are wired on the same native session contract",
+        "governed turn submission is wired from the IDE surface through the v1alpha1 integration invoke path using the current taskId",
+        "first CLI ingress slice landed in clients/cli-agentops",
+        "CLI thread review composes native task, session, timeline, approval, tool_action, evidence, and event-stream state without introducing another orchestration path",
+        "CLI approval decisions, tool-proposal decisions, and governed turn submission are wired on the same native session contract used by desktop chat and VS Code",
+        "first ticket workflow ingress slice landed in clients/workflow-agentops",
+        "workflow intake creates native governed tasks with reusable workflow annotations and optional first governed turns on the same session contract",
+        "workflow status renders native task, session, timeline, proposal, and recent-event state as text, json, or ticket-comment output without introducing a separate orchestration path",
+        "first chatops ingress slice landed in clients/chatops-agentops",
+        "chatops intake creates native governed tasks from external conversation context and optionally starts the first governed turn on the same session contract",
+        "chatops status renders native task, session, timeline, proposal, and recent-event state as text, json, or thread-ready update output without introducing a separate orchestration path"
+      ],
+      "next_step": "deepen chatops on the same reusable M16 or M18 contract by adding native approval and proposal decision actions while keeping VS Code, CLI, workflow, and chatops ingress on the same native control-plane model"
     },
     {
       "id": "M20",
@@ -99,6 +117,6 @@
       "exit_gate": "Fortune 500 deployment posture is supported across UI, IDE, API, and worker surfaces with clear governance boundaries"
     }
   ],
-  "recommended_immediate_next_step": "author the M16 control-plane contract spec and entity/event model before building chat, Codex worker control, VS Code, or ticket/chatops ingress",
+  "recommended_immediate_next_step": "continue M19 from the validated VS Code, CLI, workflow, and chatops slices by adding native approval and proposal decision actions to chatops on the same native session contract without forking the control-plane model",
   "parallel_execution_note": "M16 architecture/spec work may begin while M15 remains blocked on Windows execution-host proof, but M15 must not be marked complete until Phase D and final launch sign-off are closed."
 }

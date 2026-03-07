@@ -1,5 +1,5 @@
 import { escapeHTML, formatTime } from "./common.js";
-import { buildNativeSessionActivitySummary, deriveOperatorChatThreadState, listNativeToolProposals } from "../runtime/session-client.js";
+import { buildNativeSessionActivitySummary, deriveOperatorChatThreadState, listNativeToolProposals, latestManagedWorkerTranscript } from "../runtime/session-client.js";
 
 function selectedAttr(current, value) {
   return current === value ? "selected" : "";
@@ -397,6 +397,7 @@ function renderTurnCards(turns = []) {
       const evidence = Array.isArray(timeline?.evidenceRecords) ? timeline.evidenceRecords : [];
       const toolActions = Array.isArray(timeline?.toolActions) ? timeline.toolActions : [];
       const toolProposals = listNativeToolProposals(sessionView);
+      const transcript = latestManagedWorkerTranscript(sessionView);
       const streamItems = Array.isArray(activity?.semanticEvents) ? activity.semanticEvents : [];
       const rawTimeline = timeline ? JSON.stringify(timeline, null, 2) : "";
       return `
@@ -425,11 +426,12 @@ function renderTurnCards(turns = []) {
             <span class="chip chip-neutral chip-compact">workerType=${escapeHTML(String(selectedWorker?.workerType || "-"))}</span>
             <span class="chip chip-neutral chip-compact">worker=${escapeHTML(String(selectedWorker?.adapterId || selectedWorker?.workerId || "-"))}</span>
             <span class="chip chip-neutral chip-compact">route=${escapeHTML(String(response?.route || "-"))}</span>
+            <span class="chip chip-neutral chip-compact">boundary=${escapeHTML(String(response?.boundaryProviderId || "-"))}</span>
             <span class="chip chip-neutral chip-compact">events=${escapeHTML(String(Number(timeline?.latestEventSequence || 0) || 0))}</span>
           </div>
           <div class="chat-turn-foot">
             <div class="meta">completed=${escapeHTML(formatTime(response?.completedAt || session?.completedAt || turn?.createdAt))}</div>
-            <div class="meta">source=${escapeHTML(String(sessionView?.source || "not-loaded"))}; finishReason=${escapeHTML(String(response?.finishReason || "-"))}</div>
+            <div class="meta">source=${escapeHTML(String(sessionView?.source || "not-loaded"))}; finishReason=${escapeHTML(String(response?.finishReason || "-"))}; endpointRef=${escapeHTML(String(response?.endpointRef || "-"))}</div>
           </div>
           <div class="chat-activity-panel">
             <div class="metric-title-row">
@@ -441,6 +443,7 @@ function renderTurnCards(turns = []) {
             ${activity?.latestOutputText ? `<pre class="code-block chat-output-preview">${escapeHTML(String(activity.latestOutputText))}</pre>` : ""}
             ${renderProgressItems(activity?.progressItems)}
           </div>
+          ${transcript ? `<details class="details-shell" open><summary>Raw Worker Transcript (${escapeHTML(String(transcript.eventCount || 0))} events)</summary><div class="meta">managedTurn=${escapeHTML(String(transcript.toolActionId || "-"))}</div><pre class="code-block">${escapeHTML(String(transcript.pretty || ""))}</pre></details>` : ""}
           <details class="details-shell" open>
             <summary>Approval checkpoints (${approvals.length})</summary>
             ${renderApprovalCheckpoints(approvals)}
