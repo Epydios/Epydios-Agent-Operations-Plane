@@ -959,6 +959,45 @@ select.filter-input:disabled {
   line-height: 1.5;
 }
 
+.settings-agent-test-textarea {
+  min-height: 7rem;
+  resize: vertical;
+}
+
+.settings-agent-test-output {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.code-block {
+  margin: 0;
+  padding: 0.9rem 1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(19, 38, 53, 0.12);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(240, 244, 247, 0.94));
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  line-height: 1.55;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.details-shell {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.details-shell summary {
+  cursor: pointer;
+  color: var(--ink-soft);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+}
+
 .settings-metric-config-changes .settings-table,
 .settings-metric-provider-contracts .settings-table,
 .settings-metric-endpoints .settings-table {
@@ -975,7 +1014,11 @@ select.filter-input:disabled {
   }
 
   .settings-subpanel-configuration > .settings-metric-editor {
-    grid-column: span 8;
+    grid-column: span 7;
+  }
+
+  .settings-subpanel-configuration > .settings-metric-agent-test {
+    grid-column: span 5;
   }
 
   .settings-subpanel-configuration > .settings-metric-gateway {

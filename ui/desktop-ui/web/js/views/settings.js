@@ -751,6 +751,99 @@ function renderIntegrationEditor(settings, editorState) {
   `;
 }
 
+function renderIntegrationInvokePanel(settings, invokeState = {}) {
+  const integrations = settings?.integrations || {};
+  const profiles = Array.isArray(integrations.agentProfiles) ? integrations.agentProfiles : [];
+  const selectedProfileId = String(
+    invokeState.agentProfileId || integrations.selectedAgentProfileId || profiles[0]?.id || ""
+  )
+    .trim()
+    .toLowerCase();
+  const selectedProfile =
+    profiles.find((item) => String(item?.id || "").trim().toLowerCase() === selectedProfileId) ||
+    profiles[0] ||
+    {};
+  const profileOptions = profiles
+    .map((item) => {
+      const id = String(item?.id || "").trim().toLowerCase();
+      const label = String(item?.label || id || "unknown").trim() || "unknown";
+      return `<option value="${escapeHTML(id)}" ${selectedAttr(selectedProfileId, id)}>${escapeHTML(label)}</option>`;
+    })
+    .join("");
+  const prompt = String(invokeState.prompt || "").trim();
+  const systemPrompt = String(invokeState.systemPrompt || "").trim();
+  const maxOutputTokens = Number.isFinite(Number(invokeState.maxOutputTokens))
+    ? Number(invokeState.maxOutputTokens)
+    : 1024;
+  const status = String(invokeState.status || "clean").trim().toLowerCase() || "clean";
+  const statusChipClass = chipClassForEditorStatus(status === "success" ? "applied" : status === "running" ? "dirty" : status);
+  const message = String(invokeState.message || "").trim();
+  const warning = String(invokeState.response?.warning || "").trim();
+  const outputText = String(invokeState.response?.outputText || "").trim();
+  const rawResponse = invokeState.response?.rawResponse ? JSON.stringify(invokeState.response.rawResponse, null, 2) : "";
+  const route = String(invokeState.response?.route || "").trim();
+  const provider = String(selectedProfile?.provider || invokeState.response?.provider || "-").trim() || "-";
+  const transport = String(selectedProfile?.transport || invokeState.response?.transport || "-").trim() || "-";
+  const model = String(selectedProfile?.model || invokeState.response?.model || "-").trim() || "-";
+
+  const feedbackLines = [];
+  if (message) {
+    feedbackLines.push(`<div class="meta">${escapeHTML(message)}</div>`);
+  }
+  if (warning) {
+    feedbackLines.push(`<div class="meta settings-editor-warn">Fallback: ${escapeHTML(warning)}</div>`);
+  }
+  if (!message && !warning) {
+    feedbackLines.push(
+      "<div class=\"meta\">Use this panel to verify ref resolution, routing, and provider transport behavior with the selected profile.</div>"
+    );
+  }
+
+  return `
+    <div class="metric settings-metric settings-metric-agent-test">
+      <div class="title">Agent Invocation Test</div>
+      <div class="meta">provider=${escapeHTML(provider)}; transport=${escapeHTML(transport)}; model=${escapeHTML(model)}</div>
+      <div class="meta">This test uses the runtime integration invoke endpoint and the same ref:// contract as the project integration editor.</div>
+      <div class="settings-editor-grid">
+        <label class="field">
+          <span class="label">Invoke Profile</span>
+          <select id="settings-agent-test-profile" class="filter-input" data-settings-agent-test-field="agentProfileId">
+            ${profileOptions}
+          </select>
+        </label>
+        <label class="field">
+          <span class="label">Max Output Tokens</span>
+          <input id="settings-agent-test-max-output-tokens" class="filter-input" type="number" min="1" step="1" value="${escapeHTML(String(maxOutputTokens))}" data-settings-agent-test-field="maxOutputTokens" />
+        </label>
+        <label class="field field-wide">
+          <span class="label">System Prompt</span>
+          <textarea id="settings-agent-test-system-prompt" class="filter-input settings-agent-test-textarea" rows="3" data-settings-agent-test-field="systemPrompt">${escapeHTML(systemPrompt)}</textarea>
+        </label>
+        <label class="field field-wide">
+          <span class="label">Prompt</span>
+          <textarea id="settings-agent-test-prompt" class="filter-input settings-agent-test-textarea" rows="5" data-settings-agent-test-field="prompt">${escapeHTML(prompt)}</textarea>
+        </label>
+      </div>
+      <div class="filter-row settings-editor-actions">
+        <div class="action-hierarchy">
+          <div class="action-group action-group-primary">
+            <button class="btn btn-primary" type="button" data-settings-agent-test-action="invoke">Invoke Selected Agent</button>
+          </div>
+        </div>
+        <span id="settings-agent-test-status-chip" class="${statusChipClass}">${escapeHTML(status)}</span>
+      </div>
+      <div id="settings-agent-test-feedback" class="stack" role="status" aria-live="polite" aria-atomic="true">
+        ${feedbackLines.join("")}
+      </div>
+      <div class="settings-agent-test-output">
+        <div class="meta">route=${escapeHTML(route || "-")}; finishReason=${escapeHTML(String(invokeState.response?.finishReason || "-"))}</div>
+        <pre class="code-block">${escapeHTML(outputText || "No response yet.")}</pre>
+        ${rawResponse ? `<details class="details-shell"><summary>Raw Response</summary><pre class="code-block">${escapeHTML(rawResponse)}</pre></details>` : ""}
+      </div>
+    </div>
+  `;
+}
+
 export function renderSettings(ui, settingsPayload, editorState = {}, viewState = {}) {
   if (!ui.settingsContent) {
     return;
@@ -776,6 +869,7 @@ export function renderSettings(ui, settingsPayload, editorState = {}, viewState 
   const endpointRows = renderEndpointMatrixRows(endpoints);
   const providerContractRows = renderProviderContractRows(providerContracts);
   const integrationEditor = renderIntegrationEditor(settings, editorState);
+  const integrationInvokePanel = renderIntegrationInvokePanel(settings, viewState?.agentTest || {});
   const integrationSyncStatus = renderIntegrationSyncStatus(settings, editorState);
   const configChangeRows = renderConfigChangeRows(configChanges);
   const requestedSubview = String(viewState?.subview || "configuration").trim().toLowerCase();
@@ -818,6 +912,7 @@ export function renderSettings(ui, settingsPayload, editorState = {}, viewState 
         <div class="meta">profileProviderContract=${escapeHTML(agent.provider)}</div>
       </div>
       ${integrationEditor}
+      ${integrationInvokePanel}
       <div class="metric settings-metric settings-metric-gateway">
         <div class="title">Gateway Security References</div>
         <div class="meta">gatewayTokenRef=<code>${escapeHTML(integrations.gatewayTokenRef || "-")}</code></div>

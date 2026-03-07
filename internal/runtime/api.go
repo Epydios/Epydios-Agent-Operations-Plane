@@ -23,6 +23,7 @@ type APIServer struct {
 	store        RunStore
 	orchestrator *Orchestrator
 	auth         *AuthEnforcer
+	agentInvoker *AgentInvoker
 }
 
 func NewAPIServer(store RunStore, orchestrator *Orchestrator, auth *AuthEnforcer) *APIServer {
@@ -32,6 +33,11 @@ func NewAPIServer(store RunStore, orchestrator *Orchestrator, auth *AuthEnforcer
 		orchestrator: orchestrator,
 		auth:         auth,
 	}
+}
+
+func (s *APIServer) WithAgentInvoker(invoker *AgentInvoker) *APIServer {
+	s.agentInvoker = invoker
+	return s
 }
 
 const (
@@ -92,6 +98,7 @@ func (s *APIServer) Routes() http.Handler {
 	mux.HandleFunc("/v1alpha1/runtime/audit/events", s.handleAuditEvents)
 	mux.HandleFunc("/v1alpha1/runtime/terminal/sessions", s.handleTerminalSessions)
 	mux.HandleFunc("/v1alpha1/runtime/integrations/settings", s.handleIntegrationSettings)
+	mux.HandleFunc("/v1alpha1/runtime/integrations/invoke", s.handleIntegrationInvoke)
 	return loggingMiddleware(mux)
 }
 
@@ -945,6 +952,118 @@ func (s *APIServer) handleIntegrationSettings(w http.ResponseWriter, r *http.Req
 	default:
 		writeAPIError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "method not allowed", false, nil)
 	}
+}
+
+func (s *APIServer) handleIntegrationInvoke(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeAPIError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "method not allowed", false, nil)
+		return
+	}
+	ctx, ok := s.authorizeRequest(w, r, PermissionRunCreate)
+	if !ok {
+		return
+	}
+	s.handlePostIntegrationInvoke(w, r.WithContext(ctx))
+}
+
+func (s *APIServer) handlePostIntegrationInvoke(w http.ResponseWriter, r *http.Request) {
+	if s.agentInvoker == nil {
+		writeAPIError(
+			w,
+			http.StatusNotImplemented,
+			"INTEGRATION_INVOKE_UNAVAILABLE",
+			"runtime integration invocation is not configured",
+			false,
+			nil,
+		)
+		return
+	}
+	defer r.Body.Close()
+
+	var req AgentInvokeRequest
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, integrationRequestMaxBytes)).Decode(&req); err != nil {
+		writeAPIError(w, http.StatusBadRequest, "INVALID_JSON", "invalid JSON body", false, map[string]interface{}{"error": err.Error()})
+		return
+	}
+
+	identity, _ := RuntimeIdentityFromContext(r.Context())
+	if err := enforceRequestMetaScope(&req.Meta, identity); err != nil {
+		emitAuditEvent(r.Context(), "runtime.scope.deny", map[string]interface{}{
+			"path":       r.URL.Path,
+			"method":     r.Method,
+			"permission": PermissionRunCreate,
+			"tenantId":   req.Meta.TenantID,
+			"projectId":  req.Meta.ProjectID,
+			"error":      err.Error(),
+		})
+		s.writeAuthError(w, err)
+		return
+	}
+	if err := s.authorizeScoped(identity, PermissionRunCreate, req.Meta.TenantID, req.Meta.ProjectID); err != nil {
+		emitAuditEvent(r.Context(), "runtime.authz.policy.deny", map[string]interface{}{
+			"path":       r.URL.Path,
+			"method":     r.Method,
+			"permission": PermissionRunCreate,
+			"tenantId":   req.Meta.TenantID,
+			"projectId":  req.Meta.ProjectID,
+			"error":      err.Error(),
+		})
+		s.writeAuthError(w, err)
+		return
+	}
+	injectActorIdentity(&req.Meta, r.Context())
+	emitAuditEvent(r.Context(), "runtime.authz.policy.allow", map[string]interface{}{
+		"path":       r.URL.Path,
+		"method":     r.Method,
+		"permission": PermissionRunCreate,
+		"tenantId":   req.Meta.TenantID,
+		"projectId":  req.Meta.ProjectID,
+	})
+
+	emitAuditEvent(r.Context(), "runtime.integrations.invoke.started", map[string]interface{}{
+		"path":           r.URL.Path,
+		"method":         r.Method,
+		"tenantId":       req.Meta.TenantID,
+		"projectId":      req.Meta.ProjectID,
+		"agentProfileId": strings.TrimSpace(req.AgentProfileID),
+		"requestId":      strings.TrimSpace(req.Meta.RequestID),
+	})
+	response, err := s.agentInvoker.Invoke(r.Context(), req)
+	if err != nil {
+		emitAuditEvent(r.Context(), "runtime.integrations.invoke.failed", map[string]interface{}{
+			"path":           r.URL.Path,
+			"method":         r.Method,
+			"tenantId":       req.Meta.TenantID,
+			"projectId":      req.Meta.ProjectID,
+			"agentProfileId": strings.TrimSpace(req.AgentProfileID),
+			"requestId":      strings.TrimSpace(req.Meta.RequestID),
+			"error":          err.Error(),
+		})
+		writeAPIError(
+			w,
+			http.StatusBadGateway,
+			"INTEGRATION_INVOKE_FAILED",
+			"integration invocation failed",
+			true,
+			map[string]interface{}{"error": err.Error()},
+		)
+		return
+	}
+
+	emitAuditEvent(r.Context(), "runtime.integrations.invoke.completed", map[string]interface{}{
+		"path":           r.URL.Path,
+		"method":         r.Method,
+		"tenantId":       response.TenantID,
+		"projectId":      response.ProjectID,
+		"agentProfileId": response.AgentProfileID,
+		"provider":       response.Provider,
+		"transport":      response.Transport,
+		"model":          response.Model,
+		"route":          response.Route,
+		"requestId":      response.RequestID,
+		"finishReason":   response.FinishReason,
+	})
+	writeJSON(w, http.StatusOK, response)
 }
 
 func (s *APIServer) handleGetIntegrationSettings(w http.ResponseWriter, r *http.Request) {

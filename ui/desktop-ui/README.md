@@ -143,6 +143,7 @@ Notes:
   - Provider contract matrix with per-profile transport/model/endpoint reference and credential reference scope (reference-only, no raw secrets in UI payloads).
   - Gateway security reference panel for bearer-token and mTLS certificate/key references.
   - Project-scoped integrations editor with draft save/apply/reset flow, strict `ref://` validation, and raw-secret pattern blocking.
+  - Agent Invocation Test panel wired to `POST /v1alpha1/runtime/integrations/invoke` for live profile validation across `codex`, `openai`, `anthropic`, `google`, `azure_openai`, and `bedrock`.
   - M14.8 IP-governance alignment verifier path ensures UI new-IP surfaces are registered with required review metadata in the shared intake register.
   - AIMXS provider status summary from provider registry payload.
   - Files:
@@ -237,6 +238,29 @@ Notes:
 7. Optional browser stress scenario: `RUN_M14_BROWSER_STRESS=1 ./bin/verify-m14-ui-028.sh`
 8. Optional auth/session robustness: `RUN_M14_AUTH_STRESS=1 ./bin/verify-m14-ui-029.sh`
 
+## Live Provider Invocation Testing
+
+- `mock` mode does not hit real model providers; it returns a synthetic integration-invoke response.
+- To test real provider calls, the runtime API must expose `POST /v1alpha1/runtime/integrations/invoke` and must have runtime ref values configured.
+- Runtime ref resolution sources:
+  - `RUNTIME_REF_VALUES_PATH=/absolute/path/to/ref-values.json`
+  - `RUNTIME_REF_VALUES_JSON='{"ref://...":"..."}'`
+- The UI settings editor remains reference-only. Concrete secrets stay outside the UI and are resolved by the runtime.
+- Minimal operator path:
+  1. Start or update the runtime with `RUNTIME_REF_VALUES_PATH` or `RUNTIME_REF_VALUES_JSON`.
+  2. Run the UI in `live` mode so it talks to the real runtime API.
+  3. Open `Settings -> Configuration`.
+  4. Set `modelRouting=direct_first` if no LiteLLM gateway is available.
+  5. Use `Agent Invocation Test` to invoke the selected profile.
+- Direct defaults exist for:
+  - `codex` / `openai` -> `https://api.openai.com`
+  - `anthropic` -> `https://api.anthropic.com`
+  - `google` -> `https://generativelanguage.googleapis.com`
+- Explicit endpoint refs are still required for:
+  - `azure_openai`
+  - `bedrock`
+- A non-repo template for the ref-values JSON is kept under `EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/integration-invoke/`.
+
 ## macOS Program Path
 
 - Bootstrap checks:
@@ -255,7 +279,46 @@ Notes:
 - Framework choice is locked to `Wails` for M15 native packaging.
 - Preflight prerequisites:
   - `./bin/check-m15-native-toolchain.sh`
-- Current blocking prerequisites (on this host) are `node`, `npm`, and `wails`.
+- The preflight also checks common user-local install locations such as `~/bin` and `~/.local/bin`.
+- If the preflight fails, install the missing host prerequisites and rerun it until PASS.
+- Phase A native shell foundation:
+  - runner: `./bin/run-m15-native-macos.sh --mode mock`
+  - verifier: `./bin/verify-m15-phase-a.sh`
+  - script-managed cache root: `../../../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/m15-cache/`
+  - cached native binary root: `../../../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/m15-cache/native-build/<host-tag>/`
+  - staged frontend root: `../../../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/m15-cache/frontend-stage/phase-a/`
+  - session output root: `${XDG_CACHE_HOME:-$HOME/Library/Caches}/EpydiosAgentOpsDesktop/native-shell/<timestamp>`
+  - session manifest includes runtime mode, runtime process mode, log paths, crash-dump path, and the default `sandbox_vm_autonomous` / restricted-host-blocked posture
+- The Wails shell stages the existing `web/` bundle into a per-session directory and rewrites `config/runtime-config.json` there, so native mock/live launches preserve the current browser-era config flow.
+- Phase B Linux packaging baseline:
+  - packager: `./bin/package-m15-linux.sh`
+  - verifier: `./bin/verify-m15-phase-b.sh`
+  - Docker Linux host wrapper (from macOS): `./bin/run-m15-phase-b-linux-docker.sh`
+  - artifact root: `../../../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/m15-native-phase-b/<timestamp>`
+  - on non-Linux hosts the Phase B verifier records the packaging blocker instead of pretending Linux artifacts were produced
+- Phase B Linux exit gate proof:
+  - verifier: `./bin/verify-m15-phase-b-exit-gate.sh`
+  - Docker wrapper (from macOS): `./bin/run-m15-phase-b-exit-gate-docker.sh`
+  - proof root: `../../../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/m15-native-phase-b-exit/<timestamp>`
+  - default mode is `live`; `mock` is only a troubleshooting fallback and does not close the Phase B exit gate
+- Phase C macOS packaged beta:
+  - packager: `./bin/package-m15-macos.sh`
+  - installer: `./bin/install-m15-macos-beta.sh`
+  - launcher: `./bin/launch-m15-macos-beta.sh`
+  - uninstaller: `./bin/uninstall-m15-macos-beta.sh`
+  - verifier: `./bin/verify-m15-phase-c.sh`
+  - proof root: `../../../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/m15-native-phase-c/<timestamp>`
+  - package flow uses a deterministic manual `.app` bundle around the working native binary so Phase C does not depend on the opaque Wails packaging wrapper
+  - bootstrap config default path for installed beta runs: `$HOME/Library/Application Support/EpydiosAgentOpsDesktop/runtime-bootstrap.json`
+  - local beta install root default: `$HOME/Applications/Epydios AgentOps Desktop.app`
+- Phase D Windows parity foundation:
+  - packager: `./bin/package-m15-windows.sh`
+  - Docker Linux builder wrapper (from macOS): `./bin/run-m15-phase-d-windows-docker.sh`
+  - verifier: `./bin/verify-m15-phase-d.sh`
+  - Docker builder definition: `./docker/m15-windows-builder/Dockerfile`
+  - proof root: `../../../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/m15-native-phase-d/<timestamp>`
+  - current proof covers Windows `.exe` + NSIS installer baseline plus the existing Windows parity verifier foundation
+  - Phase D exit gate still requires real packaged-app execution proof on a Windows host before the milestone can close
 
 ## Notes
 

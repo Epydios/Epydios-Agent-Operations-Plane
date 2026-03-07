@@ -242,6 +242,15 @@ let aimxsEditorState = {
   status: "clean",
   message: ""
 };
+let agentInvokeState = {
+  agentProfileId: "",
+  prompt: "",
+  systemPrompt: "",
+  maxOutputTokens: 1024,
+  status: "clean",
+  message: "",
+  response: null
+};
 
 const SECRET_LIKE_PATTERNS = [
   /sk-[a-zA-Z0-9]{12,}/,
@@ -625,6 +634,63 @@ function readAimxsEditorInput() {
     bearerTokenRef: String(bearerTokenRef.value || "").trim(),
     mtlsCertRef: String(mtlsCertRef.value || "").trim(),
     mtlsKeyRef: String(mtlsKeyRef.value || "").trim()
+  };
+}
+
+function normalizeAgentInvokeDraft(input = {}) {
+  const maxOutputTokens = Number.parseInt(String(input.maxOutputTokens || ""), 10);
+  return {
+    agentProfileId: String(input.agentProfileId || "").trim().toLowerCase(),
+    prompt: String(input.prompt || "").trim(),
+    systemPrompt: String(input.systemPrompt || "").trim(),
+    maxOutputTokens:
+      Number.isFinite(maxOutputTokens) && maxOutputTokens > 0 ? maxOutputTokens : 1024
+  };
+}
+
+function readAgentInvokeInput() {
+  const root = ui.settingsContent;
+  if (!root) {
+    return null;
+  }
+  const read = (selector) => root.querySelector(selector);
+  const profile = read("#settings-agent-test-profile");
+  const prompt = read("#settings-agent-test-prompt");
+  const systemPrompt = read("#settings-agent-test-system-prompt");
+  const maxOutputTokens = read("#settings-agent-test-max-output-tokens");
+  if (
+    !(profile instanceof HTMLSelectElement) ||
+    !(prompt instanceof HTMLTextAreaElement) ||
+    !(systemPrompt instanceof HTMLTextAreaElement) ||
+    !(maxOutputTokens instanceof HTMLInputElement)
+  ) {
+    return null;
+  }
+  return normalizeAgentInvokeDraft({
+    agentProfileId: profile.value,
+    prompt: prompt.value,
+    systemPrompt: systemPrompt.value,
+    maxOutputTokens: maxOutputTokens.value
+  });
+}
+
+function validateAgentInvokeDraft(draft, choices) {
+  const errors = [];
+  const profiles = Array.isArray(choices?.integrations?.agentProfiles)
+    ? choices.integrations.agentProfiles
+    : [];
+  const selected = String(draft?.agentProfileId || "").trim().toLowerCase();
+  if (!selected) {
+    errors.push("Agent profile is required.");
+  } else if (!profiles.some((profile) => String(profile?.id || "").trim().toLowerCase() === selected)) {
+    errors.push(`Unknown agent profile: ${selected}`);
+  }
+  if (!String(draft?.prompt || "").trim()) {
+    errors.push("Prompt is required.");
+  }
+  return {
+    valid: errors.length === 0,
+    errors
   };
 }
 
@@ -3475,7 +3541,19 @@ async function main() {
       const selectedApprovalRunId = String(ui.approvalsDetailContent?.dataset?.selectedRunId || "").trim();
       renderSettings(ui, settingsWithConfigChanges, editorState, {
         subview: settingsSubviewState,
-        aimxsEditor: aimxsEditorState
+        aimxsEditor: aimxsEditorState,
+        agentTest: {
+          ...agentInvokeState,
+          agentProfileId:
+            String(
+              agentInvokeState.agentProfileId ||
+                selectedAgentProfileId ||
+                settingsWithConfigChanges?.integrations?.selectedAgentProfileId ||
+                ""
+            )
+              .trim()
+              .toLowerCase()
+        }
       });
       setSettingsSubview(settingsSubviewState);
       renderApprovals(ui, store, approvals, approvalScope, selectedApprovalRunId);
@@ -3891,6 +3969,10 @@ async function main() {
     if (selected) {
       saveValue(AGENT_PREF_KEY, selected);
     }
+    agentInvokeState = {
+      ...agentInvokeState,
+      agentProfileId: selected || agentInvokeState.agentProfileId
+    };
     const current = deepClone(getRuntimeChoices());
     current.integrations = current.integrations || {};
     current.integrations.selectedAgentProfileId = selected;
@@ -3912,7 +3994,25 @@ async function main() {
     }
     const integrationFieldNode = target.closest("[data-settings-int-field]");
     const aimxsFieldNode = target.closest("[data-settings-aimxs-field]");
-    if (!integrationFieldNode && !aimxsFieldNode) {
+    const agentTestFieldNode = target.closest("[data-settings-agent-test-field]");
+    if (!integrationFieldNode && !aimxsFieldNode && !agentTestFieldNode) {
+      return;
+    }
+    if (agentTestFieldNode) {
+      const draft = readAgentInvokeInput();
+      if (!draft) {
+        return;
+      }
+      const validation = validateAgentInvokeDraft(draft, getRuntimeChoices());
+      agentInvokeState = {
+        ...agentInvokeState,
+        ...draft,
+        status: validation.valid ? "dirty" : "invalid",
+        message: validation.valid
+          ? "Agent test draft changed. Run Invoke Selected Agent to exercise the live runtime integration path."
+          : validation.errors.join(" "),
+        response: validation.valid ? agentInvokeState.response : null
+      };
       return;
     }
     if (aimxsFieldNode) {
@@ -4068,6 +4168,92 @@ async function main() {
       return;
     }
     const actionNode = target.closest("[data-settings-int-action]");
+    const agentTestActionNode = target.closest("[data-settings-agent-test-action]");
+    if (agentTestActionNode instanceof HTMLElement) {
+      const action = String(agentTestActionNode.dataset.settingsAgentTestAction || "")
+        .trim()
+        .toLowerCase();
+      if (action !== "invoke") {
+        return;
+      }
+
+      const draft = readAgentInvokeInput() || normalizeAgentInvokeDraft(agentInvokeState);
+      const validation = validateAgentInvokeDraft(draft, getRuntimeChoices());
+      if (!validation.valid) {
+        agentInvokeState = {
+          ...agentInvokeState,
+          ...draft,
+          status: "invalid",
+          message: validation.errors.join(" "),
+          response: null
+        };
+        await refresh();
+        return;
+      }
+
+      const session = getSession();
+      const tenantID = activeTenantScope(session);
+      const projectID = activeProjectScope(session);
+      if (!tenantID || !projectID) {
+        agentInvokeState = {
+          ...agentInvokeState,
+          ...draft,
+          status: "invalid",
+          message: "Tenant and project scope are required before invoking a configured agent profile.",
+          response: null
+        };
+        await refresh();
+        return;
+      }
+
+      agentInvokeState = {
+        ...agentInvokeState,
+        ...draft,
+        status: "running",
+        message: `Invoking ${draft.agentProfileId} through the runtime integration path...`,
+        response: null
+      };
+      await refresh();
+
+      try {
+        const result = await api.invokeIntegrationAgent({
+          meta: {
+            tenantId: tenantID,
+            projectId: projectID,
+            requestId: `req-agent-test-${Date.now()}`
+          },
+          agentProfileId: draft.agentProfileId,
+          prompt: draft.prompt,
+          systemPrompt: draft.systemPrompt,
+          maxOutputTokens: draft.maxOutputTokens
+        });
+        agentInvokeState = {
+          ...agentInvokeState,
+          ...draft,
+          status:
+            result?.applied && result?.source !== "endpoint-unavailable"
+              ? "success"
+              : result?.source === "endpoint-unavailable"
+                ? "error"
+                : "warn",
+          message:
+            result?.applied && result?.source === "runtime-endpoint"
+              ? `Invocation completed via ${String(result.route || "runtime").trim() || "runtime"} route.`
+              : String(result?.warning || "").trim() || "Invocation did not complete.",
+          response: result || null
+        };
+      } catch (error) {
+        agentInvokeState = {
+          ...agentInvokeState,
+          ...draft,
+          status: "error",
+          message: `Invocation failed: ${error.message}`,
+          response: null
+        };
+      }
+      await refresh();
+      return;
+    }
     if (!(actionNode instanceof HTMLElement)) {
       return;
     }
