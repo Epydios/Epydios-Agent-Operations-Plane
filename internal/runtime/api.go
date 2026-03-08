@@ -446,7 +446,10 @@ func (s *APIServer) handleAuditExport(w http.ResponseWriter, r *http.Request) {
 		exportItems = append(exportItems, sanitized)
 		redactionCount += count
 	}
-	applyRuntimeExportHeaders(w, disposition, redactionCount)
+	orgAdminSummary := summarizeRuntimeAuditExportOrgAdmin(filtered)
+	totalRedactionCount := redactionCount + orgAdminSummary.RedactionCount
+	applyRuntimeExportHeaders(w, disposition, totalRedactionCount)
+	applyRuntimeExportOrgAdminHeaders(w, orgAdminSummary)
 
 	emitAuditEvent(r.Context(), "runtime.audit.export", map[string]interface{}{
 		"path":                 r.URL.Path,
@@ -464,7 +467,10 @@ func (s *APIServer) handleAuditExport(w http.ResponseWriter, r *http.Request) {
 		"exportProfile":        disposition.ExportProfile,
 		"audience":             disposition.Audience,
 		"exportRetentionClass": disposition.RetentionClass,
-		"redactionCount":       redactionCount,
+		"redactionCount":       totalRedactionCount,
+		"orgAdminProfiles":     len(orgAdminSummary.Profiles),
+		"orgAdminBindings":     len(orgAdminSummary.DecisionBindings),
+		"orgAdminPending":      orgAdminSummary.PendingReviewCount,
 	})
 
 	switch format {
@@ -480,15 +486,27 @@ func (s *APIServer) handleAuditExport(w http.ResponseWriter, r *http.Request) {
 		}
 	case "json":
 		writeJSON(w, http.StatusOK, map[string]interface{}{
-			"source":               "runtime-memory",
-			"count":                len(exportItems),
-			"unfilteredCount":      len(items),
-			"filteredDenied":       deniedByAuthz,
-			"exportProfile":        disposition.ExportProfile,
-			"audience":             disposition.Audience,
-			"exportRetentionClass": disposition.RetentionClass,
-			"redactionCount":       redactionCount,
-			"items":                exportItems,
+			"source":                     "runtime-memory",
+			"count":                      len(exportItems),
+			"unfilteredCount":            len(items),
+			"filteredDenied":             deniedByAuthz,
+			"exportProfile":              disposition.ExportProfile,
+			"audience":                   disposition.Audience,
+			"exportRetentionClass":       disposition.RetentionClass,
+			"redactionCount":             totalRedactionCount,
+			"orgAdminProfiles":           orgAdminSummary.Profiles,
+			"orgAdminOrganizationModels": orgAdminSummary.OrganizationModels,
+			"orgAdminDecisionBindings":   orgAdminSummary.DecisionBindings,
+			"orgAdminCategories":         orgAdminSummary.Categories,
+			"orgAdminRoleBundles":        orgAdminSummary.RoleBundles,
+			"orgAdminInputKeys":          orgAdminSummary.InputKeys,
+			"orgAdminInputValues":        orgAdminSummary.InputValues,
+			"orgAdminDecisionActorRoles": orgAdminSummary.DecisionActorRoles,
+			"orgAdminDirectoryMappings":  orgAdminSummary.DirectoryMappings,
+			"orgAdminExceptionProfiles":  orgAdminSummary.ExceptionProfiles,
+			"orgAdminOverlayProfiles":    orgAdminSummary.OverlayProfiles,
+			"orgAdminPendingReviewCount": orgAdminSummary.PendingReviewCount,
+			"items":                      exportItems,
 		})
 	}
 }

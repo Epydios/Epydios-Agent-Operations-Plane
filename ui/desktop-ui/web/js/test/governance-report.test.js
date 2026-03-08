@@ -68,6 +68,7 @@ test("enterprise governance report envelope filters catalogs and redacts secret-
                 environment: "prod",
                 business_unit: "platform"
               },
+              decisionActorRoles: ["enterprise.tenant_admin"],
               decisionSurfaces: ["policy_pack_assignment"],
               boundaryRequirements: ["runtime_authz"]
             }
@@ -218,6 +219,10 @@ test("enterprise governance report envelope filters catalogs and redacts secret-
   assert.match(renderEnterpriseReportEnvelope(envelope), /Directory-sync mapping coverage:/);
   assert.match(renderEnterpriseReportEnvelope(envelope), /Exception profile coverage:/);
   assert.match(renderEnterpriseReportEnvelope(envelope), /Overlay profile coverage:/);
+  assert.match(renderEnterpriseReportEnvelope(envelope), /Active org-admin categories:/);
+  assert.match(renderEnterpriseReportEnvelope(envelope), /Active org-admin decision actor roles:/);
+  assert.match(renderEnterpriseReportEnvelope(envelope), /Active org-admin decision surfaces:/);
+  assert.match(renderEnterpriseReportEnvelope(envelope), /Active org-admin boundary requirements:/);
 });
 
 test("governed json export redacts structured secret-like content and carries export metadata", () => {
@@ -238,6 +243,59 @@ test("governed json export redacts structured secret-like content and carries ex
   assert.equal(prepared.retentionClass, "archive");
   assert.match(prepared.serialized, /\[REDACTED\]/);
   assert.ok(prepared.redactionCount > 0);
+});
+
+test("governed export carries active org-admin review metadata when approval checkpoints are provided", () => {
+  const prepared = prepareGovernedJsonExport(
+    {
+      transcript: {
+        token: "Bearer sk-abc1234567890123456789"
+      }
+    },
+    {
+      exportProfile: "external_report",
+      audience: "exec_review",
+      approvalCheckpoints: [
+        {
+          checkpointId: "approval-org-admin-export-1",
+          status: "PENDING",
+          reason: "Delegated admin review required before export.",
+          annotations: {
+            orgAdminDecisionBinding: {
+              profileId: "centralized_enterprise_admin",
+              organizationModel: "centralized_enterprise",
+              bindingId: "centralized_enterprise_admin_delegated_admin_binding",
+              bindingLabel: "Centralized Enterprise Admin Delegated Admin Decision Binding",
+              category: "delegated_admin",
+              bindingMode: "delegated_admin_scope_review",
+              selectedRoleBundle: "enterprise.tenant_admin",
+              requestedInputKeys: ["idp_group", "tenant_id"],
+              inputValues: {
+                idp_group: "grp-agentops-tenant-admins",
+                tenant_id: "tenant-a"
+              },
+              decisionActorRoles: ["enterprise.tenant_admin"],
+              decisionSurfaces: ["policy_pack_assignment"],
+              boundaryRequirements: ["runtime_authz"]
+            }
+          }
+        }
+      ]
+    }
+  );
+
+  assert.equal(prepared.activeOrgAdminProfileId, "centralized_enterprise_admin");
+  assert.equal(prepared.activeOrgAdminOrganizationModel, "centralized_enterprise");
+  assert.equal(prepared.activeOrgAdminRoleBundle, "enterprise.tenant_admin");
+  assert.equal(prepared.activeOrgAdminPendingReviews, 1);
+  assert.deepEqual(prepared.activeOrgAdminCategories, ["delegated_admin"]);
+  assert.ok(prepared.activeOrgAdminDecisionBindings.some((item) => item.includes("Delegated Admin Decision Binding")));
+  assert.deepEqual(prepared.activeOrgAdminDecisionActorRoles, ["enterprise.tenant_admin"]);
+  assert.deepEqual(prepared.activeOrgAdminDecisionSurfaces, ["policy_pack_assignment"]);
+  assert.deepEqual(prepared.activeOrgAdminBoundaryRequirements, ["runtime_authz"]);
+  assert.deepEqual(prepared.activeOrgAdminInputKeys, ["idp_group", "tenant_id"]);
+  assert.ok(prepared.activeOrgAdminDetails.some((item) => item.includes("Org-admin decision binding:")));
+  assert.ok(prepared.activeOrgAdminActionHints.some((item) => item.includes("pending org-admin decision reviews")));
 });
 
 test("enterprise report and governed export infer normalized profile and audience from surface plus report type", () => {

@@ -998,6 +998,34 @@ func (s *APIServer) handleCreateApprovalCheckpointV1Alpha2(w http.ResponseWriter
 	}
 	if orgAdminBinding != nil {
 		appendOrgAdminDecisionBindingRequestedArtifacts(s, r.Context(), session, checkpoint, orgAdminBinding, now)
+		emitAuditEvent(r.Context(), "runtime.org_admin.binding.requested", map[string]interface{}{
+			"path":                    r.URL.Path,
+			"method":                  r.Method,
+			"sessionId":               session.SessionID,
+			"checkpointId":            checkpoint.CheckpointID,
+			"tenantId":                session.TenantID,
+			"projectId":               session.ProjectID,
+			"status":                  checkpoint.Status,
+			"reason":                  checkpoint.Reason,
+			"requestedCapabilities":   checkpoint.RequestedCapabilities,
+			"requiredVerifierIds":     checkpoint.RequiredVerifierIDs,
+			"orgAdminDecisionBinding": orgAdminDecisionBindingAuditPayload(orgAdminBinding),
+		})
+		if eventName := orgAdminCategoryAuditEventName(orgAdminBinding.Category, "requested"); eventName != "" {
+			emitAuditEvent(r.Context(), eventName, map[string]interface{}{
+				"path":                    r.URL.Path,
+				"method":                  r.Method,
+				"sessionId":               session.SessionID,
+				"checkpointId":            checkpoint.CheckpointID,
+				"tenantId":                session.TenantID,
+				"projectId":               session.ProjectID,
+				"status":                  checkpoint.Status,
+				"reason":                  checkpoint.Reason,
+				"requestedCapabilities":   checkpoint.RequestedCapabilities,
+				"requiredVerifierIds":     checkpoint.RequiredVerifierIDs,
+				"orgAdminDecisionBinding": orgAdminDecisionBindingAuditPayload(orgAdminBinding),
+			})
+		}
 	}
 
 	writeJSON(w, http.StatusCreated, checkpoint)
@@ -1184,6 +1212,32 @@ func (s *APIServer) handleApprovalCheckpointDecisionV1Alpha2(w http.ResponseWrit
 	}
 	if orgAdminBinding != nil {
 		appendOrgAdminDecisionBindingResolvedArtifacts(s, r.Context(), session, &checkpoint, orgAdminBinding, decision, now)
+		emitAuditEvent(r.Context(), "runtime.org_admin.binding.decision", map[string]interface{}{
+			"path":                    r.URL.Path,
+			"method":                  r.Method,
+			"sessionId":               session.SessionID,
+			"checkpointId":            checkpoint.CheckpointID,
+			"tenantId":                session.TenantID,
+			"projectId":               session.ProjectID,
+			"decision":                decision,
+			"status":                  checkpoint.Status,
+			"reason":                  checkpoint.Reason,
+			"orgAdminDecisionBinding": orgAdminDecisionBindingAuditPayload(orgAdminBinding),
+		})
+		if eventName := orgAdminCategoryAuditEventName(orgAdminBinding.Category, "decision"); eventName != "" {
+			emitAuditEvent(r.Context(), eventName, map[string]interface{}{
+				"path":                    r.URL.Path,
+				"method":                  r.Method,
+				"sessionId":               session.SessionID,
+				"checkpointId":            checkpoint.CheckpointID,
+				"tenantId":                session.TenantID,
+				"projectId":               session.ProjectID,
+				"decision":                decision,
+				"status":                  checkpoint.Status,
+				"reason":                  checkpoint.Reason,
+				"orgAdminDecisionBinding": orgAdminDecisionBindingAuditPayload(orgAdminBinding),
+			})
+		}
 	}
 
 	writeJSON(w, http.StatusOK, ApprovalCheckpointDecisionResponse{
@@ -2441,7 +2495,21 @@ func (s *APIServer) handleExportEvidenceRecordsV1Alpha2(w http.ResponseWriter, r
 		exportItems = append(exportItems, sanitized)
 		redactionCount += count
 	}
-	applyRuntimeExportHeaders(w, disposition, redactionCount)
+	approvalItems, err := s.listApprovalCheckpointsForRead(r.Context(), session, ApprovalCheckpointListQuery{
+		SessionID:     sessionID,
+		TenantID:      session.TenantID,
+		ProjectID:     session.ProjectID,
+		Limit:         100,
+		IncludeLegacy: true,
+	})
+	if err != nil {
+		writeAPIError(w, http.StatusInternalServerError, "STORE_QUERY_FAILED", "failed to fetch approval checkpoints for evidence export", true, map[string]interface{}{"error": err.Error(), "sessionId": sessionID})
+		return
+	}
+	orgAdminSummary := summarizeRuntimeExportOrgAdmin(approvalItems)
+	totalRedactionCount := redactionCount + orgAdminSummary.RedactionCount
+	applyRuntimeExportHeaders(w, disposition, totalRedactionCount)
+	applyRuntimeExportOrgAdminHeaders(w, orgAdminSummary)
 
 	emitAuditEvent(r.Context(), "runtime.session.evidence.export", map[string]interface{}{
 		"path":                 r.URL.Path,
@@ -2457,7 +2525,10 @@ func (s *APIServer) handleExportEvidenceRecordsV1Alpha2(w http.ResponseWriter, r
 		"exportProfile":        disposition.ExportProfile,
 		"audience":             disposition.Audience,
 		"exportRetentionClass": disposition.RetentionClass,
-		"redactionCount":       redactionCount,
+		"redactionCount":       totalRedactionCount,
+		"orgAdminProfiles":     len(orgAdminSummary.Profiles),
+		"orgAdminBindings":     len(orgAdminSummary.DecisionBindings),
+		"orgAdminPending":      orgAdminSummary.PendingReviewCount,
 	})
 
 	switch format {
@@ -2473,13 +2544,25 @@ func (s *APIServer) handleExportEvidenceRecordsV1Alpha2(w http.ResponseWriter, r
 		}
 	case "json":
 		writeJSON(w, http.StatusOK, map[string]interface{}{
-			"sessionId":            sessionID,
-			"count":                len(exportItems),
-			"exportProfile":        disposition.ExportProfile,
-			"audience":             disposition.Audience,
-			"exportRetentionClass": disposition.RetentionClass,
-			"redactionCount":       redactionCount,
-			"items":                exportItems,
+			"sessionId":                  sessionID,
+			"count":                      len(exportItems),
+			"exportProfile":              disposition.ExportProfile,
+			"audience":                   disposition.Audience,
+			"exportRetentionClass":       disposition.RetentionClass,
+			"redactionCount":             totalRedactionCount,
+			"orgAdminProfiles":           orgAdminSummary.Profiles,
+			"orgAdminOrganizationModels": orgAdminSummary.OrganizationModels,
+			"orgAdminDecisionBindings":   orgAdminSummary.DecisionBindings,
+			"orgAdminCategories":         orgAdminSummary.Categories,
+			"orgAdminRoleBundles":        orgAdminSummary.RoleBundles,
+			"orgAdminInputKeys":          orgAdminSummary.InputKeys,
+			"orgAdminInputValues":        orgAdminSummary.InputValues,
+			"orgAdminDecisionActorRoles": orgAdminSummary.DecisionActorRoles,
+			"orgAdminDirectoryMappings":  orgAdminSummary.DirectoryMappings,
+			"orgAdminExceptionProfiles":  orgAdminSummary.ExceptionProfiles,
+			"orgAdminOverlayProfiles":    orgAdminSummary.OverlayProfiles,
+			"orgAdminPendingReviewCount": orgAdminSummary.PendingReviewCount,
+			"items":                      exportItems,
 		})
 	}
 }

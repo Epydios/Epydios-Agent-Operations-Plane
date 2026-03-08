@@ -244,6 +244,55 @@ func TestRenderCLIThreadEnvelopeMatchesParityFixture(t *testing.T) {
 	}
 }
 
+func TestRenderCLIThreadEnvelopeIncludesOrgAdminReviewHints(t *testing.T) {
+	view := &runtimeclient.ThreadReview{
+		Task: runtimeapi.TaskRecord{TaskID: "task-1", Title: "Thread one", Status: "IN_PROGRESS"},
+		Timeline: &runtimeapi.SessionTimelineResponse{
+			Session: runtimeapi.SessionRecord{SessionID: "sess-1", Status: "AWAITING_APPROVAL"},
+			Task:    &runtimeapi.TaskRecord{TaskID: "task-1", Title: "Thread one", Status: "IN_PROGRESS"},
+			ApprovalCheckpoints: []runtimeapi.ApprovalCheckpointRecord{
+				{
+					CheckpointID: "approval-org-1",
+					Status:       runtimeapi.ApprovalStatusPending,
+					Annotations: mustJSON(map[string]interface{}{
+						"orgAdminDecisionBinding": map[string]interface{}{
+							"profileId":          "centralized_enterprise_admin",
+							"profileLabel":       "Centralized Enterprise Admin",
+							"organizationModel":  "centralized_enterprise",
+							"bindingId":          "break_glass_timebox",
+							"bindingLabel":       "Break-glass timebox",
+							"category":           "break_glass",
+							"bindingMode":        "enforced",
+							"selectedRoleBundle": "enterprise_break_glass_admin",
+							"requiredInputs":     []string{"break_glass_expiry", "incident_id"},
+							"requestedInputKeys": []string{"break_glass_expiry", "incident_id"},
+							"decisionSurfaces":   []string{"cli", "workflow"},
+							"boundaryRequirements": []string{
+								"runtime_authz",
+							},
+							"inputValues": map[string]interface{}{
+								"break_glass_expiry": "2026-03-09T00:00:00Z",
+								"incident_id":        "INC-9001",
+							},
+						},
+					}),
+				},
+			},
+		},
+	}
+	rendered := renderCLIThreadEnvelope(view)
+	for _, part := range []string{
+		"Org-admin input values: break_glass_expiry=2026-03-09T00:00:00Z, incident_id=INC-9001",
+		"Resolve 1 pending org-admin decision reviews before enterprise handoff.",
+		"Org-admin decision is restricted to role bundle enterprise_break_glass_admin.",
+		"Org-admin review requires input coverage for break_glass_expiry, incident_id.",
+	} {
+		if !strings.Contains(rendered, part) {
+			t.Fatalf("missing %q in %s", part, rendered)
+		}
+	}
+}
+
 func TestRenderCLIReportIncludesGovernedSectionsAndRedactsSecrets(t *testing.T) {
 	client := newCLIReportTestClient(t)
 	view := buildCLIParityThreadReview(t)
@@ -302,6 +351,11 @@ func TestRenderCLIReportAppliesExplicitSelection(t *testing.T) {
 	if !strings.Contains(rendered, "Audience: security_review") || !strings.Contains(rendered, "Retention class: archive") {
 		t.Fatalf("selection not applied in report: %s", rendered)
 	}
+}
+
+func mustJSON(value interface{}) json.RawMessage {
+	payload, _ := json.Marshal(value)
+	return payload
 }
 
 func newCLIReportTestClient(t *testing.T) *runtimeclient.Client {

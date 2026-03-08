@@ -8,27 +8,42 @@ import (
 )
 
 type GovernedUpdateEnvelope struct {
-	Header               string
-	UpdateType           string
-	ContextLabel         string
-	ContextValue         string
-	SubjectLabel         string
-	SubjectValue         string
-	TaskID               string
-	TaskStatus           string
-	SessionID            string
-	SessionStatus        string
-	WorkerID             string
-	WorkerType           string
-	WorkerState          string
-	OpenApprovals        int
-	PendingProposalCount int
-	ToolActionCount      int
-	EvidenceCount        int
-	Summary              string
-	Details              []string
-	Recent               []string
-	ActionHints          []string
+	Header                       string
+	UpdateType                   string
+	ContextLabel                 string
+	ContextValue                 string
+	SubjectLabel                 string
+	SubjectValue                 string
+	TaskID                       string
+	TaskStatus                   string
+	SessionID                    string
+	SessionStatus                string
+	WorkerID                     string
+	WorkerType                   string
+	WorkerState                  string
+	OpenApprovals                int
+	PendingProposalCount         int
+	ToolActionCount              int
+	EvidenceCount                int
+	Summary                      string
+	OrgAdminProfileID            string
+	OrgAdminProfileLabel         string
+	OrgAdminOrganizationModel    string
+	OrgAdminRoleBundle           string
+	OrgAdminCategories           []string
+	OrgAdminDecisionBindings     []string
+	OrgAdminDirectoryMappings    []string
+	OrgAdminExceptionProfiles    []string
+	OrgAdminOverlayProfiles      []string
+	OrgAdminDecisionActorRoles   []string
+	OrgAdminDecisionSurfaces     []string
+	OrgAdminBoundaryRequirements []string
+	OrgAdminInputKeys            []string
+	OrgAdminInputValues          []string
+	OrgAdminPendingReviews       int
+	Details                      []string
+	Recent                       []string
+	ActionHints                  []string
 }
 
 func RenderGovernedUpdateEnvelope(env GovernedUpdateEnvelope) string {
@@ -56,6 +71,32 @@ func RenderGovernedUpdateEnvelope(env GovernedUpdateEnvelope) string {
 	if summary := strings.TrimSpace(env.Summary); summary != "" {
 		lines = append(lines, fmt.Sprintf("Summary: %s", summary))
 	}
+	if env.OrgAdminProfileID != "" || env.OrgAdminProfileLabel != "" {
+		lines = append(lines, fmt.Sprintf(
+			"Org-admin profile: %s (%s)",
+			NormalizeStringOrDefault(env.OrgAdminProfileLabel, env.OrgAdminProfileID),
+			NormalizeStringOrDefault(env.OrgAdminProfileID, "-"),
+		))
+	}
+	if env.OrgAdminOrganizationModel != "" {
+		lines = append(lines, fmt.Sprintf("Org-admin organization model: %s", env.OrgAdminOrganizationModel))
+	}
+	if env.OrgAdminRoleBundle != "" {
+		lines = append(lines, fmt.Sprintf("Org-admin role bundle: %s", env.OrgAdminRoleBundle))
+	}
+	if env.OrgAdminPendingReviews > 0 {
+		lines = append(lines, fmt.Sprintf("Org-admin pending reviews: %d", env.OrgAdminPendingReviews))
+	}
+	appendEnvelopeSection(&lines, "Org-admin categories:", env.OrgAdminCategories)
+	appendEnvelopeSection(&lines, "Org-admin decision bindings:", env.OrgAdminDecisionBindings)
+	appendEnvelopeSection(&lines, "Org-admin directory sync mappings:", env.OrgAdminDirectoryMappings)
+	appendEnvelopeSection(&lines, "Org-admin exception profiles:", env.OrgAdminExceptionProfiles)
+	appendEnvelopeSection(&lines, "Org-admin overlay profiles:", env.OrgAdminOverlayProfiles)
+	appendEnvelopeSection(&lines, "Org-admin decision actor roles:", env.OrgAdminDecisionActorRoles)
+	appendEnvelopeSection(&lines, "Org-admin decision surfaces:", env.OrgAdminDecisionSurfaces)
+	appendEnvelopeSection(&lines, "Org-admin boundary requirements:", env.OrgAdminBoundaryRequirements)
+	appendEnvelopeSection(&lines, "Org-admin input keys:", env.OrgAdminInputKeys)
+	appendEnvelopeSection(&lines, "Org-admin input values:", env.OrgAdminInputValues)
 	appendEnvelopeSection(&lines, "Details:", env.Details)
 	appendEnvelopeSection(&lines, "Recent activity:", env.Recent)
 	appendEnvelopeSection(&lines, "Action hints:", env.ActionHints)
@@ -78,6 +119,25 @@ func RenderEventSummaryLines(items []EventSummary, limit int) []string {
 		lines = append(lines, fmt.Sprintf("%s: %s", NormalizeStringOrDefault(item.Label, item.EventType), NormalizeStringOrDefault(item.Detail, "Event recorded.")))
 	}
 	return lines
+}
+
+func MergeEnvelopeLines(groups ...[]string) []string {
+	seen := map[string]struct{}{}
+	out := make([]string, 0)
+	for _, group := range groups {
+		for _, item := range group {
+			trimmed := strings.TrimSpace(item)
+			if trimmed == "" {
+				continue
+			}
+			if _, ok := seen[trimmed]; ok {
+				continue
+			}
+			seen[trimmed] = struct{}{}
+			out = append(out, trimmed)
+		}
+	}
+	return out
 }
 
 func RenderSessionEventLines(items []runtimeapi.SessionEventRecord, limit int) []string {

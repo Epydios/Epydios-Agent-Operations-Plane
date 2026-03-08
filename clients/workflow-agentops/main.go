@@ -74,6 +74,7 @@ type workflowStatusReport struct {
 	SelectedWorkerState     string                                `json:"selectedWorkerStatus,omitempty"`
 	SelectedExecutionMode   string                                `json:"selectedExecutionMode,omitempty"`
 	OpenApprovals           int                                   `json:"openApprovals,omitempty"`
+	ApprovalCheckpoints     []runtimeapi.ApprovalCheckpointRecord `json:"approvalCheckpoints,omitempty"`
 	PendingApprovals        []runtimeapi.ApprovalCheckpointRecord `json:"pendingApprovals,omitempty"`
 	PendingProposals        []runtimeclient.ToolProposalReview    `json:"pendingProposals,omitempty"`
 	ToolActionCount         int                                   `json:"toolActionCount,omitempty"`
@@ -698,6 +699,7 @@ func buildWorkflowStatusReport(view *runtimeclient.ThreadReview) *workflowStatus
 	report.ToolActionCount = len(view.Timeline.ToolActions)
 	report.EvidenceCount = len(view.Timeline.EvidenceRecords)
 	report.RecentEvents = append([]runtimeclient.EventSummary(nil), view.RecentEvents...)
+	report.ApprovalCheckpoints = append([]runtimeapi.ApprovalCheckpointRecord(nil), view.Timeline.ApprovalCheckpoints...)
 	pendingApprovals := make([]runtimeapi.ApprovalCheckpointRecord, 0)
 	for _, item := range view.Timeline.ApprovalCheckpoints {
 		if strings.EqualFold(string(item.Status), string(runtimeapi.ApprovalStatusPending)) {
@@ -863,7 +865,7 @@ func renderWorkflowReport(ctx context.Context, client *runtimeclient.Client, rep
 		PendingProposalCount: len(report.PendingProposals),
 		ToolActionCount:      report.ToolActionCount,
 		EvidenceCount:        report.EvidenceCount,
-		ApprovalCheckpoints:  append([]runtimeapi.ApprovalCheckpointRecord(nil), report.PendingApprovals...),
+		ApprovalCheckpoints:  append([]runtimeapi.ApprovalCheckpointRecord(nil), report.ApprovalCheckpoints...),
 		Summary:              runtimeclient.NormalizeStringOrDefault(report.LatestWorkerSummary, "Enterprise workflow posture refreshed."),
 		Details:              buildWorkflowReportDetails(report),
 		Recent:               workflowRecentEventLines(report, 4),
@@ -917,7 +919,7 @@ func renderWorkflowDeltaReport(ctx context.Context, client *runtimeclient.Client
 		PendingProposalCount: len(report.PendingProposals),
 		ToolActionCount:      report.ToolActionCount,
 		EvidenceCount:        report.EvidenceCount,
-		ApprovalCheckpoints:  append([]runtimeapi.ApprovalCheckpointRecord(nil), report.PendingApprovals...),
+		ApprovalCheckpoints:  append([]runtimeapi.ApprovalCheckpointRecord(nil), report.ApprovalCheckpoints...),
 		Summary:              summary,
 		Details:              runtimeclient.BuildThreadFollowDetails(items),
 		Recent:               runtimeclient.RenderSessionEventLines(items, 4),
@@ -957,6 +959,13 @@ func renderWorkflowEnvelope(updateType, summary string, report *workflowStatusRe
 		pendingProposalCount = len(report.PendingProposals)
 		toolActionCount = report.ToolActionCount
 		evidenceCount = report.EvidenceCount
+		orgAdminReview := runtimeclient.BuildOrgAdminReviewProjection(report.ApprovalCheckpoints)
+		details = runtimeclient.MergeEnvelopeLines(details, orgAdminReview.Details)
+	}
+	actionHints := renderWorkflowActionHints(report)
+	if report != nil {
+		orgAdminReview := runtimeclient.BuildOrgAdminReviewProjection(report.ApprovalCheckpoints)
+		actionHints = runtimeclient.MergeEnvelopeLines(actionHints, orgAdminReview.ActionHints)
 	}
 	return runtimeclient.RenderGovernedUpdateEnvelope(runtimeclient.GovernedUpdateEnvelope{
 		Header:               "AgentOps ticket update",
@@ -979,7 +988,7 @@ func renderWorkflowEnvelope(updateType, summary string, report *workflowStatusRe
 		Summary:              summary,
 		Details:              details,
 		Recent:               recent,
-		ActionHints:          renderWorkflowActionHints(report),
+		ActionHints:          actionHints,
 	})
 }
 

@@ -21,8 +21,32 @@ func TestRuntimeAuditExportRedactsSensitiveFields(t *testing.T) {
 			"apiKey": "sk-1234567890abcdefghijklmnop",
 		},
 	})
+	emitAuditEvent(context.Background(), "runtime.org_admin.binding.requested", map[string]interface{}{
+		"tenantId":     "tenant-audit-export",
+		"projectId":    "project-audit-export",
+		"sessionId":    "session-audit-export-1",
+		"checkpointId": "checkpoint-audit-export-1",
+		"status":       "PENDING",
+		"orgAdminDecisionBinding": map[string]interface{}{
+			"profileId":                     "centralized_enterprise_admin",
+			"profileLabel":                  "Centralized enterprise admin",
+			"organizationModel":             "centralized_enterprise",
+			"bindingId":                     "centralized_enterprise_admin_break_glass_binding",
+			"bindingLabel":                  "Break-glass binding",
+			"category":                      "break_glass",
+			"selectedRoleBundle":            "enterprise.break_glass_admin",
+			"selectedDirectorySyncMappings": []string{"centralized_enterprise_admin_directory_sync_mapping"},
+			"selectedExceptionProfiles":     []string{"centralized_enterprise_admin_residency_exception"},
+			"selectedOverlayProfiles":       []string{"centralized_enterprise_admin_quota_overlay"},
+			"requestedInputKeys":            []string{"break_glass_id"},
+			"decisionActorRoles":            []string{"enterprise.break_glass_admin"},
+			"inputValues": map[string]interface{}{
+				"break_glass_id": "Bearer topsecret-token-value-1234567890",
+			},
+		},
+	})
 
-	rr := requestJSON(t, handler, http.MethodGet, "/v1alpha1/runtime/audit/events/export?format=json&tenantId=tenant-audit-export&projectId=project-audit-export&event=secret_export&audience=compliance_review", nil)
+	rr := requestJSON(t, handler, http.MethodGet, "/v1alpha1/runtime/audit/events/export?format=json&tenantId=tenant-audit-export&projectId=project-audit-export&audience=compliance_review", nil)
 	if rr.Code != http.StatusOK {
 		t.Fatalf("GET audit export status=%d body=%s", rr.Code, rr.Body.String())
 	}
@@ -46,6 +70,21 @@ func TestRuntimeAuditExportRedactsSensitiveFields(t *testing.T) {
 	}
 	if rr.Header().Get("X-AgentOps-Export-Redactions") == "" {
 		t.Fatalf("expected audit export redaction header")
+	}
+	if rr.Header().Get("X-AgentOps-Org-Admin-Organization-Models") != "centralized_enterprise" {
+		t.Fatalf("expected org-admin organization-model header, got %q", rr.Header().Get("X-AgentOps-Org-Admin-Organization-Models"))
+	}
+	if rr.Header().Get("X-AgentOps-Org-Admin-Role-Bundles") != "enterprise.break_glass_admin" {
+		t.Fatalf("expected org-admin role-bundle header, got %q", rr.Header().Get("X-AgentOps-Org-Admin-Role-Bundles"))
+	}
+	if rr.Header().Get("X-AgentOps-Org-Admin-Decision-Actor-Roles") != "enterprise.break_glass_admin" {
+		t.Fatalf("expected org-admin decision-actor-role header, got %q", rr.Header().Get("X-AgentOps-Org-Admin-Decision-Actor-Roles"))
+	}
+	if !strings.Contains(rr.Body.String(), "\"orgAdminProfiles\"") {
+		t.Fatalf("audit export missing org-admin profile summary: %s", rr.Body.String())
+	}
+	if !strings.Contains(rr.Body.String(), "\"orgAdminInputValues\"") {
+		t.Fatalf("audit export missing org-admin input-value summary: %s", rr.Body.String())
 	}
 }
 
@@ -103,6 +142,47 @@ func TestRuntimeSessionEvidenceExportRedactsSensitiveFields(t *testing.T) {
 	if err := store.UpsertEvidenceRecord(context.Background(), record); err != nil {
 		t.Fatalf("upsert evidence: %v", err)
 	}
+	checkpoint := &ApprovalCheckpointRecord{
+		CheckpointID:           "checkpoint-evidence-export-1",
+		SessionID:              session.SessionID,
+		RequestID:              task.RequestID,
+		TenantID:               task.TenantID,
+		ProjectID:              task.ProjectID,
+		Scope:                  "session",
+		Tier:                   3,
+		TargetOS:               "darwin",
+		TargetExecutionProfile: "sandbox_vm_autonomous",
+		RequestedCapabilities:  []string{"org_admin.delegated_admin"},
+		Status:                 ApprovalStatusPending,
+		Reason:                 "delegated admin org export review",
+		Annotations: mustMarshalJSON(map[string]interface{}{
+			orgAdminDecisionBindingAnnotationKey: map[string]interface{}{
+				"profileId":                     "centralized_enterprise_admin",
+				"profileLabel":                  "Centralized Enterprise Admin",
+				"organizationModel":             "centralized_enterprise",
+				"bindingId":                     "centralized_enterprise_admin_delegated_admin_binding",
+				"bindingLabel":                  "Centralized Enterprise Admin Delegated Admin Decision Binding",
+				"category":                      "delegated_admin",
+				"bindingMode":                   "delegated_admin_scope_review",
+				"selectedRoleBundle":            "enterprise.tenant_admin",
+				"selectedDirectorySyncMappings": []string{"centralized_enterprise_admin_directory_sync_mapping"},
+				"selectedExceptionProfiles":     []string{"centralized_enterprise_admin_residency_exception"},
+				"selectedOverlayProfiles":       []string{"centralized_enterprise_admin_quota_overlay"},
+				"requestedInputKeys":            []string{"idp_group", "tenant_id"},
+				"decisionActorRoles":            []string{"enterprise.tenant_admin"},
+				"inputValues": map[string]interface{}{
+					"idp_group":      "grp-agentops-tenant-admins",
+					"tenant_id":      "tenant-evidence-export",
+					"break_glass_id": "Bearer topsecret-token-value-1234567890",
+				},
+			},
+		}),
+		CreatedAt: createdAt,
+		UpdatedAt: createdAt,
+	}
+	if err := store.UpsertApprovalCheckpoint(context.Background(), checkpoint); err != nil {
+		t.Fatalf("upsert approval checkpoint: %v", err)
+	}
 
 	rr := requestJSON(t, handler, http.MethodGet, "/v1alpha2/runtime/sessions/"+session.SessionID+"/evidence/export?format=json&audience=compliance_review", nil)
 	if rr.Code != http.StatusOK {
@@ -128,5 +208,47 @@ func TestRuntimeSessionEvidenceExportRedactsSensitiveFields(t *testing.T) {
 	}
 	if rr.Header().Get("X-AgentOps-Export-Redactions") == "" {
 		t.Fatalf("expected evidence export redaction header")
+	}
+	if rr.Header().Get("X-AgentOps-Org-Admin-Profiles") != "1" {
+		t.Fatalf("expected org-admin profile header, got %q", rr.Header().Get("X-AgentOps-Org-Admin-Profiles"))
+	}
+	if rr.Header().Get("X-AgentOps-Org-Admin-Bindings") != "1" {
+		t.Fatalf("expected org-admin binding header, got %q", rr.Header().Get("X-AgentOps-Org-Admin-Bindings"))
+	}
+	if rr.Header().Get("X-AgentOps-Org-Admin-Pending-Reviews") != "1" {
+		t.Fatalf("expected org-admin pending header, got %q", rr.Header().Get("X-AgentOps-Org-Admin-Pending-Reviews"))
+	}
+	if rr.Header().Get("X-AgentOps-Org-Admin-Organization-Models") != "centralized_enterprise" {
+		t.Fatalf("expected org-admin organization model header, got %q", rr.Header().Get("X-AgentOps-Org-Admin-Organization-Models"))
+	}
+	if rr.Header().Get("X-AgentOps-Org-Admin-Role-Bundles") != "enterprise.tenant_admin" {
+		t.Fatalf("expected org-admin role bundle header, got %q", rr.Header().Get("X-AgentOps-Org-Admin-Role-Bundles"))
+	}
+	if rr.Header().Get("X-AgentOps-Org-Admin-Decision-Actor-Roles") != "enterprise.tenant_admin" {
+		t.Fatalf("expected org-admin decision actor roles header, got %q", rr.Header().Get("X-AgentOps-Org-Admin-Decision-Actor-Roles"))
+	}
+	if !strings.Contains(rr.Body.String(), "\"orgAdminProfiles\"") {
+		t.Fatalf("expected org-admin metadata in response: %s", rr.Body.String())
+	}
+	if !strings.Contains(rr.Body.String(), "\"orgAdminOrganizationModels\"") {
+		t.Fatalf("expected org-admin organization model metadata in response: %s", rr.Body.String())
+	}
+	if !strings.Contains(rr.Body.String(), "\"orgAdminRoleBundles\"") {
+		t.Fatalf("expected org-admin role bundle metadata in response: %s", rr.Body.String())
+	}
+	if !strings.Contains(rr.Body.String(), "\"orgAdminDecisionActorRoles\"") {
+		t.Fatalf("expected org-admin decision actor roles in response: %s", rr.Body.String())
+	}
+	if !strings.Contains(rr.Body.String(), "\"orgAdminInputValues\"") {
+		t.Fatalf("expected org-admin input values in response: %s", rr.Body.String())
+	}
+	if !strings.Contains(rr.Body.String(), "\"Centralized Enterprise Admin\"") {
+		t.Fatalf("expected org-admin profile label in response: %s", rr.Body.String())
+	}
+	if strings.Contains(rr.Body.String(), "break_glass_id=Bearer topsecret-token-value-1234567890") {
+		t.Fatalf("org-admin export metadata leaked input value: %s", rr.Body.String())
+	}
+	if !strings.Contains(rr.Body.String(), "\"orgAdminPendingReviewCount\": 1") {
+		t.Fatalf("expected org-admin pending review count in response: %s", rr.Body.String())
 	}
 }

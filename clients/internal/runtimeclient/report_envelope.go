@@ -44,69 +44,84 @@ type EnterpriseReportSubject struct {
 }
 
 type EnterpriseReportEnvelope struct {
-	Header                   string
-	ReportType               string
-	ExportProfile            string
-	Audience                 string
-	RetentionClass           string
-	ClientSurface            string
-	ContextLabel             string
-	ContextValue             string
-	SubjectLabel             string
-	SubjectValue             string
-	TaskID                   string
-	TaskStatus               string
-	SessionID                string
-	SessionStatus            string
-	WorkerID                 string
-	WorkerType               string
-	WorkerAdapterID          string
-	WorkerState              string
-	ExecutionMode            string
-	OpenApprovals            int
-	PendingProposalCount     int
-	ToolActionCount          int
-	EvidenceCount            int
-	Summary                  string
-	Details                  []string
-	ApplicableOrgAdmins      []string
-	ApplicablePolicyPacks    []string
-	ExportProfileLabels      []string
-	RoleBundles              []string
-	AdminRoleBundles         []string
-	DelegationModels         []string
-	DelegatedAdminBundles    []string
-	BreakGlassBundles        []string
-	DecisionBindingLabels    []string
-	EnforcementProfileLabels []string
-	DirectorySyncMappings    []string
-	ExceptionProfileLabels   []string
-	OverlayProfileLabels     []string
-	WorkerCapabilityLabels   []string
-	DirectorySyncInputs      []string
-	ResidencyProfiles        []string
-	ResidencyExceptions      []string
-	LegalHoldProfiles        []string
-	LegalHoldExceptions      []string
-	NetworkBoundaryProfiles  []string
-	FleetRolloutProfiles     []string
-	QuotaDimensions          []string
-	QuotaOverlays            []string
-	ChargebackDimensions     []string
-	ChargebackOverlays       []string
-	EnforcementHooks         []string
-	BoundaryRequirements     []string
-	DecisionSurfaces         []string
-	ReportingSurfaces        []string
-	AllowedAudiences         []string
-	AllowedRetention         []string
-	RetentionOverlays        []string
-	DeliveryChannels         []string
-	RedactionModes           []string
-	Recent                   []string
-	ActionHints              []string
-	DLPFindings              []string
-	RedactionCount           int
+	Header                             string
+	ReportType                         string
+	ExportProfile                      string
+	Audience                           string
+	RetentionClass                     string
+	ClientSurface                      string
+	ContextLabel                       string
+	ContextValue                       string
+	SubjectLabel                       string
+	SubjectValue                       string
+	TaskID                             string
+	TaskStatus                         string
+	SessionID                          string
+	SessionStatus                      string
+	WorkerID                           string
+	WorkerType                         string
+	WorkerAdapterID                    string
+	WorkerState                        string
+	ExecutionMode                      string
+	OpenApprovals                      int
+	PendingProposalCount               int
+	ToolActionCount                    int
+	EvidenceCount                      int
+	Summary                            string
+	Details                            []string
+	ApplicableOrgAdmins                []string
+	ApplicablePolicyPacks              []string
+	ExportProfileLabels                []string
+	RoleBundles                        []string
+	AdminRoleBundles                   []string
+	DelegationModels                   []string
+	DelegatedAdminBundles              []string
+	BreakGlassBundles                  []string
+	DecisionBindingLabels              []string
+	EnforcementProfileLabels           []string
+	DirectorySyncMappings              []string
+	ExceptionProfileLabels             []string
+	OverlayProfileLabels               []string
+	WorkerCapabilityLabels             []string
+	DirectorySyncInputs                []string
+	ResidencyProfiles                  []string
+	ResidencyExceptions                []string
+	LegalHoldProfiles                  []string
+	LegalHoldExceptions                []string
+	NetworkBoundaryProfiles            []string
+	FleetRolloutProfiles               []string
+	QuotaDimensions                    []string
+	QuotaOverlays                      []string
+	ChargebackDimensions               []string
+	ChargebackOverlays                 []string
+	EnforcementHooks                   []string
+	BoundaryRequirements               []string
+	DecisionSurfaces                   []string
+	ActiveOrgAdminProfileID            string
+	ActiveOrgAdminProfileLabel         string
+	ActiveOrgAdminOrganizationModel    string
+	ActiveOrgAdminRoleBundle           string
+	ActiveOrgAdminCategories           []string
+	ActiveOrgAdminDecisionBindings     []string
+	ActiveOrgAdminDecisionActorRoles   []string
+	ActiveOrgAdminDecisionSurfaces     []string
+	ActiveOrgAdminBoundaryRequirements []string
+	ActiveOrgAdminInputKeys            []string
+	ActiveOrgAdminDirectoryMappings    []string
+	ActiveOrgAdminExceptionProfiles    []string
+	ActiveOrgAdminOverlayProfiles      []string
+	ActiveOrgAdminInputValues          []string
+	ActiveOrgAdminPendingReviews       int
+	ReportingSurfaces                  []string
+	AllowedAudiences                   []string
+	AllowedRetention                   []string
+	RetentionOverlays                  []string
+	DeliveryChannels                   []string
+	RedactionModes                     []string
+	Recent                             []string
+	ActionHints                        []string
+	DLPFindings                        []string
+	RedactionCount                     int
 }
 
 type EnterpriseReportDisposition struct {
@@ -208,6 +223,21 @@ func BuildEnterpriseReportEnvelope(subject EnterpriseReportSubject, policyCatalo
 	envelope.ChargebackOverlays = combineOrgAdminField(orgAdminItems, func(item runtimeapi.OrgAdminCatalogEntry) []string { return item.ChargebackOverlayInputs })
 	envelope.EnforcementHooks = combineOrgAdminField(orgAdminItems, func(item runtimeapi.OrgAdminCatalogEntry) []string { return item.EnforcementHooks })
 	envelope.DecisionSurfaces = combineDecisionSurfaces(policyItems)
+	envelope.ActiveOrgAdminProfileID = strings.TrimSpace(orgAdminReview.ProfileID)
+	envelope.ActiveOrgAdminProfileLabel = strings.TrimSpace(orgAdminReview.ProfileLabel)
+	envelope.ActiveOrgAdminOrganizationModel = strings.TrimSpace(orgAdminReview.OrganizationModel)
+	envelope.ActiveOrgAdminRoleBundle = strings.TrimSpace(orgAdminReview.RoleBundle)
+	envelope.ActiveOrgAdminCategories = append([]string(nil), orgAdminReview.Categories...)
+	envelope.ActiveOrgAdminDecisionBindings = append([]string(nil), orgAdminReview.BindingLabels...)
+	envelope.ActiveOrgAdminDecisionActorRoles = append([]string(nil), orgAdminReview.DecisionActorRoles...)
+	envelope.ActiveOrgAdminDecisionSurfaces = append([]string(nil), orgAdminReview.DecisionSurfaces...)
+	envelope.ActiveOrgAdminBoundaryRequirements = append([]string(nil), orgAdminReview.BoundaryRequirements...)
+	envelope.ActiveOrgAdminInputKeys = append([]string(nil), orgAdminReview.InputKeys...)
+	envelope.ActiveOrgAdminDirectoryMappings = append([]string(nil), orgAdminReview.DirectoryMappings...)
+	envelope.ActiveOrgAdminExceptionProfiles = append([]string(nil), orgAdminReview.ExceptionProfiles...)
+	envelope.ActiveOrgAdminOverlayProfiles = append([]string(nil), orgAdminReview.OverlayProfiles...)
+	envelope.ActiveOrgAdminInputValues = append([]string(nil), orgAdminReview.InputValueLines...)
+	envelope.ActiveOrgAdminPendingReviews = orgAdminReview.PendingCount
 	envelope.ReportingSurfaces = sortedUniqueStrings(append(
 		append(combineReportingSurfaces(policyItems), combineOrgAdminField(orgAdminItems, func(item runtimeapi.OrgAdminCatalogEntry) []string { return item.ReportingSurfaces })...),
 		combineExportProfileDeliveryChannels(exportProfileItems)...,
@@ -297,6 +327,32 @@ func RenderEnterpriseReportEnvelope(env EnterpriseReportEnvelope) string {
 	appendEnvelopeSection(&lines, "Enforcement hooks:", env.EnforcementHooks)
 	appendEnvelopeSection(&lines, "Boundary requirements:", env.BoundaryRequirements)
 	appendEnvelopeSection(&lines, "Decision surfaces:", env.DecisionSurfaces)
+	if strings.TrimSpace(env.ActiveOrgAdminProfileID) != "" || strings.TrimSpace(env.ActiveOrgAdminProfileLabel) != "" {
+		lines = append(lines, fmt.Sprintf(
+			"Active org-admin profile: %s (%s)",
+			NormalizeStringOrDefault(env.ActiveOrgAdminProfileLabel, env.ActiveOrgAdminProfileID),
+			NormalizeStringOrDefault(env.ActiveOrgAdminProfileID, "-"),
+		))
+	}
+	if strings.TrimSpace(env.ActiveOrgAdminOrganizationModel) != "" {
+		lines = append(lines, fmt.Sprintf("Active org-admin organization model: %s", env.ActiveOrgAdminOrganizationModel))
+	}
+	if strings.TrimSpace(env.ActiveOrgAdminRoleBundle) != "" {
+		lines = append(lines, fmt.Sprintf("Active org-admin role bundle: %s", env.ActiveOrgAdminRoleBundle))
+	}
+	if env.ActiveOrgAdminPendingReviews > 0 {
+		lines = append(lines, fmt.Sprintf("Active org-admin pending reviews: %d", env.ActiveOrgAdminPendingReviews))
+	}
+	appendEnvelopeSection(&lines, "Active org-admin categories:", env.ActiveOrgAdminCategories)
+	appendEnvelopeSection(&lines, "Active org-admin decision bindings:", env.ActiveOrgAdminDecisionBindings)
+	appendEnvelopeSection(&lines, "Active org-admin decision actor roles:", env.ActiveOrgAdminDecisionActorRoles)
+	appendEnvelopeSection(&lines, "Active org-admin decision surfaces:", env.ActiveOrgAdminDecisionSurfaces)
+	appendEnvelopeSection(&lines, "Active org-admin boundary requirements:", env.ActiveOrgAdminBoundaryRequirements)
+	appendEnvelopeSection(&lines, "Active org-admin input keys:", env.ActiveOrgAdminInputKeys)
+	appendEnvelopeSection(&lines, "Active org-admin directory sync mappings:", env.ActiveOrgAdminDirectoryMappings)
+	appendEnvelopeSection(&lines, "Active org-admin exception profiles:", env.ActiveOrgAdminExceptionProfiles)
+	appendEnvelopeSection(&lines, "Active org-admin overlay profiles:", env.ActiveOrgAdminOverlayProfiles)
+	appendEnvelopeSection(&lines, "Active org-admin input values:", env.ActiveOrgAdminInputValues)
 	appendEnvelopeSection(&lines, "Reporting surfaces:", env.ReportingSurfaces)
 	appendEnvelopeSection(&lines, "Allowed audiences:", env.AllowedAudiences)
 	appendEnvelopeSection(&lines, "Allowed retention classes:", env.AllowedRetention)

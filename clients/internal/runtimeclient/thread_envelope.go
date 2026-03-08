@@ -53,6 +53,24 @@ func BuildThreadGovernedUpdateEnvelope(view *ThreadReview, options ThreadEnvelop
 			envelope.WorkerType = strings.TrimSpace(timeline.SelectedWorker.WorkerType)
 			envelope.WorkerState = string(timeline.SelectedWorker.Status)
 		}
+		orgAdminReview := BuildOrgAdminReviewProjection(timeline.ApprovalCheckpoints)
+		envelope.OrgAdminProfileID = orgAdminReview.ProfileID
+		envelope.OrgAdminProfileLabel = orgAdminReview.ProfileLabel
+		envelope.OrgAdminOrganizationModel = orgAdminReview.OrganizationModel
+		envelope.OrgAdminRoleBundle = orgAdminReview.RoleBundle
+		envelope.OrgAdminCategories = append([]string(nil), orgAdminReview.Categories...)
+		envelope.OrgAdminDecisionBindings = append([]string(nil), orgAdminReview.BindingLabels...)
+		envelope.OrgAdminDirectoryMappings = append([]string(nil), orgAdminReview.DirectoryMappings...)
+		envelope.OrgAdminExceptionProfiles = append([]string(nil), orgAdminReview.ExceptionProfiles...)
+		envelope.OrgAdminOverlayProfiles = append([]string(nil), orgAdminReview.OverlayProfiles...)
+		envelope.OrgAdminDecisionActorRoles = append([]string(nil), orgAdminReview.DecisionActorRoles...)
+		envelope.OrgAdminDecisionSurfaces = append([]string(nil), orgAdminReview.DecisionSurfaces...)
+		envelope.OrgAdminBoundaryRequirements = append([]string(nil), orgAdminReview.BoundaryRequirements...)
+		envelope.OrgAdminInputKeys = append([]string(nil), orgAdminReview.InputKeys...)
+		envelope.OrgAdminInputValues = append([]string(nil), orgAdminReview.InputValueLines...)
+		envelope.OrgAdminPendingReviews = orgAdminReview.PendingCount
+		envelope.Details = MergeEnvelopeLines(envelope.Details, orgAdminReview.Details)
+		envelope.ActionHints = MergeEnvelopeLines(envelope.ActionHints, orgAdminReview.ActionHints)
 	}
 	if len(envelope.Recent) == 0 {
 		envelope.Recent = RenderEventSummaryLines(view.RecentEvents, 4)
