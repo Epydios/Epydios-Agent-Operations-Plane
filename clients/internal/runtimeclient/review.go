@@ -50,6 +50,37 @@ type EventSummary struct {
 	Detail    string `json:"detail,omitempty"`
 }
 
+type OrgAdminReviewProjection struct {
+	ProfileID         string   `json:"profileId,omitempty"`
+	ProfileLabel      string   `json:"profileLabel,omitempty"`
+	OrganizationModel string   `json:"organizationModel,omitempty"`
+	RoleBundle        string   `json:"roleBundle,omitempty"`
+	Details           []string `json:"details,omitempty"`
+	ActionHints       []string `json:"actionHints,omitempty"`
+}
+
+type orgAdminDecisionBindingProjection struct {
+	CheckpointID              string
+	Status                    string
+	Reason                    string
+	ProfileID                 string
+	ProfileLabel              string
+	OrganizationModel         string
+	BindingID                 string
+	BindingLabel              string
+	Category                  string
+	BindingMode               string
+	SelectedRoleBundle        string
+	SelectedDirectoryMappings []string
+	SelectedExceptionProfiles []string
+	SelectedOverlayProfiles   []string
+	RequiredInputs            []string
+	RequestedInputKeys        []string
+	DecisionSurfaces          []string
+	BoundaryRequirements      []string
+	InputValues               map[string]string
+}
+
 func BuildThreadReview(task *runtimeapi.TaskRecord, sessions []runtimeapi.SessionRecord, selectedSessionID string, timeline *runtimeapi.SessionTimelineResponse) *ThreadReview {
 	view := &ThreadReview{}
 	if task != nil {
@@ -254,6 +285,98 @@ func ExtractManagedTranscript(timeline *runtimeapi.SessionTimelineResponse) *Man
 	return nil
 }
 
+func BuildOrgAdminReviewProjection(approvals []runtimeapi.ApprovalCheckpointRecord) OrgAdminReviewProjection {
+	bindings := make([]orgAdminDecisionBindingProjection, 0)
+	pendingCount := 0
+	for _, item := range approvals {
+		value, ok := parseOrgAdminDecisionBinding(item)
+		if !ok {
+			continue
+		}
+		if strings.EqualFold(strings.TrimSpace(string(item.Status)), string(runtimeapi.ApprovalStatusPending)) {
+			pendingCount++
+		}
+		bindings = append(bindings, value)
+	}
+	if len(bindings) == 0 {
+		return OrgAdminReviewProjection{}
+	}
+	primary := bindings[0]
+	details := make([]string, 0, len(bindings)*2+6)
+	for _, item := range bindings {
+		line := NormalizeStringOrDefault(item.BindingLabel, item.BindingID)
+		if item.Category != "" {
+			line += fmt.Sprintf(" | category=%s", item.Category)
+		}
+		if item.BindingMode != "" {
+			line += fmt.Sprintf(" | mode=%s", item.BindingMode)
+		}
+		line += fmt.Sprintf(" | status=%s", NormalizeStringOrDefault(item.Status, "PENDING"))
+		if item.CheckpointID != "" {
+			line += fmt.Sprintf(" | checkpoint=%s", item.CheckpointID)
+		}
+		details = append(details, "Org-admin decision binding: "+line)
+		if item.Reason != "" {
+			details = append(details, "Org-admin review reason: "+ClipText(item.Reason, 240))
+		}
+	}
+	if primary.ProfileID != "" || primary.ProfileLabel != "" {
+		details = append(details, fmt.Sprintf(
+			"Org-admin profile: %s (%s)",
+			NormalizeStringOrDefault(primary.ProfileLabel, primary.ProfileID),
+			NormalizeStringOrDefault(primary.ProfileID, "-"),
+		))
+	}
+	if primary.SelectedRoleBundle != "" {
+		details = append(details, "Org-admin role bundle: "+primary.SelectedRoleBundle)
+	}
+	if values := sortedUniqueStrings(primary.SelectedDirectoryMappings); len(values) > 0 {
+		details = append(details, "Org-admin directory sync mappings: "+strings.Join(values, ", "))
+	}
+	if values := sortedUniqueStrings(primary.SelectedExceptionProfiles); len(values) > 0 {
+		details = append(details, "Org-admin exception profiles: "+strings.Join(values, ", "))
+	}
+	if values := sortedUniqueStrings(primary.SelectedOverlayProfiles); len(values) > 0 {
+		details = append(details, "Org-admin overlay profiles: "+strings.Join(values, ", "))
+	}
+	if values := sortedUniqueStrings(primary.RequiredInputs); len(values) > 0 {
+		details = append(details, "Org-admin required inputs: "+strings.Join(values, ", "))
+	}
+	if values := sortedUniqueStrings(primary.RequestedInputKeys); len(values) > 0 {
+		details = append(details, "Org-admin provided inputs: "+strings.Join(values, ", "))
+	}
+	if summary := renderOrgAdminInputValues(primary.InputValues); summary != "" {
+		details = append(details, "Org-admin input values: "+summary)
+	}
+	if values := sortedUniqueStrings(primary.DecisionSurfaces); len(values) > 0 {
+		details = append(details, "Org-admin decision surfaces: "+strings.Join(values, ", "))
+	}
+	if values := sortedUniqueStrings(primary.BoundaryRequirements); len(values) > 0 {
+		details = append(details, "Org-admin boundary requirements: "+strings.Join(values, ", "))
+	}
+
+	hints := make([]string, 0, 3)
+	if pendingCount > 0 {
+		hints = append(hints, fmt.Sprintf("Resolve %d pending org-admin decision reviews before enterprise handoff.", pendingCount))
+	}
+	if primary.SelectedRoleBundle != "" {
+		hints = append(hints, "Org-admin decision is restricted to role bundle "+primary.SelectedRoleBundle+".")
+	}
+	if values := sortedUniqueStrings(primary.RequiredInputs); len(values) > 0 {
+		hints = append(hints, "Org-admin review requires input coverage for "+strings.Join(values, ", ")+".")
+	}
+	hints = append(hints, orgAdminCategoryHints(primary)...)
+
+	return OrgAdminReviewProjection{
+		ProfileID:         primary.ProfileID,
+		ProfileLabel:      primary.ProfileLabel,
+		OrganizationModel: primary.OrganizationModel,
+		RoleBundle:        primary.SelectedRoleBundle,
+		Details:           sortedUniqueStrings(details),
+		ActionHints:       sortedUniqueStrings(hints),
+	}
+}
+
 func rawObject(raw json.RawMessage) map[string]interface{} {
 	if len(raw) == 0 {
 		return map[string]interface{}{}
@@ -290,4 +413,115 @@ func ClipText(value string, max int) string {
 		return value
 	}
 	return strings.TrimSpace(string(runes[:max-1])) + "..."
+}
+
+func parseOrgAdminDecisionBinding(item runtimeapi.ApprovalCheckpointRecord) (orgAdminDecisionBindingProjection, bool) {
+	annotations := rawObject(item.Annotations)
+	binding, ok := annotations["orgAdminDecisionBinding"].(map[string]interface{})
+	if !ok || binding == nil {
+		return orgAdminDecisionBindingProjection{}, false
+	}
+	return orgAdminDecisionBindingProjection{
+		CheckpointID:              strings.TrimSpace(item.CheckpointID),
+		Status:                    strings.TrimSpace(string(item.Status)),
+		Reason:                    strings.TrimSpace(item.Reason),
+		ProfileID:                 normalizeInterfaceString(binding["profileId"], ""),
+		ProfileLabel:              normalizeInterfaceString(binding["profileLabel"], ""),
+		OrganizationModel:         normalizeInterfaceString(binding["organizationModel"], ""),
+		BindingID:                 normalizeInterfaceString(binding["bindingId"], ""),
+		BindingLabel:              normalizeInterfaceString(binding["bindingLabel"], ""),
+		Category:                  normalizeInterfaceString(binding["category"], ""),
+		BindingMode:               normalizeInterfaceString(binding["bindingMode"], ""),
+		SelectedRoleBundle:        normalizeInterfaceString(binding["selectedRoleBundle"], ""),
+		SelectedDirectoryMappings: normalizeApprovalStringList(binding["selectedDirectorySyncMappings"]),
+		SelectedExceptionProfiles: normalizeApprovalStringList(binding["selectedExceptionProfiles"]),
+		SelectedOverlayProfiles:   normalizeApprovalStringList(binding["selectedOverlayProfiles"]),
+		RequiredInputs:            normalizeApprovalStringList(binding["requiredInputs"]),
+		RequestedInputKeys:        normalizeApprovalStringList(binding["requestedInputKeys"]),
+		DecisionSurfaces:          normalizeApprovalStringList(binding["decisionSurfaces"]),
+		BoundaryRequirements:      normalizeApprovalStringList(binding["boundaryRequirements"]),
+		InputValues:               normalizeApprovalStringMap(binding["inputValues"]),
+	}, true
+}
+
+func normalizeApprovalStringList(value interface{}) []string {
+	items, ok := value.([]interface{})
+	if !ok {
+		switch typed := value.(type) {
+		case []string:
+			return sortedUniqueStrings(typed)
+		default:
+			return nil
+		}
+	}
+	out := make([]string, 0, len(items))
+	for _, item := range items {
+		if text := normalizeInterfaceString(item, ""); text != "" {
+			out = append(out, text)
+		}
+	}
+	return sortedUniqueStrings(out)
+}
+
+func normalizeApprovalStringMap(value interface{}) map[string]string {
+	object, ok := value.(map[string]interface{})
+	if !ok || object == nil {
+		return nil
+	}
+	out := make(map[string]string, len(object))
+	for key, item := range object {
+		trimmedKey := strings.TrimSpace(key)
+		if trimmedKey == "" {
+			continue
+		}
+		text := normalizeInterfaceString(item, "")
+		if text == "" {
+			continue
+		}
+		out[trimmedKey] = text
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func renderOrgAdminInputValues(values map[string]string) string {
+	if len(values) == 0 {
+		return ""
+	}
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	parts := make([]string, 0, len(keys))
+	for _, key := range keys {
+		parts = append(parts, fmt.Sprintf("%s=%s", key, values[key]))
+	}
+	return ClipText(strings.Join(parts, ", "), 320)
+}
+
+func orgAdminCategoryHints(binding orgAdminDecisionBindingProjection) []string {
+	category := strings.TrimSpace(binding.Category)
+	switch category {
+	case "break_glass":
+		expiry := strings.TrimSpace(binding.InputValues["break_glass_expiry"])
+		if expiry != "" {
+			return []string{"Break-glass access stays time-boxed until " + expiry + "."}
+		}
+		return []string{"Break-glass activation must stay explicitly time-boxed and auditable."}
+	case "directory_sync":
+		return []string{"Directory-sync reviews change governed group-to-role bindings and should be checked against IdP source data."}
+	case "residency":
+		return []string{"Residency exceptions should be reviewed against the requested region and export-profile override path."}
+	case "legal_hold":
+		return []string{"Legal-hold exceptions should be verified against hold case data before export or retention changes are allowed."}
+	case "quota":
+		return []string{"Quota overlays change governed capacity limits and must stay aligned with metering dimensions."}
+	case "chargeback":
+		return []string{"Chargeback overlays change allocation boundaries and should be reviewed against the declared billing dimensions."}
+	default:
+		return nil
+	}
 }

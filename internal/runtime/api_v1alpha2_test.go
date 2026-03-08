@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -929,6 +930,179 @@ func TestRuntimeV1Alpha2ApprovalDenyClosesBlockedSession(t *testing.T) {
 	}
 }
 
+func TestRuntimeV1Alpha2OrgAdminApprovalPersistsDecisionBindings(t *testing.T) {
+	store := newMemoryRunStore()
+	server := NewAPIServer(store, nil, nil)
+	handler := server.Routes()
+
+	rr := requestJSON(t, handler, http.MethodPost, "/v1alpha2/runtime/tasks", map[string]interface{}{
+		"meta": map[string]interface{}{
+			"requestId": "task-request-org-admin-1",
+			"tenantId":  "tenant-a",
+			"projectId": "project-a",
+		},
+		"source": "desktop-ui",
+		"title":  "Review delegated admin scope change",
+		"intent": "Exercise org-admin approval binding persistence.",
+	})
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("POST task status=%d body=%s", rr.Code, rr.Body.String())
+	}
+	var task TaskRecord
+	decodeResponseBody(t, rr, &task)
+
+	rr = requestJSON(t, handler, http.MethodPost, "/v1alpha2/runtime/tasks/"+task.TaskID+"/sessions", map[string]interface{}{
+		"meta": map[string]interface{}{
+			"requestId": "session-request-org-admin-1",
+			"tenantId":  "tenant-a",
+			"projectId": "project-a",
+		},
+		"sessionType": "operator_request",
+		"source":      "desktop-ui",
+	})
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("POST session status=%d body=%s", rr.Code, rr.Body.String())
+	}
+	var session SessionRecord
+	decodeResponseBody(t, rr, &session)
+
+	reqCtx := withRuntimeIdentity(context.Background(), &RuntimeIdentity{
+		Subject:    "user://tenant-admin",
+		TenantIDs:  []string{"tenant-a"},
+		ProjectIDs: []string{"project-a"},
+		Roles:      []string{"enterprise.tenant_admin"},
+	})
+	rr = requestJSONWithContext(t, handler, reqCtx, http.MethodPost, "/v1alpha2/runtime/sessions/"+session.SessionID+"/approval-checkpoints", map[string]interface{}{
+		"meta": map[string]interface{}{
+			"requestId": "approval-request-org-admin-1",
+			"tenantId":  "tenant-a",
+			"projectId": "project-a",
+			"actor": map[string]interface{}{
+				"id": "tenant-admin",
+			},
+		},
+		"reason": "Delegated admin scope review is required before rollout.",
+		"annotations": map[string]interface{}{
+			"orgAdminDecisionBinding": map[string]interface{}{
+				"profileId":             "centralized_enterprise_admin",
+				"bindingId":             "centralized_enterprise_admin_delegated_admin_binding",
+				"roleBundle":            "enterprise.tenant_admin",
+				"directorySyncMappings": []string{"centralized_enterprise_admin_directory_sync_mapping"},
+				"inputValues": map[string]interface{}{
+					"idp_group":     "grp-agentops-tenant-admins",
+					"tenant_id":     "tenant-a",
+					"project_id":    "project-a",
+					"business_unit": "platform",
+					"cost_center":   "CC-20410",
+					"environment":   "prod",
+					"region":        "us-east",
+				},
+			},
+		},
+	})
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("POST org-admin approval checkpoint status=%d body=%s", rr.Code, rr.Body.String())
+	}
+	var checkpoint ApprovalCheckpointRecord
+	decodeResponseBody(t, rr, &checkpoint)
+	if checkpoint.Scope != "org_admin_binding" {
+		t.Fatalf("checkpoint scope=%q want org_admin_binding", checkpoint.Scope)
+	}
+	if !containsExactString(checkpoint.RequestedCapabilities, "policy_pack_assignment") {
+		t.Fatalf("requested capabilities=%v", checkpoint.RequestedCapabilities)
+	}
+	if !containsExactString(checkpoint.RequiredVerifierIDs, "runtime_authz") {
+		t.Fatalf("required verifier ids=%v", checkpoint.RequiredVerifierIDs)
+	}
+	var annotationObject map[string]interface{}
+	if err := json.Unmarshal(checkpoint.Annotations, &annotationObject); err != nil {
+		t.Fatalf("unmarshal checkpoint annotations: %v", err)
+	}
+	binding := annotationObject["orgAdminDecisionBinding"]
+	bindingObject, ok := binding.(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected org-admin annotation on checkpoint: %s", string(checkpoint.Annotations))
+	}
+	if got := normalizeStringOrDefault(normalizeInterfaceString(bindingObject["selectedRoleBundle"], ""), ""); got != "enterprise.tenant_admin" {
+		t.Fatalf("selected role bundle=%q want enterprise.tenant_admin", got)
+	}
+
+	rr = requestJSON(t, handler, http.MethodGet, "/v1alpha2/runtime/sessions/"+session.SessionID+"/evidence", nil)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("GET evidence status=%d body=%s", rr.Code, rr.Body.String())
+	}
+	var evidenceList struct {
+		Count int              `json:"count"`
+		Items []EvidenceRecord `json:"items"`
+	}
+	decodeResponseBody(t, rr, &evidenceList)
+	foundRequestEvidence := false
+	for _, item := range evidenceList.Items {
+		if item.Kind == "org_admin_binding_request" {
+			foundRequestEvidence = true
+			break
+		}
+	}
+	if !foundRequestEvidence {
+		t.Fatalf("expected org_admin_binding_request evidence: %+v", evidenceList.Items)
+	}
+
+	rr = requestJSONWithContext(t, handler, reqCtx, http.MethodPost, "/v1alpha2/runtime/sessions/"+session.SessionID+"/approval-checkpoints/"+checkpoint.CheckpointID+"/decision", map[string]interface{}{
+		"meta": map[string]interface{}{
+			"requestId": "approval-decision-org-admin-1",
+			"tenantId":  "tenant-a",
+			"projectId": "project-a",
+			"actor": map[string]interface{}{
+				"id": "tenant-admin",
+			},
+		},
+		"decision": "APPROVE",
+		"reason":   "Approved delegated admin scope change for rollout.",
+	})
+	if rr.Code != http.StatusOK {
+		t.Fatalf("POST org-admin approval decision status=%d body=%s", rr.Code, rr.Body.String())
+	}
+
+	rr = requestJSON(t, handler, http.MethodGet, "/v1alpha2/runtime/sessions/"+session.SessionID+"/events", nil)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("GET events status=%d body=%s", rr.Code, rr.Body.String())
+	}
+	var eventList struct {
+		Count int                  `json:"count"`
+		Items []SessionEventRecord `json:"items"`
+	}
+	decodeResponseBody(t, rr, &eventList)
+	foundRequestEvent := false
+	foundDecisionEvent := false
+	for _, item := range eventList.Items {
+		if item.EventType == SessionEventType("org_admin.binding.requested") {
+			foundRequestEvent = true
+		}
+		if item.EventType == SessionEventType("org_admin.binding.decision.applied") {
+			foundDecisionEvent = true
+		}
+	}
+	if !foundRequestEvent || !foundDecisionEvent {
+		t.Fatalf("org-admin events missing request=%v decision=%v items=%+v", foundRequestEvent, foundDecisionEvent, eventList.Items)
+	}
+
+	rr = requestJSON(t, handler, http.MethodGet, "/v1alpha2/runtime/sessions/"+session.SessionID+"/evidence", nil)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("GET evidence after decision status=%d body=%s", rr.Code, rr.Body.String())
+	}
+	decodeResponseBody(t, rr, &evidenceList)
+	foundDecisionEvidence := false
+	for _, item := range evidenceList.Items {
+		if item.Kind == "org_admin_binding_decision" {
+			foundDecisionEvidence = true
+			break
+		}
+	}
+	if !foundDecisionEvidence {
+		t.Fatalf("expected org_admin_binding_decision evidence: %+v", evidenceList.Items)
+	}
+}
+
 func TestRuntimeV1Alpha2LegacyRunProjection(t *testing.T) {
 	store := newMemoryRunStore()
 	server := NewAPIServer(store, nil, nil)
@@ -1040,6 +1214,289 @@ func TestRuntimeV1Alpha2LegacyRunProjection(t *testing.T) {
 	if rr.Code != http.StatusConflict {
 		t.Fatalf("POST legacy session approval checkpoint status=%d body=%s", rr.Code, rr.Body.String())
 	}
+}
+
+func TestRuntimeV1Alpha2OrgAdminCategoryBindingsPersistSelectionsAndInputs(t *testing.T) {
+	cases := []struct {
+		name              string
+		role              string
+		roleBundle        string
+		bindingID         string
+		wantCategory      string
+		dirMappings       []string
+		exceptionProfiles []string
+		overlayProfiles   []string
+		inputValues       map[string]interface{}
+		wantInputKey      string
+	}{
+		{
+			name:         "break glass",
+			role:         "enterprise.break_glass_admin",
+			roleBundle:   "enterprise.break_glass_admin",
+			bindingID:    "centralized_enterprise_admin_break_glass_binding",
+			wantCategory: "break_glass",
+			inputValues: map[string]interface{}{
+				"break_glass_ticket": "BG-1001",
+				"break_glass_reason": "prod outage mitigation",
+				"break_glass_expiry": time.Now().UTC().Add(2 * time.Hour).Format(time.RFC3339),
+			},
+			wantInputKey: "break_glass_expiry",
+		},
+		{
+			name:         "directory sync",
+			role:         "enterprise.org_admin",
+			roleBundle:   "enterprise.org_admin",
+			bindingID:    "centralized_enterprise_admin_directory_sync_binding",
+			wantCategory: "directory_sync",
+			dirMappings:  []string{"centralized_enterprise_admin_directory_sync_mapping"},
+			inputValues: map[string]interface{}{
+				"idp_group":   "grp-agentops-org-admins",
+				"tenant_id":   "tenant-a",
+				"cost_center": "CC-20410",
+				"environment": "prod",
+			},
+			wantInputKey: "idp_group",
+		},
+		{
+			name:              "residency",
+			role:              "enterprise.org_admin",
+			roleBundle:        "enterprise.org_admin",
+			bindingID:         "centralized_enterprise_admin_residency_exception_binding",
+			wantCategory:      "residency",
+			exceptionProfiles: []string{"centralized_enterprise_admin_residency_exception"},
+			inputValues: map[string]interface{}{
+				"region":                     "us-east",
+				"jurisdiction":               "us",
+				"residency_exception_ticket": "RES-1001",
+			},
+			wantInputKey: "residency_exception_ticket",
+		},
+		{
+			name:              "legal hold",
+			role:              "enterprise.org_admin",
+			roleBundle:        "enterprise.org_admin",
+			bindingID:         "centralized_enterprise_admin_legal_hold_exception_binding",
+			wantCategory:      "legal_hold",
+			exceptionProfiles: []string{"centralized_enterprise_admin_legal_hold_exception"},
+			inputValues: map[string]interface{}{
+				"legal_hold_case_id": "CASE-1001",
+				"legal_hold_reason":  "security incident evidence preservation",
+				"legal_hold_expiry":  time.Now().UTC().Add(24 * time.Hour).Format(time.RFC3339),
+			},
+			wantInputKey: "legal_hold_case_id",
+		},
+		{
+			name:            "quota",
+			role:            "enterprise.org_admin",
+			roleBundle:      "enterprise.org_admin",
+			bindingID:       "centralized_enterprise_admin_quota_overlay_binding",
+			wantCategory:    "quota",
+			overlayProfiles: []string{"centralized_enterprise_admin_quota_overlay"},
+			inputValues: map[string]interface{}{
+				"organization":   "epydios",
+				"tenant":         "tenant-a",
+				"project":        "project-a",
+				"worker_adapter": "codex",
+				"provider":       "agentops_gateway",
+				"model":          "gpt-5-codex",
+				"tenant_id":      "tenant-a",
+				"project_id":     "project-a",
+				"environment":    "prod",
+				"cost_center":    "CC-20410",
+			},
+			wantInputKey: "project_id",
+		},
+		{
+			name:            "chargeback",
+			role:            "enterprise.org_admin",
+			roleBundle:      "enterprise.org_admin",
+			bindingID:       "centralized_enterprise_admin_chargeback_overlay_binding",
+			wantCategory:    "chargeback",
+			overlayProfiles: []string{"centralized_enterprise_admin_chargeback_overlay"},
+			inputValues: map[string]interface{}{
+				"tenant":        "tenant-a",
+				"project":       "project-a",
+				"cost_center":   "CC-20410",
+				"business_unit": "platform",
+				"project_id":    "project-a",
+				"environment":   "prod",
+			},
+			wantInputKey: "business_unit",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			store := newMemoryRunStore()
+			server := NewAPIServer(store, nil, nil)
+			handler := server.Routes()
+			session := createV1Alpha2SessionForTest(t, handler, "tenant-a", "project-a")
+			reqCtx := withRuntimeIdentity(context.Background(), &RuntimeIdentity{
+				Subject:    "user://org-admin",
+				TenantIDs:  []string{"tenant-a"},
+				ProjectIDs: []string{"project-a"},
+				Roles:      []string{tc.role},
+			})
+
+			rr := requestJSONWithContext(t, handler, reqCtx, http.MethodPost, "/v1alpha2/runtime/sessions/"+session.SessionID+"/approval-checkpoints", map[string]interface{}{
+				"meta": map[string]interface{}{
+					"requestId": "approval-request-" + strings.ReplaceAll(tc.name, " ", "-"),
+					"tenantId":  "tenant-a",
+					"projectId": "project-a",
+					"actor": map[string]interface{}{
+						"id": "org-admin",
+					},
+				},
+				"reason": "Org-admin review required for " + tc.name,
+				"annotations": map[string]interface{}{
+					"orgAdminDecisionBinding": map[string]interface{}{
+						"profileId":             "centralized_enterprise_admin",
+						"bindingId":             tc.bindingID,
+						"roleBundle":            tc.roleBundle,
+						"directorySyncMappings": tc.dirMappings,
+						"exceptionProfiles":     tc.exceptionProfiles,
+						"overlayProfiles":       tc.overlayProfiles,
+						"inputValues":           tc.inputValues,
+					},
+				},
+			})
+			if rr.Code != http.StatusCreated {
+				t.Fatalf("POST org-admin approval checkpoint status=%d body=%s", rr.Code, rr.Body.String())
+			}
+
+			var checkpoint ApprovalCheckpointRecord
+			decodeResponseBody(t, rr, &checkpoint)
+			var annotationObject map[string]interface{}
+			if err := json.Unmarshal(checkpoint.Annotations, &annotationObject); err != nil {
+				t.Fatalf("unmarshal checkpoint annotations: %v", err)
+			}
+			bindingObject, ok := annotationObject["orgAdminDecisionBinding"].(map[string]interface{})
+			if !ok {
+				t.Fatalf("expected org-admin annotation on checkpoint: %s", string(checkpoint.Annotations))
+			}
+			if got := normalizeStringOrDefault(normalizeInterfaceString(bindingObject["category"], ""), ""); got != tc.wantCategory {
+				t.Fatalf("binding category=%q want %q", got, tc.wantCategory)
+			}
+			inputValues, ok := bindingObject["inputValues"].(map[string]interface{})
+			if !ok {
+				t.Fatalf("expected inputValues in binding annotation: %+v", bindingObject)
+			}
+			if got := normalizeStringOrDefault(normalizeInterfaceString(inputValues[tc.wantInputKey], ""), ""); got == "" {
+				t.Fatalf("binding inputValues missing %q: %+v", tc.wantInputKey, inputValues)
+			}
+
+			rr = requestJSON(t, handler, http.MethodGet, "/v1alpha2/runtime/sessions/"+session.SessionID+"/evidence", nil)
+			if rr.Code != http.StatusOK {
+				t.Fatalf("GET evidence status=%d body=%s", rr.Code, rr.Body.String())
+			}
+			var evidenceList struct {
+				Count int              `json:"count"`
+				Items []EvidenceRecord `json:"items"`
+			}
+			decodeResponseBody(t, rr, &evidenceList)
+			foundRequestEvidence := false
+			for _, item := range evidenceList.Items {
+				if item.Kind != "org_admin_binding_request" || item.CheckpointID != checkpoint.CheckpointID {
+					continue
+				}
+				var metadata map[string]interface{}
+				if err := json.Unmarshal(item.Metadata, &metadata); err != nil {
+					t.Fatalf("unmarshal evidence metadata: %v", err)
+				}
+				inputValues, ok := metadata["inputValues"].(map[string]interface{})
+				if !ok {
+					t.Fatalf("expected inputValues in evidence metadata: %+v", metadata)
+				}
+				if got := normalizeStringOrDefault(normalizeInterfaceString(inputValues[tc.wantInputKey], ""), ""); got == "" {
+					t.Fatalf("evidence inputValues missing %q: %+v", tc.wantInputKey, inputValues)
+				}
+				foundRequestEvidence = true
+			}
+			if !foundRequestEvidence {
+				t.Fatalf("expected org_admin_binding_request evidence for checkpoint %s: %+v", checkpoint.CheckpointID, evidenceList.Items)
+			}
+		})
+	}
+}
+
+func TestRuntimeV1Alpha2OrgAdminQuotaBindingRequiresOverlaySelection(t *testing.T) {
+	store := newMemoryRunStore()
+	server := NewAPIServer(store, nil, nil)
+	handler := server.Routes()
+	session := createV1Alpha2SessionForTest(t, handler, "tenant-a", "project-a")
+
+	reqCtx := withRuntimeIdentity(context.Background(), &RuntimeIdentity{
+		Subject:    "user://org-admin",
+		TenantIDs:  []string{"tenant-a"},
+		ProjectIDs: []string{"project-a"},
+		Roles:      []string{"enterprise.org_admin"},
+	})
+	rr := requestJSONWithContext(t, handler, reqCtx, http.MethodPost, "/v1alpha2/runtime/sessions/"+session.SessionID+"/approval-checkpoints", map[string]interface{}{
+		"meta": map[string]interface{}{
+			"requestId": "approval-request-org-admin-quota-missing-overlay",
+			"tenantId":  "tenant-a",
+			"projectId": "project-a",
+		},
+		"annotations": map[string]interface{}{
+			"orgAdminDecisionBinding": map[string]interface{}{
+				"profileId":  "centralized_enterprise_admin",
+				"bindingId":  "centralized_enterprise_admin_quota_overlay_binding",
+				"roleBundle": "enterprise.org_admin",
+				"inputValues": map[string]interface{}{
+					"organization":   "epydios",
+					"tenant":         "tenant-a",
+					"project":        "project-a",
+					"worker_adapter": "codex",
+					"provider":       "agentops_gateway",
+					"model":          "gpt-5-codex",
+					"tenant_id":      "tenant-a",
+					"project_id":     "project-a",
+					"environment":    "prod",
+					"cost_center":    "CC-20410",
+				},
+			},
+		},
+	})
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected bad request for missing overlay selection status=%d body=%s", rr.Code, rr.Body.String())
+	}
+	if !strings.Contains(rr.Body.String(), "requires at least one selected overlay profile") {
+		t.Fatalf("expected overlay selection error body=%s", rr.Body.String())
+	}
+}
+
+func createV1Alpha2SessionForTest(t *testing.T, handler http.Handler, tenantID, projectID string) SessionRecord {
+	t.Helper()
+	rr := requestJSON(t, handler, http.MethodPost, "/v1alpha2/runtime/tasks", map[string]interface{}{
+		"meta": map[string]interface{}{
+			"requestId": "task-request-test-" + tenantID + "-" + projectID,
+			"tenantId":  tenantID,
+			"projectId": projectID,
+		},
+		"source": "test-suite",
+		"title":  "Test task",
+		"intent": "Create a governed test task.",
+	})
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("POST task status=%d body=%s", rr.Code, rr.Body.String())
+	}
+	var task TaskRecord
+	decodeResponseBody(t, rr, &task)
+	rr = requestJSON(t, handler, http.MethodPost, "/v1alpha2/runtime/tasks/"+task.TaskID+"/sessions", map[string]interface{}{
+		"meta": map[string]interface{}{
+			"requestId": "session-request-test-" + tenantID + "-" + projectID,
+			"tenantId":  tenantID,
+			"projectId": projectID,
+		},
+		"sessionType": "operator_request",
+		"source":      "test-suite",
+	})
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("POST session status=%d body=%s", rr.Code, rr.Body.String())
+	}
+	var session SessionRecord
+	decodeResponseBody(t, rr, &session)
+	return session
 }
 
 func TestMemoryRunStoreImplementsM16Methods(t *testing.T) {

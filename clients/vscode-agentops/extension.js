@@ -12,6 +12,7 @@ const {
   resolveProposalDecisionTarget
 } = require("./lib/threadContext");
 const { buildGovernedUpdateEnvelope } = require("./lib/updateEnvelope");
+const { buildGovernedReportEnvelope, buildGovernedReportSelectionState } = require("./lib/reportEnvelope");
 
 function normalizedString(value, fallback = "") {
   const text = String(value || "").trim();
@@ -169,6 +170,8 @@ class ThreadPanel {
     this.selectedSessionId = "";
     this.followHandle = null;
     this.followGeneration = 0;
+    this.catalogs = { workerCapabilities: null, policyPacks: null, exportProfiles: null, orgAdminProfiles: null };
+    this.governedReportSelection = {};
 
     this.panel.onDidDispose(() => {
       this.stopFollow();
@@ -201,6 +204,14 @@ class ThreadPanel {
     }
     if (message?.type === "sendTurn") {
       await this.sendGovernedTurn(message);
+      return;
+    }
+    if (message?.type === "copyGovernanceReport") {
+      await this.copyGovernanceReport();
+      return;
+    }
+    if (message?.type === "selectGovernanceReportProfile") {
+      await this.selectGovernanceReportProfile();
     }
   }
 
@@ -210,14 +221,30 @@ class ThreadPanel {
 
   async load(taskHint, sessionHints) {
     const taskId = this.taskId;
-    const thread = await this.client.loadThread(taskId, {
-      tenantId: this.client.getTenantId(),
-      projectId: this.client.getProjectId(),
-      includeLegacy: this.client.includeLegacySessions(),
-      taskHint,
-      sessionHints
-    });
+    const [threadResult, workerCapabilitiesResult, policyPacksResult, exportProfilesResult, orgAdminProfilesResult] = await Promise.allSettled([
+      this.client.loadThread(taskId, {
+        tenantId: this.client.getTenantId(),
+        projectId: this.client.getProjectId(),
+        includeLegacy: this.client.includeLegacySessions(),
+        taskHint,
+        sessionHints
+      }),
+      this.client.listWorkerCapabilities({}),
+      this.client.listPolicyPacks({ clientSurface: "vscode" }),
+      this.client.listExportProfiles({ clientSurface: "vscode" }),
+      this.client.listOrgAdminProfiles({ clientSurface: "vscode" })
+    ]);
+    if (threadResult.status !== "fulfilled") {
+      throw threadResult.reason;
+    }
+    const thread = threadResult.value;
     this.thread = thread;
+    this.catalogs = {
+      workerCapabilities: workerCapabilitiesResult.status === "fulfilled" ? workerCapabilitiesResult.value : null,
+      policyPacks: policyPacksResult.status === "fulfilled" ? policyPacksResult.value : null,
+      exportProfiles: exportProfilesResult.status === "fulfilled" ? exportProfilesResult.value : null,
+      orgAdminProfiles: orgAdminProfilesResult.status === "fulfilled" ? orgAdminProfilesResult.value : null
+    };
     const sessions = Array.isArray(thread?.sessionViews) ? thread.sessionViews : [];
     const preferred = normalizedString(this.selectedSessionId);
     const fallback = normalizedString(sessions[0]?.session?.sessionId);
@@ -364,7 +391,78 @@ class ThreadPanel {
 
   render() {
     const model = buildThreadReviewModel(this.thread, this.selectedSessionId);
-    this.panel.webview.html = renderHtml(model);
+    model.catalogs = this.catalogs || {};
+    this.panel.webview.html = renderHtml(model, this.governedReportSelection);
+  }
+
+  async copyGovernanceReport() {
+    const model = buildThreadReviewModel(this.thread, this.selectedSessionId);
+    model.catalogs = this.catalogs || {};
+    const report = buildThreadGovernanceReport(model, this.governedReportSelection);
+    await vscode.env.clipboard.writeText(normalizedString(report?.renderedText));
+    vscode.window.showInformationMessage("AgentOps enterprise governance report copied to clipboard.");
+  }
+
+  async selectGovernanceReportProfile() {
+    const current = buildGovernedReportSelectionState(this.catalogs || {}, {
+      clientSurface: "vscode",
+      reportType: "review",
+      ...this.governedReportSelection
+    });
+    const exportProfilePick = await vscode.window.showQuickPick(
+      current.exportProfileOptions.map((item) => ({
+        label: item.label,
+        description: item.value,
+        value: item.value
+      })),
+      { placeHolder: "Select governed export profile for VS Code thread review" }
+    );
+    if (!exportProfilePick) {
+      return;
+    }
+    const audienceState = buildGovernedReportSelectionState(this.catalogs || {}, {
+      clientSurface: "vscode",
+      reportType: "review",
+      exportProfile: exportProfilePick.value,
+      audience: current.audience,
+      retentionClass: current.retentionClass
+    });
+    const audiencePick = await vscode.window.showQuickPick(
+      audienceState.audienceOptions.map((item) => ({
+        label: item,
+        value: item
+      })),
+      { placeHolder: "Select governed report audience for VS Code thread review" }
+    );
+    if (!audiencePick) {
+      return;
+    }
+    const retentionState = buildGovernedReportSelectionState(this.catalogs || {}, {
+      clientSurface: "vscode",
+      reportType: "review",
+      exportProfile: exportProfilePick.value,
+      audience: audiencePick.value,
+      retentionClass: audienceState.retentionClass
+    });
+    const retentionPick = await vscode.window.showQuickPick(
+      retentionState.retentionClassOptions.map((item) => ({
+        label: item,
+        value: item
+      })),
+      { placeHolder: "Select governed report retention class for VS Code thread review" }
+    );
+    if (!retentionPick) {
+      return;
+    }
+    this.governedReportSelection = {
+      exportProfile: exportProfilePick.value,
+      audience: audiencePick.value,
+      retentionClass: retentionPick.value
+    };
+    this.render();
+    vscode.window.showInformationMessage(
+      `VS Code governed report selection updated: ${exportProfilePick.value} / ${audiencePick.value} / ${retentionPick.value}.`
+    );
   }
 }
 
@@ -400,13 +498,37 @@ function renderEnvelopeSection(title, items = []) {
   return `<div class="envelope-section"><strong>${escapeHtml(title)}</strong><ul>${items.map((item) => `<li>${escapeHtml(normalizedString(item).replace(/^[-*]\s+/, ""))}</li>`).join("")}</ul></div>`;
 }
 
-function renderHtml(model) {
+function buildThreadGovernanceReport(model = {}, selection = {}) {
+  const selectedSessionId = normalizedString(model?.selectedSession?.sessionId);
+  const selectedSummary = model?.selectedSummary || {};
+  const transcript = model?.selectedTranscript || null;
+  const decisionHints = buildDecisionActionHints(selectedSummary, selectedSessionId);
+  return buildGovernedReportEnvelope(model, model?.catalogs || {}, {
+    exportProfile: normalizedString(selection?.exportProfile),
+    audience: normalizedString(selection?.audience),
+    retentionClass: normalizedString(selection?.retentionClass),
+    header: "AgentOps enterprise governance report",
+    reportType: "review",
+    details: [
+      selectedSessionId ? `Selected session: ${selectedSessionId}` : "",
+      selectedSummary?.selectedWorker?.adapterId ? `Worker adapter: ${normalizedString(selectedSummary.selectedWorker.adapterId)} (${normalizedString(selectedSummary?.selectedWorker?.workerType, "-")})` : "",
+      selectedSummary?.boundaryProviderId ? `Boundary provider: ${normalizedString(selectedSummary.boundaryProviderId)}` : "",
+      selectedSummary?.endpointRef ? `Endpoint ref: ${normalizedString(selectedSummary.endpointRef)}` : "",
+      transcript?.toolActionId ? `Managed transcript: ${normalizedString(transcript.toolActionId)}` : ""
+    ],
+    recent: (selectedSummary?.events || []).slice(-4).map((item) => `${normalizedString(item?.label, item?.eventType)}: ${normalizedString(item?.detail, "Event recorded.")}`),
+    actionHints: decisionHints
+  });
+}
+
+function renderHtml(model, selection = {}) {
   const selectedSessionId = normalizedString(model?.selectedSession?.sessionId);
   const sessions = Array.isArray(model?.sessions) ? model.sessions : [];
   const selectedActivity = model?.selectedActivity || {};
   const selectedSummary = model?.selectedSummary || {};
   const transcript = model?.selectedTranscript || null;
   const decisionHints = buildDecisionActionHints(selectedSummary, selectedSessionId);
+  const governedReport = buildThreadGovernanceReport(model, selection);
   const governedUpdate = buildGovernedUpdateEnvelope(model, {
     header: "AgentOps thread update",
     updateType: "review",
@@ -473,6 +595,59 @@ function renderHtml(model) {
     ${renderEnvelopeSection("Recent activity", governedUpdate.recent)}
     ${renderEnvelopeSection("Action hints", governedUpdate.actionHints)}
   </section>`;
+  const governedReportBlock = `<section class="panel">
+    <h3>${escapeHtml(governedReport.header)}</h3>
+    <div class="meta">type=${escapeHtml(governedReport.reportType)} | export=${escapeHtml(governedReport.exportProfile)} | audience=${escapeHtml(governedReport.audience)} | retention=${escapeHtml(governedReport.retentionClass)} | surface=${escapeHtml(governedReport.clientSurface)}</div>
+    <div class="chips">
+      <span class="chip">task=${escapeHtml(normalizedString(governedReport.taskId, "-"))}</span>
+      <span class="chip">session=${escapeHtml(normalizedString(governedReport.sessionId, "-"))}</span>
+      <span class="chip">worker=${escapeHtml(normalizedString(governedReport.workerId, "-"))}</span>
+      <span class="chip">workerState=${escapeHtml(normalizedString(governedReport.workerState, "-"))}</span>
+      <span class="chip">exportCatalog=${escapeHtml(String((governedReport.exportProfileLabels || []).length))}</span>
+      <span class="chip">orgAdmin=${escapeHtml(String((governedReport.applicableOrgAdmins || []).length))}</span>
+      <span class="chip">policyPacks=${escapeHtml(String((governedReport.applicablePolicyPacks || []).length))}</span>
+      <span class="chip">roleBundles=${escapeHtml(String((governedReport.roleBundles || []).length))}</span>
+      <span class="chip">adminBundles=${escapeHtml(String((governedReport.adminRoleBundles || []).length))}</span>
+      <span class="chip">dlpFindings=${escapeHtml(String((governedReport.dlpFindings || []).length))}</span>
+    </div>
+    <p>${escapeHtml(normalizedString(governedReport.summary, "Governed thread state refreshed."))}</p>
+    <div class="toolbar">
+      <button type="button" data-action="select-governance-report-profile">Select Report Profile</button>
+      <button type="button" data-action="copy-governance-report">Copy Governed Report</button>
+    </div>
+    ${renderEnvelopeSection("Details", governedReport.details)}
+    ${renderEnvelopeSection("Applicable org-admin profiles", governedReport.applicableOrgAdmins)}
+    ${renderEnvelopeSection("Export profile coverage", governedReport.exportProfileLabels)}
+    ${renderEnvelopeSection("Applicable policy packs", governedReport.applicablePolicyPacks)}
+    ${renderEnvelopeSection("Role bundles", governedReport.roleBundles)}
+    ${renderEnvelopeSection("Admin role bundles", governedReport.adminRoleBundles)}
+    ${renderEnvelopeSection("Delegation models", governedReport.delegationModels)}
+    ${renderEnvelopeSection("Delegated admin bundles", governedReport.delegatedAdminBundles)}
+    ${renderEnvelopeSection("Break-glass bundles", governedReport.breakGlassBundles)}
+    ${renderEnvelopeSection("Worker capability coverage", governedReport.workerCapabilityLabels)}
+    ${renderEnvelopeSection("Directory-sync inputs", governedReport.directorySyncInputs)}
+    ${renderEnvelopeSection("Residency profiles", governedReport.residencyProfiles)}
+    ${renderEnvelopeSection("Residency exceptions", governedReport.residencyExceptions)}
+    ${renderEnvelopeSection("Legal-hold profiles", governedReport.legalHoldProfiles)}
+    ${renderEnvelopeSection("Legal-hold exceptions", governedReport.legalHoldExceptions)}
+    ${renderEnvelopeSection("Network boundary profiles", governedReport.networkBoundaryProfiles)}
+    ${renderEnvelopeSection("Fleet rollout profiles", governedReport.fleetRolloutProfiles)}
+    ${renderEnvelopeSection("Quota dimensions", governedReport.quotaDimensions)}
+    ${renderEnvelopeSection("Quota overlays", governedReport.quotaOverlays)}
+    ${renderEnvelopeSection("Chargeback dimensions", governedReport.chargebackDimensions)}
+    ${renderEnvelopeSection("Chargeback overlays", governedReport.chargebackOverlays)}
+    ${renderEnvelopeSection("Enforcement hooks", governedReport.enforcementHooks)}
+    ${renderEnvelopeSection("Boundary requirements", governedReport.boundaryRequirements)}
+    ${renderEnvelopeSection("Decision surfaces", governedReport.decisionSurfaces)}
+    ${renderEnvelopeSection("Reporting surfaces", governedReport.reportingSurfaces)}
+    ${renderEnvelopeSection("Allowed audiences", governedReport.allowedAudiences)}
+    ${renderEnvelopeSection("Delivery channels", governedReport.deliveryChannels)}
+    ${renderEnvelopeSection("Redaction modes", governedReport.redactionModes)}
+    ${renderEnvelopeSection("Recent activity", governedReport.recent)}
+    ${renderEnvelopeSection("Action hints", governedReport.actionHints)}
+    ${renderEnvelopeSection("DLP findings", governedReport.dlpFindings)}
+    <details><summary>Rendered governed report</summary><pre>${escapeHtml(normalizedString(governedReport.renderedText))}</pre></details>
+  </section>`;
   const nonce = String(Date.now());
   return `<!DOCTYPE html>
 <html>
@@ -517,6 +692,7 @@ ul { margin: 8px 0 0; padding-left: 18px; }
 </header>
 <div class="panel-grid">
   ${governedUpdateBlock}
+  ${governedReportBlock}
   <section class="panel">
     <h3>Governed Turn</h3>
     <div class="meta">Submit the next governed turn against this task on the existing M16 or M18 contract.</div>
@@ -616,6 +792,14 @@ ul { margin: 8px 0 0; padding-left: 18px; }
     const action = button.dataset.action || '';
     const sessionId = button.dataset.sessionId || '';
     const itemId = button.dataset.itemId || '';
+    if (action === 'select-governance-report-profile') {
+      vscode.postMessage({ type: 'selectGovernanceReportProfile' });
+      return;
+    }
+    if (action === 'copy-governance-report') {
+      vscode.postMessage({ type: 'copyGovernanceReport' });
+      return;
+    }
     const reason = window.prompt('Decision reason (optional):', '') || '';
     if (action === 'approval:approve' || action === 'approval:deny') {
       vscode.postMessage({

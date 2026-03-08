@@ -123,6 +123,7 @@ func m16SchemaStatements() []string {
 			target_execution_profile TEXT,
 			requested_capabilities JSONB NOT NULL DEFAULT '[]'::jsonb,
 			required_verifier_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
+			annotations JSONB NOT NULL DEFAULT '{}'::jsonb,
 			status TEXT NOT NULL,
 			reason TEXT,
 			created_at TIMESTAMPTZ NOT NULL,
@@ -130,6 +131,7 @@ func m16SchemaStatements() []string {
 			reviewed_at TIMESTAMPTZ,
 			updated_at TIMESTAMPTZ NOT NULL
 		)`,
+		`ALTER TABLE orchestration_approval_checkpoints ADD COLUMN IF NOT EXISTS annotations JSONB NOT NULL DEFAULT '{}'::jsonb`,
 		`CREATE INDEX IF NOT EXISTS idx_orchestration_approval_checkpoints_scope ON orchestration_approval_checkpoints (tenant_id, project_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_orchestration_approval_checkpoints_session_id ON orchestration_approval_checkpoints (session_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_orchestration_approval_checkpoints_status ON orchestration_approval_checkpoints (status)`,
@@ -1222,9 +1224,9 @@ func (s *PostgresRunStore) UpsertApprovalCheckpoint(ctx context.Context, checkpo
 	requestedCapabilities, _ := json.Marshal(normalizeStringList(checkpoint.RequestedCapabilities))
 	const q = `
 INSERT INTO orchestration_approval_checkpoints (
-	checkpoint_id, session_id, legacy_run_id, request_id, tenant_id, project_id, scope, tier, target_os, target_execution_profile, requested_capabilities, required_verifier_ids, status, reason, created_at, expires_at, reviewed_at, updated_at
+	checkpoint_id, session_id, legacy_run_id, request_id, tenant_id, project_id, scope, tier, target_os, target_execution_profile, requested_capabilities, required_verifier_ids, annotations, status, reason, created_at, expires_at, reviewed_at, updated_at
 ) VALUES (
-	$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18
+	$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19
 )
 ON CONFLICT (checkpoint_id) DO UPDATE SET
 	session_id = EXCLUDED.session_id,
@@ -1238,6 +1240,7 @@ ON CONFLICT (checkpoint_id) DO UPDATE SET
 	target_execution_profile = EXCLUDED.target_execution_profile,
 	requested_capabilities = EXCLUDED.requested_capabilities,
 	required_verifier_ids = EXCLUDED.required_verifier_ids,
+	annotations = EXCLUDED.annotations,
 	status = EXCLUDED.status,
 	reason = EXCLUDED.reason,
 	expires_at = EXCLUDED.expires_at,
@@ -1259,6 +1262,7 @@ ON CONFLICT (checkpoint_id) DO UPDATE SET
 		nullStr(checkpoint.TargetExecutionProfile),
 		requestedCapabilities,
 		requiredVerifierIDs,
+		jsonBytesOrEmptyObject(checkpoint.Annotations),
 		string(checkpoint.Status),
 		nullStr(checkpoint.Reason),
 		createdAt,
@@ -1294,6 +1298,7 @@ SELECT
 	COALESCE(target_execution_profile, ''),
 	requested_capabilities,
 	required_verifier_ids,
+	annotations,
 	status,
 	COALESCE(reason, ''),
 	created_at,
@@ -1348,6 +1353,7 @@ FROM orchestration_approval_checkpoints
 			status              string
 			requestedCapsRaw    []byte
 			requiredVerifierRaw []byte
+			annotationsRaw      []byte
 			expiresAt           sql.NullTime
 			reviewedAt          sql.NullTime
 		)
@@ -1364,6 +1370,7 @@ FROM orchestration_approval_checkpoints
 			&item.TargetExecutionProfile,
 			&requestedCapsRaw,
 			&requiredVerifierRaw,
+			&annotationsRaw,
 			&status,
 			&item.Reason,
 			&item.CreatedAt,
@@ -1376,6 +1383,7 @@ FROM orchestration_approval_checkpoints
 		item.Status = ApprovalStatus(status)
 		_ = json.Unmarshal(requestedCapsRaw, &item.RequestedCapabilities)
 		_ = json.Unmarshal(requiredVerifierRaw, &item.RequiredVerifierIDs)
+		item.Annotations = cloneJSONRaw(annotationsRaw)
 		if expiresAt.Valid {
 			t := expiresAt.Time.UTC()
 			item.ExpiresAt = &t

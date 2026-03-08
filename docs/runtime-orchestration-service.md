@@ -35,12 +35,16 @@ This service moves policy/evidence/profile execution flow out of ad-hoc scripts 
 - `GET /v1alpha1/runtime/approvals?limit=100&tenantId=...&projectId=...&status=PENDING|APPROVED|DENIED|EXPIRED`
 - `POST /v1alpha1/runtime/approvals/{runId}/decision` (`decision=APPROVE|DENY`, optional `reason`, optional `ttlSeconds`, optional `grantToken`)
 - `GET /v1alpha1/runtime/audit/events?limit=100&tenantId=...&projectId=...&providerId=...&decision=...&event=...`
+- `GET /v1alpha1/runtime/audit/events/export?format=jsonl|json&tenantId=...&projectId=...&providerId=...&decision=...&event=...&exportProfile=...&audience=...&exportRetentionClass=...`
 - `POST /v1alpha1/runtime/terminal/sessions` (run-scoped terminal command request with deterministic command allowlist, policy guardrails, and audit linkage)
 - `GET /v1alpha1/runtime/integrations/settings?tenantId=...&projectId=...` (project-scoped integration settings read)
 - `PUT /v1alpha1/runtime/integrations/settings` (`meta.tenantId`, `meta.projectId`, `settings` JSON object)
 - `POST /v1alpha1/runtime/integrations/invoke` (`meta.tenantId`, `meta.projectId`, optional `agentProfileId`, `prompt`, optional `systemPrompt`, optional `maxOutputTokens`)
 - `GET /v1alpha2/runtime/worker-capabilities?executionMode=...&workerType=...&adapterId=...`
 - `GET /v1alpha2/runtime/policy-packs?packId=...&permission=...&executionMode=...&workerType=...&adapterId=...&clientSurface=...`
+- `GET /v1alpha2/runtime/export-profiles?exportProfile=...&reportType=...&clientSurface=...&audience=...&retentionClass=...`
+- `GET /v1alpha2/runtime/org-admin-profiles?profileId=...&organizationModel=...&roleBundle=...&clientSurface=...`
+- `GET /v1alpha2/runtime/sessions/{sessionId}/evidence/export?format=jsonl|json&kind=...&retentionClass=...&exportProfile=...&audience=...&exportRetentionClass=...`
 - `POST /v1alpha2/runtime/sessions/{sessionId}/tool-proposals/{proposalId}/decision` (`meta.tenantId`, `meta.projectId`, `decision=APPROVE|DENY`, optional `reason`)
 
 ## Integration Settings Contract (M14.9)
@@ -84,6 +88,70 @@ This service moves policy/evidence/profile execution flow out of ad-hoc scripts 
   - `roleBundles`
   - `decisionSurfaces`
 
+## Export Profile Catalog Contract (M20 baseline)
+
+- Endpoint scope is runtime-authz protected and currently requires the same read permission as session and run reads.
+- `GET /v1alpha2/runtime/export-profiles` returns the governed export-profile catalog used by enterprise review, follow, audit, and incident export surfaces.
+- Supported filters:
+  - `exportProfile`
+  - `reportType`
+  - `clientSurface`
+  - `audience`
+  - `retentionClass`
+- Current baseline profiles cover:
+  - operator review and operator follow
+  - workflow review and workflow follow
+  - conversation review and conversation follow
+  - audit export and audit handoff
+  - evidence export
+  - incident export and incident handoff
+- Export-profile entries carry:
+  - `defaultAudience`
+  - `allowedAudiences`
+  - `defaultRetentionClass`
+  - `allowedRetentionClasses`
+  - `audienceRetentionClassOverlays`
+  - `deliveryChannels`
+  - `redactionMode`
+- Runtime-native audit and evidence exports now resolve governed export disposition from the same runtime export-profile catalog with `clientSurface=runtime` and `reportType=export`, stamp `X-AgentOps-Export-*` headers, and emit `X-AgentOps-Export-Redactions` when secret-like content is sanitized at the server boundary.
+
+## Org Admin Catalog Contract (M20 baseline)
+
+- Endpoint scope is runtime-authz protected and currently requires the same read permission as session and run reads.
+- `GET /v1alpha2/runtime/org-admin-profiles` returns the first org-scale hardening inventory for enterprise admin and IT-department perspectives.
+- catalog entries now include structured `enforcementProfiles` describing delegated-admin, break-glass, directory-sync, residency, legal-hold, quota, and chargeback governance hooks with role bundles, required inputs, decision surfaces, and boundary requirements.
+- catalog entries now also include structured `directorySyncMappings`, `exceptionProfiles`, and `overlayProfiles` for directory-sync scope attachment, residency or legal-hold exceptions, and org-level quota or chargeback overlays on the same native contract.
+- catalog entries now also include structured `decisionBindings` that bind delegated-admin, break-glass, directory-sync, residency or legal-hold exception, and quota or chargeback overlay decisions to concrete governed review objects on the same native contract.
+- approval-checkpoint create and decision flows can now persist active org-admin `decisionBindings` in checkpoint annotations, enforce required-input and role-bundle checks for the bound review, and emit org-admin request or resolution evidence on the same native approval/evidence contract.
+- approval-checkpoint create and decision flows now also persist normalized org-admin `inputValues`, enforce category-specific selection/input validation for the active binding, and project those persisted inputs into shared governed review surfaces on the same native contract.
+- desktop Chat and VS Code governed report surfaces now consume this catalog on the same governed report envelope used by the other ingress surfaces.
+- Supported filters:
+  - `profileId`
+  - `organizationModel`
+  - `roleBundle`
+  - `clientSurface`
+- Current baseline profiles cover:
+  - centralized enterprise administration
+  - federated business-unit administration
+  - regulated regional administration
+- Org-admin entries carry:
+  - `adminRoleBundles`
+  - `delegatedAdminRoleBundles`
+  - `breakGlassRoleBundles`
+  - `groupRoleMappingInputs`
+  - `residencyProfiles`
+  - `legalHoldProfiles`
+  - `networkBoundaryProfiles`
+  - `fleetRolloutProfiles`
+  - `quotaDimensions`
+  - `chargebackDimensions`
+  - `decisionSurfaces`
+  - `boundaryRequirements`
+  - `directorySyncMappings`
+  - `exceptionProfiles`
+  - `overlayProfiles`
+  - `decisionBindings`
+
 ## Enterprise Report Envelope (M20 baseline)
 
 - The first shared enterprise report envelope is implemented in the shared Go client layer:
@@ -99,17 +167,38 @@ This service moves policy/evidence/profile execution flow out of ad-hoc scripts 
   - workflow or ticket reporting surfaces
   - chatops reporting surfaces
   - CLI reporting surfaces
+  - desktop Chat governed review and export surfaces
+  - VS Code governed review surfaces
 - Purpose:
   - keep governance reporting on the same native task, session, worker, approval, tool-action, evidence, and event-stream contract
   - avoid workflow-vendor-specific or chat-vendor-specific reporting branches
 - The envelope now also carries:
+  - `exportProfile`
+  - `audience`
+  - `retentionClass`
+  - export-profile labels
+  - allowed retention classes
+  - retention overlays
   - applicable policy packs
   - role bundles
   - decision surfaces
   - worker capability coverage
   - boundary requirements
+  - directory-sync mapping coverage
+  - active org-admin review details and action hints derived from persisted approval-checkpoint `decisionBindings`
+  - exception profile coverage
+  - overlay profile coverage
   - `DLP findings`
+- `exportProfile` and `audience` defaults are now normalized by `clientSurface` and `reportType`, so Chat, VS Code, CLI, workflow, and chatops do not drift on governed report metadata.
+- `retentionClass` now resolves from the same export-profile catalog using explicit export-profile overlays instead of client-local retention assumptions.
+- CLI, workflow, and chatops now bind explicit operator selections for `exportProfile`, `audience`, and `retentionClass`, and validate those choices against the runtime export-profile catalog before governed report output is rendered.
+- Desktop Chat and VS Code now load the runtime export-profile catalog, render export-profile coverage from the same governed source, and expose explicit operator-selectable `exportProfile`, `audience`, and `retentionClass` choices for governed review/export actions.
+- CLI, workflow, and chatops now load that same runtime export-profile catalog into the shared Go enterprise-report envelope and render the same retention, delivery, and redaction metadata on the same native contract.
 - Secret-like transcript, evidence, summary, and hint content is redacted before render in the shared enterprise report envelope so governed report consumers do not leak raw credentials or tokens through downstream status surfaces.
+- Runtime run export also performs export-time redaction before JSONL/CSV output, stamps `X-AgentOps-Export-Redactions` on the response, and emits `redactionCount` into the audit event path.
+- Runtime-native audit and session evidence exports now apply the same export-time redaction model before JSONL/JSON output and emit governed export metadata plus redaction counts on the server boundary.
+- Desktop audit and incident exports now run through the same governed export helper with explicit export profile, audience, retention class, client surface, and report type metadata instead of carrying standalone export option logic.
+- A shared governed-report parity fixture now drives Go and JS parity checks across desktop Chat, VS Code, CLI, workflow, and chatops on the same export-profile catalog and DLP/redaction contract, and remaining desktop Chat governed export actions are covered directly in JS tests.
 
 ## Integration Invoke Contract (2026-03-07)
 

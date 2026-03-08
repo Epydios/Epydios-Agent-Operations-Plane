@@ -41,7 +41,7 @@ import {
   renderTerminalHistory
 } from "./views/terminal.js";
 import { renderSettings } from "./views/settings.js";
-import { renderChat } from "./views/chat.js";
+import { buildChatTurnGovernanceReport, renderChat, resolveChatGovernedExportSelection } from "./views/chat.js";
 import { renderExecutionDefaults } from "./views/execution-defaults.js";
 import {
   closeManagedCodexWorkerSession,
@@ -58,6 +58,16 @@ import {
   recoverManagedCodexWorker,
   refreshOperatorChatThreadSession
 } from "./runtime/session-client.js";
+import {
+  buildGovernedExportSelectionState,
+  prepareGovernedJsonExport,
+  prepareGovernedTextExport
+} from "./runtime/governance-report.js";
+import {
+  buildDesktopGovernedExportOptions as buildDesktopGovernedExportOptionsInternal,
+  describeGovernedExportDisposition as describeGovernedExportDispositionInternal,
+  describeGovernedExportRedactions as describeGovernedExportRedactionsInternal
+} from "./runtime/desktop-export-governance.js";
 import {
   escapeHTML,
   formatTime,
@@ -288,6 +298,19 @@ let operatorChatState = {
     showArchived: false,
     message: "",
     items: []
+  },
+  catalogs: {
+    source: "not-loaded",
+    message: "",
+    workerCapabilities: null,
+    policyPacks: null,
+    exportProfiles: null,
+    orgAdminProfiles: null
+  },
+  exportSelection: {
+    exportProfile: "",
+    audience: "",
+    retentionClass: ""
   }
 };
 let operatorChatArchiveState = normalizeOperatorChatArchiveState(readSavedJSON(OPERATOR_CHAT_ARCHIVE_KEY));
@@ -295,6 +318,12 @@ let operatorChatFollowState = {
   token: 0,
   timerId: 0,
   sessionId: ""
+};
+let desktopGovernedExportCatalogState = {
+  source: "not-loaded",
+  message: "",
+  exportProfiles: null,
+  orgAdminProfiles: null
 };
 const CHAT_FOLLOW_RETRY_MS = 1250;
 const CHAT_FOLLOW_CONTINUE_MS = 160;
@@ -996,6 +1025,80 @@ async function refreshOperatorChatHistory(sessionValue) {
   }
 }
 
+async function refreshOperatorChatGovernanceCatalogs(sessionValue) {
+  const scope = {
+    tenantId: activeTenantScope(sessionValue),
+    projectId: activeProjectScope(sessionValue)
+  };
+  if (!scope.tenantId || !scope.projectId) {
+    operatorChatState = {
+      ...operatorChatState,
+      catalogs: {
+        source: "scope-unavailable",
+        message: "Tenant and project scope are required before enterprise governance catalogs can be loaded.",
+        workerCapabilities: null,
+        policyPacks: null,
+        exportProfiles: null,
+        orgAdminProfiles: null
+      }
+    };
+    return;
+  }
+  try {
+    const [workerCapabilities, policyPacks, exportProfiles, orgAdminProfiles] = await Promise.all([
+      api.listRuntimeWorkerCapabilities({}),
+      api.listRuntimePolicyPacks({ clientSurface: "chat" }),
+      api.listRuntimeExportProfiles({ clientSurface: "chat" }),
+      api.listRuntimeOrgAdminProfiles({ clientSurface: "chat" })
+    ]);
+    operatorChatState = {
+      ...operatorChatState,
+      catalogs: {
+        source: "runtime-endpoint",
+        message: "Enterprise governance catalogs loaded for Chat review, report, governed export, and org-admin posture.",
+        workerCapabilities,
+        policyPacks,
+        exportProfiles,
+        orgAdminProfiles
+      }
+    };
+  } catch (error) {
+    operatorChatState = {
+      ...operatorChatState,
+      catalogs: {
+        source: "error",
+        message: `Enterprise governance catalogs failed to load: ${error.message}`,
+        workerCapabilities: null,
+        policyPacks: null,
+        exportProfiles: null,
+        orgAdminProfiles: null
+      }
+    };
+  }
+}
+
+async function refreshDesktopGovernedExportCatalogs() {
+  try {
+    const [exportProfiles, orgAdminProfiles] = await Promise.all([
+      api.listRuntimeExportProfiles({ clientSurface: "desktop" }),
+      api.listRuntimeOrgAdminProfiles({ clientSurface: "desktop" })
+    ]);
+    desktopGovernedExportCatalogState = {
+      source: "runtime-endpoint",
+      message: "Enterprise governed export profiles and org-admin overlays loaded for desktop export and handoff paths.",
+      exportProfiles,
+      orgAdminProfiles
+    };
+  } catch (error) {
+    desktopGovernedExportCatalogState = {
+      source: "error",
+      message: `Enterprise governed export profiles failed to load: ${error.message}`,
+      exportProfiles: null,
+      orgAdminProfiles: null
+    };
+  }
+}
+
 function findOperatorChatTurn(thread = {}, sessionId) {
   const normalizedSessionID = String(sessionId || "").trim();
   const turns = Array.isArray(thread?.turns) ? thread.turns : [];
@@ -1032,6 +1135,14 @@ function buildOperatorChatEvidenceExport(thread = {}, sessionId, evidenceId) {
     selectedWorker: timeline?.selectedWorker || null,
     evidence
   };
+}
+
+function buildOperatorChatGovernanceReportExport(thread = {}, sessionId, catalogs = {}, exportSelection = {}) {
+  const turn = findOperatorChatTurn(thread, sessionId);
+  if (!turn) {
+    return null;
+  }
+  return buildChatTurnGovernanceReport(turn, catalogs, exportSelection);
 }
 
 function validateAimxsOverride(override, fallback) {
@@ -2320,6 +2431,79 @@ function buildIncidentEntryTraceabilitySummary(entry) {
     `generatedAt=${String(entry?.generatedAt || entry?.createdAt || "").trim() || "-"}`,
     `sources=run:${String(entry?.runDetailSource || "").trim() || "-"},approval:${String(entry?.approvalSource || "").trim() || "-"},audit:${String(entry?.auditSource || "").trim() || "-"}`
   ].join("; ");
+}
+
+function resolveGovernedExportProfileCatalog(clientSurface = "desktop", overrideCatalog = null) {
+  if (overrideCatalog && Array.isArray(overrideCatalog.items) && overrideCatalog.items.length > 0) {
+    return overrideCatalog;
+  }
+  if (String(clientSurface || "").trim().toLowerCase() === "chat") {
+    return operatorChatState?.catalogs?.exportProfiles || null;
+  }
+  return desktopGovernedExportCatalogState?.exportProfiles || null;
+}
+
+function resolveGovernedOrgAdminCatalog(clientSurface = "desktop", overrideCatalog = null) {
+  if (overrideCatalog && Array.isArray(overrideCatalog.items) && overrideCatalog.items.length > 0) {
+    return overrideCatalog;
+  }
+  if (String(clientSurface || "").trim().toLowerCase() === "chat") {
+    return operatorChatState?.catalogs?.orgAdminProfiles || null;
+  }
+  return desktopGovernedExportCatalogState?.orgAdminProfiles || null;
+}
+
+function buildDesktopGovernedExportOptions(exportProfile, audience, reportType = "export", clientSurface = "desktop", exportProfileCatalog = null, retentionClass = "") {
+  return buildDesktopGovernedExportOptionsInternal(
+    exportProfile,
+    audience,
+    reportType,
+    clientSurface,
+    resolveGovernedExportProfileCatalog(clientSurface, exportProfileCatalog),
+    retentionClass
+  );
+}
+
+function describeGovernedExportDisposition(result = {}) {
+  return describeGovernedExportDispositionInternal(result);
+}
+
+function describeGovernedExportRedactions(result = {}, noun = "export") {
+  return describeGovernedExportRedactionsInternal(result, noun);
+}
+
+function resolveOperatorChatGovernedExportSelection() {
+  return resolveChatGovernedExportSelection(
+    operatorChatState?.exportSelection || {},
+    operatorChatState?.catalogs?.exportProfiles || null
+  );
+}
+
+function exportGovernedJson(payload, fileName, options = {}) {
+  const prepared = prepareGovernedJsonExport(payload, {
+    ...options,
+    orgAdminCatalog: resolveGovernedOrgAdminCatalog(options?.clientSurface || "desktop", options?.orgAdminCatalog || options?.orgAdminProfiles || null)
+  });
+  triggerTextDownload(prepared.serialized, fileName, "application/json;charset=utf-8");
+  return prepared;
+}
+
+async function copyGovernedText(text, options = {}) {
+  const prepared = prepareGovernedTextExport(text, {
+    ...options,
+    orgAdminCatalog: resolveGovernedOrgAdminCatalog(options?.clientSurface || "desktop", options?.orgAdminCatalog || options?.orgAdminProfiles || null)
+  });
+  await copyTextToClipboard(prepared.text);
+  return prepared;
+}
+
+function downloadGovernedText(text, fileName, mimeType = "text/plain;charset=utf-8", options = {}) {
+  const prepared = prepareGovernedTextExport(text, {
+    ...options,
+    orgAdminCatalog: resolveGovernedOrgAdminCatalog(options?.clientSurface || "desktop", options?.orgAdminCatalog || options?.orgAdminProfiles || null)
+  });
+  triggerTextDownload(prepared.text, fileName, mimeType);
+  return prepared;
 }
 
 function triggerTextDownload(content, fileName, mimeType = "text/plain;charset=utf-8") {
@@ -3873,7 +4057,11 @@ async function main() {
         ...settings,
         configChanges: buildSettingsConfigChanges(configChangeHistory, audit)
       };
-      await refreshOperatorChatHistory(session);
+      await Promise.all([
+        refreshOperatorChatHistory(session),
+        refreshOperatorChatGovernanceCatalogs(session),
+        refreshDesktopGovernedExportCatalogs()
+      ]);
 
       latestSettingsSnapshot = settingsWithConfigChanges;
       triageSnapshot = { runs, approvals, audit };
@@ -4354,6 +4542,34 @@ async function main() {
   });
   ui.chatContent?.addEventListener("input", (event) => {
     const target = event.target;
+    if (target instanceof HTMLElement && target.closest("[data-chat-export-field]")) {
+      const field = String(target.dataset.chatExportField || "").trim();
+      if (!field) {
+        return;
+      }
+      const rawValue = target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement
+        ? String(target.value || "").trim()
+        : "";
+      const selection = buildGovernedExportSelectionState({
+        clientSurface: "chat",
+        reportType: "review",
+        exportProfileCatalog: operatorChatState?.catalogs?.exportProfiles || null,
+        ...operatorChatState?.exportSelection,
+        [field]: rawValue
+      });
+      operatorChatState = {
+        ...operatorChatState,
+        exportSelection: {
+          exportProfile: selection.exportProfile,
+          audience: selection.audience,
+          retentionClass: selection.retentionClass
+        },
+        status: operatorChatState.thread?.taskId ? "ready" : operatorChatState.status,
+        message: "Governed export selection updated for Chat review and export actions."
+      };
+      refresh().catch(() => {});
+      return;
+    }
     if (!(target instanceof HTMLElement) || !target.closest("[data-chat-field]")) {
       return;
     }
@@ -4959,6 +5175,7 @@ async function main() {
         return;
       }
       const payload = buildOperatorChatToolActionExport(operatorChatState.thread, sessionId, toolActionId);
+      const governedExportSelection = resolveOperatorChatGovernedExportSelection();
       if (!payload) {
         operatorChatState = {
           ...operatorChatState,
@@ -4972,21 +5189,42 @@ async function main() {
       const serialized = JSON.stringify(payload, null, 2);
       try {
         if (action === "copy-tool-action-json") {
-          await copyTextToClipboard(serialized);
+          const prepared = await copyGovernedText(
+            serialized,
+            buildDesktopGovernedExportOptions(
+              governedExportSelection.exportProfile,
+              governedExportSelection.audience,
+              "review",
+              "chat",
+              operatorChatState?.catalogs?.exportProfiles,
+              governedExportSelection.retentionClass
+            )
+          );
           operatorChatState = {
             ...operatorChatState,
             ...draft,
             status: "success",
-            message: `Copied tool action ${toolActionId} review JSON to the clipboard.`
+            message: `Copied tool action ${toolActionId} review JSON to the clipboard.${describeGovernedExportDisposition(prepared)}${describeGovernedExportRedactions(prepared, "tool-action export")}`
           };
         } else {
           const fileName = `epydios-agentops-chat-tool-action-${toolActionId}.json`;
-          triggerTextDownload(serialized, fileName, "application/json;charset=utf-8");
+          const prepared = exportGovernedJson(
+            payload,
+            fileName,
+            buildDesktopGovernedExportOptions(
+              governedExportSelection.exportProfile,
+              governedExportSelection.audience,
+              "review",
+              "chat",
+              operatorChatState?.catalogs?.exportProfiles,
+              governedExportSelection.retentionClass
+            )
+          );
           operatorChatState = {
             ...operatorChatState,
             ...draft,
             status: "success",
-            message: `Downloaded tool action ${toolActionId} review JSON as ${fileName}.`
+            message: `Downloaded tool action ${toolActionId} review JSON as ${fileName}.${describeGovernedExportDisposition(prepared)}${describeGovernedExportRedactions(prepared, "tool-action export")}`
           };
         }
       } catch (error) {
@@ -5008,6 +5246,7 @@ async function main() {
         return;
       }
       const payload = buildOperatorChatEvidenceExport(operatorChatState.thread, sessionId, evidenceId);
+      const governedExportSelection = resolveOperatorChatGovernedExportSelection();
       if (!payload) {
         operatorChatState = {
           ...operatorChatState,
@@ -5018,24 +5257,44 @@ async function main() {
         await refresh();
         return;
       }
-      const serialized = JSON.stringify(payload, null, 2);
       try {
         if (action === "copy-evidence-json") {
-          await copyTextToClipboard(serialized);
+          const prepared = await copyGovernedText(
+            JSON.stringify(payload, null, 2),
+            buildDesktopGovernedExportOptions(
+              governedExportSelection.exportProfile,
+              governedExportSelection.audience,
+              "review",
+              "chat",
+              operatorChatState?.catalogs?.exportProfiles,
+              governedExportSelection.retentionClass
+            )
+          );
           operatorChatState = {
             ...operatorChatState,
             ...draft,
             status: "success",
-            message: `Copied evidence record ${evidenceId} review JSON to the clipboard.`
+            message: `Copied evidence record ${evidenceId} review JSON to the clipboard.${describeGovernedExportDisposition(prepared)}${describeGovernedExportRedactions(prepared, "evidence export")}`
           };
         } else {
           const fileName = `epydios-agentops-chat-evidence-${evidenceId}.json`;
-          triggerTextDownload(serialized, fileName, "application/json;charset=utf-8");
+          const prepared = exportGovernedJson(
+            payload,
+            fileName,
+            buildDesktopGovernedExportOptions(
+              governedExportSelection.exportProfile,
+              governedExportSelection.audience,
+              "review",
+              "chat",
+              operatorChatState?.catalogs?.exportProfiles,
+              governedExportSelection.retentionClass
+            )
+          );
           operatorChatState = {
             ...operatorChatState,
             ...draft,
             status: "success",
-            message: `Downloaded evidence record ${evidenceId} review JSON as ${fileName}.`
+            message: `Downloaded evidence record ${evidenceId} review JSON as ${fileName}.${describeGovernedExportDisposition(prepared)}${describeGovernedExportRedactions(prepared, "evidence export")}`
           };
         }
       } catch (error) {
@@ -5044,6 +5303,75 @@ async function main() {
           ...draft,
           status: "error",
           message: `Evidence export failed: ${error.message}`
+        };
+      }
+      await refresh();
+      return;
+    }
+
+    if (action === "copy-governance-report" || action === "download-governance-report") {
+      const sessionId = String(actionNode.dataset.chatSessionId || "").trim();
+      if (!sessionId) {
+        return;
+      }
+      const governedExportSelection = resolveOperatorChatGovernedExportSelection();
+      const envelope = buildOperatorChatGovernanceReportExport(operatorChatState.thread, sessionId, operatorChatState.catalogs, governedExportSelection);
+      if (!envelope) {
+        operatorChatState = {
+          ...operatorChatState,
+          ...draft,
+          status: "warn",
+          message: `Governance report for session ${sessionId} is no longer available in the loaded thread view.`
+        };
+        await refresh();
+        return;
+      }
+      try {
+        if (action === "copy-governance-report") {
+          const prepared = await copyGovernedText(
+            envelope.renderedText || "",
+            buildDesktopGovernedExportOptions(
+              envelope.exportProfile,
+              envelope.audience,
+              envelope.reportType || "review",
+              "chat",
+              operatorChatState?.catalogs?.exportProfiles,
+              envelope.retentionClass
+            )
+          );
+          operatorChatState = {
+            ...operatorChatState,
+            ...draft,
+            status: "success",
+            message: `Copied enterprise governance report for session ${sessionId}.${describeGovernedExportDisposition(prepared)}${describeGovernedExportRedactions(prepared, "governance report")}`
+          };
+        } else {
+          const fileName = `epydios-agentops-chat-governance-report-${sessionId}.json`;
+          const prepared = exportGovernedJson(
+            envelope,
+            fileName,
+            buildDesktopGovernedExportOptions(
+              envelope.exportProfile,
+              envelope.audience,
+              envelope.reportType || "review",
+              "chat",
+              operatorChatState?.catalogs?.exportProfiles,
+              envelope.retentionClass
+            )
+          );
+          operatorChatState = {
+            ...operatorChatState,
+            ...draft,
+            status: "success",
+            message: `Downloaded enterprise governance report for session ${sessionId} as ${fileName}.${describeGovernedExportDisposition(prepared)}${describeGovernedExportRedactions(prepared, "governance report")}`
+          };
+        }
+      } catch (error) {
+        operatorChatState = {
+          ...operatorChatState,
+          ...draft,
+          status: "error",
+          message: `Governance report export failed: ${error.message}`
         };
       }
       await refresh();
@@ -6128,13 +6456,16 @@ async function main() {
       return;
     }
     const fileName = buildAuditExportFileName("json", bundle?.meta?.filters || {}, bundle?.meta?.generatedAt);
-    triggerTextDownload(JSON.stringify(bundle, null, 2), fileName, "application/json;charset=utf-8");
+    const prepared = exportGovernedJson(bundle, fileName, buildDesktopGovernedExportOptions("audit_export", "downstream_review", "export"));
     if (ui.auditHandoffPreview instanceof HTMLElement) {
-      ui.auditHandoffPreview.textContent = buildAuditHandoffText(bundle);
+      ui.auditHandoffPreview.textContent = prepareGovernedTextExport(
+        buildAuditHandoffText(bundle),
+        buildDesktopGovernedExportOptions("audit_export", "downstream_review", "handoff")
+      ).text;
     }
     renderAuditFilingFeedback(
       "ok",
-      `Audit JSON exported to ${fileName}. rows=${bundle.items.length}. Review the handoff preview before sharing downstream. ${buildAuditTraceabilitySummary(bundle, fileName)}`
+      `Audit JSON exported to ${fileName}. rows=${bundle.items.length}. Review the handoff preview before sharing downstream.${describeGovernedExportDisposition(prepared)}${describeGovernedExportRedactions(prepared, "audit export")} ${buildAuditTraceabilitySummary(bundle, fileName)}`
     );
   });
   ui.auditExportCsvButton?.addEventListener("click", () => {
@@ -6145,10 +6476,15 @@ async function main() {
     }
     const fileName = buildAuditExportFileName("csv", bundle?.meta?.filters || {}, bundle?.meta?.generatedAt);
     const csv = buildAuditCsv(bundle.items);
-    triggerTextDownload(csv, fileName, "text/csv;charset=utf-8");
+    const prepared = downloadGovernedText(
+      csv,
+      fileName,
+      "text/csv;charset=utf-8",
+      buildDesktopGovernedExportOptions("audit_export", "downstream_review", "export")
+    );
     renderAuditFilingFeedback(
       "ok",
-      `Audit CSV exported to ${fileName}. rows=${bundle.items.length}. Review scope and time window before sharing downstream. ${buildAuditTraceabilitySummary(bundle, fileName)}`
+      `Audit CSV exported to ${fileName}. rows=${bundle.items.length}. Review scope and time window before sharing downstream.${describeGovernedExportDisposition(prepared)}${describeGovernedExportRedactions(prepared, "audit export")} ${buildAuditTraceabilitySummary(bundle, fileName)}`
     );
   });
   ui.auditCopyHandoffButton?.addEventListener("click", async () => {
@@ -6159,13 +6495,16 @@ async function main() {
     }
     const handoffText = buildAuditHandoffText(bundle);
     try {
-      await copyTextToClipboard(handoffText);
+      const prepared = await copyGovernedText(
+        handoffText,
+        buildDesktopGovernedExportOptions("audit_handoff", "downstream_review", "handoff")
+      );
       if (ui.auditHandoffPreview instanceof HTMLElement) {
-        ui.auditHandoffPreview.textContent = handoffText;
+        ui.auditHandoffPreview.textContent = prepared.text;
       }
       renderAuditFilingFeedback(
         "ok",
-        `Copied handoff summary for ${bundle.items.length} audit rows to clipboard. Review the preview pane before sending it downstream. ${buildAuditTraceabilitySummary(bundle)}`
+        `Copied handoff summary for ${bundle.items.length} audit rows to clipboard. Review the preview pane before sending it downstream.${describeGovernedExportDisposition(prepared)}${describeGovernedExportRedactions(prepared, "audit handoff")} ${buildAuditTraceabilitySummary(bundle)}`
       );
     } catch (error) {
       renderAuditFilingFeedback("error", `Audit handoff copy failed: ${error.message}`);
@@ -6188,16 +6527,23 @@ async function main() {
       incidentPkg?.audit?.meta?.filters || {},
       incidentPkg?.meta?.generatedAt
     );
-    triggerTextDownload(JSON.stringify(incidentPkg, null, 2), fileName, "application/json;charset=utf-8");
+    const prepared = exportGovernedJson(
+      incidentPkg,
+      fileName,
+      buildDesktopGovernedExportOptions("incident_export", "incident_response", "export")
+    );
     pushIncidentHistory(buildIncidentHistoryEntry(incidentPkg, fileName));
     if (ui.auditHandoffPreview instanceof HTMLElement) {
-      ui.auditHandoffPreview.textContent = handoffText;
+      ui.auditHandoffPreview.textContent = prepareGovernedTextExport(
+        handoffText,
+        buildDesktopGovernedExportOptions("incident_export", "incident_response", "handoff")
+      ).text;
     }
     const auditCount = Number(incidentPkg?.audit?.meta?.matchedCount || 0);
     const approvalStatus = String(incidentPkg?.approval?.status || "UNAVAILABLE").trim().toUpperCase();
     renderAuditFilingFeedback(
       "ok",
-      `Incident package exported to ${fileName}. runId=${runId}; approval=${approvalStatus}; auditRows=${auditCount}. Review the handoff preview and queue status before downstream handoff. ${buildIncidentTraceabilitySummary(incidentPkg, fileName)}`
+      `Incident package exported to ${fileName}. runId=${runId}; approval=${approvalStatus}; auditRows=${auditCount}. Review the handoff preview and queue status before downstream handoff.${describeGovernedExportDisposition(prepared)}${describeGovernedExportRedactions(prepared, "incident export")} ${buildIncidentTraceabilitySummary(incidentPkg, fileName)}`
     );
   });
   ui.auditContent?.addEventListener("click", async (event) => {
@@ -6290,10 +6636,14 @@ async function main() {
     const view = readIncidentHistoryViewFromUI();
     const bundle = buildSelectedIncidentExportBundle(selectedEntries, view, actor);
     const fileName = buildIncidentSelectionFileName(selectedEntries.length, bundle?.meta?.generatedAt);
-    triggerTextDownload(JSON.stringify(bundle, null, 2), fileName, "application/json;charset=utf-8");
+    const prepared = exportGovernedJson(
+      bundle,
+      fileName,
+      buildDesktopGovernedExportOptions("incident_export", "incident_response", "export")
+    );
     renderAuditFilingFeedback(
       "ok",
-      `Selected incident bundle exported to ${fileName}. rows=${selectedEntries.length}; source=${bundle?.meta?.source || "-"}; generatedAt=${bundle?.meta?.generatedAt || "-"}; scopes=${(bundle?.meta?.scopeSummary || []).join(",") || "-"}. Review scope coverage before sharing downstream.`
+      `Selected incident bundle exported to ${fileName}. rows=${selectedEntries.length}; source=${bundle?.meta?.source || "-"}; generatedAt=${bundle?.meta?.generatedAt || "-"}; scopes=${(bundle?.meta?.scopeSummary || []).join(",") || "-"}. Review scope coverage before sharing downstream.${describeGovernedExportDisposition(prepared)}${describeGovernedExportRedactions(prepared, "incident export")}`
     );
   });
   ui.incidentHistoryClearSelectionButton?.addEventListener("click", () => {
@@ -6312,13 +6662,16 @@ async function main() {
       return;
     }
     try {
-      await copyTextToClipboard(handoffText);
+      const prepared = await copyGovernedText(
+        handoffText,
+        buildDesktopGovernedExportOptions("incident_handoff", "incident_response", "handoff")
+      );
       if (ui.auditHandoffPreview instanceof HTMLElement) {
-        ui.auditHandoffPreview.textContent = handoffText;
+        ui.auditHandoffPreview.textContent = prepared.text;
       }
       renderAuditFilingFeedback(
         "ok",
-        `Latest incident handoff summary copied for ${latest.packageId || latest.id}. Review the preview pane before sending it downstream. ${buildIncidentEntryTraceabilitySummary(latest)}`
+        `Latest incident handoff summary copied for ${latest.packageId || latest.id}. Review the preview pane before sending it downstream.${describeGovernedExportDisposition(prepared)}${describeGovernedExportRedactions(prepared, "incident handoff")} ${buildIncidentEntryTraceabilitySummary(latest)}`
       );
     } catch (error) {
       renderAuditFilingFeedback("error", `Incident handoff summary copy failed: ${error.message}`);
@@ -6417,8 +6770,12 @@ async function main() {
       const fallbackRunId = String(entry?.runId || "").trim();
       const fallbackFileName = String(entry?.fileName || "").trim();
       const fileName = fallbackFileName || buildIncidentPackageFileName(fallbackRunId, {}, new Date().toISOString());
-      triggerTextDownload(JSON.stringify(entry.payload, null, 2), fileName, "application/json;charset=utf-8");
-      renderAuditFilingFeedback("ok", `Incident package JSON downloaded to ${fileName}. Review package metadata before external handoff. ${buildIncidentEntryTraceabilitySummary(entry)}`);
+      const prepared = exportGovernedJson(
+        entry.payload,
+        fileName,
+        buildDesktopGovernedExportOptions("incident_export", "incident_response", "export")
+      );
+      renderAuditFilingFeedback("ok", `Incident package JSON downloaded to ${fileName}. Review package metadata before external handoff.${describeGovernedExportDisposition(prepared)}${describeGovernedExportRedactions(prepared, "incident export")} ${buildIncidentEntryTraceabilitySummary(entry)}`);
       return;
     }
     const copyId = String(target.dataset.incidentHistoryCopyId || "").trim();
@@ -6430,13 +6787,16 @@ async function main() {
         return;
       }
       try {
-        await copyTextToClipboard(handoffText);
+        const prepared = await copyGovernedText(
+          handoffText,
+          buildDesktopGovernedExportOptions("incident_handoff", "incident_response", "handoff")
+        );
         if (ui.auditHandoffPreview instanceof HTMLElement) {
-          ui.auditHandoffPreview.textContent = handoffText;
+          ui.auditHandoffPreview.textContent = prepared.text;
         }
         renderAuditFilingFeedback(
           "ok",
-          `Incident handoff summary copied for ${entry.packageId || entry.id}. Review the preview pane before sending it downstream. ${buildIncidentEntryTraceabilitySummary(entry)}`
+          `Incident handoff summary copied for ${entry.packageId || entry.id}. Review the preview pane before sending it downstream.${describeGovernedExportDisposition(prepared)}${describeGovernedExportRedactions(prepared, "incident handoff")} ${buildIncidentEntryTraceabilitySummary(entry)}`
         );
       } catch (error) {
         renderAuditFilingFeedback("error", `Incident handoff summary copy failed: ${error.message}`);

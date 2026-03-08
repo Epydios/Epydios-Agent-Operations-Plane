@@ -668,3 +668,12 @@ func jsonBytesOrEmptyObject(v []byte) []byte {
 	}
 	return v
 }
+
+func cloneJSONRaw(v []byte) []byte {
+	if len(v) == 0 {
+		return nil
+	}
+	out := make([]byte, len(v))
+	copy(out, v)
+	return out
+}

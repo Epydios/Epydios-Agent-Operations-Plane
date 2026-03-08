@@ -251,7 +251,7 @@ func TestRenderCLIReportIncludesGovernedSectionsAndRedactsSecrets(t *testing.T) 
 		ToolActionID: "tool-act-1",
 		Pretty:       "token sk-1234567890abcdefghijklmnop and Bearer abcdefghijklmnopqrstuvwxyz012345",
 	}
-	rendered, err := renderCLIReport(context.Background(), client, view)
+	rendered, err := renderCLIReport(context.Background(), client, view, runtimeclient.EnterpriseReportSelection{})
 	if err != nil {
 		t.Fatalf("renderCLIReport() error = %v", err)
 	}
@@ -274,7 +274,7 @@ func TestRenderCLIReportIncludesGovernedSectionsAndRedactsSecrets(t *testing.T) 
 func TestRenderCLIFollowReportDeltaIncludesReportType(t *testing.T) {
 	client := newCLIReportTestClient(t)
 	view := buildCLIParityThreadReview(t)
-	rendered, err := renderCLIFollowReport(context.Background(), client, view.Timeline, view.Timeline.Events[:1], true)
+	rendered, err := renderCLIFollowReport(context.Background(), client, view.Timeline, view.Timeline.Events[:1], true, runtimeclient.EnterpriseReportSelection{})
 	if err != nil {
 		t.Fatalf("renderCLIFollowReport() error = %v", err)
 	}
@@ -286,6 +286,21 @@ func TestRenderCLIFollowReportDeltaIncludesReportType(t *testing.T) {
 		if !strings.Contains(rendered, part) {
 			t.Fatalf("missing %q in %s", part, rendered)
 		}
+	}
+}
+
+func TestRenderCLIReportAppliesExplicitSelection(t *testing.T) {
+	client := newCLIReportTestClient(t)
+	view := buildCLIParityThreadReview(t)
+	rendered, err := renderCLIReport(context.Background(), client, view, runtimeclient.EnterpriseReportSelection{
+		RetentionClass: "archive",
+		Audience:       "security_review",
+	})
+	if err != nil {
+		t.Fatalf("renderCLIReport() selection error = %v", err)
+	}
+	if !strings.Contains(rendered, "Audience: security_review") || !strings.Contains(rendered, "Retention class: archive") {
+		t.Fatalf("selection not applied in report: %s", rendered)
 	}
 }
 
@@ -320,6 +335,51 @@ func newCLIReportTestClient(t *testing.T) *runtimeclient.Client {
 					ClientSurfaces:           []string{"cli"},
 					ReportingSurfaces:        []string{"report", "delta-report"},
 					BoundaryRequirements:     []string{"agentops_gateway_boundary"},
+				}},
+			}
+		case req.Method == http.MethodGet && req.URL.Path == "/v1alpha2/runtime/export-profiles":
+			reportType := req.URL.Query().Get("reportType")
+			payload = runtimeapi.ExportProfileCatalogResponse{
+				Count: 1,
+				Items: []runtimeapi.ExportProfileCatalogEntry{{
+					ExportProfile:           map[bool]string{true: "operator_follow", false: "operator_review"}[strings.Contains(reportType, "delta")],
+					Label:                   map[bool]string{true: "Operator Follow", false: "Operator Review"}[strings.Contains(reportType, "delta")],
+					DefaultAudience:         "operator",
+					AllowedAudiences:        []string{"operator", "security_review"},
+					DefaultRetentionClass:   map[bool]string{true: "short", false: "standard"}[strings.Contains(reportType, "delta")],
+					AllowedRetentionClasses: []string{"short", "standard", "archive"},
+					ClientSurfaces:          []string{"cli"},
+					ReportTypes:             []string{"report", "delta-report"},
+					DeliveryChannels:        []string{"report", "stream"},
+					RedactionMode:           "structured_and_text",
+				}},
+			}
+		case req.Method == http.MethodGet && req.URL.Path == "/v1alpha2/runtime/org-admin-profiles":
+			payload = runtimeapi.OrgAdminCatalogResponse{
+				Count: 1,
+				Items: []runtimeapi.OrgAdminCatalogEntry{{
+					ProfileID:                 "centralized_enterprise_admin",
+					Label:                     "Centralized Enterprise Admin",
+					OrganizationModel:         "centralized_enterprise",
+					DelegationModel:           "central_it_with_tenant_project_delegation",
+					AdminRoleBundles:          []string{"enterprise.org_admin"},
+					DelegatedAdminRoleBundles: []string{"enterprise.tenant_admin"},
+					BreakGlassRoleBundles:     []string{"enterprise.break_glass_admin"},
+					DirectorySyncInputs:       []string{"idp_group", "tenant_id"},
+					ResidencyProfiles:         []string{"single_region_tenant_pinning"},
+					ResidencyExceptionInputs:  []string{"residency_exception_ticket"},
+					LegalHoldProfiles:         []string{"litigation_hold"},
+					LegalHoldExceptionInputs:  []string{"legal_hold_case_id"},
+					NetworkBoundaryProfiles:   []string{"enterprise_proxy_required"},
+					FleetRolloutProfiles:      []string{"mdm_managed_desktop_ring"},
+					QuotaDimensions:           []string{"organization", "tenant"},
+					QuotaOverlayInputs:        []string{"tenant_id"},
+					ChargebackDimensions:      []string{"cost_center"},
+					ChargebackOverlayInputs:   []string{"cost_center"},
+					EnforcementHooks:          []string{"delegated_admin_scope_guard"},
+					BoundaryRequirements:      []string{"runtime_authz"},
+					ReportingSurfaces:         []string{"admin_report"},
+					ClientSurfaces:            []string{"cli"},
 				}},
 			}
 		default:

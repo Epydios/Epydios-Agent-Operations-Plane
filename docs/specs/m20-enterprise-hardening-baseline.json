@@ -1,7 +1,7 @@
 {
   "id": "m20_enterprise_hardening_baseline_20260307",
-  "date": "2026-03-07",
-  "status": "baseline_recorded_role_bundle_cli_reporting_and_dlp_slice_landed",
+  "date": "2026-03-08",
+  "status": "baseline_recorded_org_admin_decision_binding_enforcement_and_review_slice_landed",
   "scope": "Inventory the current enterprise posture after M19 and land the first shared M20 hardening artifact without forking the native M16/M18 contract.",
   "baseline": {
     "multi_tenant_policy": {
@@ -23,7 +23,7 @@
       ]
     },
     "dlp_and_secret_handling": {
-      "status": "implemented_for_settings_ingress_platform_hardening_and_governed_report_redaction",
+      "status": "implemented_for_settings_ingress_platform_hardening_governed_report_redaction_and_runtime_run_audit_evidence_export_redaction",
       "evidence": [
         "EPYDIOS_AGENTOPS_DESKTOP_REPO/docs/runtime-orchestration-service.md",
         "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api.go",
@@ -31,7 +31,16 @@
         "EPYDIOS_AGENTOPS_DESKTOP_REPO/platform/local/bin/verify-admission-enforcement.sh",
         "EPYDIOS_AGENTOPS_DESKTOP_REPO/platform/local/bin/verify-prod-hardening-baseline.sh",
         "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/internal/runtimeclient/report_envelope.go",
-        "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/internal/runtimeclient/report_envelope_test.go"
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/internal/runtimeclient/report_envelope_test.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/export_redaction.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api_run_projection_test.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/runtime/governance-report.js",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/vscode-agentops/lib/reportEnvelope.js",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/vscode-agentops/test/reportEnvelope.test.js",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/main.js",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/export_disposition.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api_v1alpha2.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api_export_runtime_test.go"
       ]
     },
     "worker_capabilities": {
@@ -44,7 +53,7 @@
       ]
     },
     "reporting_and_export": {
-      "status": "shared_enterprise_report_envelope_landed_for_workflow_chatops_and_cli_with_dlp_redaction",
+      "status": "shared_enterprise_report_envelope_with_runtime_native_export_hardening_and_org_admin_active_review_projection_landed",
       "evidence": [
         "EPYDIOS_AGENTOPS_DESKTOP_REPO/docs/runtime-orchestration-service.md",
         "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api.go",
@@ -55,7 +64,30 @@
         "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/chatops-agentops/main.go",
         "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/cli-agentops/main.go",
         "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/cli-agentops/main_test.go",
-        "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/cli-agentops/README.md"
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/cli-agentops/README.md",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/runtime/governance-report.js",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/test/governance-report.test.js",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/vscode-agentops/lib/reportEnvelope.js",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/vscode-agentops/extension.js",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/vscode-agentops/test/reportEnvelope.test.js",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/main.js",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/platform/local/bin/verify-m20-enterprise-hardening-baseline.sh",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/export_profile_catalog.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api_export_profiles_test.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/vscode-agentops/lib/runtimeClient.js",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/internal/runtimeclient/client.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/internal/runtimeclient/report_envelope_test.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/internal/runtimeclient/report_selection.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/internal/runtimeclient/report_selection_test.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/workflow-agentops/main_test.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/chatops-agentops/main_test.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/test/chat.test.js",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/export_disposition.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api_v1alpha2.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api_export_runtime_test.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/org_admin_decisions.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api_v1alpha2_test.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/internal/runtimeclient/review.go"
       ]
     },
     "policy_packs": {
@@ -65,6 +97,29 @@
         "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api_v1alpha2.go",
         "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api_policy_packs_test.go",
         "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/types_v1alpha2.go"
+      ]
+    },
+    "export_profiles": {
+      "status": "explicit_catalog_with_runtime_audit_evidence_export_profiles_and_retention_overlays_landed",
+      "evidence": [
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/export_profile_catalog.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api_export_profiles_test.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/runtime/governance-report.js",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/test/governance-report.test.js",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/vscode-agentops/lib/runtimeClient.js",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/vscode-agentops/lib/reportEnvelope.js",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/vscode-agentops/test/reportEnvelope.test.js",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/internal/runtimeclient/client.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/internal/runtimeclient/report_envelope.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/internal/runtimeclient/report_envelope_test.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/main.js",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/internal/runtimeclient/report_selection.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/internal/runtimeclient/report_selection_test.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/views/chat.js",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/test/chat.test.js",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/vscode-agentops/extension.js",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/export_disposition.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api_export_runtime_test.go"
       ]
     }
   },
@@ -95,7 +150,7 @@
     ],
     "dlp_and_secret_policy_enforcement": [
       "outbound deny or escalation rules beyond the current governed report redaction pass",
-      "export-time secret scanning and policy hooks on runtime-native audit, incident, run, and governed evidence export paths",
+      "runtime-native export-time secret scanning and policy hooks for the remaining incident export path and any future server-side governed export routes beyond the now-covered run, audit, and evidence exports",
       "credential-class policy hooks without client-specific branching"
     ],
     "worker_capability_matrices": [
@@ -105,16 +160,29 @@
       "verifier coverage for capability policy drift"
     ],
     "reporting_and_export_integration": [
-      "downstream export profiles and sink mappings for SIEM, GRC, and ticket systems beyond the current shared workflow/chatops/CLI report envelope",
-      "export profile definitions by audience and retention class",
-      "stronger contract between audit or evidence exports and downstream governance systems"
+      "downstream export profiles and sink mappings for SIEM, GRC, and ticket systems beyond the current shared workflow/chatops/CLI/Chat/VS Code report envelope",
+      "stronger contract between audit/evidence exports and external governance sinks",
+      "server-side governed export routes beyond the current shared run, audit, and evidence export coverage"
+    ],
+    "enterprise_it_admin_and_org_scale_operations": [
+      "runtime org-admin inventory now covers centralized enterprise, federated business-unit, and regulated regional operating models",
+      "delegated admin and break-glass role bundles are cataloged on the same native contract as worker-capability, policy-pack, and export-profile catalogs",
+      "group-to-role mapping inputs for directory-sync or identity-claim driven scope attachment are now inventoried",
+      "residency, legal hold, network boundary, fleet rollout, quota, and chargeback dimensions are now durable runtime inventory",
+      "desktop Chat and VS Code governed reports now consume the org-admin inventory on the shared enterprise report envelope without introducing a second admin-report contract",
+      "structured org-admin enforcement profiles now project delegated-admin, break-glass, directory-sync, residency, legal-hold, quota, and chargeback hooks into the shared governed report contract",
+      "structured directory-sync mappings, exception profiles, and overlay profiles now project into the shared Go, desktop Chat, and VS Code governed report and export surfaces without introducing a second admin/export contract",
+      "structured decision bindings now project delegated-admin, break-glass, directory-sync, residency/legal-hold exception, and quota/chargeback overlay decisions into the shared Go, desktop Chat, VS Code, and desktop governed export surfaces without introducing a second admin/export contract",
+      "delegated-admin decision bindings now persist through native approval checkpoints and project active org-admin review state across shared Go, desktop Chat, VS Code, CLI, workflow, and chatops governed report surfaces on the same contract",
+      "structured decision bindings, overlays, exceptions, and normalized input values are now cataloged, persisted on the native approval path, and projected into shared governed review surfaces, but broader delegated-admin and break-glass admin-surface enforcement, SCIM ingestion, residency/legal-hold enforcement, and org-level quota or chargeback implementation are still required",
+      "shared Go, desktop Chat, and VS Code governed report surfaces now render persisted org-admin input values and category-specific action hints directly from approval annotations on the same native contract"
     ]
   },
   "next_batch": [
-    "Extend the shared enterprise reporting envelope into the remaining enterprise review and export surfaces, starting with VS Code and desktop Chat review/export paths.",
-    "Add export-profile and audience metadata on top of the governed report envelope without forking the native contract.",
-    "Add export-time secret scanning hooks to runtime-native audit, incident, run, and governed evidence export paths.",
-    "Keep Chat, VS Code, CLI, workflow, and chatops on the same native M16/M18 contract while doing it.",
+    "Extend runtime-side enforcement and persistence from the current approval-checkpoint org-admin binding path into the broader delegated-admin, break-glass, directory-sync, residency/legal-hold exception, and quota/chargeback overlay admin surfaces.",
+    "Extend org-admin binding, exception, overlay, and normalized input-value metadata into the remaining governed report and export surfaces without forking the native M16/M18 contract.",
+    "Extend parity and verifier coverage for structured org-admin binding and input-state metadata across desktop Chat, VS Code, CLI, workflow, and chatops.",
+    "Keep Chat, VS Code, CLI, workflow, and chatops on the same native M16/M18 contract.",
     "Do not introduce client-specific hardening branches."
   ],
   "second_shared_hardening_artifact": {
@@ -140,7 +208,7 @@
     ]
   },
   "shared_enterprise_reporting_envelope": {
-    "status": "implemented_shared_governed_report_envelope_with_cli_and_dlp_redaction",
+    "status": "implemented_shared_governed_report_envelope_with_runtime_export_profile_catalog_and_explicit_chat_vscode_selection",
     "evidence": [
       "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/internal/runtimeclient/report_envelope.go",
       "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/internal/runtimeclient/report_envelope_test.go",
@@ -148,11 +216,94 @@
       "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/chatops-agentops/main.go",
       "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/cli-agentops/main.go",
       "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/cli-agentops/main_test.go",
-      "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/cli-agentops/README.md"
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/cli-agentops/README.md",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/runtime/governance-report.js",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/views/chat.js",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/test/governance-report.test.js",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/vscode-agentops/lib/reportEnvelope.js",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/vscode-agentops/extension.js",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/vscode-agentops/test/reportEnvelope.test.js",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/main.js",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/platform/local/bin/verify-m20-enterprise-hardening-baseline.sh",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/export_profile_catalog.go",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api_export_profiles_test.go",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/vscode-agentops/lib/runtimeClient.js",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/internal/runtimeclient/report_selection.go",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/internal/runtimeclient/report_selection_test.go",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/workflow-agentops/main_test.go",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/chatops-agentops/main_test.go",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/test/chat.test.js"
     ]
   },
   "verifier": {
     "path": "EPYDIOS_AGENTOPS_DESKTOP_REPO/platform/local/bin/verify-m20-enterprise-hardening-baseline.sh",
     "latest_log": "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/m20-enterprise-hardening/verify-m20-enterprise-hardening-baseline-latest.log"
+  },
+  "third_shared_hardening_artifact": {
+    "name": "runtime_export_profile_catalog",
+    "endpoint": "/v1alpha2/runtime/export-profiles",
+    "filters": [
+      "exportProfile",
+      "reportType",
+      "clientSurface",
+      "audience",
+      "retentionClass"
+    ],
+    "purpose": [
+      "make governed export-profile choices explicit instead of inferred from client-local defaults",
+      "keep report and export review surfaces on the same native contract while exposing audience, retention, delivery, and redaction policy",
+      "provide one authoritative export-profile inventory for later retention-class, audience-selection, and downstream-governance integration work"
+    ],
+    "evidence_paths": [
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/internal/runtimeclient/report_parity_fixture_test.go",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/testdata/m20-governed-report-parity.json",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/vscode-agentops/test/reportEnvelope.test.js",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/platform/local/bin/verify-m20-enterprise-hardening-baseline.sh",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/runtime/desktop-export-governance.js",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/test/desktop-export-governance.test.js",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/test/governance-report.test.js"
+    ]
+  },
+  "fourth_shared_hardening_artifact": {
+    "name": "runtime_org_admin_governed_report_projection",
+    "endpoint": "/v1alpha2/runtime/org-admin-profiles",
+    "consuming_surfaces": [
+      "desktop_chat",
+      "vscode_review"
+    ],
+    "purpose": [
+      "project org-admin inventory into governed report surfaces without creating a second admin-report contract",
+      "surface delegated-admin, break-glass, directory-sync, residency, legal-hold, network, fleet, quota, chargeback, and enforcement-hook metadata on the same shared report envelope",
+      "keep enterprise IT/admin inventory attached to the native M16/M18 contract rather than inventing client-specific hardening branches"
+    ],
+    "evidence_paths": [
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/runtime/governance-report.js",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/views/chat.js",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/test/governance-report.test.js",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/vscode-agentops/lib/reportEnvelope.js",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/vscode-agentops/extension.js",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/vscode-agentops/test/reportEnvelope.test.js",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/platform/local/bin/verify-m20-enterprise-hardening-baseline.sh"
+    ]
+  },
+  "fifth_shared_hardening_artifact": {
+    "name": "runtime_org_admin_enforcement_profiles",
+    "endpoint": "/v1alpha2/runtime/org-admin-profiles",
+    "purpose": [
+      "carry delegated-admin, break-glass, directory-sync, residency, legal-hold, quota, and chargeback enforcement profiles on the same native org-admin catalog",
+      "project role bundles, required inputs, decision surfaces, and boundary requirements into shared governed report surfaces",
+      "prepare later runtime enforcement without inventing a second admin or export contract"
+    ],
+    "evidence_paths": [
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/org_admin_catalog.go",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api_org_admin_profiles_test.go",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/internal/runtimeclient/report_envelope.go",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/internal/runtimeclient/report_envelope_test.go",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/runtime/governance-report.js",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/test/governance-report.test.js",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/vscode-agentops/lib/reportEnvelope.js",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/vscode-agentops/test/reportEnvelope.test.js",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/platform/local/bin/verify-m20-enterprise-hardening-baseline.sh"
+    ]
   }
 }

@@ -102,6 +102,582 @@ function mockPipelineStatus() {
   };
 }
 
+function mockWorkerCapabilityCatalog() {
+  return {
+    source: "mock",
+    count: 7,
+    items: [
+      {
+        executionMode: "managed_codex_worker",
+        workerType: "managed_agent",
+        adapterId: "codex",
+        label: "Managed Codex Worker",
+        provider: "agentops_gateway",
+        transport: "responses_api",
+        model: "gpt-5-codex",
+        boundaryRequirements: [
+          "tenant_project_scope",
+          "runtime_authz",
+          "audit_emission",
+          "agentops_gateway_boundary",
+          "governed_tool_execution"
+        ]
+      },
+      {
+        executionMode: "raw_model_invoke",
+        workerType: "model_invoke",
+        adapterId: "codex",
+        label: "OpenAI Codex",
+        provider: "openai_compatible",
+        transport: "responses_api",
+        model: "gpt-5-codex",
+        boundaryRequirements: ["tenant_project_scope", "runtime_authz", "audit_emission", "gateway_or_direct_provider_boundary"]
+      },
+      {
+        executionMode: "raw_model_invoke",
+        workerType: "model_invoke",
+        adapterId: "openai",
+        label: "OpenAI",
+        provider: "openai_responses",
+        transport: "responses_api",
+        model: "gpt-5",
+        boundaryRequirements: ["tenant_project_scope", "runtime_authz", "audit_emission", "gateway_or_direct_provider_boundary"]
+      },
+      {
+        executionMode: "raw_model_invoke",
+        workerType: "model_invoke",
+        adapterId: "anthropic",
+        label: "Anthropic",
+        provider: "anthropic_messages",
+        transport: "messages_api",
+        model: "claude-sonnet-latest",
+        boundaryRequirements: ["tenant_project_scope", "runtime_authz", "audit_emission", "gateway_or_direct_provider_boundary"]
+      },
+      {
+        executionMode: "raw_model_invoke",
+        workerType: "model_invoke",
+        adapterId: "google",
+        label: "Google",
+        provider: "google_gemini",
+        transport: "gemini_api",
+        model: "gemini-2.5-pro",
+        boundaryRequirements: ["tenant_project_scope", "runtime_authz", "audit_emission", "gateway_or_direct_provider_boundary"]
+      },
+      {
+        executionMode: "raw_model_invoke",
+        workerType: "model_invoke",
+        adapterId: "azure_openai",
+        label: "Azure OpenAI",
+        provider: "azure_openai",
+        transport: "chat_completions_api",
+        model: "gpt-4.1",
+        boundaryRequirements: ["tenant_project_scope", "runtime_authz", "audit_emission", "gateway_or_direct_provider_boundary"]
+      },
+      {
+        executionMode: "raw_model_invoke",
+        workerType: "model_invoke",
+        adapterId: "bedrock",
+        label: "AWS Bedrock",
+        provider: "aws_bedrock",
+        transport: "bedrock_invoke_model",
+        model: "anthropic.claude-3-7-sonnet",
+        boundaryRequirements: ["tenant_project_scope", "runtime_authz", "audit_emission", "gateway_or_direct_provider_boundary"]
+      }
+    ]
+  };
+}
+
+function mockPolicyPackCatalog() {
+  return {
+    source: "mock",
+    count: 3,
+    items: [
+      {
+        packId: "read_only_review",
+        label: "Read-Only Review",
+        roleBundles: ["enterprise.observer", "enterprise.reviewer"],
+        boundaryRequirements: ["tenant_project_scope", "runtime_authz", "audit_emission"],
+        decisionSurfaces: ["review_only"],
+        clientSurfaces: ["chat", "vscode", "cli", "workflow", "chatops"],
+        reportingSurfaces: ["update", "delta-update", "report"]
+      },
+      {
+        packId: "governed_model_invoke_operator",
+        label: "Governed Model Invoke Operator",
+        applicableExecutionModes: ["raw_model_invoke"],
+        applicableWorkerTypes: ["model_invoke"],
+        applicableAdapterIDs: ["codex", "openai", "anthropic", "google", "azure_openai", "bedrock"],
+        roleBundles: ["enterprise.operator", "enterprise.ai_operator"],
+        boundaryRequirements: ["tenant_project_scope", "runtime_authz", "audit_emission", "gateway_or_direct_provider_boundary"],
+        decisionSurfaces: ["governed_turn_submission", "approval_checkpoint"],
+        clientSurfaces: ["chat", "vscode", "cli", "workflow", "chatops"],
+        reportingSurfaces: ["update", "delta-update", "report"]
+      },
+      {
+        packId: "managed_codex_worker_operator",
+        label: "Managed Codex Worker Operator",
+        applicableExecutionModes: ["managed_codex_worker"],
+        applicableWorkerTypes: ["managed_agent"],
+        applicableAdapterIDs: ["codex"],
+        roleBundles: ["enterprise.operator", "enterprise.ai_operator", "enterprise.worker_controller"],
+        boundaryRequirements: ["tenant_project_scope", "runtime_authz", "audit_emission", "agentops_gateway_boundary", "governed_tool_execution"],
+        decisionSurfaces: ["managed_worker_launch", "managed_worker_recovery", "approval_checkpoint", "tool_proposal", "governed_tool_action"],
+        clientSurfaces: ["chat", "vscode", "cli", "workflow", "chatops"],
+        reportingSurfaces: ["update", "delta-update", "report"]
+      }
+    ]
+  };
+}
+
+function mockExportProfileCatalog() {
+  return {
+    source: "mock",
+    count: 10,
+    items: [
+      {
+        exportProfile: "operator_review",
+        label: "Operator Review",
+        reportTypes: ["review", "report"],
+        defaultAudience: "operator",
+        allowedAudiences: ["operator", "security_review", "exec_review"],
+        defaultRetentionClass: "standard",
+        allowedRetentionClasses: ["standard", "archive"],
+        audienceRetentionClassOverlays: { security_review: "archive", exec_review: "archive" },
+        clientSurfaces: ["chat", "vscode", "cli"],
+        deliveryChannels: ["copy", "download", "report"],
+        redactionMode: "structured_and_text"
+      },
+      {
+        exportProfile: "operator_follow",
+        label: "Operator Follow",
+        reportTypes: ["delta-report", "follow"],
+        defaultAudience: "operator",
+        allowedAudiences: ["operator", "security_review"],
+        defaultRetentionClass: "short",
+        allowedRetentionClasses: ["short", "standard"],
+        audienceRetentionClassOverlays: { security_review: "standard" },
+        clientSurfaces: ["chat", "vscode", "cli"],
+        deliveryChannels: ["stream", "report"],
+        redactionMode: "structured_and_text"
+      },
+      {
+        exportProfile: "workflow_review",
+        label: "Workflow Review",
+        reportTypes: ["review", "report"],
+        defaultAudience: "workflow_operator",
+        allowedAudiences: ["workflow_operator", "security_review", "ticket_reviewer"],
+        defaultRetentionClass: "standard",
+        allowedRetentionClasses: ["standard", "archive"],
+        audienceRetentionClassOverlays: { security_review: "archive" },
+        clientSurfaces: ["workflow"],
+        deliveryChannels: ["comment", "update", "report"],
+        redactionMode: "structured_and_text"
+      },
+      {
+        exportProfile: "workflow_follow",
+        label: "Workflow Follow",
+        reportTypes: ["delta-report", "follow"],
+        defaultAudience: "workflow_operator",
+        allowedAudiences: ["workflow_operator", "ticket_reviewer"],
+        defaultRetentionClass: "short",
+        allowedRetentionClasses: ["short", "standard"],
+        audienceRetentionClassOverlays: { ticket_reviewer: "standard" },
+        clientSurfaces: ["workflow"],
+        deliveryChannels: ["update", "comment", "stream"],
+        redactionMode: "structured_and_text"
+      },
+      {
+        exportProfile: "conversation_review",
+        label: "Conversation Review",
+        reportTypes: ["review", "report"],
+        defaultAudience: "conversation_operator",
+        allowedAudiences: ["conversation_operator", "security_review", "channel_reviewer"],
+        defaultRetentionClass: "standard",
+        allowedRetentionClasses: ["standard", "archive"],
+        audienceRetentionClassOverlays: { security_review: "archive" },
+        clientSurfaces: ["chatops"],
+        deliveryChannels: ["update", "thread_reply", "report"],
+        redactionMode: "structured_and_text"
+      },
+      {
+        exportProfile: "conversation_follow",
+        label: "Conversation Follow",
+        reportTypes: ["delta-report", "follow"],
+        defaultAudience: "conversation_operator",
+        allowedAudiences: ["conversation_operator", "channel_reviewer"],
+        defaultRetentionClass: "short",
+        allowedRetentionClasses: ["short", "standard"],
+        audienceRetentionClassOverlays: { channel_reviewer: "standard" },
+        clientSurfaces: ["chatops"],
+        deliveryChannels: ["update", "thread_reply", "stream"],
+        redactionMode: "structured_and_text"
+      },
+      {
+        exportProfile: "audit_export",
+        label: "Audit Export",
+        reportTypes: ["export", "handoff"],
+        defaultAudience: "downstream_review",
+        allowedAudiences: ["downstream_review", "security_review", "compliance_review"],
+        defaultRetentionClass: "archive",
+        allowedRetentionClasses: ["standard", "archive"],
+        audienceRetentionClassOverlays: { downstream_review: "standard", security_review: "archive", compliance_review: "archive" },
+        clientSurfaces: ["desktop"],
+        deliveryChannels: ["download", "copy", "preview"],
+        redactionMode: "structured_and_text"
+      },
+      {
+        exportProfile: "audit_handoff",
+        label: "Audit Handoff",
+        reportTypes: ["handoff"],
+        defaultAudience: "downstream_review",
+        allowedAudiences: ["downstream_review", "security_review"],
+        defaultRetentionClass: "short",
+        allowedRetentionClasses: ["short", "standard"],
+        audienceRetentionClassOverlays: { security_review: "standard" },
+        clientSurfaces: ["desktop"],
+        deliveryChannels: ["copy", "preview"],
+        redactionMode: "text"
+      },
+      {
+        exportProfile: "incident_export",
+        label: "Incident Export",
+        reportTypes: ["export", "handoff"],
+        defaultAudience: "incident_response",
+        allowedAudiences: ["incident_response", "security_review", "executive_incident_review"],
+        defaultRetentionClass: "archive",
+        allowedRetentionClasses: ["standard", "archive"],
+        audienceRetentionClassOverlays: { incident_response: "standard", security_review: "archive", executive_incident_review: "archive" },
+        clientSurfaces: ["desktop"],
+        deliveryChannels: ["download", "copy", "preview"],
+        redactionMode: "structured_and_text"
+      },
+      {
+        exportProfile: "incident_handoff",
+        label: "Incident Handoff",
+        reportTypes: ["handoff"],
+        defaultAudience: "incident_response",
+        allowedAudiences: ["incident_response", "security_review"],
+        defaultRetentionClass: "standard",
+        allowedRetentionClasses: ["short", "standard"],
+        audienceRetentionClassOverlays: { security_review: "standard" },
+        clientSurfaces: ["desktop"],
+        deliveryChannels: ["copy", "preview"],
+        redactionMode: "text"
+      }
+    ]
+  };
+}
+
+function orgAdminEnforcementCategory(hookId) {
+  switch (hookId) {
+    case "delegated_admin_scope_guard":
+    case "delegated_business_unit_scope_guard":
+      return "delegated_admin";
+    case "break_glass_timebox":
+      return "break_glass";
+    case "directory_sync_group_mapping":
+    case "directory_sync_business_unit_mapping":
+      return "directory_sync";
+    case "regional_residency_guard":
+    case "cross_border_exception_review":
+    case "residency_policy_exception_review":
+      return "residency";
+    case "legal_hold_exception_review":
+      return "legal_hold";
+    case "org_quota_override_approval":
+    case "business_unit_quota_override_approval":
+    case "regional_quota_override_approval":
+      return "quota";
+    case "chargeback_override_audit":
+      return "chargeback";
+    default:
+      return "admin";
+  }
+}
+
+function orgAdminEnforcementLabel(hookId) {
+  switch (hookId) {
+    case "delegated_admin_scope_guard":
+      return "Delegated Admin Scope Guard";
+    case "delegated_business_unit_scope_guard":
+      return "Delegated Business-Unit Scope Guard";
+    case "break_glass_timebox":
+      return "Break-Glass Timebox";
+    case "directory_sync_group_mapping":
+      return "Directory Sync Group Mapping";
+    case "directory_sync_business_unit_mapping":
+      return "Directory Sync Business-Unit Mapping";
+    case "regional_residency_guard":
+      return "Regional Residency Guard";
+    case "cross_border_exception_review":
+      return "Cross-Border Exception Review";
+    case "residency_policy_exception_review":
+      return "Residency Policy Exception Review";
+    case "legal_hold_exception_review":
+      return "Legal-Hold Exception Review";
+    case "org_quota_override_approval":
+      return "Org Quota Override Approval";
+    case "business_unit_quota_override_approval":
+      return "Business-Unit Quota Override Approval";
+    case "regional_quota_override_approval":
+      return "Regional Quota Override Approval";
+    case "chargeback_override_audit":
+      return "Chargeback Override Audit";
+    default:
+      return hookId;
+  }
+}
+
+function orgAdminEnforcementMode(category) {
+  switch (category) {
+    case "delegated_admin":
+      return "scope_guard";
+    case "break_glass":
+      return "timeboxed_elevation";
+    case "directory_sync":
+      return "mapping_validation";
+    case "residency":
+    case "legal_hold":
+      return "exception_review";
+    case "quota":
+      return "approval_required";
+    case "chargeback":
+      return "audit_required";
+    default:
+      return "governed_review";
+  }
+}
+
+function uniqueSortedValues(items = []) {
+  return Array.from(new Set((Array.isArray(items) ? items : []).filter(Boolean).map((item) => String(item).trim()).filter(Boolean))).sort();
+}
+
+function buildMockOrgAdminEnforcementProfiles(entry) {
+  const decisionSurfaces = Array.isArray(entry?.decisionSurfaces) ? entry.decisionSurfaces : [];
+  return (Array.isArray(entry?.enforcementHooks) ? entry.enforcementHooks : []).map((hookId) => {
+    const category = orgAdminEnforcementCategory(hookId);
+    let roleBundles = [];
+    let requiredInputs = [];
+    let scopedSurfaces = decisionSurfaces;
+    if (category === "delegated_admin") {
+      roleBundles = entry?.delegatedAdminRoleBundles || [];
+      requiredInputs = uniqueSortedValues([...(entry?.directorySyncInputs || []), "project_id", "tenant_id", "business_unit", "region", "environment"]);
+    } else if (category === "break_glass") {
+      roleBundles = entry?.breakGlassRoleBundles || [];
+      requiredInputs = ["break_glass_ticket", "break_glass_reason", "break_glass_expiry"];
+      scopedSurfaces = decisionSurfaces.filter((item) => item === "break_glass_activation");
+    } else if (category === "directory_sync") {
+      roleBundles = uniqueSortedValues([...(entry?.adminRoleBundles || []), ...(entry?.delegatedAdminRoleBundles || [])]);
+      requiredInputs = entry?.directorySyncInputs || [];
+    } else if (category === "residency") {
+      roleBundles = uniqueSortedValues([...(entry?.adminRoleBundles || []), ...(entry?.delegatedAdminRoleBundles || [])]);
+      requiredInputs = entry?.residencyExceptionInputs || [];
+      scopedSurfaces = decisionSurfaces.filter((item) => item === "residency_policy_assignment" || item === "export_profile_override");
+    } else if (category === "legal_hold") {
+      roleBundles = uniqueSortedValues([...(entry?.adminRoleBundles || []), ...(entry?.breakGlassRoleBundles || [])]);
+      requiredInputs = entry?.legalHoldExceptionInputs || [];
+      scopedSurfaces = decisionSurfaces.filter((item) => item === "legal_hold_activation" || item === "export_profile_override");
+    } else if (category === "quota") {
+      roleBundles = uniqueSortedValues([...(entry?.adminRoleBundles || []), ...(entry?.delegatedAdminRoleBundles || [])]);
+      requiredInputs = uniqueSortedValues([...(entry?.quotaOverlayInputs || []), ...(entry?.quotaDimensions || [])]);
+      scopedSurfaces = decisionSurfaces.filter((item) => item === "quota_override");
+    } else if (category === "chargeback") {
+      roleBundles = uniqueSortedValues([...(entry?.adminRoleBundles || []), ...(entry?.delegatedAdminRoleBundles || [])]);
+      requiredInputs = uniqueSortedValues([...(entry?.chargebackOverlayInputs || []), ...(entry?.chargebackDimensions || [])]);
+      scopedSurfaces = decisionSurfaces.filter((item) => item === "quota_override" || item === "export_profile_override");
+    } else {
+      roleBundles = entry?.adminRoleBundles || [];
+    }
+    return {
+      hookId,
+      label: orgAdminEnforcementLabel(hookId),
+      category,
+      enforcementMode: orgAdminEnforcementMode(category),
+      roleBundles,
+      requiredInputs,
+      decisionSurfaces: scopedSurfaces.length > 0 ? scopedSurfaces : decisionSurfaces,
+      boundaryRequirements: entry?.boundaryRequirements || []
+    };
+  });
+}
+
+function buildMockOrgAdminDirectorySyncMappings(entry) {
+  const sourceSystems = uniqueSortedValues((entry?.groupRoleMappingInputs || []).map((item) => item?.source).filter(Boolean));
+  const scopeDimensions = uniqueSortedValues(
+    (entry?.groupRoleMappingInputs || [])
+      .map((item) => item?.field)
+      .filter((field) => ["tenant_id", "project_id", "business_unit", "environment", "region", "jurisdiction", "cost_center"].includes(field))
+  );
+  if ((entry?.directorySyncInputs || []).length === 0 && (entry?.groupRoleMappingInputs || []).length === 0) {
+    return [];
+  }
+  return [
+    {
+      mappingId: `${entry?.profileId || "org-admin"}_directory_sync_mapping`,
+      label: `${entry?.label || "Org Admin"} Directory Sync Mapping`,
+      mappingMode: "group_to_role_binding",
+      sourceSystems: sourceSystems.length > 0 ? sourceSystems : ["directory_sync"],
+      requiredInputs: uniqueSortedValues(entry?.directorySyncInputs || []),
+      roleBundles: uniqueSortedValues([...(entry?.adminRoleBundles || []), ...(entry?.delegatedAdminRoleBundles || []), ...(entry?.breakGlassRoleBundles || [])]),
+      scopeDimensions,
+      decisionSurfaces: uniqueSortedValues((entry?.decisionSurfaces || []).filter((item) => item === "policy_pack_assignment" || item === "break_glass_activation"))
+    }
+  ];
+}
+
+function buildMockOrgAdminExceptionProfiles(entry) {
+  const profiles = [];
+  if ((entry?.residencyProfiles || []).length > 0 || (entry?.residencyExceptionInputs || []).length > 0) {
+    profiles.push({
+      profileId: `${entry?.profileId || "org-admin"}_residency_exception`,
+      label: `${entry?.label || "Org Admin"} Residency Exception`,
+      category: "residency",
+      exceptionMode: "ticketed_exception_review",
+      managedProfiles: uniqueSortedValues(entry?.residencyProfiles || []),
+      requiredInputs: uniqueSortedValues(entry?.residencyExceptionInputs || []),
+      roleBundles: uniqueSortedValues([...(entry?.adminRoleBundles || []), ...(entry?.delegatedAdminRoleBundles || []), ...(entry?.breakGlassRoleBundles || [])]),
+      decisionSurfaces: uniqueSortedValues((entry?.decisionSurfaces || []).filter((item) => item === "residency_policy_assignment" || item === "export_profile_override")),
+      boundaryRequirements: uniqueSortedValues((entry?.boundaryRequirements || []).filter((item) => ["tenant_project_scope", "runtime_authz", "governed_export_redaction"].includes(item)))
+    });
+  }
+  if ((entry?.legalHoldProfiles || []).length > 0 || (entry?.legalHoldExceptionInputs || []).length > 0) {
+    profiles.push({
+      profileId: `${entry?.profileId || "org-admin"}_legal_hold_exception`,
+      label: `${entry?.label || "Org Admin"} Legal Hold Exception`,
+      category: "legal_hold",
+      exceptionMode: "hold_exception_review",
+      managedProfiles: uniqueSortedValues(entry?.legalHoldProfiles || []),
+      requiredInputs: uniqueSortedValues(entry?.legalHoldExceptionInputs || []),
+      roleBundles: uniqueSortedValues([...(entry?.adminRoleBundles || []), ...(entry?.delegatedAdminRoleBundles || []), ...(entry?.breakGlassRoleBundles || [])]),
+      decisionSurfaces: uniqueSortedValues((entry?.decisionSurfaces || []).filter((item) => item === "legal_hold_activation" || item === "export_profile_override")),
+      boundaryRequirements: uniqueSortedValues((entry?.boundaryRequirements || []).filter((item) => ["audit_emission", "runtime_authz", "governed_export_redaction"].includes(item)))
+    });
+  }
+  return profiles;
+}
+
+function buildMockOrgAdminOverlayProfiles(entry) {
+  const profiles = [];
+  if ((entry?.quotaDimensions || []).length > 0 || (entry?.quotaOverlayInputs || []).length > 0) {
+    profiles.push({
+      overlayId: `${entry?.profileId || "org-admin"}_quota_overlay`,
+      label: `${entry?.label || "Org Admin"} Quota Overlay`,
+      category: "quota",
+      overlayMode: "quota_override_review",
+      targetDimensions: uniqueSortedValues(entry?.quotaDimensions || []),
+      requiredInputs: uniqueSortedValues(entry?.quotaOverlayInputs || []),
+      roleBundles: uniqueSortedValues([...(entry?.adminRoleBundles || []), ...(entry?.delegatedAdminRoleBundles || []), ...(entry?.breakGlassRoleBundles || [])]),
+      decisionSurfaces: uniqueSortedValues((entry?.decisionSurfaces || []).filter((item) => item === "quota_override")),
+      boundaryRequirements: uniqueSortedValues((entry?.boundaryRequirements || []).filter((item) => ["org_quota_metering", "audit_emission", "runtime_authz"].includes(item)))
+    });
+  }
+  if ((entry?.chargebackDimensions || []).length > 0 || (entry?.chargebackOverlayInputs || []).length > 0) {
+    profiles.push({
+      overlayId: `${entry?.profileId || "org-admin"}_chargeback_overlay`,
+      label: `${entry?.label || "Org Admin"} Chargeback Overlay`,
+      category: "chargeback",
+      overlayMode: "chargeback_allocation_review",
+      targetDimensions: uniqueSortedValues(entry?.chargebackDimensions || []),
+      requiredInputs: uniqueSortedValues(entry?.chargebackOverlayInputs || []),
+      roleBundles: uniqueSortedValues([...(entry?.adminRoleBundles || []), ...(entry?.delegatedAdminRoleBundles || []), ...(entry?.breakGlassRoleBundles || [])]),
+      decisionSurfaces: uniqueSortedValues((entry?.decisionSurfaces || []).filter((item) => item === "quota_override" || item === "export_profile_override")),
+      boundaryRequirements: uniqueSortedValues((entry?.boundaryRequirements || []).filter((item) => ["org_quota_metering", "audit_emission"].includes(item)))
+    });
+  }
+  return profiles;
+}
+
+function mockOrgAdminCatalog() {
+  const items = [
+      {
+        profileId: "centralized_enterprise_admin",
+        label: "Centralized Enterprise Admin",
+        organizationModel: "centralized_enterprise",
+        delegationModel: "central_it_with_tenant_project_delegation",
+        adminRoleBundles: ["enterprise.org_admin", "enterprise.security_admin", "enterprise.compliance_admin"],
+        delegatedAdminRoleBundles: ["enterprise.tenant_admin", "enterprise.project_admin", "enterprise.identity_admin"],
+        breakGlassRoleBundles: ["enterprise.break_glass_admin", "enterprise.break_glass_auditor"],
+        directorySyncInputs: ["idp_group", "tenant_id", "cost_center", "environment"],
+        residencyProfiles: ["single_region_tenant_pinning", "regional_failover_within_jurisdiction"],
+        residencyExceptionInputs: ["region", "jurisdiction", "residency_exception_ticket"],
+        legalHoldProfiles: ["litigation_hold", "security_incident_hold"],
+        legalHoldExceptionInputs: ["legal_hold_case_id", "legal_hold_reason", "legal_hold_expiry"],
+        networkBoundaryProfiles: ["enterprise_proxy_required", "private_egress_preferred", "tls_inspection_compatible"],
+        fleetRolloutProfiles: ["mdm_managed_desktop_ring", "regional_beta_ring"],
+        quotaDimensions: ["organization", "tenant", "project", "worker_adapter", "provider", "model"],
+        quotaOverlayInputs: ["tenant_id", "project_id", "environment", "cost_center"],
+        chargebackDimensions: ["cost_center", "business_unit", "tenant", "project", "environment"],
+        chargebackOverlayInputs: ["cost_center", "business_unit", "project_id", "environment"],
+        decisionSurfaces: ["policy_pack_assignment", "export_profile_override", "quota_override", "legal_hold_activation", "break_glass_activation"],
+        enforcementHooks: ["delegated_admin_scope_guard", "break_glass_timebox", "directory_sync_group_mapping", "residency_policy_exception_review", "legal_hold_exception_review", "org_quota_override_approval", "chargeback_override_audit"],
+        boundaryRequirements: ["tenant_project_scope", "runtime_authz", "audit_emission", "directory_group_mapping", "org_quota_metering", "governed_export_redaction"],
+        clientSurfaces: ["chat", "vscode", "cli", "workflow", "chatops", "desktop", "runtime"],
+        reportingSurfaces: ["report", "export", "admin_report"]
+      },
+      {
+        profileId: "federated_business_unit_admin",
+        label: "Federated Business-Unit Admin",
+        organizationModel: "federated_business_unit",
+        delegationModel: "business_unit_scoped_delegation",
+        adminRoleBundles: ["enterprise.org_admin", "enterprise.security_admin"],
+        delegatedAdminRoleBundles: ["enterprise.business_unit_admin", "enterprise.tenant_admin", "enterprise.project_admin"],
+        breakGlassRoleBundles: ["enterprise.break_glass_admin"],
+        directorySyncInputs: ["idp_group", "business_unit", "cost_center", "workflow_id"],
+        residencyProfiles: ["business_unit_regional_partitioning", "regional_residency_enforced"],
+        residencyExceptionInputs: ["business_unit", "region", "residency_exception_ticket"],
+        legalHoldProfiles: ["business_unit_case_hold", "security_incident_hold"],
+        legalHoldExceptionInputs: ["hold_case_id", "hold_reason", "regional_counsel_approval"],
+        networkBoundaryProfiles: ["proxy_by_business_unit", "private_egress_preferred"],
+        fleetRolloutProfiles: ["business_unit_desktop_ring", "regional_package_distribution"],
+        quotaDimensions: ["organization", "business_unit", "tenant", "project", "worker_adapter"],
+        quotaOverlayInputs: ["business_unit", "tenant_id", "project_id", "cost_center"],
+        chargebackDimensions: ["business_unit", "cost_center", "project", "environment"],
+        chargebackOverlayInputs: ["business_unit", "cost_center", "project_id", "environment"],
+        decisionSurfaces: ["policy_pack_assignment", "quota_override", "export_profile_override"],
+        enforcementHooks: ["delegated_business_unit_scope_guard", "directory_sync_business_unit_mapping", "business_unit_quota_override_approval", "chargeback_override_audit"],
+        boundaryRequirements: ["tenant_project_scope", "runtime_authz", "audit_emission", "directory_group_mapping", "business_unit_chargeback"],
+        clientSurfaces: ["chat", "vscode", "cli", "workflow", "chatops", "desktop"],
+        reportingSurfaces: ["report", "export", "admin_report"]
+      },
+      {
+        profileId: "regulated_regional_admin",
+        label: "Regulated Regional Admin",
+        organizationModel: "regulated_regional",
+        delegationModel: "regional_compliance_delegation",
+        adminRoleBundles: ["enterprise.org_admin", "enterprise.compliance_admin", "enterprise.records_admin"],
+        delegatedAdminRoleBundles: ["enterprise.regional_admin", "enterprise.tenant_admin"],
+        breakGlassRoleBundles: ["enterprise.break_glass_admin", "enterprise.break_glass_auditor"],
+        directorySyncInputs: ["idp_group", "region", "data_classification", "legal_entity"],
+        residencyProfiles: ["single_jurisdiction_enforced", "regional_failover_blocked"],
+        residencyExceptionInputs: ["region", "jurisdiction", "cross_region_exception_ticket"],
+        legalHoldProfiles: ["litigation_hold", "regulatory_hold", "ediscovery_hold"],
+        legalHoldExceptionInputs: ["hold_case_id", "regulator_reference", "exception_expiry"],
+        networkBoundaryProfiles: ["private_connectivity_only", "regional_egress_allowlist", "mutual_tls_enterprise_edge"],
+        fleetRolloutProfiles: ["mdm_managed_regional_ring", "signed_package_required"],
+        quotaDimensions: ["organization", "region", "tenant", "project", "export_profile"],
+        quotaOverlayInputs: ["region", "tenant_id", "project_id", "data_classification"],
+        chargebackDimensions: ["region", "legal_entity", "project"],
+        chargebackOverlayInputs: ["region", "legal_entity", "cost_center", "project_id"],
+        decisionSurfaces: ["residency_policy_assignment", "legal_hold_activation", "export_profile_override", "break_glass_activation"],
+        enforcementHooks: ["regional_residency_guard", "cross_border_exception_review", "legal_hold_exception_review", "break_glass_timebox", "regional_quota_override_approval"],
+        boundaryRequirements: ["tenant_project_scope", "runtime_authz", "audit_emission", "directory_group_mapping", "jurisdictional_residency", "governed_export_redaction"],
+        clientSurfaces: ["chat", "vscode", "cli", "workflow", "chatops", "desktop", "runtime"],
+        reportingSurfaces: ["report", "export", "compliance_report", "admin_report"]
+      }
+    ].map((entry) => ({
+      ...entry,
+      enforcementProfiles: buildMockOrgAdminEnforcementProfiles(entry),
+      directorySyncMappings: buildMockOrgAdminDirectorySyncMappings(entry),
+      exceptionProfiles: buildMockOrgAdminExceptionProfiles(entry),
+      overlayProfiles: buildMockOrgAdminOverlayProfiles(entry)
+    }));
+  return {
+    source: "mock",
+    count: items.length,
+    items
+  };
+}
+
 function seedMockRuns() {
   return [
     {
@@ -1879,6 +2455,16 @@ export class AgentOpsApi {
         detail: "Not checked yet.",
         updatedAt: ""
       },
+      workerCapabilities: {
+        state: "unknown",
+        detail: "Not checked yet.",
+        updatedAt: ""
+      },
+      policyPacks: {
+        state: "unknown",
+        detail: "Not checked yet.",
+        updatedAt: ""
+      },
       runs: {
         state: "unknown",
         detail: "Not checked yet.",
@@ -2041,6 +2627,18 @@ export class AgentOpsApi {
           label: "Runtime Sessions",
           path: this.config?.endpoints?.sessions || "",
           ...(endpointSnapshot.sessions || {})
+        },
+        {
+          id: "workerCapabilities",
+          label: "Runtime Worker Capabilities",
+          path: this.config?.endpoints?.workerCapabilities || "",
+          ...(endpointSnapshot.workerCapabilities || {})
+        },
+        {
+          id: "policyPacks",
+          label: "Runtime Policy Packs",
+          path: this.config?.endpoints?.policyPacks || "",
+          ...(endpointSnapshot.policyPacks || {})
         },
         {
           id: "runs",
@@ -2409,6 +3007,110 @@ export class AgentOpsApi {
         this.updateEndpointStatus("sessions", "unavailable", `Runtime session list endpoint returned HTTP ${error.status}.`);
       } else {
         this.updateEndpointStatus("sessions", "error", `Runtime session list request failed (${error.message}).`);
+      }
+      throw error;
+    }
+  }
+
+  async listRuntimeWorkerCapabilities(query = {}) {
+    if (this.config.mockMode) {
+      this.updateEndpointStatus("workerCapabilities", "mock", "Mock mode enabled.");
+      return mockWorkerCapabilityCatalog();
+    }
+
+    const endpoint = this.config?.endpoints?.workerCapabilities;
+    if (!endpoint) {
+      this.updateEndpointStatus("workerCapabilities", "unavailable", "No runtime worker-capability endpoint configured.");
+      throw new Error("Runtime worker-capability endpoint is not configured.");
+    }
+
+    try {
+      const response = await this.request(this.config.runtimeApiBaseUrl, endpoint, query);
+      this.updateEndpointStatus("workerCapabilities", "available", "Runtime worker-capability endpoint responded.");
+      return response;
+    } catch (error) {
+      if (error.status === 404 || error.status === 405 || error.status === 501) {
+        this.updateEndpointStatus("workerCapabilities", "unavailable", `Runtime worker-capability endpoint returned HTTP ${error.status}.`);
+      } else {
+        this.updateEndpointStatus("workerCapabilities", "error", `Runtime worker-capability request failed (${error.message}).`);
+      }
+      throw error;
+    }
+  }
+
+  async listRuntimePolicyPacks(query = {}) {
+    if (this.config.mockMode) {
+      this.updateEndpointStatus("policyPacks", "mock", "Mock mode enabled.");
+      return mockPolicyPackCatalog();
+    }
+
+    const endpoint = this.config?.endpoints?.policyPacks;
+    if (!endpoint) {
+      this.updateEndpointStatus("policyPacks", "unavailable", "No runtime policy-pack endpoint configured.");
+      throw new Error("Runtime policy-pack endpoint is not configured.");
+    }
+
+    try {
+      const response = await this.request(this.config.runtimeApiBaseUrl, endpoint, query);
+      this.updateEndpointStatus("policyPacks", "available", "Runtime policy-pack endpoint responded.");
+      return response;
+    } catch (error) {
+      if (error.status === 404 || error.status === 405 || error.status === 501) {
+        this.updateEndpointStatus("policyPacks", "unavailable", `Runtime policy-pack endpoint returned HTTP ${error.status}.`);
+      } else {
+        this.updateEndpointStatus("policyPacks", "error", `Runtime policy-pack request failed (${error.message}).`);
+      }
+      throw error;
+    }
+  }
+
+  async listRuntimeExportProfiles(query = {}) {
+    if (this.config.mockMode) {
+      this.updateEndpointStatus("exportProfiles", "mock", "Mock mode enabled.");
+      return mockExportProfileCatalog();
+    }
+
+    const endpoint = this.config?.endpoints?.exportProfiles;
+    if (!endpoint) {
+      this.updateEndpointStatus("exportProfiles", "unavailable", "No runtime export-profile endpoint configured.");
+      throw new Error("Runtime export-profile endpoint is not configured.");
+    }
+
+    try {
+      const response = await this.request(this.config.runtimeApiBaseUrl, endpoint, query);
+      this.updateEndpointStatus("exportProfiles", "available", "Runtime export-profile endpoint responded.");
+      return response;
+    } catch (error) {
+      if (error.status === 404 || error.status === 405 || error.status === 501) {
+        this.updateEndpointStatus("exportProfiles", "unavailable", `Runtime export-profile endpoint returned HTTP ${error.status}.`);
+      } else {
+        this.updateEndpointStatus("exportProfiles", "error", `Runtime export-profile request failed (${error.message}).`);
+      }
+      throw error;
+    }
+  }
+
+  async listRuntimeOrgAdminProfiles(query = {}) {
+    if (this.config.mockMode) {
+      this.updateEndpointStatus("orgAdminProfiles", "mock", "Mock mode enabled.");
+      return mockOrgAdminCatalog();
+    }
+
+    const endpoint = this.config?.endpoints?.orgAdminProfiles;
+    if (!endpoint) {
+      this.updateEndpointStatus("orgAdminProfiles", "unavailable", "No runtime org-admin endpoint configured.");
+      throw new Error("Runtime org-admin endpoint is not configured.");
+    }
+
+    try {
+      const response = await this.request(this.config.runtimeApiBaseUrl, endpoint, query);
+      this.updateEndpointStatus("orgAdminProfiles", "available", "Runtime org-admin endpoint responded.");
+      return response;
+    } catch (error) {
+      if (error.status === 404 || error.status === 405 || error.status === 501) {
+        this.updateEndpointStatus("orgAdminProfiles", "unavailable", `Runtime org-admin endpoint returned HTTP ${error.status}.`);
+      } else {
+        this.updateEndpointStatus("orgAdminProfiles", "error", `Runtime org-admin request failed (${error.message}).`);
       }
       throw error;
     }

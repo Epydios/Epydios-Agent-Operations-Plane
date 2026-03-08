@@ -274,6 +274,7 @@ func runConversationStatus(ctx context.Context, client *runtimeclient.Client, cf
 	fs.SetOutput(os.Stderr)
 	sessionID := fs.String("session-id", "", "optional session id override")
 	render := fs.String("render", "text", "render mode: update, report, text, or json")
+	reportSelection := runtimeclient.BindEnterpriseReportSelectionFlags(fs)
 	lookup := bindChatopsLookupFlags(fs)
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -291,7 +292,7 @@ func runConversationStatus(ctx context.Context, client *runtimeclient.Client, cf
 		return printJSON(report)
 	}
 	if format == "report" {
-		rendered, err := renderChatopsReport(ctx, client, report)
+		rendered, err := renderChatopsReport(ctx, client, report, *reportSelection)
 		if err != nil {
 			return err
 		}
@@ -313,6 +314,7 @@ func runConversationFollow(ctx context.Context, client *runtimeclient.Client, cf
 	waitSeconds := fs.Int("wait-seconds", cfg.LiveFollowWait, "server wait seconds")
 	once := fs.Bool("once", false, "fetch one event-stream window and exit")
 	render := fs.String("render", "text", "render mode: update, delta-update, report, delta-report, text, or json")
+	reportSelection := runtimeclient.BindEnterpriseReportSelectionFlags(fs)
 	lookup := bindChatopsLookupFlags(fs)
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -357,7 +359,7 @@ func runConversationFollow(ctx context.Context, client *runtimeclient.Client, cf
 			if err != nil {
 				return err
 			}
-			rendered, err := renderChatopsDeltaReport(ctx, client, current, items)
+			rendered, err := renderChatopsDeltaReport(ctx, client, current, items, *reportSelection)
 			if err != nil {
 				return err
 			}
@@ -367,7 +369,7 @@ func runConversationFollow(ctx context.Context, client *runtimeclient.Client, cf
 			if err != nil {
 				return err
 			}
-			rendered, err := renderChatopsReport(ctx, client, current)
+			rendered, err := renderChatopsReport(ctx, client, current, *reportSelection)
 			if err != nil {
 				return err
 			}
@@ -854,7 +856,7 @@ func renderChatopsDeltaUpdate(report *chatopsStatusReport, items []runtimeapi.Se
 	return renderChatopsThreadEnvelope("follow_delta", summary, report, details, summarizeChatopsEventItems(items, 4), renderChatopsActionHints(report))
 }
 
-func renderChatopsReport(ctx context.Context, client *runtimeclient.Client, report *chatopsStatusReport) (string, error) {
+func renderChatopsReport(ctx context.Context, client *runtimeclient.Client, report *chatopsStatusReport, selection runtimeclient.EnterpriseReportSelection) (string, error) {
 	if report == nil {
 		return "", nil
 	}
@@ -866,9 +868,20 @@ func renderChatopsReport(ctx context.Context, client *runtimeclient.Client, repo
 	if err != nil {
 		return "", err
 	}
+	exportProfiles, disposition, err := runtimeclient.LoadEnterpriseReportSelectionCatalog(ctx, client, "report", "chatops", selection)
+	if err != nil {
+		return "", err
+	}
+	orgAdminProfiles, err := client.ListOrgAdminProfiles(ctx, "", "", "", "chatops")
+	if err != nil {
+		return "", err
+	}
 	envelope := runtimeclient.BuildEnterpriseReportEnvelope(runtimeclient.EnterpriseReportSubject{
 		Header:               "AgentOps conversation governance report",
 		ReportType:           "report",
+		ExportProfile:        disposition.ExportProfile,
+		Audience:             disposition.Audience,
+		RetentionClass:       disposition.RetentionClass,
 		ClientSurface:        "chatops",
 		ContextLabel:         "Conversation",
 		ContextValue:         buildChatopsReportContext(report),
@@ -887,15 +900,16 @@ func renderChatopsReport(ctx context.Context, client *runtimeclient.Client, repo
 		PendingProposalCount: len(report.PendingProposals),
 		ToolActionCount:      report.ToolActionCount,
 		EvidenceCount:        report.EvidenceCount,
+		ApprovalCheckpoints:  append([]runtimeapi.ApprovalCheckpointRecord(nil), report.PendingApprovals...),
 		Summary:              runtimeclient.NormalizeStringOrDefault(report.LatestWorkerSummary, "Enterprise conversation posture refreshed."),
 		Details:              buildChatopsReportDetails(report),
 		Recent:               renderChatopsRecentEventLines(report, 4),
 		ActionHints:          renderChatopsActionHints(report),
-	}, policyPacks, workerCapabilities)
+	}, policyPacks, workerCapabilities, exportProfiles, orgAdminProfiles)
 	return runtimeclient.RenderEnterpriseReportEnvelope(envelope), nil
 }
 
-func renderChatopsDeltaReport(ctx context.Context, client *runtimeclient.Client, report *chatopsStatusReport, items []runtimeapi.SessionEventRecord) (string, error) {
+func renderChatopsDeltaReport(ctx context.Context, client *runtimeclient.Client, report *chatopsStatusReport, items []runtimeapi.SessionEventRecord, selection runtimeclient.EnterpriseReportSelection) (string, error) {
 	if len(items) == 0 {
 		return "", nil
 	}
@@ -907,9 +921,20 @@ func renderChatopsDeltaReport(ctx context.Context, client *runtimeclient.Client,
 	if err != nil {
 		return "", err
 	}
+	exportProfiles, disposition, err := runtimeclient.LoadEnterpriseReportSelectionCatalog(ctx, client, "delta-report", "chatops", selection)
+	if err != nil {
+		return "", err
+	}
+	orgAdminProfiles, err := client.ListOrgAdminProfiles(ctx, "", "", "", "chatops")
+	if err != nil {
+		return "", err
+	}
 	envelope := runtimeclient.BuildEnterpriseReportEnvelope(runtimeclient.EnterpriseReportSubject{
 		Header:               "AgentOps conversation governance report",
 		ReportType:           "delta-report",
+		ExportProfile:        disposition.ExportProfile,
+		Audience:             disposition.Audience,
+		RetentionClass:       disposition.RetentionClass,
 		ClientSurface:        "chatops",
 		ContextLabel:         "Conversation",
 		ContextValue:         buildChatopsReportContext(report),
@@ -928,11 +953,12 @@ func renderChatopsDeltaReport(ctx context.Context, client *runtimeclient.Client,
 		PendingProposalCount: len(report.PendingProposals),
 		ToolActionCount:      report.ToolActionCount,
 		EvidenceCount:        report.EvidenceCount,
+		ApprovalCheckpoints:  append([]runtimeapi.ApprovalCheckpointRecord(nil), report.PendingApprovals...),
 		Summary:              runtimeclient.BuildThreadFollowSummary(items),
 		Details:              runtimeclient.BuildThreadFollowDetails(items),
 		Recent:               runtimeclient.RenderSessionEventLines(items, 4),
 		ActionHints:          renderChatopsActionHints(report),
-	}, policyPacks, workerCapabilities)
+	}, policyPacks, workerCapabilities, exportProfiles, orgAdminProfiles)
 	return runtimeclient.RenderEnterpriseReportEnvelope(envelope), nil
 }
 
