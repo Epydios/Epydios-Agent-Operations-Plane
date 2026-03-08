@@ -1,6 +1,6 @@
 {
   "id": "post_m15_enterprise_expansion_plan_20260307",
-  "status": "parallelized_m19_chatops_ingress_in_progress_while_m15_remains_open",
+  "status": "parallelized_m20_hardening_in_progress_while_m15_remains_open",
   "created_on": "2026-03-07",
   "product_stance": {
     "control_plane": "AgentOps",
@@ -99,9 +99,28 @@
         "workflow status renders native task, session, timeline, proposal, and recent-event state as text, json, or ticket-comment output without introducing a separate orchestration path",
         "first chatops ingress slice landed in clients/chatops-agentops",
         "chatops intake creates native governed tasks from external conversation context and optionally starts the first governed turn on the same session contract",
-        "chatops status renders native task, session, timeline, proposal, and recent-event state as text, json, or thread-ready update output without introducing a separate orchestration path"
+        "chatops status renders native task, session, timeline, proposal, and recent-event state as text, json, or thread-ready update output without introducing a separate orchestration path",
+        "chatops approval and tool-proposal decisions are wired on the same native session contract with thread-ready update output",
+        "chatops follow-up turns and resume are wired on existing governed tasks through the same native invoke path with thread-ready update output",
+        "chatops status, reply, and resume can now resolve governed tasks from native conversation context such as threadId, messageId, sourceSystem, channelId, and channelName instead of requiring only a taskId",
+        "chatops live follow is now wired through the native session event-stream surface with text, json, and thread-ready update output",
+        "chatops approval and proposal decisions can now resolve the target session and pending checkpoint or proposal from native conversation context when exactly one pending item matches the thread instead of requiring raw sessionId and checkpoint or proposal identifiers",
+        "chatops thread-ready update packaging now includes recent activity summaries and explicit action hints, including the IDs to use when multiple pending approvals or proposals still require explicit operator selection",
+        "chatops intake, status, follow, reply, approval, and proposal update modes now share one normalized governed thread-update envelope, and conversations follow also supports a lower-noise delta-update mode on the same native session contract",
+        "workflow/ticket status output now reuses the shared governed update envelope from the Go client layer instead of carrying a separate ticket-specific outbound status dialect",
+        "workflow/ticket ingress now supports governed follow-up turn submission on existing tasks through tickets reply and tickets resume using the same native invoke path as chatops, VS Code, CLI, and desktop chat",
+        "workflow/ticket ingress now supports native session follow through tickets follow on the same M16 event-stream contract and shared governed update envelope",
+        "workflow/ticket ingress now supports native approval and proposal decisions on the same reusable control-plane contract, and those decisions can resolve the target task and session from ticket identifiers instead of requiring only raw task or session ids",
+        "workflow/ticket ingress now uses the same governed update-envelope path for intake, status, follow, reply, approval, and proposal actions, and tickets follow with render=delta-update now suppresses empty follow windows instead of emitting zero-event noise",
+        "workflow/ticket and chatops now share the same Go client helpers for annotation-based task lookup, pending approval and proposal target resolution, context-hint building, and decision action-hint rendering instead of carrying parallel resolver logic in each ingress client",
+        "CLI convenience flows now resolve native thread review from sessionId, resolve live-follow sessions from taskId, auto-select a single pending native approval or proposal target from task/session context, resolve governed turn taskId from sessionId, and render native action hints from thread review output",
+        "VS Code thread review now mirrors the same native pending-target convenience rules with a dedicated thread-context helper that auto-selects a single pending approval or proposal from the selected session and renders native action hints when explicit operator choice is still required",
+        "CLI review and live-follow output now reuse a shared governed update-envelope helper, so threads show with render=update and sessions follow with render=update or delta-update package operator guidance on the same model already used by workflow and chatops ingress",
+        "VS Code thread review and live follow now package selected native session state through a shared governed update helper so the IDE surface shows the same summary, recent-activity, and action-hint structure instead of inventing a second review dialect",
+        "a shared M19 parity fixture now validates the same governed thread review and follow semantics across CLI, workflow, chatops, and VS Code from one source instead of relying on separate client-local assumptions",
+        "M19 exit-gate validation is now complete across Chat, VS Code, CLI, workflow, and chatops on the same native contract; the only parity defect found was a desktop Chat worker-summary mismatch, and it was fixed before the gate was closed."
       ],
-      "next_step": "deepen chatops on the same reusable M16 or M18 contract by adding native approval and proposal decision actions while keeping VS Code, CLI, workflow, and chatops ingress on the same native control-plane model"
+      "next_step": "Attach the policy-pack baseline to concrete enterprise role bundles and worker decision surfaces, extend the shared enterprise reporting envelope beyond workflow/chatops into the remaining enterprise review and export surfaces, and add the first DLP/export-time secret scanning hooks for transcripts, evidence, and governed exports."
     },
     {
       "id": "M20",
@@ -114,9 +133,22 @@
         "worker capability matrices",
         "reporting and export integration"
       ],
-      "exit_gate": "Fortune 500 deployment posture is supported across UI, IDE, API, and worker surfaces with clear governance boundaries"
+      "exit_gate": "Fortune 500 deployment posture is supported across UI, IDE, API, and worker surfaces with clear governance boundaries",
+      "current_parallel_progress": [
+        "the current multi-tenant policy, RBAC, DLP/secret, worker-capability, and reporting/export posture is now inventoried in docs/specs/m20-enterprise-hardening-baseline.md",
+        "the first shared hardening artifact is now live as GET /v1alpha2/runtime/worker-capabilities backed by internal/runtime/worker_capability_catalog.go",
+        "the worker-capability catalog currently covers the managed Codex worker path and all default direct governed model-invoke profiles without forking the native M16/M18 contract",
+        "the runtime now exposes GET /v1alpha2/runtime/policy-packs backed by internal/runtime/policy_pack_catalog.go as the first shared role-and-capability policy-pack inventory",
+        "the shared enterprise reporting envelope is now implemented in clients/internal/runtimeclient/report_envelope.go and reused by workflow and chatops report surfaces",
+        "the dedicated M20 baseline verifier now exists at platform/local/bin/verify-m20-enterprise-hardening-baseline.sh and the latest proof log is captured in the non-repo readiness area",
+        "the runtime policy-pack catalog now attaches concrete roleBundles and decisionSurfaces to the baseline enterprise policy packs",
+        "the shared enterprise reporting envelope now extends into CLI review and follow flows through threads show --render report and sessions follow --render report|delta-report",
+        "enterprise report output now redacts secret-like transcript, evidence, summary, and hint content before render and surfaces explicit DLP findings",
+        "the dedicated M20 baseline verifier remained green after the slice and the standing desktop/runtime gates stayed green"
+      ],
+      "next_step": "Extend the shared enterprise reporting envelope into the remaining enterprise review and export surfaces, starting with VS Code and desktop Chat review/export paths, add export-profile and audience metadata on top of the governed report envelope without forking the native contract, and add export-time secret scanning hooks to runtime-native audit, incident, run, and governed evidence export paths."
     }
   ],
-  "recommended_immediate_next_step": "continue M19 from the validated VS Code, CLI, workflow, and chatops slices by adding native approval and proposal decision actions to chatops on the same native session contract without forking the control-plane model",
+  "recommended_immediate_next_step": "Extend the shared enterprise reporting envelope into the remaining enterprise review and export surfaces, starting with VS Code and desktop Chat review/export paths, add export-profile and audience metadata on top of the governed report envelope without forking the native contract, and add export-time secret scanning hooks to runtime-native audit, incident, run, and governed evidence export paths.",
   "parallel_execution_note": "M16 architecture/spec work may begin while M15 remains blocked on Windows execution-host proof, but M15 must not be marked complete until Phase D and final launch sign-off are closed."
 }

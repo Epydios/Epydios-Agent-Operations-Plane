@@ -88,7 +88,7 @@
     }
   },
   "scripts": {
-    "check": "node --check extension.js && node --check lib/runtimeClient.js && node --check lib/sessionReview.js",
+    "check": "node --check extension.js && node --check lib/runtimeClient.js && node --check lib/sessionReview.js && node --check lib/threadContext.js && node --check lib/updateEnvelope.js",
     "test": "node --test ./test/*.test.js"
   }
 }

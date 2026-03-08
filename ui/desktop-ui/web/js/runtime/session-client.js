@@ -289,7 +289,7 @@ export function buildNativeSessionActivitySummary(sessionView = {}) {
       payload
     };
   });
-  const latestWorkerEvent = [...semanticEvents].reverse().find((item) => item.eventType.startsWith("worker.") || item.eventType.startsWith("tool_action."));
+  const latestWorkerEvent = [...semanticEvents].reverse().find((item) => item.eventType.startsWith("worker.") || item.eventType.startsWith("tool_action.") || item.eventType.startsWith("tool_proposal."));
   const latestWorkerStatusEvent = [...semanticEvents].reverse().find((item) => item.eventType === "worker.status.changed");
   const latestOutputEvent = [...semanticEvents].reverse().find((item) => item.eventType === "worker.output.delta");
   const taskStatus = normalizedString(task?.status).toUpperCase();

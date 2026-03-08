@@ -39,6 +39,8 @@ This service moves policy/evidence/profile execution flow out of ad-hoc scripts 
 - `GET /v1alpha1/runtime/integrations/settings?tenantId=...&projectId=...` (project-scoped integration settings read)
 - `PUT /v1alpha1/runtime/integrations/settings` (`meta.tenantId`, `meta.projectId`, `settings` JSON object)
 - `POST /v1alpha1/runtime/integrations/invoke` (`meta.tenantId`, `meta.projectId`, optional `agentProfileId`, `prompt`, optional `systemPrompt`, optional `maxOutputTokens`)
+- `GET /v1alpha2/runtime/worker-capabilities?executionMode=...&workerType=...&adapterId=...`
+- `GET /v1alpha2/runtime/policy-packs?packId=...&permission=...&executionMode=...&workerType=...&adapterId=...&clientSurface=...`
 - `POST /v1alpha2/runtime/sessions/{sessionId}/tool-proposals/{proposalId}/decision` (`meta.tenantId`, `meta.projectId`, `decision=APPROVE|DENY`, optional `reason`)
 
 ## Integration Settings Contract (M14.9)
@@ -50,6 +52,64 @@ This service moves policy/evidence/profile execution flow out of ad-hoc scripts 
 - Read and update actions emit runtime audit events:
   - `runtime.integrations.settings.read`
   - `runtime.integrations.settings.update`
+
+## Worker Capability Catalog Contract (M20 baseline)
+
+- Endpoint scope is runtime-authz protected and currently requires the same read permission as session and run reads.
+- `GET /v1alpha2/runtime/worker-capabilities` returns the authoritative runtime worker-capability catalog used by the enterprise hardening pack.
+- Supported filters:
+  - `executionMode`
+  - `workerType`
+  - `adapterId`
+- Current catalog coverage:
+  - managed Codex worker execution
+  - direct governed model-invoke profiles from the default agent catalog
+
+## Policy Pack Catalog Contract (M20 baseline)
+
+- Endpoint scope is runtime-authz protected and currently requires the same read permission as session and run reads.
+- `GET /v1alpha2/runtime/policy-packs` returns the runtime policy-pack catalog used by the first enterprise hardening pack.
+- Supported filters:
+  - `packId`
+  - `permission`
+  - `executionMode`
+  - `workerType`
+  - `adapterId`
+  - `clientSurface`
+- Current baseline packs:
+  - `read_only_review`
+  - `governed_model_invoke_operator`
+  - `managed_codex_worker_operator`
+- Policy-pack entries now also carry:
+  - `roleBundles`
+  - `decisionSurfaces`
+
+## Enterprise Report Envelope (M20 baseline)
+
+- The first shared enterprise report envelope is implemented in the shared Go client layer:
+  - `clients/internal/runtimeclient/report_envelope.go`
+- The envelope composes:
+  - task or session review state
+  - worker-capability catalog matches
+  - policy-pack catalog matches
+  - boundary requirements
+  - recent activity
+  - operator action hints
+- Current consumers:
+  - workflow or ticket reporting surfaces
+  - chatops reporting surfaces
+  - CLI reporting surfaces
+- Purpose:
+  - keep governance reporting on the same native task, session, worker, approval, tool-action, evidence, and event-stream contract
+  - avoid workflow-vendor-specific or chat-vendor-specific reporting branches
+- The envelope now also carries:
+  - applicable policy packs
+  - role bundles
+  - decision surfaces
+  - worker capability coverage
+  - boundary requirements
+  - `DLP findings`
+- Secret-like transcript, evidence, summary, and hint content is redacted before render in the shared enterprise report envelope so governed report consumers do not leak raw credentials or tokens through downstream status surfaces.
 
 ## Integration Invoke Contract (2026-03-07)
 

@@ -178,6 +178,55 @@ type SessionWorkerListQuery struct {
 	Limit      int
 }
 
+type WorkerCapabilityCatalogEntry struct {
+	ExecutionMode            string   `json:"executionMode"`
+	WorkerType               string   `json:"workerType"`
+	AdapterID                string   `json:"adapterId"`
+	Label                    string   `json:"label"`
+	Description              string   `json:"description,omitempty"`
+	Provider                 string   `json:"provider,omitempty"`
+	Transport                string   `json:"transport,omitempty"`
+	Model                    string   `json:"model,omitempty"`
+	Capabilities             []string `json:"capabilities,omitempty"`
+	SupportedToolActionTypes []string `json:"supportedToolActionTypes,omitempty"`
+	SupportedEvidenceKinds   []string `json:"supportedEvidenceKinds,omitempty"`
+	SupportedApprovalKinds   []string `json:"supportedApprovalKinds,omitempty"`
+	SupportedEventTypes      []string `json:"supportedEventTypes,omitempty"`
+	BoundaryRequirements     []string `json:"boundaryRequirements,omitempty"`
+	TargetEnvironments       []string `json:"targetEnvironments,omitempty"`
+}
+
+type WorkerCapabilityCatalogResponse struct {
+	GeneratedAt time.Time                      `json:"generatedAt"`
+	Source      string                         `json:"source"`
+	Count       int                            `json:"count"`
+	Items       []WorkerCapabilityCatalogEntry `json:"items"`
+}
+
+type PolicyPackCatalogEntry struct {
+	PackID                   string   `json:"packId"`
+	Label                    string   `json:"label"`
+	Description              string   `json:"description,omitempty"`
+	RoleBundles              []string `json:"roleBundles,omitempty"`
+	Roles                    []string `json:"roles,omitempty"`
+	Permissions              []string `json:"permissions,omitempty"`
+	ApplicableExecutionModes []string `json:"applicableExecutionModes,omitempty"`
+	ApplicableWorkerTypes    []string `json:"applicableWorkerTypes,omitempty"`
+	ApplicableAdapterIDs     []string `json:"applicableAdapterIds,omitempty"`
+	Capabilities             []string `json:"capabilities,omitempty"`
+	BoundaryRequirements     []string `json:"boundaryRequirements,omitempty"`
+	DecisionSurfaces         []string `json:"decisionSurfaces,omitempty"`
+	ClientSurfaces           []string `json:"clientSurfaces,omitempty"`
+	ReportingSurfaces        []string `json:"reportingSurfaces,omitempty"`
+}
+
+type PolicyPackCatalogResponse struct {
+	GeneratedAt time.Time                `json:"generatedAt"`
+	Source      string                   `json:"source"`
+	Count       int                      `json:"count"`
+	Items       []PolicyPackCatalogEntry `json:"items"`
+}
+
 type WorkerEventCreateRequest struct {
 	Meta      ObjectMeta      `json:"meta"`
 	EventType string          `json:"eventType,omitempty"`

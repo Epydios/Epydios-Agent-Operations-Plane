@@ -131,7 +131,9 @@ func normalizeRuntimeHTTPPath(path string) string {
 		"/v1alpha1/runtime/integrations/settings",
 		"/v1alpha1/runtime/integrations/invoke",
 		"/v1alpha2/runtime/tasks",
-		"/v1alpha2/runtime/sessions":
+		"/v1alpha2/runtime/sessions",
+		"/v1alpha2/runtime/worker-capabilities",
+		"/v1alpha2/runtime/policy-packs":
 		return normalized
 	}
 	if strings.HasPrefix(normalized, "/v1alpha1/runtime/runs/") {

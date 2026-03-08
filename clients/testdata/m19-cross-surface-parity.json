@@ -1,0 +1,89 @@
+{
+  "task": {
+    "taskId": "task-parity-1",
+    "title": "Investigate checkout timeouts",
+    "status": "IN_PROGRESS"
+  },
+  "session": {
+    "sessionId": "sess-parity-1",
+    "taskId": "task-parity-1",
+    "status": "AWAITING_APPROVAL",
+    "selectedWorkerId": "worker-parity-1"
+  },
+  "selectedWorker": {
+    "workerId": "worker-parity-1",
+    "workerType": "managed_agent",
+    "adapterId": "codex",
+    "status": "RUNNING"
+  },
+  "pendingApprovals": [
+    {
+      "checkpointId": "approval-1",
+      "scope": "runtime.apply",
+      "status": "PENDING"
+    },
+    {
+      "checkpointId": "approval-2",
+      "scope": "terminal.exec",
+      "status": "PENDING"
+    }
+  ],
+  "events": [
+    {
+      "eventId": "evt-1",
+      "sequence": 1,
+      "eventType": "worker.progress",
+      "payload": {
+        "summary": "Worker collected deployment context."
+      }
+    },
+    {
+      "eventId": "evt-2",
+      "sequence": 2,
+      "eventType": "tool_proposal.generated",
+      "payload": {
+        "proposalId": "proposal-1",
+        "summary": "Tool proposal generated for shell execution.",
+        "payload": {
+          "command": "pwd"
+        }
+      }
+    }
+  ],
+  "toolActions": [
+    {
+      "toolActionId": "tool-1",
+      "toolType": "managed_agent_turn",
+      "status": "SUCCEEDED",
+      "resultPayload": {
+        "rawResponse": [
+          {
+            "type": "message",
+            "text": "ok"
+          }
+        ]
+      }
+    }
+  ],
+  "evidenceRecords": [
+    {
+      "evidenceId": "evidence-1",
+      "kind": "worker_output",
+      "summary": "Managed worker output captured."
+    }
+  ],
+  "expected": {
+    "summary": "Tool proposal generated for shell execution.",
+    "eventLines": [
+      "Worker Progress: Worker collected deployment context.",
+      "Tool Proposal: Tool proposal generated for shell execution."
+    ],
+    "approvalIds": [
+      "approval-1",
+      "approval-2"
+    ],
+    "proposalIds": [
+      "proposal-1"
+    ]
+  }
+}

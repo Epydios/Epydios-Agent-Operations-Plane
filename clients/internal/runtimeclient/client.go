@@ -99,6 +99,14 @@ func NewClient(cfg Config) *Client {
 	}
 }
 
+func NewClientWithHTTPClient(cfg Config, httpClient *http.Client) *Client {
+	client := NewClient(cfg)
+	if httpClient != nil {
+		client.httpClient = httpClient
+	}
+	return client
+}
+
 func (c *Client) request(ctx context.Context, method, requestPath string, query url.Values, body interface{}, accept string, target interface{}) error {
 	base, err := url.Parse(c.baseURL)
 	if err != nil {
@@ -232,6 +240,48 @@ func (c *Client) ListSessions(ctx context.Context, taskID string, limit, offset 
 	}
 	var response SessionListResponse
 	if err := c.request(ctx, http.MethodGet, "/v1alpha2/runtime/sessions", query, nil, "application/json", &response); err != nil {
+		return nil, err
+	}
+	return &response, nil
+}
+
+func (c *Client) ListWorkerCapabilities(ctx context.Context, executionMode, workerType, adapterID string) (*runtimeapi.WorkerCapabilityCatalogResponse, error) {
+	query := url.Values{}
+	if strings.TrimSpace(executionMode) != "" {
+		query.Set("executionMode", strings.TrimSpace(executionMode))
+	}
+	if strings.TrimSpace(workerType) != "" {
+		query.Set("workerType", strings.TrimSpace(workerType))
+	}
+	if strings.TrimSpace(adapterID) != "" {
+		query.Set("adapterId", strings.TrimSpace(adapterID))
+	}
+	var response runtimeapi.WorkerCapabilityCatalogResponse
+	if err := c.request(ctx, http.MethodGet, "/v1alpha2/runtime/worker-capabilities", query, nil, "application/json", &response); err != nil {
+		return nil, err
+	}
+	return &response, nil
+}
+
+func (c *Client) ListPolicyPacks(ctx context.Context, permission, executionMode, workerType, adapterID, clientSurface string) (*runtimeapi.PolicyPackCatalogResponse, error) {
+	query := url.Values{}
+	if strings.TrimSpace(permission) != "" {
+		query.Set("permission", strings.TrimSpace(permission))
+	}
+	if strings.TrimSpace(executionMode) != "" {
+		query.Set("executionMode", strings.TrimSpace(executionMode))
+	}
+	if strings.TrimSpace(workerType) != "" {
+		query.Set("workerType", strings.TrimSpace(workerType))
+	}
+	if strings.TrimSpace(adapterID) != "" {
+		query.Set("adapterId", strings.TrimSpace(adapterID))
+	}
+	if strings.TrimSpace(clientSurface) != "" {
+		query.Set("clientSurface", strings.TrimSpace(clientSurface))
+	}
+	var response runtimeapi.PolicyPackCatalogResponse
+	if err := c.request(ctx, http.MethodGet, "/v1alpha2/runtime/policy-packs", query, nil, "application/json", &response); err != nil {
 		return nil, err
 	}
 	return &response, nil

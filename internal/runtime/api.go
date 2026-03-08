@@ -104,6 +104,8 @@ func (s *APIServer) Routes() http.Handler {
 	mux.HandleFunc("/v1alpha2/runtime/sessions", s.handleSessionsV1Alpha2)
 	mux.HandleFunc("/v1alpha2/runtime/sessions/", s.handleSessionByIDV1Alpha2)
 	mux.HandleFunc("/v1alpha2/runtime/approvals/", s.handleApprovalCheckpointByIDV1Alpha2)
+	mux.HandleFunc("/v1alpha2/runtime/worker-capabilities", s.handleWorkerCapabilitiesV1Alpha2)
+	mux.HandleFunc("/v1alpha2/runtime/policy-packs", s.handlePolicyPacksV1Alpha2)
 	return loggingMiddleware(mux)
 }
 

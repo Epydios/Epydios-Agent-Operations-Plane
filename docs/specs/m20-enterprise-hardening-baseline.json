@@ -1,0 +1,158 @@
+{
+  "id": "m20_enterprise_hardening_baseline_20260307",
+  "date": "2026-03-07",
+  "status": "baseline_recorded_role_bundle_cli_reporting_and_dlp_slice_landed",
+  "scope": "Inventory the current enterprise posture after M19 and land the first shared M20 hardening artifact without forking the native M16/M18 contract.",
+  "baseline": {
+    "multi_tenant_policy": {
+      "status": "implemented_baseline",
+      "evidence": [
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/auth.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/platform/local/bin/verify-m9-rbac-matrix.sh",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/platform/local/bin/verify-m9-authz-tenancy.sh",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/docs/runtime-orchestration-service.md"
+      ]
+    },
+    "rbac": {
+      "status": "implemented_baseline",
+      "evidence": [
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/auth.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/platform/local/bin/verify-m9-authn-authz.sh",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/platform/local/bin/verify-m9-rbac-matrix.sh",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/platform/local/bin/verify-m9-audit-read.sh"
+      ]
+    },
+    "dlp_and_secret_handling": {
+      "status": "implemented_for_settings_ingress_platform_hardening_and_governed_report_redaction",
+      "evidence": [
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/docs/runtime-orchestration-service.md",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/platform/local/bin/verify-secret-cert-rotation.sh",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/platform/local/bin/verify-admission-enforcement.sh",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/platform/local/bin/verify-prod-hardening-baseline.sh",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/internal/runtimeclient/report_envelope.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/internal/runtimeclient/report_envelope_test.go"
+      ]
+    },
+    "worker_capabilities": {
+      "status": "explicit_catalog_landed",
+      "evidence": [
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/types_v1alpha2.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/m16_linking.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/worker_capability_catalog.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api_v1alpha2.go"
+      ]
+    },
+    "reporting_and_export": {
+      "status": "shared_enterprise_report_envelope_landed_for_workflow_chatops_and_cli_with_dlp_redaction",
+      "evidence": [
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/docs/runtime-orchestration-service.md",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/views/chat.js",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/internal/runtimeclient/update_envelope.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/internal/runtimeclient/report_envelope.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/workflow-agentops/main.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/chatops-agentops/main.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/cli-agentops/main.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/cli-agentops/main_test.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/cli-agentops/README.md"
+      ]
+    },
+    "policy_packs": {
+      "status": "explicit_catalog_landed",
+      "evidence": [
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/policy_pack_catalog.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api_v1alpha2.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api_policy_packs_test.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/types_v1alpha2.go"
+      ]
+    }
+  },
+  "first_shared_hardening_artifact": {
+    "name": "runtime_worker_capability_catalog",
+    "endpoint": "/v1alpha2/runtime/worker-capabilities",
+    "filters": [
+      "executionMode",
+      "workerType",
+      "adapterId"
+    ],
+    "purpose": [
+      "make worker capabilities explicit instead of inferred from client-local logic",
+      "keep chat, vs_code, cli, workflow, and chatops on one native worker or session contract",
+      "give later M20 policy packs one authoritative capability inventory to target"
+    ]
+  },
+  "gaps": {
+    "multi_tenant_policy_packs": [
+      "reusable enterprise policy bundles by deployment mode",
+      "policy-pack attachment rules for clients and workers",
+      "tenant-tier rollout defaults"
+    ],
+    "rbac_refinement": [
+      "enterprise operator role bundles across UI, IDE, CLI, workflow, and chatops",
+      "worker-specific permission mapping",
+      "clear separation between review, decision, and execution roles"
+    ],
+    "dlp_and_secret_policy_enforcement": [
+      "outbound deny or escalation rules beyond the current governed report redaction pass",
+      "export-time secret scanning and policy hooks on runtime-native audit, incident, run, and governed evidence export paths",
+      "credential-class policy hooks without client-specific branching"
+    ],
+    "worker_capability_matrices": [
+      "capability grant classes mapped to worker categories and environments",
+      "required approvals by capability class",
+      "support-tier matrix beyond managed Codex",
+      "verifier coverage for capability policy drift"
+    ],
+    "reporting_and_export_integration": [
+      "downstream export profiles and sink mappings for SIEM, GRC, and ticket systems beyond the current shared workflow/chatops/CLI report envelope",
+      "export profile definitions by audience and retention class",
+      "stronger contract between audit or evidence exports and downstream governance systems"
+    ]
+  },
+  "next_batch": [
+    "Extend the shared enterprise reporting envelope into the remaining enterprise review and export surfaces, starting with VS Code and desktop Chat review/export paths.",
+    "Add export-profile and audience metadata on top of the governed report envelope without forking the native contract.",
+    "Add export-time secret scanning hooks to runtime-native audit, incident, run, and governed evidence export paths.",
+    "Keep Chat, VS Code, CLI, workflow, and chatops on the same native M16/M18 contract while doing it.",
+    "Do not introduce client-specific hardening branches."
+  ],
+  "second_shared_hardening_artifact": {
+    "name": "runtime_policy_pack_catalog",
+    "endpoint": "/v1alpha2/runtime/policy-packs",
+    "filters": [
+      "packId",
+      "permission",
+      "executionMode",
+      "workerType",
+      "adapterId",
+      "clientSurface"
+    ],
+    "baseline_packs": [
+      "read_only_review",
+      "governed_model_invoke_operator",
+      "managed_codex_worker_operator"
+    ],
+    "purpose": [
+      "make the first reusable role-and-capability hardening packs explicit at runtime",
+      "keep policy-pack attachment rules on the same native worker and execution contract used by all ingress surfaces",
+      "provide one authoritative policy-pack inventory for later RBAC and capability-matrix refinement"
+    ]
+  },
+  "shared_enterprise_reporting_envelope": {
+    "status": "implemented_shared_governed_report_envelope_with_cli_and_dlp_redaction",
+    "evidence": [
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/internal/runtimeclient/report_envelope.go",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/internal/runtimeclient/report_envelope_test.go",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/workflow-agentops/main.go",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/chatops-agentops/main.go",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/cli-agentops/main.go",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/cli-agentops/main_test.go",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/cli-agentops/README.md"
+    ]
+  },
+  "verifier": {
+    "path": "EPYDIOS_AGENTOPS_DESKTOP_REPO/platform/local/bin/verify-m20-enterprise-hardening-baseline.sh",
+    "latest_log": "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/m20-enterprise-hardening/verify-m20-enterprise-hardening-baseline-latest.log"
+  }
+}
