@@ -275,3 +275,9 @@ Still needed:
 3. The dedicated M20 exit gate passed with the baseline verifier, full repo tests, and the standing desktop/runtime gate suite.
 4. No further M20 implementation slice is active.
 5. Remaining enterprise IT/admin and org-scale items are follow-on scope only and should not reopen M20 unless a new milestone is explicitly defined.
+
+
+## Planned follow-on milestones after M20 closure
+
+- `M21` is planned for stabilization and turnkey local operator work: live-mode refresh stabilization, Chat live empty-state clarity, `.tmp` cache hygiene, documented OpenAI live-test flow, and a turnkey Mac-local managed Codex path.
+- `M22` is planned after that for local or customer-hosted AIMXS decision-provider work on the existing `PolicyProvider` boundary.
