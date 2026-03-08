@@ -36,27 +36,50 @@ type workflowIntakePayload struct {
 type workflowIntakeResponse struct {
 	Task   *runtimeapi.TaskRecord          `json:"task,omitempty"`
 	Invoke *runtimeapi.AgentInvokeResponse `json:"invoke,omitempty"`
+	Status *workflowStatusReport           `json:"status,omitempty"`
+}
+
+type workflowTurnResponse struct {
+	Invoke *runtimeapi.AgentInvokeResponse `json:"invoke,omitempty"`
+	Status *workflowStatusReport           `json:"status,omitempty"`
+}
+
+type workflowApprovalDecisionResult struct {
+	Decision *runtimeapi.ApprovalCheckpointDecisionResponse `json:"decision,omitempty"`
+}
+
+type workflowProposalDecisionResult struct {
+	Decision *runtimeapi.ToolProposalDecisionResponse `json:"decision,omitempty"`
+}
+
+type workflowLookupOptions struct {
+	TaskID       string
+	SourceSystem string
+	TicketID     string
+	WorkflowID   string
 }
 
 type workflowStatusReport struct {
-	SourceSystem        string                                `json:"sourceSystem,omitempty"`
-	TicketID            string                                `json:"ticketId,omitempty"`
-	WorkflowID          string                                `json:"workflowId,omitempty"`
-	TaskID              string                                `json:"taskId"`
-	Title               string                                `json:"title,omitempty"`
-	TaskStatus          string                                `json:"taskStatus,omitempty"`
-	LatestSessionID     string                                `json:"latestSessionId,omitempty"`
-	SessionStatus       string                                `json:"sessionStatus,omitempty"`
-	SelectedWorkerID    string                                `json:"selectedWorkerId,omitempty"`
-	SelectedWorkerType  string                                `json:"selectedWorkerType,omitempty"`
-	SelectedWorkerState string                                `json:"selectedWorkerStatus,omitempty"`
-	OpenApprovals       int                                   `json:"openApprovals,omitempty"`
-	PendingApprovals    []runtimeapi.ApprovalCheckpointRecord `json:"pendingApprovals,omitempty"`
-	PendingProposals    []runtimeclient.ToolProposalReview    `json:"pendingProposals,omitempty"`
-	ToolActionCount     int                                   `json:"toolActionCount,omitempty"`
-	EvidenceCount       int                                   `json:"evidenceCount,omitempty"`
-	LatestWorkerSummary string                                `json:"latestWorkerSummary,omitempty"`
-	RecentEvents        []runtimeclient.EventSummary          `json:"recentEvents,omitempty"`
+	SourceSystem            string                                `json:"sourceSystem,omitempty"`
+	TicketID                string                                `json:"ticketId,omitempty"`
+	WorkflowID              string                                `json:"workflowId,omitempty"`
+	TaskID                  string                                `json:"taskId"`
+	Title                   string                                `json:"title,omitempty"`
+	TaskStatus              string                                `json:"taskStatus,omitempty"`
+	LatestSessionID         string                                `json:"latestSessionId,omitempty"`
+	SessionStatus           string                                `json:"sessionStatus,omitempty"`
+	SelectedWorkerID        string                                `json:"selectedWorkerId,omitempty"`
+	SelectedWorkerType      string                                `json:"selectedWorkerType,omitempty"`
+	SelectedWorkerAdapterID string                                `json:"selectedWorkerAdapterId,omitempty"`
+	SelectedWorkerState     string                                `json:"selectedWorkerStatus,omitempty"`
+	SelectedExecutionMode   string                                `json:"selectedExecutionMode,omitempty"`
+	OpenApprovals           int                                   `json:"openApprovals,omitempty"`
+	PendingApprovals        []runtimeapi.ApprovalCheckpointRecord `json:"pendingApprovals,omitempty"`
+	PendingProposals        []runtimeclient.ToolProposalReview    `json:"pendingProposals,omitempty"`
+	ToolActionCount         int                                   `json:"toolActionCount,omitempty"`
+	EvidenceCount           int                                   `json:"evidenceCount,omitempty"`
+	LatestWorkerSummary     string                                `json:"latestWorkerSummary,omitempty"`
+	RecentEvents            []runtimeclient.EventSummary          `json:"recentEvents,omitempty"`
 }
 
 func main() {
@@ -71,34 +94,52 @@ func main() {
 	root.StringVar(&cfg.OutputFormat, "output", cfg.OutputFormat, "output format: text or json")
 	root.IntVar(&cfg.LiveFollowWait, "live-follow-wait-seconds", cfg.LiveFollowWait, "poll wait window for event follow")
 	root.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: %s [global flags] tickets <intake|status> [flags]\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Usage: %s [global flags] <tickets|approvals|proposals> <command> [flags]\n", os.Args[0])
 		fmt.Fprintln(os.Stderr)
 		fmt.Fprintln(os.Stderr, "Global flags:")
 		root.PrintDefaults()
 		fmt.Fprintln(os.Stderr)
 		fmt.Fprintln(os.Stderr, "Commands:")
-		fmt.Fprintln(os.Stderr, "  tickets intake --file payload.json")
-		fmt.Fprintln(os.Stderr, "  tickets status --task-id <taskId> [--session-id <sessionId>] [--render comment|text|json]")
+		fmt.Fprintln(os.Stderr, "  tickets intake --file payload.json [--render update|text|json]")
+		fmt.Fprintln(os.Stderr, "  tickets status (--task-id <taskId> | --ticket-id <ticketId>) [--workflow-id <workflowId>] [--source-system <source>] [--session-id <sessionId>] [--render comment|update|report|text|json]")
+		fmt.Fprintln(os.Stderr, "  tickets follow (--task-id <taskId> | --ticket-id <ticketId>) [--workflow-id <workflowId>] [--source-system <source>] [--session-id <sessionId>] [--render update|delta-update|report|delta-report|text|json]")
+		fmt.Fprintln(os.Stderr, "  tickets reply (--task-id <taskId> | --ticket-id <ticketId>) [--workflow-id <workflowId>] [--source-system <source>] --prompt <text> [--render update|text|json]")
+		fmt.Fprintln(os.Stderr, "  tickets resume (--task-id <taskId> | --ticket-id <ticketId>) [--workflow-id <workflowId>] [--source-system <source>] --prompt <text> [--render update|text|json]")
+		fmt.Fprintln(os.Stderr, "  approvals decide [--session-id <sessionId>] [--checkpoint-id <checkpointId>] (--task-id <taskId> | --ticket-id <ticketId>) [--workflow-id <workflowId>] [--source-system <source>] --decision APPROVE|DENY [--render update|text|json]")
+		fmt.Fprintln(os.Stderr, "  proposals decide [--session-id <sessionId>] [--proposal-id <proposalId>] (--task-id <taskId> | --ticket-id <ticketId>) [--workflow-id <workflowId>] [--source-system <source>] --decision APPROVE|DENY [--render update|text|json]")
 	}
 	if err := root.Parse(os.Args[1:]); err != nil {
 		exitUsage(err)
 	}
 	cfg.OutputFormat = runtimeclient.NormalizeOutputFormat(cfg.OutputFormat)
 	args := root.Args()
-	if len(args) < 2 || args[0] != "tickets" {
+	if len(args) < 2 {
 		root.Usage()
 		os.Exit(2)
 	}
 	client := runtimeclient.NewClient(cfg)
 	ctx := context.Background()
 	var err error
-	switch args[1] {
-	case "intake":
-		err = runTicketIntake(ctx, client, cfg, args[2:])
-	case "status":
-		err = runTicketStatus(ctx, client, cfg, args[2:])
+	switch args[0] {
+	case "tickets":
+		switch args[1] {
+		case "intake":
+			err = runTicketIntake(ctx, client, cfg, args[2:])
+		case "status":
+			err = runTicketStatus(ctx, client, cfg, args[2:])
+		case "follow":
+			err = runTicketFollow(ctx, client, cfg, args[2:])
+		case "reply", "resume":
+			err = runTicketReply(ctx, client, cfg, args[2:])
+		default:
+			err = fmt.Errorf("unknown tickets command %q", args[1])
+		}
+	case "approvals":
+		err = runWorkflowApprovalCommand(ctx, client, cfg, args[1:])
+	case "proposals":
+		err = runWorkflowProposalCommand(ctx, client, cfg, args[1:])
 	default:
-		err = fmt.Errorf("unknown tickets command %q", args[1])
+		err = fmt.Errorf("unknown resource %q", args[0])
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -125,6 +166,7 @@ func runTicketIntake(ctx context.Context, client *runtimeclient.Client, cfg runt
 	agentProfileID := fs.String("agent-profile", "codex", "agent profile id")
 	systemPrompt := fs.String("system-prompt", "", "optional system prompt")
 	maxOutputTokens := fs.Int("max-output-tokens", 0, "optional max output tokens")
+	render := fs.String("render", "text", "render mode: update, text, or json")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -185,8 +227,22 @@ func runTicketIntake(ctx context.Context, client *runtimeclient.Client, cfg runt
 		}
 		response.Invoke = invoke
 	}
-	if cfg.OutputFormat == "json" {
+	selectedSessionID := ""
+	if response.Invoke != nil {
+		selectedSessionID = strings.TrimSpace(response.Invoke.SessionID)
+	}
+	report, err := loadWorkflowStatusReport(ctx, client, task, selectedSessionID)
+	if err != nil {
+		return err
+	}
+	response.Status = report
+	format := strings.ToLower(strings.TrimSpace(*render))
+	if cfg.OutputFormat == "json" || format == "json" {
 		return printJSON(response)
+	}
+	if format == "update" || format == "comment" {
+		fmt.Print(renderWorkflowIntakeUpdate(payload, response, report))
+		return nil
 	}
 	fmt.Printf("ticket intake created task=%s source=%s\n", task.TaskID, runtimeclient.NormalizeStringOrDefault(payload.SourceSystem, "workflow"))
 	if response.Invoke != nil {
@@ -198,49 +254,382 @@ func runTicketIntake(ctx context.Context, client *runtimeclient.Client, cfg runt
 func runTicketStatus(ctx context.Context, client *runtimeclient.Client, cfg runtimeclient.Config, args []string) error {
 	fs := flag.NewFlagSet("tickets status", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
-	taskID := fs.String("task-id", "", "task id")
 	sessionID := fs.String("session-id", "", "optional session id override")
-	render := fs.String("render", "text", "render mode: text, comment, or json")
+	render := fs.String("render", "text", "render mode: text, comment, update, report, or json")
+	lookup := bindWorkflowLookupFlags(fs)
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	if strings.TrimSpace(*taskID) == "" {
-		return fmt.Errorf("--task-id is required")
-	}
-	task, err := client.GetTask(ctx, *taskID)
+	task, err := resolveWorkflowTask(ctx, client, *lookup)
 	if err != nil {
 		return err
 	}
-	sessionsResp, err := client.ListSessions(ctx, task.TaskID, 100, 0, "")
+	report, err := loadWorkflowStatusReport(ctx, client, task, *sessionID)
 	if err != nil {
 		return err
 	}
-	sessions := append([]runtimeapi.SessionRecord(nil), sessionsResp.Items...)
-	sort.SliceStable(sessions, func(i, j int) bool {
-		return sessions[j].UpdatedAt.Before(sessions[i].UpdatedAt)
-	})
-	selectedID := strings.TrimSpace(*sessionID)
-	if selectedID == "" {
-		selectedID = runtimeclient.NormalizeStringOrDefault(task.LatestSessionID, firstSessionID(sessions))
-	}
-	var timeline *runtimeapi.SessionTimelineResponse
-	if selectedID != "" {
-		timeline, err = client.GetSessionTimeline(ctx, selectedID)
-		if err != nil {
-			return err
-		}
-	}
-	view := runtimeclient.BuildThreadReview(task, sessions, selectedID, timeline)
-	report := buildWorkflowStatusReport(view)
 	format := strings.ToLower(strings.TrimSpace(*render))
 	if cfg.OutputFormat == "json" || format == "json" {
 		return printJSON(report)
 	}
-	if format == "comment" {
-		fmt.Print(renderWorkflowComment(report))
+	if format == "report" {
+		rendered, err := renderWorkflowReport(ctx, client, report)
+		if err != nil {
+			return err
+		}
+		fmt.Print(rendered)
+		return nil
+	}
+	if format == "comment" || format == "update" {
+		fmt.Print(renderWorkflowUpdate(report))
 		return nil
 	}
 	return printWorkflowStatusReport(report)
+}
+
+func runTicketFollow(ctx context.Context, client *runtimeclient.Client, cfg runtimeclient.Config, args []string) error {
+	fs := flag.NewFlagSet("tickets follow", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+	sessionID := fs.String("session-id", "", "optional session id override")
+	afterSequence := fs.Int64("after-sequence", 0, "only stream events after this sequence")
+	waitSeconds := fs.Int("wait-seconds", cfg.LiveFollowWait, "server wait seconds")
+	once := fs.Bool("once", false, "fetch one event-stream window and exit")
+	render := fs.String("render", "text", "render mode: update, delta-update, report, delta-report, text, or json")
+	lookup := bindWorkflowLookupFlags(fs)
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	task, err := resolveWorkflowTask(ctx, client, *lookup)
+	if err != nil {
+		return err
+	}
+	report, err := loadWorkflowStatusReport(ctx, client, task, *sessionID)
+	if err != nil {
+		return err
+	}
+	selectedSessionID := strings.TrimSpace(runtimeclient.NormalizeStringOrDefault(*sessionID, report.LatestSessionID))
+	if selectedSessionID == "" {
+		return fmt.Errorf("no session available to follow for task %s", runtimeclient.NormalizeStringOrDefault(task.TaskID, "-"))
+	}
+	lastSequence := *afterSequence
+	format := strings.ToLower(strings.TrimSpace(*render))
+	for {
+		items, err := client.StreamSessionEvents(ctx, selectedSessionID, lastSequence, *waitSeconds, !*once)
+		if err != nil {
+			return err
+		}
+		for _, item := range items {
+			if item.Sequence > lastSequence {
+				lastSequence = item.Sequence
+			}
+		}
+		switch {
+		case cfg.OutputFormat == "json" || format == "json":
+			if err := printJSON(items); err != nil {
+				return err
+			}
+		case format == "delta-report":
+			if len(items) == 0 {
+				if *once {
+					return nil
+				}
+				continue
+			}
+			current, err := loadWorkflowStatusReport(ctx, client, task, selectedSessionID)
+			if err != nil {
+				return err
+			}
+			rendered, err := renderWorkflowDeltaReport(ctx, client, current, items)
+			if err != nil {
+				return err
+			}
+			fmt.Print(rendered)
+		case format == "report":
+			current, err := loadWorkflowStatusReport(ctx, client, task, selectedSessionID)
+			if err != nil {
+				return err
+			}
+			rendered, err := renderWorkflowReport(ctx, client, current)
+			if err != nil {
+				return err
+			}
+			fmt.Print(rendered)
+		case format == "delta-update":
+			current, err := loadWorkflowStatusReport(ctx, client, task, selectedSessionID)
+			if err != nil {
+				return err
+			}
+			fmt.Print(renderWorkflowDeltaUpdate(current, items))
+		case format == "update" || format == "comment":
+			current, err := loadWorkflowStatusReport(ctx, client, task, selectedSessionID)
+			if err != nil {
+				return err
+			}
+			fmt.Print(renderWorkflowUpdate(current))
+		default:
+			printWorkflowEventStream(items)
+		}
+		if *once {
+			return nil
+		}
+	}
+}
+
+func runTicketReply(ctx context.Context, client *runtimeclient.Client, cfg runtimeclient.Config, args []string) error {
+	fs := flag.NewFlagSet("tickets reply", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+	prompt := fs.String("prompt", "", "governed follow-up turn prompt")
+	executionMode := fs.String("execution-mode", runtimeapi.AgentInvokeExecutionModeRawModelInvoke, "raw_model_invoke or managed_codex_worker")
+	agentProfileID := fs.String("agent-profile", "codex", "agent profile id")
+	systemPrompt := fs.String("system-prompt", "", "optional system prompt")
+	maxOutputTokens := fs.Int("max-output-tokens", 0, "optional max output tokens")
+	render := fs.String("render", "text", "render mode: update, text, or json")
+	lookup := bindWorkflowLookupFlags(fs)
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if strings.TrimSpace(*prompt) == "" {
+		return fmt.Errorf("--prompt is required")
+	}
+	task, err := resolveWorkflowTask(ctx, client, *lookup)
+	if err != nil {
+		return err
+	}
+	invoke, err := client.InvokeTurn(ctx, task.TaskID, *prompt, *executionMode, *agentProfileID, *systemPrompt, *maxOutputTokens)
+	if err != nil {
+		return err
+	}
+	report, err := loadWorkflowStatusReport(ctx, client, task, invoke.SessionID)
+	if err != nil {
+		return err
+	}
+	result := &workflowTurnResponse{Invoke: invoke, Status: report}
+	format := strings.ToLower(strings.TrimSpace(*render))
+	if cfg.OutputFormat == "json" || format == "json" {
+		return printJSON(result)
+	}
+	if format == "update" || format == "comment" {
+		fmt.Print(renderWorkflowTurnUpdate(invoke, report))
+		return nil
+	}
+	return printWorkflowTurnResult(invoke, report)
+}
+
+func bindWorkflowLookupFlags(fs *flag.FlagSet) *workflowLookupOptions {
+	options := &workflowLookupOptions{}
+	fs.StringVar(&options.TaskID, "task-id", "", "existing task id")
+	fs.StringVar(&options.SourceSystem, "source-system", "", "source system, for example jira or servicenow")
+	fs.StringVar(&options.TicketID, "ticket-id", "", "external ticket id")
+	fs.StringVar(&options.WorkflowID, "workflow-id", "", "external workflow id")
+	return options
+}
+
+func runWorkflowApprovalCommand(ctx context.Context, client *runtimeclient.Client, cfg runtimeclient.Config, args []string) error {
+	switch args[0] {
+	case "decide":
+		fs := flag.NewFlagSet("approvals decide", flag.ContinueOnError)
+		fs.SetOutput(os.Stderr)
+		sessionID := fs.String("session-id", "", "session id")
+		checkpointID := fs.String("checkpoint-id", "", "checkpoint id")
+		decision := fs.String("decision", "", "APPROVE or DENY")
+		reason := fs.String("reason", "", "optional operator reason")
+		render := fs.String("render", "text", "render mode: update, text, or json")
+		lookup := bindWorkflowLookupFlags(fs)
+		if err := fs.Parse(args[1:]); err != nil {
+			return err
+		}
+		if strings.TrimSpace(*decision) == "" {
+			return fmt.Errorf("--decision is required")
+		}
+		var task *runtimeapi.TaskRecord
+		var err error
+		resolvedSessionID := strings.TrimSpace(*sessionID)
+		resolvedCheckpointID := strings.TrimSpace(*checkpointID)
+		if resolvedSessionID == "" || resolvedCheckpointID == "" {
+			task, err = resolveWorkflowTask(ctx, client, *lookup)
+			if err != nil {
+				return err
+			}
+			report, err := loadWorkflowStatusReport(ctx, client, task, resolvedSessionID)
+			if err != nil {
+				return err
+			}
+			resolvedSessionID, resolvedCheckpointID, err = resolveWorkflowApprovalTarget(report, resolvedSessionID, resolvedCheckpointID)
+			if err != nil {
+				return err
+			}
+		}
+		if resolvedSessionID == "" || resolvedCheckpointID == "" {
+			return fmt.Errorf("unable to resolve approval target")
+		}
+		response, err := client.SubmitApprovalDecision(ctx, resolvedSessionID, resolvedCheckpointID, *decision, *reason)
+		if err != nil {
+			return err
+		}
+		result := &workflowApprovalDecisionResult{Decision: response}
+		format := strings.ToLower(strings.TrimSpace(*render))
+		if cfg.OutputFormat == "json" || format == "json" {
+			return printJSON(result)
+		}
+		if format == "update" || format == "comment" {
+			var report *workflowStatusReport
+			if task != nil {
+				report, err = loadWorkflowStatusReport(ctx, client, task, resolvedSessionID)
+				if err != nil {
+					return err
+				}
+			}
+			fmt.Print(renderWorkflowApprovalDecisionUpdate(response, report))
+			return nil
+		}
+		return printWorkflowApprovalDecision(response)
+	default:
+		return fmt.Errorf("unknown approvals command %q", args[0])
+	}
+}
+
+func runWorkflowProposalCommand(ctx context.Context, client *runtimeclient.Client, cfg runtimeclient.Config, args []string) error {
+	switch args[0] {
+	case "decide":
+		fs := flag.NewFlagSet("proposals decide", flag.ContinueOnError)
+		fs.SetOutput(os.Stderr)
+		sessionID := fs.String("session-id", "", "session id")
+		proposalID := fs.String("proposal-id", "", "proposal id")
+		decision := fs.String("decision", "", "APPROVE or DENY")
+		reason := fs.String("reason", "", "optional operator reason")
+		render := fs.String("render", "text", "render mode: update, text, or json")
+		lookup := bindWorkflowLookupFlags(fs)
+		if err := fs.Parse(args[1:]); err != nil {
+			return err
+		}
+		if strings.TrimSpace(*decision) == "" {
+			return fmt.Errorf("--decision is required")
+		}
+		var task *runtimeapi.TaskRecord
+		var err error
+		resolvedSessionID := strings.TrimSpace(*sessionID)
+		resolvedProposalID := strings.TrimSpace(*proposalID)
+		if resolvedSessionID == "" || resolvedProposalID == "" {
+			task, err = resolveWorkflowTask(ctx, client, *lookup)
+			if err != nil {
+				return err
+			}
+			report, err := loadWorkflowStatusReport(ctx, client, task, resolvedSessionID)
+			if err != nil {
+				return err
+			}
+			resolvedSessionID, resolvedProposalID, err = resolveWorkflowProposalTarget(report, resolvedSessionID, resolvedProposalID)
+			if err != nil {
+				return err
+			}
+		}
+		if resolvedSessionID == "" || resolvedProposalID == "" {
+			return fmt.Errorf("unable to resolve proposal target")
+		}
+		response, err := client.SubmitToolProposalDecision(ctx, resolvedSessionID, resolvedProposalID, *decision, *reason)
+		if err != nil {
+			return err
+		}
+		result := &workflowProposalDecisionResult{Decision: response}
+		format := strings.ToLower(strings.TrimSpace(*render))
+		if cfg.OutputFormat == "json" || format == "json" {
+			return printJSON(result)
+		}
+		if format == "update" || format == "comment" {
+			var report *workflowStatusReport
+			if task != nil {
+				report, err = loadWorkflowStatusReport(ctx, client, task, resolvedSessionID)
+				if err != nil {
+					return err
+				}
+			}
+			fmt.Print(renderWorkflowProposalDecisionUpdate(response, report))
+			return nil
+		}
+		return printWorkflowProposalDecision(response)
+	default:
+		return fmt.Errorf("unknown proposals command %q", args[0])
+	}
+}
+
+func resolveWorkflowTask(ctx context.Context, client *runtimeclient.Client, lookup workflowLookupOptions) (*runtimeapi.TaskRecord, error) {
+	return runtimeclient.ResolveTaskByAnnotationLookup(ctx, client, runtimeclient.TaskAnnotationLookup{
+		TaskID: lookup.TaskID,
+		RequiredAnnotations: map[string]string{
+			"ingressKind":  "ticket_workflow",
+			"sourceSystem": lookup.SourceSystem,
+			"ticketId":     lookup.TicketID,
+			"workflowId":   lookup.WorkflowID,
+		},
+		CaseInsensitiveKeys: map[string]bool{
+			"ingressKind":  true,
+			"sourceSystem": true,
+		},
+		MissingLookupMessage: "either --task-id or one of --ticket-id/--workflow-id is required",
+		NotFoundMessage:      "no workflow task matched the provided ticket context",
+	})
+}
+
+func matchesWorkflowLookup(task runtimeapi.TaskRecord, lookup workflowLookupOptions) bool {
+	return runtimeclient.MatchesTaskAnnotationLookup(task, runtimeclient.TaskAnnotationLookup{
+		RequiredAnnotations: map[string]string{
+			"ingressKind":  "ticket_workflow",
+			"sourceSystem": lookup.SourceSystem,
+			"ticketId":     lookup.TicketID,
+			"workflowId":   lookup.WorkflowID,
+		},
+		CaseInsensitiveKeys: map[string]bool{
+			"ingressKind":  true,
+			"sourceSystem": true,
+		},
+	})
+}
+
+func resolveWorkflowApprovalTarget(report *workflowStatusReport, sessionID, checkpointID string) (string, string, error) {
+	items := make([]runtimeclient.PendingTargetItem, 0, len(report.PendingApprovals))
+	for _, item := range report.PendingApprovals {
+		items = append(items, runtimeclient.PendingTargetItem{
+			ID:    strings.TrimSpace(item.CheckpointID),
+			Label: runtimeclient.NormalizeStringOrDefault(item.Scope, item.CheckpointID),
+		})
+	}
+	return runtimeclient.ResolvePendingTarget(runtimeclient.PendingTargetLookup{
+		SessionID:         sessionID,
+		FallbackSessionID: reportSessionID(report),
+		ExplicitTargetID:  checkpointID,
+		TargetSingular:    "approval",
+		TargetPlural:      "approvals",
+		ContextLabel:      "workflow context",
+		ExplicitFlag:      "checkpoint-id",
+		Items:             items,
+	})
+}
+
+func resolveWorkflowProposalTarget(report *workflowStatusReport, sessionID, proposalID string) (string, string, error) {
+	items := make([]runtimeclient.PendingTargetItem, 0, len(report.PendingProposals))
+	for _, item := range report.PendingProposals {
+		items = append(items, runtimeclient.PendingTargetItem{
+			ID:    strings.TrimSpace(item.ProposalID),
+			Label: runtimeclient.NormalizeStringOrDefault(item.Summary, item.ProposalID),
+		})
+	}
+	return runtimeclient.ResolvePendingTarget(runtimeclient.PendingTargetLookup{
+		SessionID:         sessionID,
+		FallbackSessionID: reportSessionID(report),
+		ExplicitTargetID:  proposalID,
+		TargetSingular:    "proposal",
+		TargetPlural:      "proposals",
+		ContextLabel:      "workflow context",
+		ExplicitFlag:      "proposal-id",
+		Items:             items,
+	})
+}
+
+func reportSessionID(report *workflowStatusReport) string {
+	if report == nil {
+		return ""
+	}
+	return strings.TrimSpace(report.LatestSessionID)
 }
 
 func buildWorkflowAnnotations(payload *workflowIntakePayload) map[string]interface{} {
@@ -299,7 +688,9 @@ func buildWorkflowStatusReport(view *runtimeclient.ThreadReview) *workflowStatus
 	report.SelectedWorkerID = runtimeclient.NormalizeStringOrDefault(view.Timeline.Session.SelectedWorkerID, "")
 	if view.Timeline.SelectedWorker != nil {
 		report.SelectedWorkerType = runtimeclient.NormalizeStringOrDefault(view.Timeline.SelectedWorker.WorkerType, "")
+		report.SelectedWorkerAdapterID = runtimeclient.NormalizeStringOrDefault(view.Timeline.SelectedWorker.AdapterID, "")
 		report.SelectedWorkerState = runtimeclient.NormalizeStringOrDefault(string(view.Timeline.SelectedWorker.Status), "")
+		report.SelectedExecutionMode = runtimeclient.ExecutionModeForWorker(report.SelectedWorkerType, report.SelectedWorkerAdapterID)
 	}
 	report.OpenApprovals = view.Timeline.OpenApprovalCount
 	report.ToolActionCount = len(view.Timeline.ToolActions)
@@ -326,41 +717,363 @@ func buildWorkflowStatusReport(view *runtimeclient.ThreadReview) *workflowStatus
 	return report
 }
 
-func renderWorkflowComment(report *workflowStatusReport) string {
+func loadWorkflowStatusReport(ctx context.Context, client *runtimeclient.Client, task *runtimeapi.TaskRecord, sessionID string) (*workflowStatusReport, error) {
+	if task == nil {
+		return nil, fmt.Errorf("task is required")
+	}
+	sessionsResp, err := client.ListSessions(ctx, task.TaskID, 100, 0, "")
+	if err != nil {
+		return nil, err
+	}
+	sessions := append([]runtimeapi.SessionRecord(nil), sessionsResp.Items...)
+	sort.SliceStable(sessions, func(i, j int) bool {
+		return sessions[j].UpdatedAt.Before(sessions[i].UpdatedAt)
+	})
+	selectedID := strings.TrimSpace(sessionID)
+	if selectedID == "" {
+		selectedID = runtimeclient.NormalizeStringOrDefault(task.LatestSessionID, firstSessionID(sessions))
+	}
+	var timeline *runtimeapi.SessionTimelineResponse
+	if selectedID != "" {
+		timeline, err = client.GetSessionTimeline(ctx, selectedID)
+		if err != nil {
+			return nil, err
+		}
+	}
+	view := runtimeclient.BuildThreadReview(task, sessions, selectedID, timeline)
+	return buildWorkflowStatusReport(view), nil
+}
+
+func renderWorkflowUpdate(report *workflowStatusReport) string {
 	if report == nil {
 		return ""
 	}
-	lines := []string{
-		fmt.Sprintf("AgentOps update for %s", runtimeclient.NormalizeStringOrDefault(report.TicketID, report.TaskID)),
-		fmt.Sprintf("- Task: %s (%s)", runtimeclient.NormalizeStringOrDefault(report.TaskID, "-"), runtimeclient.NormalizeStringOrDefault(report.TaskStatus, "-")),
-	}
+	summary := runtimeclient.NormalizeStringOrDefault(report.LatestWorkerSummary, "Governed workflow state refreshed.")
+	details := make([]string, 0, 1+len(report.PendingApprovals)+len(report.PendingProposals))
 	if report.Title != "" {
-		lines = append(lines, fmt.Sprintf("- Title: %s", report.Title))
+		details = append(details, fmt.Sprintf("Title: %s", report.Title))
 	}
-	if report.SessionStatus != "" {
-		lines = append(lines, fmt.Sprintf("- Session: %s (%s)", runtimeclient.NormalizeStringOrDefault(report.LatestSessionID, "-"), report.SessionStatus))
+	for _, item := range report.PendingApprovals {
+		details = append(details, fmt.Sprintf("Pending approval: %s (%s)", item.CheckpointID, runtimeclient.NormalizeStringOrDefault(item.Scope, "scope-unspecified")))
 	}
-	if report.SelectedWorkerID != "" || report.SelectedWorkerType != "" {
-		lines = append(lines, fmt.Sprintf("- Worker: %s %s %s", runtimeclient.NormalizeStringOrDefault(report.SelectedWorkerID, "-"), runtimeclient.NormalizeStringOrDefault(report.SelectedWorkerType, "-"), runtimeclient.NormalizeStringOrDefault(report.SelectedWorkerState, "-")))
+	for _, item := range report.PendingProposals {
+		details = append(details, fmt.Sprintf("Pending proposal: %s (%s)", item.ProposalID, runtimeclient.NormalizeStringOrDefault(item.Summary, item.Command)))
 	}
-	lines = append(lines, fmt.Sprintf("- Open approvals: %d", report.OpenApprovals))
-	lines = append(lines, fmt.Sprintf("- Pending proposals: %d", len(report.PendingProposals)))
-	if report.LatestWorkerSummary != "" {
-		lines = append(lines, fmt.Sprintf("- Latest activity: %s", report.LatestWorkerSummary))
+	return renderWorkflowEnvelope("status", summary, report, details, runtimeclient.RenderEventSummaryLines(report.RecentEvents, 3))
+}
+
+func renderWorkflowIntakeUpdate(payload *workflowIntakePayload, response *workflowIntakeResponse, report *workflowStatusReport) string {
+	summary := "Governed workflow task created from ticket context."
+	details := []string{
+		fmt.Sprintf("Source: %s", runtimeclient.NormalizeStringOrDefault(payload.SourceSystem, "workflow")),
 	}
-	if len(report.PendingApprovals) > 0 {
-		lines = append(lines, "- Pending approval IDs:")
-		for _, item := range report.PendingApprovals {
-			lines = append(lines, fmt.Sprintf("  - %s (%s)", item.CheckpointID, runtimeclient.NormalizeStringOrDefault(item.Scope, "scope-unspecified")))
+	if report != nil && report.Title != "" {
+		details = append(details, fmt.Sprintf("Title: %s", report.Title))
+	}
+	if response != nil && response.Invoke != nil {
+		summary = "Governed workflow task created and initial turn started."
+		details = append(details,
+			fmt.Sprintf("Execution mode: %s", runtimeclient.NormalizeStringOrDefault(response.Invoke.ExecutionMode, payload.ExecutionMode)),
+			fmt.Sprintf("Finish: %s", runtimeclient.NormalizeStringOrDefault(response.Invoke.FinishReason, "-")),
+		)
+	}
+	recent := workflowRecentEventLines(report, 3)
+	if len(recent) == 0 && report != nil && report.LatestWorkerSummary != "" {
+		recent = []string{fmt.Sprintf("Worker activity: %s", report.LatestWorkerSummary)}
+	}
+	return renderWorkflowEnvelope("intake", summary, report, details, recent)
+}
+
+func renderWorkflowTurnUpdate(invoke *runtimeapi.AgentInvokeResponse, report *workflowStatusReport) string {
+	summary := fmt.Sprintf("Turn finished with %s.", runtimeclient.NormalizeStringOrDefault(invoke.FinishReason, "unknown status"))
+	if strings.TrimSpace(invoke.OutputText) != "" {
+		summary = runtimeclient.ClipText(strings.TrimSpace(invoke.OutputText), 220)
+	}
+	details := []string{
+		fmt.Sprintf("Execution mode: %s", runtimeclient.NormalizeStringOrDefault(invoke.ExecutionMode, "-")),
+		fmt.Sprintf("Finish: %s", runtimeclient.NormalizeStringOrDefault(invoke.FinishReason, "-")),
+	}
+	if strings.TrimSpace(invoke.SelectedWorkerID) != "" || strings.TrimSpace(invoke.WorkerType) != "" {
+		details = append(details, fmt.Sprintf("Selected worker: %s %s", runtimeclient.NormalizeStringOrDefault(invoke.SelectedWorkerID, "-"), runtimeclient.NormalizeStringOrDefault(invoke.WorkerType, "-")))
+	}
+	if report != nil && report.Title != "" {
+		details = append(details, fmt.Sprintf("Title: %s", report.Title))
+	}
+	if report != nil && report.LatestWorkerSummary != "" {
+		details = append(details, fmt.Sprintf("Latest activity: %s", report.LatestWorkerSummary))
+	}
+	return renderWorkflowEnvelope("turn", summary, report, details, workflowRecentEventLines(report, 3))
+}
+
+func renderWorkflowDeltaUpdate(report *workflowStatusReport, items []runtimeapi.SessionEventRecord) string {
+	if len(items) == 0 {
+		return ""
+	}
+	summary := fmt.Sprintf("Observed %d new native event(s).", len(items))
+	if len(items) == 1 {
+		summary = fmt.Sprintf("Observed 1 new native event: %s", runtimeclient.SummarizeEventDetail(items[0]))
+	}
+	details := []string{fmt.Sprintf("New events: %d", len(items))}
+	return renderWorkflowEnvelope("follow_delta", summary, report, details, runtimeclient.RenderSessionEventLines(items, 4))
+}
+
+func renderWorkflowReport(ctx context.Context, client *runtimeclient.Client, report *workflowStatusReport) (string, error) {
+	if report == nil {
+		return "", nil
+	}
+	workerCapabilities, err := client.ListWorkerCapabilities(ctx, report.SelectedExecutionMode, report.SelectedWorkerType, report.SelectedWorkerAdapterID)
+	if err != nil {
+		return "", err
+	}
+	policyPacks, err := client.ListPolicyPacks(ctx, "", report.SelectedExecutionMode, report.SelectedWorkerType, report.SelectedWorkerAdapterID, "workflow")
+	if err != nil {
+		return "", err
+	}
+	envelope := runtimeclient.BuildEnterpriseReportEnvelope(runtimeclient.EnterpriseReportSubject{
+		Header:               "AgentOps workflow governance report",
+		ReportType:           "report",
+		ClientSurface:        "workflow",
+		ContextLabel:         "Workflow",
+		ContextValue:         buildWorkflowReportContext(report),
+		SubjectLabel:         "Ticket",
+		SubjectValue:         runtimeclient.NormalizeStringOrDefault(report.TicketID, report.TaskID),
+		TaskID:               report.TaskID,
+		TaskStatus:           report.TaskStatus,
+		SessionID:            report.LatestSessionID,
+		SessionStatus:        report.SessionStatus,
+		WorkerID:             report.SelectedWorkerID,
+		WorkerType:           report.SelectedWorkerType,
+		WorkerAdapterID:      report.SelectedWorkerAdapterID,
+		WorkerState:          report.SelectedWorkerState,
+		ExecutionMode:        report.SelectedExecutionMode,
+		OpenApprovals:        report.OpenApprovals,
+		PendingProposalCount: len(report.PendingProposals),
+		ToolActionCount:      report.ToolActionCount,
+		EvidenceCount:        report.EvidenceCount,
+		Summary:              runtimeclient.NormalizeStringOrDefault(report.LatestWorkerSummary, "Enterprise workflow posture refreshed."),
+		Details:              buildWorkflowReportDetails(report),
+		Recent:               workflowRecentEventLines(report, 4),
+		ActionHints:          renderWorkflowActionHints(report),
+	}, policyPacks, workerCapabilities)
+	return runtimeclient.RenderEnterpriseReportEnvelope(envelope), nil
+}
+
+func renderWorkflowDeltaReport(ctx context.Context, client *runtimeclient.Client, report *workflowStatusReport, items []runtimeapi.SessionEventRecord) (string, error) {
+	if len(items) == 0 {
+		return "", nil
+	}
+	workerCapabilities, err := client.ListWorkerCapabilities(ctx, report.SelectedExecutionMode, report.SelectedWorkerType, report.SelectedWorkerAdapterID)
+	if err != nil {
+		return "", err
+	}
+	policyPacks, err := client.ListPolicyPacks(ctx, "", report.SelectedExecutionMode, report.SelectedWorkerType, report.SelectedWorkerAdapterID, "workflow")
+	if err != nil {
+		return "", err
+	}
+	summary := runtimeclient.BuildThreadFollowSummary(items)
+	envelope := runtimeclient.BuildEnterpriseReportEnvelope(runtimeclient.EnterpriseReportSubject{
+		Header:               "AgentOps workflow governance report",
+		ReportType:           "delta-report",
+		ClientSurface:        "workflow",
+		ContextLabel:         "Workflow",
+		ContextValue:         buildWorkflowReportContext(report),
+		SubjectLabel:         "Ticket",
+		SubjectValue:         runtimeclient.NormalizeStringOrDefault(report.TicketID, report.TaskID),
+		TaskID:               report.TaskID,
+		TaskStatus:           report.TaskStatus,
+		SessionID:            report.LatestSessionID,
+		SessionStatus:        report.SessionStatus,
+		WorkerID:             report.SelectedWorkerID,
+		WorkerType:           report.SelectedWorkerType,
+		WorkerAdapterID:      report.SelectedWorkerAdapterID,
+		WorkerState:          report.SelectedWorkerState,
+		ExecutionMode:        report.SelectedExecutionMode,
+		OpenApprovals:        report.OpenApprovals,
+		PendingProposalCount: len(report.PendingProposals),
+		ToolActionCount:      report.ToolActionCount,
+		EvidenceCount:        report.EvidenceCount,
+		Summary:              summary,
+		Details:              runtimeclient.BuildThreadFollowDetails(items),
+		Recent:               runtimeclient.RenderSessionEventLines(items, 4),
+		ActionHints:          renderWorkflowActionHints(report),
+	}, policyPacks, workerCapabilities)
+	return runtimeclient.RenderEnterpriseReportEnvelope(envelope), nil
+}
+
+func renderWorkflowEnvelope(updateType, summary string, report *workflowStatusReport, details, recent []string) string {
+	contextParts := []string{"-"}
+	subjectValue := ""
+	taskID := ""
+	taskStatus := ""
+	sessionID := ""
+	sessionStatus := ""
+	workerID := ""
+	workerType := ""
+	workerState := ""
+	openApprovals := 0
+	pendingProposalCount := 0
+	toolActionCount := 0
+	evidenceCount := 0
+	if report != nil {
+		contextParts = []string{runtimeclient.NormalizeStringOrDefault(report.SourceSystem, "-")}
+		if workflowID := strings.TrimSpace(report.WorkflowID); workflowID != "" {
+			contextParts = append(contextParts, workflowID)
+		}
+		subjectValue = runtimeclient.NormalizeStringOrDefault(report.TicketID, report.TaskID)
+		taskID = report.TaskID
+		taskStatus = report.TaskStatus
+		sessionID = report.LatestSessionID
+		sessionStatus = report.SessionStatus
+		workerID = report.SelectedWorkerID
+		workerType = report.SelectedWorkerType
+		workerState = report.SelectedWorkerState
+		openApprovals = report.OpenApprovals
+		pendingProposalCount = len(report.PendingProposals)
+		toolActionCount = report.ToolActionCount
+		evidenceCount = report.EvidenceCount
+	}
+	return runtimeclient.RenderGovernedUpdateEnvelope(runtimeclient.GovernedUpdateEnvelope{
+		Header:               "AgentOps ticket update",
+		UpdateType:           updateType,
+		ContextLabel:         "Workflow",
+		ContextValue:         strings.Join(contextParts, " | "),
+		SubjectLabel:         "Ticket",
+		SubjectValue:         subjectValue,
+		TaskID:               taskID,
+		TaskStatus:           taskStatus,
+		SessionID:            sessionID,
+		SessionStatus:        sessionStatus,
+		WorkerID:             workerID,
+		WorkerType:           workerType,
+		WorkerState:          workerState,
+		OpenApprovals:        openApprovals,
+		PendingProposalCount: pendingProposalCount,
+		ToolActionCount:      toolActionCount,
+		EvidenceCount:        evidenceCount,
+		Summary:              summary,
+		Details:              details,
+		Recent:               recent,
+		ActionHints:          renderWorkflowActionHints(report),
+	})
+}
+
+func buildWorkflowReportContext(report *workflowStatusReport) string {
+	if report == nil {
+		return "-"
+	}
+	parts := []string{runtimeclient.NormalizeStringOrDefault(report.SourceSystem, "-")}
+	if workflowID := strings.TrimSpace(report.WorkflowID); workflowID != "" {
+		parts = append(parts, workflowID)
+	}
+	return strings.Join(parts, " | ")
+}
+
+func buildWorkflowReportDetails(report *workflowStatusReport) []string {
+	if report == nil {
+		return nil
+	}
+	details := make([]string, 0, 2+len(report.PendingApprovals)+len(report.PendingProposals))
+	if title := strings.TrimSpace(report.Title); title != "" {
+		details = append(details, fmt.Sprintf("Title: %s", title))
+	}
+	if summary := strings.TrimSpace(report.LatestWorkerSummary); summary != "" {
+		details = append(details, fmt.Sprintf("Latest activity: %s", summary))
+	}
+	for _, item := range report.PendingApprovals {
+		details = append(details, fmt.Sprintf("Pending approval: %s (%s)", item.CheckpointID, runtimeclient.NormalizeStringOrDefault(item.Scope, "scope-unspecified")))
+	}
+	for _, item := range report.PendingProposals {
+		details = append(details, fmt.Sprintf("Pending proposal: %s (%s)", item.ProposalID, runtimeclient.NormalizeStringOrDefault(item.Summary, item.Command)))
+	}
+	return details
+}
+
+func workflowRecentEventLines(report *workflowStatusReport, limit int) []string {
+	if report == nil || len(report.RecentEvents) == 0 {
+		return nil
+	}
+	return runtimeclient.RenderEventSummaryLines(report.RecentEvents, limit)
+}
+
+func renderWorkflowActionHints(report *workflowStatusReport) []string {
+	if report == nil {
+		return nil
+	}
+	return runtimeclient.RenderDecisionActionHints(runtimeclient.DecisionActionHints{
+		ContextHint: buildWorkflowContextHint(report),
+		ApprovalIDs: workflowApprovalIDs(report.PendingApprovals),
+		ProposalIDs: workflowProposalIDs(report.PendingProposals),
+	})
+}
+
+func buildWorkflowContextHint(report *workflowStatusReport) string {
+	if report == nil {
+		return "--task-id <taskId>"
+	}
+	return runtimeclient.BuildContextHint(report.TaskID,
+		runtimeclient.ContextHintPart{Flag: "ticket-id", Value: report.TicketID},
+		runtimeclient.ContextHintPart{Flag: "source-system", Value: report.SourceSystem},
+		runtimeclient.ContextHintPart{Flag: "workflow-id", Value: report.WorkflowID},
+	)
+}
+
+func workflowApprovalIDs(items []runtimeapi.ApprovalCheckpointRecord) []string {
+	out := make([]string, 0, len(items))
+	for _, item := range items {
+		if id := strings.TrimSpace(item.CheckpointID); id != "" {
+			out = append(out, id)
 		}
 	}
-	if len(report.PendingProposals) > 0 {
-		lines = append(lines, "- Pending proposal IDs:")
-		for _, item := range report.PendingProposals {
-			lines = append(lines, fmt.Sprintf("  - %s (%s)", item.ProposalID, runtimeclient.NormalizeStringOrDefault(item.Summary, item.Command)))
+	return out
+}
+
+func workflowProposalIDs(items []runtimeclient.ToolProposalReview) []string {
+	out := make([]string, 0, len(items))
+	for _, item := range items {
+		if id := strings.TrimSpace(item.ProposalID); id != "" {
+			out = append(out, id)
 		}
 	}
-	return strings.Join(lines, "\n") + "\n"
+	return out
+}
+
+func renderWorkflowComment(report *workflowStatusReport) string {
+	return renderWorkflowUpdate(report)
+}
+
+func renderWorkflowApprovalDecisionUpdate(response *runtimeapi.ApprovalCheckpointDecisionResponse, report *workflowStatusReport) string {
+	summary := fmt.Sprintf("Approval %s is now %s.", runtimeclient.NormalizeStringOrDefault(response.CheckpointID, "checkpoint"), runtimeclient.NormalizeStringOrDefault(string(response.Status), "-"))
+	details := []string{
+		fmt.Sprintf("Checkpoint: %s", runtimeclient.NormalizeStringOrDefault(response.CheckpointID, "-")),
+		fmt.Sprintf("Decision: %s", runtimeclient.NormalizeStringOrDefault(strings.ToUpper(response.Decision), "-")),
+		fmt.Sprintf("Status: %s", runtimeclient.NormalizeStringOrDefault(string(response.Status), "-")),
+	}
+	if strings.TrimSpace(response.Reason) != "" {
+		details = append(details, fmt.Sprintf("Reason: %s", response.Reason))
+	}
+	if strings.TrimSpace(response.ReviewedAt) != "" {
+		details = append(details, fmt.Sprintf("Reviewed at: %s", response.ReviewedAt))
+	}
+	return renderWorkflowEnvelope("approval_decision", summary, report, details, workflowRecentEventLines(report, 3))
+}
+
+func renderWorkflowProposalDecisionUpdate(response *runtimeapi.ToolProposalDecisionResponse, report *workflowStatusReport) string {
+	summary := fmt.Sprintf("Proposal %s is now %s.", runtimeclient.NormalizeStringOrDefault(response.ProposalID, "proposal"), runtimeclient.NormalizeStringOrDefault(response.Status, "-"))
+	details := []string{
+		fmt.Sprintf("Proposal: %s", runtimeclient.NormalizeStringOrDefault(response.ProposalID, "-")),
+		fmt.Sprintf("Decision: %s", runtimeclient.NormalizeStringOrDefault(strings.ToUpper(response.Decision), "-")),
+		fmt.Sprintf("Status: %s", runtimeclient.NormalizeStringOrDefault(response.Status, "-")),
+	}
+	if strings.TrimSpace(response.ToolActionID) != "" || strings.TrimSpace(string(response.ActionStatus)) != "" {
+		details = append(details, fmt.Sprintf("Tool action: %s (%s)", runtimeclient.NormalizeStringOrDefault(response.ToolActionID, "-"), runtimeclient.NormalizeStringOrDefault(string(response.ActionStatus), "-")))
+	}
+	if strings.TrimSpace(response.Reason) != "" {
+		details = append(details, fmt.Sprintf("Reason: %s", response.Reason))
+	}
+	if strings.TrimSpace(response.ReviewedAt) != "" {
+		details = append(details, fmt.Sprintf("Reviewed at: %s", response.ReviewedAt))
+	}
+	return renderWorkflowEnvelope("proposal_decision", summary, report, details, workflowRecentEventLines(report, 3))
 }
 
 func printWorkflowStatusReport(report *workflowStatusReport) error {
@@ -377,6 +1090,13 @@ func printWorkflowStatusReport(report *workflowStatusReport) error {
 	if report.LatestWorkerSummary != "" {
 		fmt.Printf("Latest Activity: %s\n", report.LatestWorkerSummary)
 	}
+	if recent := workflowRecentEventLines(report, 5); len(recent) > 0 {
+		fmt.Println()
+		fmt.Println("Recent Activity")
+		for _, item := range recent {
+			fmt.Println(item)
+		}
+	}
 	if len(report.PendingApprovals) > 0 {
 		fmt.Println()
 		fmt.Println("Pending Approvals")
@@ -390,6 +1110,70 @@ func printWorkflowStatusReport(report *workflowStatusReport) error {
 		for _, item := range report.PendingProposals {
 			fmt.Printf("- %s | %s | %s\n", item.ProposalID, runtimeclient.NormalizeStringOrDefault(item.ProposalType, "tool_proposal"), runtimeclient.NormalizeStringOrDefault(item.Summary, item.Command))
 		}
+	}
+	if hints := renderWorkflowActionHints(report); len(hints) > 0 {
+		fmt.Println()
+		fmt.Println("Action Hints")
+		for _, item := range hints {
+			fmt.Println(item)
+		}
+	}
+	return nil
+}
+
+func printWorkflowEventStream(items []runtimeapi.SessionEventRecord) {
+	for _, item := range items {
+		fmt.Printf("#%d %s %s | %s\n", item.Sequence, item.Timestamp.UTC().Format(time.RFC3339), runtimeclient.SummarizeEventLabel(string(item.EventType)), runtimeclient.SummarizeEventDetail(item))
+	}
+}
+
+func printWorkflowTurnResult(invoke *runtimeapi.AgentInvokeResponse, report *workflowStatusReport) error {
+	fmt.Printf("Task: %s\n", runtimeclient.NormalizeStringOrDefault(invoke.TaskID, runtimeclient.NormalizeStringOrDefault(report.TaskID, "-")))
+	fmt.Printf("Session: %s\n", runtimeclient.NormalizeStringOrDefault(invoke.SessionID, runtimeclient.NormalizeStringOrDefault(report.LatestSessionID, "-")))
+	fmt.Printf("Execution Mode: %s\n", runtimeclient.NormalizeStringOrDefault(invoke.ExecutionMode, "-"))
+	fmt.Printf("Finish: %s\n", runtimeclient.NormalizeStringOrDefault(invoke.FinishReason, "-"))
+	fmt.Printf("Selected Worker: %s\n", runtimeclient.NormalizeStringOrDefault(invoke.SelectedWorkerID, "-"))
+	fmt.Printf("Worker Type: %s\n", runtimeclient.NormalizeStringOrDefault(invoke.WorkerType, "-"))
+	if strings.TrimSpace(invoke.OutputText) != "" {
+		fmt.Println()
+		fmt.Println(invoke.OutputText)
+	}
+	if report != nil {
+		fmt.Println()
+		return printWorkflowStatusReport(report)
+	}
+	return nil
+}
+
+func printWorkflowApprovalDecision(response *runtimeapi.ApprovalCheckpointDecisionResponse) error {
+	fmt.Printf("Session: %s\n", runtimeclient.NormalizeStringOrDefault(response.SessionID, "-"))
+	fmt.Printf("Checkpoint: %s\n", runtimeclient.NormalizeStringOrDefault(response.CheckpointID, "-"))
+	fmt.Printf("Decision: %s\n", runtimeclient.NormalizeStringOrDefault(strings.ToUpper(response.Decision), "-"))
+	fmt.Printf("Status: %s\n", runtimeclient.NormalizeStringOrDefault(string(response.Status), "-"))
+	fmt.Printf("Applied: %t\n", response.Applied)
+	if strings.TrimSpace(response.Reason) != "" {
+		fmt.Printf("Reason: %s\n", response.Reason)
+	}
+	if strings.TrimSpace(response.ReviewedAt) != "" {
+		fmt.Printf("Reviewed At: %s\n", response.ReviewedAt)
+	}
+	return nil
+}
+
+func printWorkflowProposalDecision(response *runtimeapi.ToolProposalDecisionResponse) error {
+	fmt.Printf("Session: %s\n", runtimeclient.NormalizeStringOrDefault(response.SessionID, "-"))
+	fmt.Printf("Proposal: %s\n", runtimeclient.NormalizeStringOrDefault(response.ProposalID, "-"))
+	fmt.Printf("Decision: %s\n", runtimeclient.NormalizeStringOrDefault(strings.ToUpper(response.Decision), "-"))
+	fmt.Printf("Status: %s\n", runtimeclient.NormalizeStringOrDefault(response.Status, "-"))
+	fmt.Printf("Applied: %t\n", response.Applied)
+	if strings.TrimSpace(response.ToolActionID) != "" || strings.TrimSpace(string(response.ActionStatus)) != "" {
+		fmt.Printf("Tool Action: %s (%s)\n", runtimeclient.NormalizeStringOrDefault(response.ToolActionID, "-"), runtimeclient.NormalizeStringOrDefault(string(response.ActionStatus), "-"))
+	}
+	if strings.TrimSpace(response.Reason) != "" {
+		fmt.Printf("Reason: %s\n", response.Reason)
+	}
+	if strings.TrimSpace(response.ReviewedAt) != "" {
+		fmt.Printf("Reviewed At: %s\n", response.ReviewedAt)
 	}
 	return nil
 }

@@ -6,6 +6,12 @@ const {
   isTerminalStatus,
   latestKnownSequence
 } = require("./lib/sessionReview");
+const {
+  buildDecisionActionHints,
+  resolveApprovalDecisionTarget,
+  resolveProposalDecisionTarget
+} = require("./lib/threadContext");
+const { buildGovernedUpdateEnvelope } = require("./lib/updateEnvelope");
 
 function normalizedString(value, fallback = "") {
   const text = String(value || "").trim();
@@ -284,41 +290,43 @@ class ThreadPanel {
 
   async applyApprovalDecision(message) {
     const selected = this.selectedSessionView();
-    const sessionId = normalizedString(message?.sessionId, normalizedString(selected?.session?.sessionId));
-    const checkpointId = normalizedString(message?.checkpointId);
+    const selectedSummary = buildThreadReviewModel(this.thread, normalizedString(selected?.session?.sessionId)).selectedSummary;
     const decision = normalizedString(message?.decision).toUpperCase() === "DENY" ? "DENY" : "APPROVE";
-    if (!sessionId || !checkpointId) {
-      throw new RuntimeClientError("sessionId and checkpointId are required");
-    }
-    await this.client.submitSessionApprovalDecision(sessionId, checkpointId, decision, {
+    const target = resolveApprovalDecisionTarget(
+      selectedSummary,
+      normalizedString(message?.sessionId, normalizedString(selected?.session?.sessionId)),
+      normalizedString(message?.checkpointId)
+    );
+    await this.client.submitSessionApprovalDecision(target.sessionId, target.targetId, decision, {
       tenantId: this.client.getTenantId(),
       projectId: this.client.getProjectId(),
       reason: normalizedString(message?.reason),
       requestId: `vscode-approval-${Date.now()}`
     });
     const decisionLabel = decision === "DENY" ? "denied" : "approved";
-    vscode.window.showInformationMessage(`AgentOps ${decisionLabel} approval ${checkpointId}.`);
-    this.selectedSessionId = sessionId;
+    vscode.window.showInformationMessage(`AgentOps ${decisionLabel} approval ${target.targetId}.`);
+    this.selectedSessionId = target.sessionId;
     await this.load();
   }
 
   async applyProposalDecision(message) {
     const selected = this.selectedSessionView();
-    const sessionId = normalizedString(message?.sessionId, normalizedString(selected?.session?.sessionId));
-    const proposalId = normalizedString(message?.proposalId);
+    const selectedSummary = buildThreadReviewModel(this.thread, normalizedString(selected?.session?.sessionId)).selectedSummary;
     const decision = normalizedString(message?.decision).toUpperCase() === "DENY" ? "DENY" : "APPROVE";
-    if (!sessionId || !proposalId) {
-      throw new RuntimeClientError("sessionId and proposalId are required");
-    }
-    await this.client.submitSessionToolProposalDecision(sessionId, proposalId, decision, {
+    const target = resolveProposalDecisionTarget(
+      selectedSummary,
+      normalizedString(message?.sessionId, normalizedString(selected?.session?.sessionId)),
+      normalizedString(message?.proposalId)
+    );
+    await this.client.submitSessionToolProposalDecision(target.sessionId, target.targetId, decision, {
       tenantId: this.client.getTenantId(),
       projectId: this.client.getProjectId(),
       reason: normalizedString(message?.reason),
       requestId: `vscode-proposal-${Date.now()}`
     });
     const decisionLabel = decision === "DENY" ? "denied" : "approved";
-    vscode.window.showInformationMessage(`AgentOps ${decisionLabel} tool proposal ${proposalId}.`);
-    this.selectedSessionId = sessionId;
+    vscode.window.showInformationMessage(`AgentOps ${decisionLabel} tool proposal ${target.targetId}.`);
+    this.selectedSessionId = target.sessionId;
     await this.load();
   }
 
@@ -385,12 +393,31 @@ function renderDecisionButtons(type, sessionId, item) {
   </div>`;
 }
 
+function renderEnvelopeSection(title, items = []) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return "";
+  }
+  return `<div class="envelope-section"><strong>${escapeHtml(title)}</strong><ul>${items.map((item) => `<li>${escapeHtml(normalizedString(item).replace(/^[-*]\s+/, ""))}</li>`).join("")}</ul></div>`;
+}
+
 function renderHtml(model) {
   const selectedSessionId = normalizedString(model?.selectedSession?.sessionId);
   const sessions = Array.isArray(model?.sessions) ? model.sessions : [];
   const selectedActivity = model?.selectedActivity || {};
   const selectedSummary = model?.selectedSummary || {};
   const transcript = model?.selectedTranscript || null;
+  const decisionHints = buildDecisionActionHints(selectedSummary, selectedSessionId);
+  const governedUpdate = buildGovernedUpdateEnvelope(model, {
+    header: "AgentOps thread update",
+    updateType: "review",
+    details: [
+      selectedSessionId ? `Selected session: ${selectedSessionId}` : "",
+      selectedSummary?.selectedWorker?.adapterId ? `Worker adapter: ${normalizedString(selectedSummary?.selectedWorker?.adapterId)} (${normalizedString(selectedSummary?.selectedWorker?.workerType, "-")})` : "",
+      transcript?.toolActionId ? `Managed transcript: ${normalizedString(transcript.toolActionId)}` : ""
+    ],
+    recent: (selectedSummary?.events || []).slice(-4).map((item) => `${normalizedString(item?.label, item?.eventType)}: ${normalizedString(item?.detail, "Event recorded.")}`),
+    actionHints: decisionHints
+  });
   const sessionOptions = sessions.map((item) => {
     const sessionId = normalizedString(item?.session?.sessionId);
     const selected = sessionId === selectedSessionId ? " selected" : "";
@@ -428,6 +455,24 @@ function renderHtml(model) {
   const transcriptBlock = transcript
     ? `<details><summary>Managed worker transcript</summary><pre>${escapeHtml(transcript.pretty)}</pre></details>`
     : "";
+  const governedUpdateBlock = `<section class="panel">
+    <h3>${escapeHtml(governedUpdate.header)}</h3>
+    <div class="meta">type=${escapeHtml(governedUpdate.updateType)} | ${escapeHtml(governedUpdate.contextLabel)}=${escapeHtml(governedUpdate.contextValue)} | ${escapeHtml(governedUpdate.subjectLabel)}=${escapeHtml(governedUpdate.subjectValue)}</div>
+    <div class="chips">
+      <span class="chip">task=${escapeHtml(normalizedString(governedUpdate.taskId, "-"))}</span>
+      <span class="chip">taskStatus=${escapeHtml(normalizedString(governedUpdate.taskStatus, "-"))}</span>
+      <span class="chip">session=${escapeHtml(normalizedString(governedUpdate.sessionId, "-"))}</span>
+      <span class="chip">sessionStatus=${escapeHtml(normalizedString(governedUpdate.sessionStatus, "-"))}</span>
+      <span class="chip">worker=${escapeHtml(normalizedString(governedUpdate.workerId, "-"))}</span>
+      <span class="chip">workerState=${escapeHtml(normalizedString(governedUpdate.workerState, "-"))}</span>
+      <span class="chip">openApprovals=${escapeHtml(String(governedUpdate.openApprovals))}</span>
+      <span class="chip">pendingProposals=${escapeHtml(String(governedUpdate.pendingProposalCount))}</span>
+    </div>
+    <p>${escapeHtml(normalizedString(governedUpdate.summary, "Governed thread state refreshed."))}</p>
+    ${renderEnvelopeSection("Details", governedUpdate.details)}
+    ${renderEnvelopeSection("Recent activity", governedUpdate.recent)}
+    ${renderEnvelopeSection("Action hints", governedUpdate.actionHints)}
+  </section>`;
   const nonce = String(Date.now());
   return `<!DOCTYPE html>
 <html>
@@ -471,6 +516,7 @@ ul { margin: 8px 0 0; padding-left: 18px; }
   </div>
 </header>
 <div class="panel-grid">
+  ${governedUpdateBlock}
   <section class="panel">
     <h3>Governed Turn</h3>
     <div class="meta">Submit the next governed turn against this task on the existing M16 or M18 contract.</div>

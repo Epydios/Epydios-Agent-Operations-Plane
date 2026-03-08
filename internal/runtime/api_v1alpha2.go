@@ -13,6 +13,94 @@ import (
 	"time"
 )
 
+func (s *APIServer) handleWorkerCapabilitiesV1Alpha2(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeAPIError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "method not allowed", false, nil)
+		return
+	}
+	ctx, ok := s.authorizeRequest(w, r, PermissionRunRead)
+	if !ok {
+		return
+	}
+	s.handleListWorkerCapabilitiesV1Alpha2(w, r.WithContext(ctx))
+}
+
+func (s *APIServer) handleListWorkerCapabilitiesV1Alpha2(w http.ResponseWriter, r *http.Request) {
+	items := defaultWorkerCapabilityCatalog()
+	executionMode := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("executionMode")))
+	workerType := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("workerType")))
+	adapterID := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("adapterId")))
+	filtered := make([]WorkerCapabilityCatalogEntry, 0, len(items))
+	for _, item := range items {
+		if executionMode != "" && !strings.EqualFold(item.ExecutionMode, executionMode) {
+			continue
+		}
+		if workerType != "" && !strings.EqualFold(item.WorkerType, workerType) {
+			continue
+		}
+		if adapterID != "" && !strings.EqualFold(item.AdapterID, adapterID) {
+			continue
+		}
+		filtered = append(filtered, item)
+	}
+	writeJSON(w, http.StatusOK, WorkerCapabilityCatalogResponse{
+		GeneratedAt: time.Now().UTC(),
+		Source:      "m20.enterprise.worker_capability_catalog",
+		Count:       len(filtered),
+		Items:       filtered,
+	})
+}
+
+func (s *APIServer) handlePolicyPacksV1Alpha2(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeAPIError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "method not allowed", false, nil)
+		return
+	}
+	ctx, ok := s.authorizeRequest(w, r, PermissionRunRead)
+	if !ok {
+		return
+	}
+	s.handleListPolicyPacksV1Alpha2(w, r.WithContext(ctx))
+}
+
+func (s *APIServer) handleListPolicyPacksV1Alpha2(w http.ResponseWriter, r *http.Request) {
+	items := defaultPolicyPackCatalog(s.auth)
+	packID := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("packId")))
+	permission := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("permission")))
+	executionMode := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("executionMode")))
+	workerType := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("workerType")))
+	adapterID := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("adapterId")))
+	clientSurface := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("clientSurface")))
+	filtered := make([]PolicyPackCatalogEntry, 0, len(items))
+	for _, item := range items {
+		if packID != "" && !strings.EqualFold(item.PackID, packID) {
+			continue
+		}
+		if permission != "" && !selectorMatches(item.Permissions, permission) {
+			continue
+		}
+		if executionMode != "" && len(item.ApplicableExecutionModes) > 0 && !selectorMatches(item.ApplicableExecutionModes, executionMode) {
+			continue
+		}
+		if workerType != "" && len(item.ApplicableWorkerTypes) > 0 && !selectorMatches(item.ApplicableWorkerTypes, workerType) {
+			continue
+		}
+		if adapterID != "" && len(item.ApplicableAdapterIDs) > 0 && !selectorMatches(item.ApplicableAdapterIDs, adapterID) {
+			continue
+		}
+		if clientSurface != "" && len(item.ClientSurfaces) > 0 && !selectorMatches(item.ClientSurfaces, clientSurface) {
+			continue
+		}
+		filtered = append(filtered, item)
+	}
+	writeJSON(w, http.StatusOK, PolicyPackCatalogResponse{
+		GeneratedAt: time.Now().UTC(),
+		Source:      "m20.enterprise.policy_pack_catalog",
+		Count:       len(filtered),
+		Items:       filtered,
+	})
+}
+
 func (s *APIServer) handleTasksV1Alpha2(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPost:
