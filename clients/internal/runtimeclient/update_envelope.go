@@ -41,6 +41,9 @@ type GovernedUpdateEnvelope struct {
 	OrgAdminInputKeys            []string
 	OrgAdminInputValues          []string
 	OrgAdminPendingReviews       int
+	OrgAdminArtifactEvents       []string
+	OrgAdminArtifactEvidence     []string
+	OrgAdminArtifactRetention    []string
 	Details                      []string
 	Recent                       []string
 	ActionHints                  []string
@@ -97,6 +100,9 @@ func RenderGovernedUpdateEnvelope(env GovernedUpdateEnvelope) string {
 	appendEnvelopeSection(&lines, "Org-admin boundary requirements:", env.OrgAdminBoundaryRequirements)
 	appendEnvelopeSection(&lines, "Org-admin input keys:", env.OrgAdminInputKeys)
 	appendEnvelopeSection(&lines, "Org-admin input values:", env.OrgAdminInputValues)
+	appendEnvelopeSection(&lines, "Org-admin artifact events:", env.OrgAdminArtifactEvents)
+	appendEnvelopeSection(&lines, "Org-admin evidence kinds:", env.OrgAdminArtifactEvidence)
+	appendEnvelopeSection(&lines, "Org-admin artifact retention classes:", env.OrgAdminArtifactRetention)
 	appendEnvelopeSection(&lines, "Details:", env.Details)
 	appendEnvelopeSection(&lines, "Recent activity:", env.Recent)
 	appendEnvelopeSection(&lines, "Action hints:", env.ActionHints)

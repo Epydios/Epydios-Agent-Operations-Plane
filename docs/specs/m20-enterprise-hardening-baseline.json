@@ -1,7 +1,7 @@
 {
   "id": "m20_enterprise_hardening_baseline_20260307",
   "date": "2026-03-08",
-  "status": "baseline_recorded_org_admin_category_artifact_persistence_slice_landed",
+  "status": "baseline_recorded_org_admin_category_artifact_governed_report_update_projection_slice_landed",
   "scope": "Inventory the current enterprise posture after M19 and land the first shared M20 hardening artifact without forking the native M16/M18 contract.",
   "baseline": {
     "multi_tenant_policy": {
@@ -53,7 +53,7 @@
       ]
     },
     "reporting_and_export": {
-      "status": "shared_enterprise_report_envelope_with_runtime_native_export_hardening_and_persisted_org_admin_active_review_audit_export_projection_landed",
+      "status": "shared_enterprise_report_envelope_with_runtime_native_export_hardening_and_persisted_org_admin_active_review_audit_export_and_category_artifact_projection_landed",
       "evidence": [
         "EPYDIOS_AGENTOPS_DESKTOP_REPO/docs/runtime-orchestration-service.md",
         "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api.go",
@@ -183,13 +183,14 @@
       "runtime-native session evidence export now derives structured org-admin export metadata from persisted approval-checkpoint annotations and stamps that metadata into governed export headers and JSON output, while desktop Chat governed tool-action, evidence, and governance-report exports now preserve active org-admin review metadata instead of collapsing back to catalog-only export metadata",
       "runtime approval-checkpoint org-admin bindings now also emit structured runtime audit events, and runtime audit export now derives governed org-admin export headers and JSON metadata from those persisted audit records on the same native export boundary",
       "shared Go, desktop Chat, and VS Code governed report/export surfaces now project active org-admin categories, decision actor roles, decision surfaces, boundary requirements, directory-sync mappings, exception profiles, overlay profiles, and normalized input values directly from persisted approval-checkpoint annotations, and CLI/workflow/chatops remain aligned to the same active org-admin review state through the shared governed update/report envelope path",
-      "runtime approval-checkpoint org-admin bindings now emit category-specific session events, evidence records, and runtime audit events for delegated-admin, break-glass, directory-sync, residency/legal-hold exception, and quota/chargeback overlay decisions, and shared Go, CLI, workflow, and chatops review paths now render those category-specific org-admin artifacts as meaningful operator activity instead of collapsing them back into generic binding blobs"
+      "runtime approval-checkpoint org-admin bindings now emit category-specific session events, evidence records, and runtime audit events for delegated-admin, break-glass, directory-sync, residency/legal-hold exception, and quota/chargeback overlay decisions, and shared Go, CLI, workflow, and chatops review paths now render those category-specific org-admin artifacts as meaningful operator activity instead of collapsing them back into generic binding blobs",
+      "shared Go, desktop Chat, and VS Code governed report/update surfaces now project active org-admin artifact events, evidence kinds, and retention classes directly from persisted org_admin session events and org-admin evidence records, and VS Code governed review now renders those artifact sections on the same native contract"
     ]
   },
   "next_batch": [
-    "Extend runtime-side enforcement and persistence from the current approval-checkpoint, runtime-audit, and category-artifact org-admin paths into the broader delegated-admin, break-glass, directory-sync, residency/legal-hold exception, and quota/chargeback overlay admin surfaces.",
-    "Extend persisted org-admin category-artifact, exception, overlay, normalized input, and audit/export metadata into the remaining governed report, export, and admin-review surfaces that still rely on partial approval projection or catalog-only coverage without forking the native M16/M18 contract.",
-    "Extend parity and verifier coverage for structured org-admin category-artifact, exception, overlay, normalized input, audit/export, and active-review metadata across desktop Chat, VS Code, CLI, workflow, and chatops.",
+    "Extend runtime-side enforcement and persistence from the current approval-checkpoint, runtime-audit, category-artifact, and governed report/update projection paths into the broader delegated-admin, break-glass, directory-sync, residency/legal-hold exception, and quota/chargeback overlay admin surfaces.",
+    "Extend parity and verifier coverage for structured org-admin exception, overlay, normalized input, audit/export, active-review, and category-artifact metadata through the remaining admin-review and export surfaces without forking the native M16/M18 contract.",
+    "Run the M20 exit-gate validation slice and close any final parity defects.",
     "Keep Chat, VS Code, CLI, workflow, and chatops on the same native M16/M18 contract.",
     "Do not introduce client-specific hardening branches."
   ],
@@ -350,6 +351,30 @@
       "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/test/governance-report.test.js",
       "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/vscode-agentops/lib/reportEnvelope.js",
       "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/vscode-agentops/test/reportEnvelope.test.js",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/platform/local/bin/verify-m20-enterprise-hardening-baseline.sh"
+    ]
+  },
+  "eighth_shared_hardening_artifact": {
+    "name": "active_org_admin_category_artifact_report_update_projection",
+    "endpoint": "/v1alpha2/runtime/sessions/{sessionId}/timeline",
+    "purpose": [
+      "project persisted org-admin artifact events, evidence kinds, and retention classes into the shared governed report and update contract instead of stopping at approval-only projection",
+      "keep desktop Chat, VS Code, CLI, workflow, and chatops aligned on the same artifact-state review model",
+      "prevent governed report/update surfaces from drifting away from the persisted session-event and evidence boundaries"
+    ],
+    "evidence_paths": [
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/internal/runtimeclient/report_envelope.go",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/internal/runtimeclient/report_envelope_test.go",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/internal/runtimeclient/update_envelope.go",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/internal/runtimeclient/update_envelope_test.go",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/internal/runtimeclient/thread_envelope.go",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/internal/runtimeclient/thread_envelope_test.go",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/runtime/governance-report.js",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/views/chat.js",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/test/governance-report.test.js",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/vscode-agentops/extension.js",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/vscode-agentops/test/reportEnvelope.test.js",
+      "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/vscode-agentops/test/updateEnvelope.test.js",
       "EPYDIOS_AGENTOPS_DESKTOP_REPO/platform/local/bin/verify-m20-enterprise-hardening-baseline.sh"
     ]
   }

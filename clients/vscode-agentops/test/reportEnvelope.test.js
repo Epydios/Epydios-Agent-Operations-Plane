@@ -58,9 +58,30 @@ test("buildGovernedReportEnvelope filters catalogs and redacts secret-like conte
             }
           }
         ],
+        events: [
+          {
+            eventId: "event-org-admin-1",
+            eventType: "org_admin.directory_sync.requested",
+            payload: {
+              bindingLabel: "Centralized Enterprise Admin Directory Sync Binding",
+              category: "directory_sync",
+              selectedDirectorySyncs: ["centralized_enterprise_admin_directory_sync_mapping"],
+              status: "PENDING"
+            }
+          }
+        ],
         toolProposals: [{ proposalId: "prop-1", status: "PENDING" }],
         toolActions: [{ toolActionId: "tool-1" }],
-        evidenceRecords: [{ evidenceId: "evidence-1" }],
+        evidenceRecords: [
+          {
+            evidenceId: "evidence-1",
+            kind: "org_admin_directory_sync_request",
+            retentionClass: "standard",
+            metadata: {
+              bindingLabel: "Centralized Enterprise Admin Directory Sync Binding"
+            }
+          }
+        ],
         latestWorkerSummary: "Bearer sk-abc1234567890123456789 should be removed"
       },
       catalogs: {}
@@ -205,6 +226,9 @@ test("buildGovernedReportEnvelope filters catalogs and redacts secret-like conte
   assert.deepEqual(envelope.activeOrgAdminDecisionActorRoles, ["enterprise.tenant_admin"]);
   assert.deepEqual(envelope.activeOrgAdminDecisionSurfaces, ["policy_pack_assignment"]);
   assert.deepEqual(envelope.activeOrgAdminBoundaryRequirements, ["runtime_authz"]);
+  assert.ok(envelope.activeOrgAdminArtifactEvents.some((item) => item.includes("Directory Sync Review")));
+  assert.ok(envelope.activeOrgAdminArtifactEvidence.includes("org_admin_directory_sync_request"));
+  assert.ok(envelope.activeOrgAdminArtifactRetention.includes("standard"));
   assert.equal(envelope.applicablePolicyPacks[0], "enterprise-default: Enterprise Default");
   assert.match(envelope.workerCapabilityLabels[0], /Managed Codex Worker/);
   assert.match(envelope.summary, /\[REDACTED\]/);
@@ -220,6 +244,9 @@ test("buildGovernedReportEnvelope filters catalogs and redacts secret-like conte
   assert.match(envelope.renderedText, /Active org-admin decision actor roles:/);
   assert.match(envelope.renderedText, /Active org-admin decision surfaces:/);
   assert.match(envelope.renderedText, /Active org-admin boundary requirements:/);
+  assert.match(envelope.renderedText, /Active org-admin artifact events:/);
+  assert.match(envelope.renderedText, /Active org-admin evidence kinds:/);
+  assert.match(envelope.renderedText, /Active org-admin artifact retention classes:/);
 });
 
 test("buildGovernedReportEnvelope infers normalized report disposition", () => {

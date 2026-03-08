@@ -190,6 +190,7 @@ This service moves policy/evidence/profile execution flow out of ad-hoc scripts 
   - directory-sync mapping coverage
   - active org-admin review details and action hints derived from persisted approval-checkpoint `decisionBindings`
   - active org-admin categories, decision actor roles, decision surfaces, boundary requirements, directory-sync mappings, exception profiles, overlay profiles, and normalized input values derived from those same persisted approval-checkpoint annotations
+  - active org-admin artifact events, evidence kinds, and retention classes derived from persisted `org_admin.*` session events and org-admin evidence records
   - exception profile coverage
   - overlay profile coverage
   - `DLP findings`

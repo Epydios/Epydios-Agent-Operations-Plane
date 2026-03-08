@@ -1,4 +1,4 @@
-const { buildOrgAdminReviewProjection } = require("./reportEnvelope");
+const { buildOrgAdminArtifactProjection, buildOrgAdminReviewProjection } = require("./reportEnvelope");
 
 function normalizedString(value, fallback = "") {
   const text = String(value || "").trim();
@@ -18,6 +18,7 @@ function buildGovernedUpdateEnvelope(model = {}, options = {}) {
   const selectedSummary = model?.selectedSummary && typeof model.selectedSummary === "object" ? model.selectedSummary : {};
   const selectedWorker = selectedSummary?.selectedWorker && typeof selectedSummary.selectedWorker === "object" ? selectedSummary.selectedWorker : {};
   const orgAdminReview = buildOrgAdminReviewProjection(selectedSummary?.approvals || []);
+  const orgAdminArtifacts = buildOrgAdminArtifactProjection(selectedSummary?.events || [], selectedSummary?.evidenceRecords || []);
   return {
     header: normalizedString(options.header, "AgentOps governed update"),
     updateType: normalizedString(options.updateType, "status"),
@@ -52,7 +53,10 @@ function buildGovernedUpdateEnvelope(model = {}, options = {}) {
     orgAdminInputKeys: normalizeEnvelopeLines(orgAdminReview?.inputKeys || []),
     orgAdminInputValues: normalizeEnvelopeLines(orgAdminReview?.inputValueLines || []),
     orgAdminPendingReviews: Number(orgAdminReview?.pendingCount || 0),
-    details: normalizeEnvelopeLines([...(options.details || []), ...((orgAdminReview?.details) || [])]),
+    orgAdminArtifactEvents: normalizeEnvelopeLines(orgAdminArtifacts?.eventLabels || []),
+    orgAdminArtifactEvidence: normalizeEnvelopeLines(orgAdminArtifacts?.evidenceKinds || []),
+    orgAdminArtifactRetention: normalizeEnvelopeLines(orgAdminArtifacts?.retentionClasses || []),
+    details: normalizeEnvelopeLines([...(options.details || []), ...((orgAdminReview?.details) || []), ...((orgAdminArtifacts?.details) || [])]),
     recent: normalizeEnvelopeLines(options.recent || []),
     actionHints: normalizeEnvelopeLines([...(options.actionHints || []), ...((orgAdminReview?.actionHints) || [])])
   };

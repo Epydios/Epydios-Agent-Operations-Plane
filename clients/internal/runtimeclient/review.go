@@ -70,6 +70,13 @@ type OrgAdminReviewProjection struct {
 	ActionHints          []string `json:"actionHints,omitempty"`
 }
 
+type OrgAdminArtifactProjection struct {
+	EventLabels       []string `json:"eventLabels,omitempty"`
+	EvidenceKinds     []string `json:"evidenceKinds,omitempty"`
+	RetentionClasses  []string `json:"retentionClasses,omitempty"`
+	Details           []string `json:"details,omitempty"`
+}
+
 type orgAdminDecisionBindingProjection struct {
 	CheckpointID              string
 	Status                    string
@@ -215,6 +222,8 @@ func SummarizeEventDetail(item runtimeapi.SessionEventRecord) string {
 
 func orgAdminEventLabel(eventType string) (string, bool) {
 	switch eventType {
+	case "org_admin.binding.requested", "org_admin.binding.decision.applied":
+		return "Org-Admin Binding Review", true
 	case "org_admin.delegated_admin.requested", "org_admin.delegated_admin.decision.applied":
 		return "Delegated Admin Review", true
 	case "org_admin.break_glass.requested", "org_admin.break_glass.decision.applied":
@@ -258,6 +267,8 @@ func summarizeOrgAdminEventDetail(eventType string, payload map[string]interface
 		fragments = append(fragments, "roleBundle="+roleBundle)
 	}
 	if selected := normalizeEventStringSlice(payload["selectedDirectorySyncs"]); len(selected) > 0 {
+		fragments = append(fragments, "directorySync="+strings.Join(selected, ","))
+	} else if selected := normalizeEventStringSlice(payload["selectedMappings"]); len(selected) > 0 {
 		fragments = append(fragments, "directorySync="+strings.Join(selected, ","))
 	}
 	if selected := normalizeEventStringSlice(payload["selectedExceptions"]); len(selected) > 0 {
@@ -547,6 +558,61 @@ func BuildOrgAdminReviewProjection(approvals []runtimeapi.ApprovalCheckpointReco
 	}
 }
 
+func BuildOrgAdminArtifactProjection(events []runtimeapi.SessionEventRecord, evidence []runtimeapi.EvidenceRecord) OrgAdminArtifactProjection {
+	eventLabels := map[string]struct{}{}
+	evidenceKinds := map[string]struct{}{}
+	retentionClasses := map[string]struct{}{}
+	details := make([]string, 0)
+
+	events = append([]runtimeapi.SessionEventRecord(nil), events...)
+	sort.SliceStable(events, func(i, j int) bool {
+		if events[i].Sequence == events[j].Sequence {
+			return events[i].Timestamp.Before(events[j].Timestamp)
+		}
+		return events[i].Sequence < events[j].Sequence
+	})
+	for _, item := range events {
+		eventType := strings.ToLower(strings.TrimSpace(string(item.EventType)))
+		if !strings.HasPrefix(eventType, "org_admin.") {
+			continue
+		}
+		label, ok := orgAdminEventLabel(eventType)
+		if !ok {
+			label = "Org-Admin Review Artifact"
+		}
+		eventLabels[label] = struct{}{}
+		if detail, ok := summarizeOrgAdminEventDetail(eventType, rawObject(item.Payload)); ok {
+			details = append(details, fmt.Sprintf("%s: %s", label, detail))
+		}
+	}
+
+	evidence = append([]runtimeapi.EvidenceRecord(nil), evidence...)
+	sort.SliceStable(evidence, func(i, j int) bool {
+		if evidence[i].CreatedAt.Equal(evidence[j].CreatedAt) {
+			return evidence[i].EvidenceID < evidence[j].EvidenceID
+		}
+		return evidence[i].CreatedAt.Before(evidence[j].CreatedAt)
+	})
+	for _, item := range evidence {
+		kind := strings.TrimSpace(item.Kind)
+		if !strings.HasPrefix(strings.ToLower(kind), "org_admin_") {
+			continue
+		}
+		evidenceKinds[kind] = struct{}{}
+		if retentionClass := strings.TrimSpace(item.RetentionClass); retentionClass != "" {
+			retentionClasses[retentionClass] = struct{}{}
+		}
+		details = append(details, renderOrgAdminEvidenceLine(item))
+	}
+
+	return OrgAdminArtifactProjection{
+		EventLabels:      mapKeysSorted(eventLabels),
+		EvidenceKinds:    mapKeysSorted(evidenceKinds),
+		RetentionClasses: mapKeysSorted(retentionClasses),
+		Details:          sortedUniqueStrings(details),
+	}
+}
+
 func mapKeysSorted(items map[string]struct{}) []string {
 	if len(items) == 0 {
 		return nil
@@ -683,6 +749,36 @@ func renderOrgAdminInputValues(values map[string]string) string {
 		parts = append(parts, fmt.Sprintf("%s=%s", key, values[key]))
 	}
 	return ClipText(strings.Join(parts, ", "), 320)
+}
+
+func renderOrgAdminEvidenceLine(item runtimeapi.EvidenceRecord) string {
+	metadata := rawObject(item.Metadata)
+	parts := []string{NormalizeStringOrDefault(normalizeInterfaceString(metadata["bindingLabel"], ""), strings.TrimSpace(item.Kind))}
+	if category := normalizeInterfaceString(metadata["category"], ""); category != "" {
+		parts = append(parts, "category="+category)
+	}
+	if roleBundle := normalizeInterfaceString(metadata["selectedRoleBundle"], ""); roleBundle != "" {
+		parts = append(parts, "roleBundle="+roleBundle)
+	}
+	if selected := normalizeApprovalStringList(metadata["selectedDirectoryMappings"]); len(selected) > 0 {
+		parts = append(parts, "directorySync="+strings.Join(selected, ","))
+	}
+	if selected := normalizeApprovalStringList(metadata["selectedExceptionProfiles"]); len(selected) > 0 {
+		parts = append(parts, "exceptions="+strings.Join(selected, ","))
+	}
+	if selected := normalizeApprovalStringList(metadata["selectedOverlayProfiles"]); len(selected) > 0 {
+		parts = append(parts, "overlays="+strings.Join(selected, ","))
+	}
+	if decision := normalizeInterfaceString(metadata["decision"], ""); decision != "" {
+		parts = append(parts, "decision="+decision)
+	}
+	if status := normalizeInterfaceString(metadata["status"], ""); status != "" {
+		parts = append(parts, "status="+status)
+	}
+	if retentionClass := strings.TrimSpace(item.RetentionClass); retentionClass != "" {
+		parts = append(parts, "retention="+retentionClass)
+	}
+	return "Org-admin evidence: " + ClipText(strings.Join(parts, " | "), 320)
 }
 
 func orgAdminCategoryHints(binding orgAdminDecisionBindingProjection) []string {

@@ -401,6 +401,8 @@ function buildChatTurnReportSubject(turn = {}, activity = {}, response = {}, tim
     toolActionCount: Number(activity?.toolActionCount ?? toolActions.length),
     evidenceCount: Number(activity?.evidenceCount ?? evidence.length),
     approvalCheckpoints: approvals,
+    sessionEvents: Array.isArray(timeline?.events) ? timeline.events : [],
+    evidenceRecords: evidence,
     summary: normalizedString(activity?.latestWorkerSummary, normalizedString(response?.outputText, "Governed thread state refreshed.")),
     details: [
       normalizedString(response?.route) ? `Route: ${normalizedString(response.route)}` : "",
@@ -542,6 +544,9 @@ function renderGovernanceReport(envelope = {}, sessionId = "") {
       ${renderEnvelopeLines("Active org-admin exception profiles", envelope.activeOrgAdminExceptionProfiles)}
       ${renderEnvelopeLines("Active org-admin overlay profiles", envelope.activeOrgAdminOverlayProfiles)}
       ${renderEnvelopeLines("Active org-admin input values", envelope.activeOrgAdminInputValues)}
+      ${renderEnvelopeLines("Active org-admin artifact events", envelope.activeOrgAdminArtifactEvents)}
+      ${renderEnvelopeLines("Active org-admin evidence kinds", envelope.activeOrgAdminArtifactEvidence)}
+      ${renderEnvelopeLines("Active org-admin artifact retention classes", envelope.activeOrgAdminArtifactRetention)}
       ${renderEnvelopeLines("Worker capability coverage", envelope.workerCapabilityLabels)}
       ${renderEnvelopeLines("Directory-sync inputs", envelope.directorySyncInputs)}
       ${renderEnvelopeLines("Residency profiles", envelope.residencyProfiles)}

@@ -84,6 +84,24 @@ func TestBuildThreadGovernedUpdateEnvelopeProjectsOrgAdminReviewState(t *testing
 					}),
 				},
 			},
+			Events: []runtimeapi.SessionEventRecord{
+				{
+					EventID:   "event-org-admin-1",
+					SessionID: "session-org-admin-1",
+					Sequence:  9,
+					EventType: runtimeapi.SessionEventType("org_admin.directory_sync.requested"),
+					Payload:   []byte(`{"bindingLabel":"Centralized Enterprise Admin Directory Sync Binding","category":"directory_sync","selectedDirectorySyncs":["centralized_enterprise_admin_directory_sync_mapping"],"status":"PENDING"}`),
+				},
+			},
+			EvidenceRecords: []runtimeapi.EvidenceRecord{
+				{
+					EvidenceID:     "evidence-org-admin-1",
+					SessionID:      "session-org-admin-1",
+					Kind:           "org_admin_directory_sync_request",
+					RetentionClass: "standard",
+					Metadata:       []byte(`{"bindingLabel":"Centralized Enterprise Admin Directory Sync Binding"}`),
+				},
+			},
 		},
 	}
 
@@ -111,12 +129,24 @@ func TestBuildThreadGovernedUpdateEnvelopeProjectsOrgAdminReviewState(t *testing
 	if !strings.Contains(strings.Join(envelope.OrgAdminInputValues, "\n"), "tenant_id=tenant-a") {
 		t.Fatalf("orgAdminInputValues=%v", envelope.OrgAdminInputValues)
 	}
+	if !strings.Contains(strings.Join(envelope.OrgAdminArtifactEvents, "\n"), "Directory Sync Review") {
+		t.Fatalf("orgAdminArtifactEvents=%v", envelope.OrgAdminArtifactEvents)
+	}
+	if !strings.Contains(strings.Join(envelope.OrgAdminArtifactEvidence, "\n"), "org_admin_directory_sync_request") {
+		t.Fatalf("orgAdminArtifactEvidence=%v", envelope.OrgAdminArtifactEvidence)
+	}
+	if !strings.Contains(strings.Join(envelope.OrgAdminArtifactRetention, "\n"), "standard") {
+		t.Fatalf("orgAdminArtifactRetention=%v", envelope.OrgAdminArtifactRetention)
+	}
 	rendered := RenderGovernedUpdateEnvelope(envelope)
 	for _, part := range []string{
 		"Org-admin profile: Centralized Enterprise Admin (centralized_enterprise_admin)",
 		"Org-admin pending reviews: 1",
 		"Org-admin decision actor roles:",
 		"Org-admin input values:",
+		"Org-admin artifact events:",
+		"Org-admin evidence kinds:",
+		"Org-admin artifact retention classes:",
 	} {
 		if !strings.Contains(rendered, part) {
 			t.Fatalf("missing %q in rendered envelope: %s", part, rendered)

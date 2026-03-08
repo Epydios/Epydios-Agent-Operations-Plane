@@ -77,6 +77,8 @@ type workflowStatusReport struct {
 	ApprovalCheckpoints     []runtimeapi.ApprovalCheckpointRecord `json:"approvalCheckpoints,omitempty"`
 	PendingApprovals        []runtimeapi.ApprovalCheckpointRecord `json:"pendingApprovals,omitempty"`
 	PendingProposals        []runtimeclient.ToolProposalReview    `json:"pendingProposals,omitempty"`
+	SessionEvents           []runtimeapi.SessionEventRecord       `json:"sessionEvents,omitempty"`
+	EvidenceRecords         []runtimeapi.EvidenceRecord           `json:"evidenceRecords,omitempty"`
 	ToolActionCount         int                                   `json:"toolActionCount,omitempty"`
 	EvidenceCount           int                                   `json:"evidenceCount,omitempty"`
 	LatestWorkerSummary     string                                `json:"latestWorkerSummary,omitempty"`
@@ -700,6 +702,8 @@ func buildWorkflowStatusReport(view *runtimeclient.ThreadReview) *workflowStatus
 	report.EvidenceCount = len(view.Timeline.EvidenceRecords)
 	report.RecentEvents = append([]runtimeclient.EventSummary(nil), view.RecentEvents...)
 	report.ApprovalCheckpoints = append([]runtimeapi.ApprovalCheckpointRecord(nil), view.Timeline.ApprovalCheckpoints...)
+	report.SessionEvents = append([]runtimeapi.SessionEventRecord(nil), view.Timeline.Events...)
+	report.EvidenceRecords = append([]runtimeapi.EvidenceRecord(nil), view.Timeline.EvidenceRecords...)
 	pendingApprovals := make([]runtimeapi.ApprovalCheckpointRecord, 0)
 	for _, item := range view.Timeline.ApprovalCheckpoints {
 		if strings.EqualFold(string(item.Status), string(runtimeapi.ApprovalStatusPending)) {
@@ -866,6 +870,8 @@ func renderWorkflowReport(ctx context.Context, client *runtimeclient.Client, rep
 		ToolActionCount:      report.ToolActionCount,
 		EvidenceCount:        report.EvidenceCount,
 		ApprovalCheckpoints:  append([]runtimeapi.ApprovalCheckpointRecord(nil), report.ApprovalCheckpoints...),
+		SessionEvents:        append([]runtimeapi.SessionEventRecord(nil), report.SessionEvents...),
+		EvidenceRecords:      append([]runtimeapi.EvidenceRecord(nil), report.EvidenceRecords...),
 		Summary:              runtimeclient.NormalizeStringOrDefault(report.LatestWorkerSummary, "Enterprise workflow posture refreshed."),
 		Details:              buildWorkflowReportDetails(report),
 		Recent:               workflowRecentEventLines(report, 4),
@@ -920,6 +926,8 @@ func renderWorkflowDeltaReport(ctx context.Context, client *runtimeclient.Client
 		ToolActionCount:      report.ToolActionCount,
 		EvidenceCount:        report.EvidenceCount,
 		ApprovalCheckpoints:  append([]runtimeapi.ApprovalCheckpointRecord(nil), report.ApprovalCheckpoints...),
+		SessionEvents:        append([]runtimeapi.SessionEventRecord(nil), report.SessionEvents...),
+		EvidenceRecords:      append([]runtimeapi.EvidenceRecord(nil), report.EvidenceRecords...),
 		Summary:              summary,
 		Details:              runtimeclient.BuildThreadFollowDetails(items),
 		Recent:               runtimeclient.RenderSessionEventLines(items, 4),
@@ -942,6 +950,8 @@ func renderWorkflowEnvelope(updateType, summary string, report *workflowStatusRe
 	pendingProposalCount := 0
 	toolActionCount := 0
 	evidenceCount := 0
+	orgAdminReview := runtimeclient.OrgAdminReviewProjection{}
+	orgAdminArtifacts := runtimeclient.OrgAdminArtifactProjection{}
 	if report != nil {
 		contextParts = []string{runtimeclient.NormalizeStringOrDefault(report.SourceSystem, "-")}
 		if workflowID := strings.TrimSpace(report.WorkflowID); workflowID != "" {
@@ -959,12 +969,12 @@ func renderWorkflowEnvelope(updateType, summary string, report *workflowStatusRe
 		pendingProposalCount = len(report.PendingProposals)
 		toolActionCount = report.ToolActionCount
 		evidenceCount = report.EvidenceCount
-		orgAdminReview := runtimeclient.BuildOrgAdminReviewProjection(report.ApprovalCheckpoints)
-		details = runtimeclient.MergeEnvelopeLines(details, orgAdminReview.Details)
+		orgAdminReview = runtimeclient.BuildOrgAdminReviewProjection(report.ApprovalCheckpoints)
+		orgAdminArtifacts = runtimeclient.BuildOrgAdminArtifactProjection(report.SessionEvents, report.EvidenceRecords)
+		details = runtimeclient.MergeEnvelopeLines(details, orgAdminReview.Details, orgAdminArtifacts.Details)
 	}
 	actionHints := renderWorkflowActionHints(report)
 	if report != nil {
-		orgAdminReview := runtimeclient.BuildOrgAdminReviewProjection(report.ApprovalCheckpoints)
 		actionHints = runtimeclient.MergeEnvelopeLines(actionHints, orgAdminReview.ActionHints)
 	}
 	return runtimeclient.RenderGovernedUpdateEnvelope(runtimeclient.GovernedUpdateEnvelope{
@@ -985,6 +995,24 @@ func renderWorkflowEnvelope(updateType, summary string, report *workflowStatusRe
 		PendingProposalCount: pendingProposalCount,
 		ToolActionCount:      toolActionCount,
 		EvidenceCount:        evidenceCount,
+		OrgAdminProfileID:            orgAdminReview.ProfileID,
+		OrgAdminProfileLabel:         orgAdminReview.ProfileLabel,
+		OrgAdminOrganizationModel:    orgAdminReview.OrganizationModel,
+		OrgAdminRoleBundle:           orgAdminReview.RoleBundle,
+		OrgAdminCategories:           append([]string(nil), orgAdminReview.Categories...),
+		OrgAdminDecisionBindings:     append([]string(nil), orgAdminReview.BindingLabels...),
+		OrgAdminDirectoryMappings:    append([]string(nil), orgAdminReview.DirectoryMappings...),
+		OrgAdminExceptionProfiles:    append([]string(nil), orgAdminReview.ExceptionProfiles...),
+		OrgAdminOverlayProfiles:      append([]string(nil), orgAdminReview.OverlayProfiles...),
+		OrgAdminDecisionActorRoles:   append([]string(nil), orgAdminReview.DecisionActorRoles...),
+		OrgAdminDecisionSurfaces:     append([]string(nil), orgAdminReview.DecisionSurfaces...),
+		OrgAdminBoundaryRequirements: append([]string(nil), orgAdminReview.BoundaryRequirements...),
+		OrgAdminInputKeys:            append([]string(nil), orgAdminReview.InputKeys...),
+		OrgAdminInputValues:          append([]string(nil), orgAdminReview.InputValueLines...),
+		OrgAdminPendingReviews:       orgAdminReview.PendingCount,
+		OrgAdminArtifactEvents:       append([]string(nil), orgAdminArtifacts.EventLabels...),
+		OrgAdminArtifactEvidence:     append([]string(nil), orgAdminArtifacts.EvidenceKinds...),
+		OrgAdminArtifactRetention:    append([]string(nil), orgAdminArtifacts.RetentionClasses...),
 		Summary:              summary,
 		Details:              details,
 		Recent:               recent,
