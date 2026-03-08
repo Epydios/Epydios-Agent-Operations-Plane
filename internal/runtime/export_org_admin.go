@@ -1,10 +1,12 @@
 package runtime
 
 import (
+	"context"
 	"net/http"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type runtimeExportOrgAdminSummary struct {
@@ -106,6 +108,42 @@ func summarizeRuntimeExportOrgAdmin(checkpoints []ApprovalCheckpointRecord) runt
 		PendingReviewCount: pendingCount,
 		RedactionCount:     redactionCount,
 	}
+}
+
+func summarizeRunExportOrgAdmin(ctx context.Context, store RunStore, runs []RunSummary) (runtimeExportOrgAdminSummary, error) {
+	if store == nil || len(runs) == 0 {
+		return runtimeExportOrgAdminSummary{}, nil
+	}
+
+	seen := map[string]struct{}{}
+	checkpoints := make([]ApprovalCheckpointRecord, 0, len(runs))
+	for _, run := range runs {
+		sessionID := strings.TrimSpace(run.RunID)
+		if sessionID == "" {
+			continue
+		}
+		items, err := store.ListApprovalCheckpoints(ctx, ApprovalCheckpointListQuery{
+			SessionID: sessionID,
+			TenantID:  strings.TrimSpace(run.TenantID),
+			ProjectID: strings.TrimSpace(run.ProjectID),
+			Limit:     100,
+		})
+		if err != nil {
+			return runtimeExportOrgAdminSummary{}, err
+		}
+		for _, item := range items {
+			key := strings.TrimSpace(item.CheckpointID)
+			if key == "" {
+				key = strings.TrimSpace(item.SessionID) + ":" + strings.TrimSpace(item.RequestID) + ":" + item.CreatedAt.UTC().Format(time.RFC3339Nano)
+			}
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = struct{}{}
+			checkpoints = append(checkpoints, item)
+		}
+	}
+	return summarizeRuntimeExportOrgAdmin(checkpoints), nil
 }
 
 func summarizeRuntimeAuditExportOrgAdmin(items []map[string]interface{}) runtimeExportOrgAdminSummary {

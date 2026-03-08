@@ -1,7 +1,7 @@
 # M20 Enterprise Hardening Baseline
 
 Date: 2026-03-08
-Status: baseline recorded, org-admin category-artifact governed report/update projection slice landed
+Status: M20 complete, governed run-export disposition and enterprise hardening exit gate passed
 
 ## Scope
 
@@ -32,7 +32,7 @@ Current baseline is implemented for configuration ingress and is now partially e
 - Runtime integration settings remain `ref://`-only and block raw secret-like values in [runtime-orchestration-service.md](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/docs/runtime-orchestration-service.md) and [api.go](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api.go).
 - Production hardening and secret/cert rotation verifiers already exist in [verify-secret-cert-rotation.sh](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/platform/local/bin/verify-secret-cert-rotation.sh), [verify-admission-enforcement.sh](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/platform/local/bin/verify-admission-enforcement.sh), and [verify-prod-hardening-baseline.sh](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/platform/local/bin/verify-prod-hardening-baseline.sh).
 - Governed enterprise report output now redacts secret-like transcript, evidence, summary, and action-hint content before render in [report_envelope.go](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/internal/runtimeclient/report_envelope.go), [ui/desktop-ui/web/js/runtime/governance-report.js](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/runtime/governance-report.js), and [clients/vscode-agentops/lib/reportEnvelope.js](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/vscode-agentops/lib/reportEnvelope.js), and surfaces any matches through explicit `DLP findings`.
-- Runtime run export now sanitizes secret-like content before JSONL or CSV output in [internal/runtime/export_redaction.go](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/export_redaction.go) and [internal/runtime/api.go](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api.go), emits `redactionCount` on the audit trail, and stamps `X-AgentOps-Export-Redactions` on the export response.
+- Runtime run export now sanitizes secret-like content before JSONL or CSV output in [internal/runtime/export_redaction.go](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/export_redaction.go) and [internal/runtime/api.go](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api.go), resolves governed disposition from the dedicated `run_export` profile, emits `redactionCount` on the audit trail, stamps `X-AgentOps-Export-*` plus `X-AgentOps-Org-Admin-*` headers on the response, and projects persisted org-admin review state from the run-backed session approval boundary.
 - Runtime audit export now sanitizes secret-like content before JSONL or JSON output in [internal/runtime/export_redaction.go](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/export_redaction.go), [internal/runtime/export_disposition.go](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/export_disposition.go), and [internal/runtime/api.go](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api.go), and now stamps the governed export metadata headers plus `X-AgentOps-Export-Redactions` on the response.
 - Runtime session evidence export now sanitizes secret-like content before JSONL or JSON output in [internal/runtime/export_redaction.go](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/export_redaction.go), [internal/runtime/export_disposition.go](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/export_disposition.go), and [internal/runtime/api_v1alpha2.go](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api_v1alpha2.go), and now stamps the governed export metadata headers plus `X-AgentOps-Export-Redactions` on the response.
 - Desktop governed export helpers now normalize `exportProfile` and `audience` from the same client-surface and report-type rules used by enterprise report rendering, and the remaining audit and incident export or handoff flows now pass explicit governed export metadata through that shared helper in [ui/desktop-ui/web/js/main.js](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/main.js).
@@ -77,6 +77,7 @@ Current baseline is now explicit and queryable.
 - Desktop Chat and VS Code now also expose explicit operator-selectable `exportProfile`, `audience`, and `retentionClass` controls on top of that same runtime catalog for governed review and export actions.
 - CLI, workflow, and chatops governed report surfaces now load the same runtime export-profile catalog into the shared Go enterprise-report envelope and render the same retention, delivery, and redaction metadata on the same contract.
 - Direct desktop audit and incident export tests now pin governed export metadata, retention overlays, governed disposition summaries, and redaction behavior instead of leaving those paths implied by helper defaults.
+- The catalog now includes a dedicated `run_export` profile, and the M20 verifier explicitly pins governed run-export disposition and org-admin header behavior on the runtime boundary.
 
 ## Shared hardening artifacts now landed
 
@@ -138,6 +139,7 @@ Purpose:
 - make governed export-profile choices explicit instead of inferred from client-local defaults
 - keep report/export review surfaces on the same native contract while exposing enterprise-facing audience, delivery, and redaction policy
 - provide one authoritative export-profile inventory for later retention-class and downstream-governance integration work
+- keep runtime-native run export on the same governed export boundary as audit and evidence export instead of leaving it as a special-case legacy path
 
 Current filter surface:
 - `exportProfile`
@@ -182,7 +184,15 @@ Verifier:
 Latest proof log:
 - [verify-m20-enterprise-hardening-baseline-latest.log](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/m20-enterprise-hardening/verify-m20-enterprise-hardening-baseline-latest.log)
 
-## Gaps still open for M20
+### Exit gate
+
+Verifier:
+- [verify-m20-enterprise-hardening-exit-gate.sh](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/platform/local/bin/verify-m20-enterprise-hardening-exit-gate.sh)
+
+Latest proof log:
+- [verify-m20-enterprise-hardening-exit-gate-latest.log](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/m20-enterprise-hardening/verify-m20-enterprise-hardening-exit-gate-latest.log)
+
+## Follow-on Enterprise Scope
 
 ### Multi-tenant policy packs
 
@@ -202,7 +212,7 @@ Still needed:
 
 Still needed:
 - outbound deny or escalation rules beyond the current governed report redaction pass
-- runtime-native export-time redaction and policy hooks for the remaining incident export path and any future server-side governed export routes beyond the now-covered run, audit, and evidence exports
+- runtime-native export-time redaction and policy hooks for any future server-side governed export routes beyond the now-covered run, audit, and evidence exports
 - policy hooks for vendor-specific credential classes without forking the client contract
 
 ### Worker capability matrices
@@ -252,16 +262,16 @@ Now projected into governed report surfaces:
 - the shared Go enterprise report/update envelopes plus desktop Chat and VS Code governed review surfaces now also project active org-admin artifact events, evidence kinds, and retention classes directly from persisted `org_admin.*` session events and org-admin evidence records instead of stopping at approval-only projection
 
 Still needed:
-- runtime-side enforcement and persistence beyond the current approval-checkpoint, runtime-audit, and category-artifact paths across the broader admin surface area for delegated-admin, break-glass, directory-sync, residency/legal-hold exception, and quota/chargeback overlay review workflows
+- runtime-side enforcement and persistence beyond the current approval-checkpoint, runtime-audit, category-artifact, and governed run-export paths across the broader admin surface area for delegated-admin, break-glass, directory-sync, residency/legal-hold exception, and quota/chargeback overlay review workflows
 - SCIM or directory-sync ingestion and real group-to-role mapping persistence
 - data residency, legal hold, eDiscovery, and records-retention exception enforcement for governed exports and evidence
 - enterprise network and fleet rollout enforcement such as proxy/TLS inspection posture, private egress, desktop MDM rollout, and regional package distribution
 - org-level quota, chargeback, billing, and admin reporting implementation beyond the current inventory catalog
 
-## Exact next M20 batch
+## M20 Closure State
 
-1. Extend runtime-side enforcement and persistence from the current approval-checkpoint, runtime-audit, category-artifact, and governed report/update projection paths into the broader delegated-admin, break-glass, directory-sync, residency/legal-hold exception, and quota/chargeback overlay admin surfaces.
-2. Extend parity and verifier coverage for structured org-admin exception, overlay, normalized input, audit/export, active-review, and category-artifact metadata through the remaining admin-review and export surfaces, without forking the native M16/M18 contract.
-3. Run the M20 exit-gate validation slice and close any final parity defects.
-4. Keep Chat, VS Code, CLI, workflow, and chatops on the same native M16/M18 contract.
-5. Do not introduce client-specific hardening branches.
+1. M20 is complete.
+2. The governed run-export boundary is now on the same enterprise hardening contract as runtime audit and evidence export.
+3. The dedicated M20 exit gate passed with the baseline verifier, full repo tests, and the standing desktop/runtime gate suite.
+4. No further M20 implementation slice is active.
+5. Remaining enterprise IT/admin and org-scale items are follow-on scope only and should not reopen M20 unless a new milestone is explicitly defined.

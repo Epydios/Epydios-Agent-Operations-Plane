@@ -1,6 +1,6 @@
 {
   "id": "post_m15_enterprise_expansion_plan_20260307",
-  "status": "parallelized_m20_hardening_in_progress_while_m15_remains_open",
+  "status": "parallelized_m20_hardening_complete_while_m15_remains_open",
   "created_on": "2026-03-07",
   "product_stance": {
     "control_plane": "AgentOps",
@@ -176,11 +176,20 @@
         "CLI, workflow, and chatops governed update envelopes now project active org-admin review details and action hints directly from persisted approval-checkpoint annotations instead of relying only on pending approval/proposal hints, and the dedicated M20 verifier plus standing desktop/runtime gates remained green after the slice",
         "the shared Go enterprise report envelope plus desktop Chat and VS Code governed report/export surfaces now project active org-admin categories, decision actor roles, decision surfaces, boundary requirements, directory-sync mappings, exception profiles, overlay profiles, and normalized input values directly from persisted approval-checkpoint annotations, while CLI/workflow/chatops stay aligned to that same active org-admin review state through the shared governed update/report envelope path",
         "runtime approval-checkpoint org-admin bindings now emit category-specific session events, evidence records, and runtime audit events for delegated-admin, break-glass, directory-sync, residency/legal-hold exception, and quota/chargeback overlay decisions, and shared Go, CLI, workflow, and chatops review paths now render those category-specific org-admin artifacts as meaningful operator activity instead of collapsing them back into generic binding blobs",
-        "shared Go, desktop Chat, and VS Code governed report/update surfaces now project active org-admin artifact events, evidence kinds, and retention classes directly from persisted org_admin session events and org-admin evidence records, and VS Code governed review now renders those artifact sections on the same native contract"
+        "shared Go, desktop Chat, and VS Code governed report/update surfaces now project active org-admin artifact events, evidence kinds, and retention classes directly from persisted org_admin session events and org-admin evidence records, and VS Code governed review now renders those artifact sections on the same native contract",
+        "runtime run export now resolves governed disposition from the dedicated run_export profile and stamps structured org-admin export headers from projected session approval checkpoints on the same runtime export boundary as audit and evidence export",
+        "the dedicated M20 exit gate now validates the baseline verifier, full repo tests, and the standing desktop/runtime gate suite together, and it passed cleanly on 2026-03-08"
       ],
-      "next_step": "Extend runtime-side enforcement and persistence from the current approval-checkpoint, runtime-audit, category-artifact, and governed report/update projection paths into the broader delegated-admin, break-glass, directory-sync, residency/legal-hold exception, and quota/chargeback overlay admin surfaces. Extend parity and verifier coverage for structured org-admin exception, overlay, normalized input, audit/export, active-review, and category-artifact metadata through the remaining admin-review and export surfaces without forking the native M16/M18 contract. Run the M20 exit-gate validation slice and close any final parity defects. Keep Chat, VS Code, CLI, workflow, and chatops on the same native M16/M18 contract. Do not introduce client-specific hardening branches."
+      "next_step": "M20 is complete. No further parallel post-M15 enterprise expansion slice is active; hold this track until a new milestone is explicitly defined.",
+      "status": "complete_parallel_m20_exit_gate_closed",
+      "latest_evidence": [
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/platform/local/bin/verify-m20-enterprise-hardening-exit-gate.sh",
+        "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/m20-enterprise-hardening/verify-m20-enterprise-hardening-exit-gate-latest.log",
+        "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/m20-enterprise-hardening/verify-m20-enterprise-hardening-exit-gate-latest.summary.json",
+        "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/desktop-closeout/m13-m14-closeout-latest.summary.json"
+      ]
     }
   ],
-  "recommended_immediate_next_step": "Extend runtime-side enforcement and persistence from the current approval-checkpoint, runtime-audit, category-artifact, and governed report/update projection paths into the broader delegated-admin, break-glass, directory-sync, residency/legal-hold exception, and quota/chargeback overlay admin surfaces. Extend parity and verifier coverage for structured org-admin exception, overlay, normalized input, audit/export, active-review, and category-artifact metadata through the remaining admin-review and export surfaces without forking the native M16/M18 contract. Run the M20 exit-gate validation slice and close any final parity defects. Keep Chat, VS Code, CLI, workflow, and chatops on the same native M16/M18 contract. Do not introduce client-specific hardening branches.",
+  "recommended_immediate_next_step": "M20 is complete. No further parallel post-M15 enterprise expansion slice is active; hold this track until a new milestone is explicitly defined.",
   "parallel_execution_note": "M16 architecture/spec work may begin while M15 remains blocked on Windows execution-host proof, but M15 must not be marked complete until Phase D and final launch sign-off are closed."
 }

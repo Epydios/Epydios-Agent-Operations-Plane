@@ -298,6 +298,11 @@ func (s *APIServer) handleRunExport(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, http.StatusBadRequest, "INVALID_FORMAT", "format must be one of: jsonl,csv", false, map[string]interface{}{"format": format})
 		return
 	}
+	disposition, err := resolveRuntimeExportDisposition(r, "run_export")
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, "INVALID_EXPORT_DISPOSITION", err.Error(), false, nil)
+		return
+	}
 
 	items, err := s.listRunSummariesWithSessionProjection(r.Context(), query)
 	if err != nil {
@@ -313,20 +318,31 @@ func (s *APIServer) handleRunExport(w http.ResponseWriter, r *http.Request) {
 		exportItems = append(exportItems, sanitized)
 		redactionCount += count
 	}
-	if redactionCount > 0 {
-		w.Header().Set("X-AgentOps-Export-Redactions", strconv.Itoa(redactionCount))
+	orgAdminSummary, err := summarizeRunExportOrgAdmin(r.Context(), s.store, filtered)
+	if err != nil {
+		writeAPIError(w, http.StatusInternalServerError, "STORE_QUERY_FAILED", "failed to summarize run export org-admin metadata", true, map[string]interface{}{"error": err.Error()})
+		return
 	}
+	totalRedactionCount := redactionCount + orgAdminSummary.RedactionCount
+	applyRuntimeExportHeaders(w, disposition, totalRedactionCount)
+	applyRuntimeExportOrgAdminHeaders(w, orgAdminSummary)
 
 	emitAuditEvent(r.Context(), "runtime.run.export", map[string]interface{}{
-		"path":            r.URL.Path,
-		"method":          r.Method,
-		"format":          format,
-		"requestedLimit":  query.Limit,
-		"requestedOffset": query.Offset,
-		"returnedCount":   len(exportItems),
-		"unfilteredCount": len(items),
-		"filteredDenied":  deniedByAuthz,
-		"redactionCount":  redactionCount,
+		"path":                 r.URL.Path,
+		"method":               r.Method,
+		"format":               format,
+		"requestedLimit":       query.Limit,
+		"requestedOffset":      query.Offset,
+		"returnedCount":        len(exportItems),
+		"unfilteredCount":      len(items),
+		"filteredDenied":       deniedByAuthz,
+		"exportProfile":        disposition.ExportProfile,
+		"audience":             disposition.Audience,
+		"exportRetentionClass": disposition.RetentionClass,
+		"redactionCount":       totalRedactionCount,
+		"orgAdminProfiles":     len(orgAdminSummary.Profiles),
+		"orgAdminBindings":     len(orgAdminSummary.DecisionBindings),
+		"orgAdminPending":      orgAdminSummary.PendingReviewCount,
 	})
 
 	switch format {

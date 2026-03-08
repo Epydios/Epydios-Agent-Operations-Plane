@@ -91,7 +91,7 @@ This service moves policy/evidence/profile execution flow out of ad-hoc scripts 
 ## Export Profile Catalog Contract (M20 baseline)
 
 - Endpoint scope is runtime-authz protected and currently requires the same read permission as session and run reads.
-- `GET /v1alpha2/runtime/export-profiles` returns the governed export-profile catalog used by enterprise review, follow, audit, and incident export surfaces.
+- `GET /v1alpha2/runtime/export-profiles` returns the governed export-profile catalog used by enterprise review, follow, run export, audit export, evidence export, and incident export surfaces.
 - Supported filters:
   - `exportProfile`
   - `reportType`
@@ -102,6 +102,7 @@ This service moves policy/evidence/profile execution flow out of ad-hoc scripts 
   - operator review and operator follow
   - workflow review and workflow follow
   - conversation review and conversation follow
+  - run export
   - audit export and audit handoff
   - evidence export
   - incident export and incident handoff
@@ -113,7 +114,7 @@ This service moves policy/evidence/profile execution flow out of ad-hoc scripts 
   - `audienceRetentionClassOverlays`
   - `deliveryChannels`
   - `redactionMode`
-- Runtime-native audit and evidence exports now resolve governed export disposition from the same runtime export-profile catalog with `clientSurface=runtime` and `reportType=export`, stamp `X-AgentOps-Export-*` headers, and emit `X-AgentOps-Export-Redactions` when secret-like content is sanitized at the server boundary.
+- Runtime-native run, audit, and evidence exports now resolve governed export disposition from the same runtime export-profile catalog with `clientSurface=runtime` and `reportType=export`, stamp `X-AgentOps-Export-*` headers, and emit `X-AgentOps-Export-Redactions` when secret-like content is sanitized at the server boundary.
 - Runtime-native audit export now also stamps structured `X-AgentOps-Org-Admin-*` headers and JSON summary fields when persisted org-admin binding state is present in the exported audit records.
 
 ## Org Admin Catalog Contract (M20 baseline)

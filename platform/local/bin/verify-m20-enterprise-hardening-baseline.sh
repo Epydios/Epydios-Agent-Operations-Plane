@@ -10,7 +10,10 @@ echo "[m20] validating runtime worker, policy, export, and org-admin catalogs"
 GOCACHE="${GOCACHE:-/tmp/go-build}" go test ./internal/runtime
 
 echo "[m20] validating runtime-native governed export redaction and metadata coverage"
-GOCACHE="${GOCACHE:-/tmp/go-build}" go test ./internal/runtime -run 'TestRuntimeAuditExportRedactsSensitiveFields|TestRuntimeSessionEvidenceExportRedactsSensitiveFields|TestRuntimeV1Alpha2ExportProfileCatalog'
+GOCACHE="${GOCACHE:-/tmp/go-build}" go test ./internal/runtime -run 'TestRuntimeAuditExportRedactsSensitiveFields|TestRuntimeSessionEvidenceExportRedactsSensitiveFields|TestRuntimeRunExportIncludesGovernedDispositionAndOrgAdminHeaders|TestRuntimeV1Alpha2ExportProfileCatalog'
+
+echo "[m20] validating org-admin approval binding, category input, and quota overlay enforcement"
+GOCACHE="${GOCACHE:-/tmp/go-build}" go test ./internal/runtime -run 'TestRuntimeV1Alpha2OrgAdminCatalog|TestRuntimeV1Alpha2OrgAdminCatalogFilters|TestRuntimeV1Alpha2OrgAdminApprovalPersistsDecisionBindings|TestRuntimeV1Alpha2OrgAdminCategoryBindingsPersistSelectionsAndInputs|TestRuntimeV1Alpha2OrgAdminQuotaBindingRequiresOverlaySelection'
 
 echo "[m20] validating desktop Chat governed report, governed export actions, and cross-surface parity coverage"
 "${HOME}/bin/node" --test ./ui/desktop-ui/web/js/test/*.test.js
