@@ -1037,14 +1037,20 @@ func TestRuntimeV1Alpha2OrgAdminApprovalPersistsDecisionBindings(t *testing.T) {
 	}
 	decodeResponseBody(t, rr, &evidenceList)
 	foundRequestEvidence := false
+	foundCategoryRequestEvidence := false
 	for _, item := range evidenceList.Items {
 		if item.Kind == "org_admin_binding_request" {
 			foundRequestEvidence = true
-			break
+		}
+		if item.Kind == "org_admin_delegated_admin_request" {
+			foundCategoryRequestEvidence = true
 		}
 	}
 	if !foundRequestEvidence {
 		t.Fatalf("expected org_admin_binding_request evidence: %+v", evidenceList.Items)
+	}
+	if !foundCategoryRequestEvidence {
+		t.Fatalf("expected org_admin_delegated_admin_request evidence: %+v", evidenceList.Items)
 	}
 
 	rr = requestJSONWithContext(t, handler, reqCtx, http.MethodPost, "/v1alpha2/runtime/sessions/"+session.SessionID+"/approval-checkpoints/"+checkpoint.CheckpointID+"/decision", map[string]interface{}{
@@ -1063,6 +1069,57 @@ func TestRuntimeV1Alpha2OrgAdminApprovalPersistsDecisionBindings(t *testing.T) {
 		t.Fatalf("POST org-admin approval decision status=%d body=%s", rr.Code, rr.Body.String())
 	}
 
+	auditItems := ListRuntimeAuditEvents(RuntimeAuditQuery{
+		TenantID:  "tenant-a",
+		ProjectID: "project-a",
+		Event:     "org_admin.binding",
+		Limit:     10,
+	})
+	foundAuditRequest := false
+	foundAuditDecision := false
+	for _, item := range auditItems {
+		eventName := normalizeStringOrDefault(normalizeInterfaceString(item["event"], ""), "")
+		bindingObject, ok := item["orgAdminDecisionBinding"].(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if eventName == "runtime.org_admin.binding.requested" {
+			foundAuditRequest = true
+			if got := normalizeStringOrDefault(normalizeInterfaceString(bindingObject["bindingId"], ""), ""); got != "centralized_enterprise_admin_delegated_admin_binding" {
+				t.Fatalf("audit request bindingId=%q", got)
+			}
+		}
+		if eventName == "runtime.org_admin.binding.decision" {
+			foundAuditDecision = true
+			if got := normalizeStringOrDefault(normalizeInterfaceString(item["decision"], ""), ""); got != "APPROVE" {
+				t.Fatalf("audit decision=%q", got)
+			}
+		}
+	}
+	if !foundAuditRequest || !foundAuditDecision {
+		t.Fatalf("org-admin audit events missing request=%v decision=%v items=%+v", foundAuditRequest, foundAuditDecision, auditItems)
+	}
+	categoryAuditItems := ListRuntimeAuditEvents(RuntimeAuditQuery{
+		TenantID:  "tenant-a",
+		ProjectID: "project-a",
+		Event:     "org_admin.delegated_admin",
+		Limit:     10,
+	})
+	foundCategoryAuditRequest := false
+	foundCategoryAuditDecision := false
+	for _, item := range categoryAuditItems {
+		eventName := normalizeStringOrDefault(normalizeInterfaceString(item["event"], ""), "")
+		if eventName == "runtime.org_admin.delegated_admin.requested" {
+			foundCategoryAuditRequest = true
+		}
+		if eventName == "runtime.org_admin.delegated_admin.decision" {
+			foundCategoryAuditDecision = true
+		}
+	}
+	if !foundCategoryAuditRequest || !foundCategoryAuditDecision {
+		t.Fatalf("category org-admin audit events missing request=%v decision=%v items=%+v", foundCategoryAuditRequest, foundCategoryAuditDecision, categoryAuditItems)
+	}
+
 	rr = requestJSON(t, handler, http.MethodGet, "/v1alpha2/runtime/sessions/"+session.SessionID+"/events", nil)
 	if rr.Code != http.StatusOK {
 		t.Fatalf("GET events status=%d body=%s", rr.Code, rr.Body.String())
@@ -1074,6 +1131,8 @@ func TestRuntimeV1Alpha2OrgAdminApprovalPersistsDecisionBindings(t *testing.T) {
 	decodeResponseBody(t, rr, &eventList)
 	foundRequestEvent := false
 	foundDecisionEvent := false
+	foundCategoryRequestEvent := false
+	foundCategoryDecisionEvent := false
 	for _, item := range eventList.Items {
 		if item.EventType == SessionEventType("org_admin.binding.requested") {
 			foundRequestEvent = true
@@ -1081,9 +1140,22 @@ func TestRuntimeV1Alpha2OrgAdminApprovalPersistsDecisionBindings(t *testing.T) {
 		if item.EventType == SessionEventType("org_admin.binding.decision.applied") {
 			foundDecisionEvent = true
 		}
+		if item.EventType == SessionEventType("org_admin.delegated_admin.requested") {
+			foundCategoryRequestEvent = true
+		}
+		if item.EventType == SessionEventType("org_admin.delegated_admin.decision.applied") {
+			foundCategoryDecisionEvent = true
+		}
 	}
-	if !foundRequestEvent || !foundDecisionEvent {
-		t.Fatalf("org-admin events missing request=%v decision=%v items=%+v", foundRequestEvent, foundDecisionEvent, eventList.Items)
+	if !foundRequestEvent || !foundDecisionEvent || !foundCategoryRequestEvent || !foundCategoryDecisionEvent {
+		t.Fatalf(
+			"org-admin events missing bindingRequest=%v bindingDecision=%v categoryRequest=%v categoryDecision=%v items=%+v",
+			foundRequestEvent,
+			foundDecisionEvent,
+			foundCategoryRequestEvent,
+			foundCategoryDecisionEvent,
+			eventList.Items,
+		)
 	}
 
 	rr = requestJSON(t, handler, http.MethodGet, "/v1alpha2/runtime/sessions/"+session.SessionID+"/evidence", nil)
@@ -1092,14 +1164,20 @@ func TestRuntimeV1Alpha2OrgAdminApprovalPersistsDecisionBindings(t *testing.T) {
 	}
 	decodeResponseBody(t, rr, &evidenceList)
 	foundDecisionEvidence := false
+	foundCategoryDecisionEvidence := false
 	for _, item := range evidenceList.Items {
 		if item.Kind == "org_admin_binding_decision" {
 			foundDecisionEvidence = true
-			break
+		}
+		if item.Kind == "org_admin_delegated_admin_decision" {
+			foundCategoryDecisionEvidence = true
 		}
 	}
 	if !foundDecisionEvidence {
 		t.Fatalf("expected org_admin_binding_decision evidence: %+v", evidenceList.Items)
+	}
+	if !foundCategoryDecisionEvidence {
+		t.Fatalf("expected org_admin_delegated_admin_decision evidence: %+v", evidenceList.Items)
 	}
 }
 
@@ -1395,27 +1473,55 @@ func TestRuntimeV1Alpha2OrgAdminCategoryBindingsPersistSelectionsAndInputs(t *te
 			}
 			decodeResponseBody(t, rr, &evidenceList)
 			foundRequestEvidence := false
+			foundCategoryRequestEvidence := false
 			for _, item := range evidenceList.Items {
 				if item.Kind != "org_admin_binding_request" || item.CheckpointID != checkpoint.CheckpointID {
-					continue
+				} else {
+					var metadata map[string]interface{}
+					if err := json.Unmarshal(item.Metadata, &metadata); err != nil {
+						t.Fatalf("unmarshal evidence metadata: %v", err)
+					}
+					inputValues, ok := metadata["inputValues"].(map[string]interface{})
+					if !ok {
+						t.Fatalf("expected inputValues in evidence metadata: %+v", metadata)
+					}
+					if got := normalizeStringOrDefault(normalizeInterfaceString(inputValues[tc.wantInputKey], ""), ""); got == "" {
+						t.Fatalf("evidence inputValues missing %q: %+v", tc.wantInputKey, inputValues)
+					}
+					foundRequestEvidence = true
 				}
-				var metadata map[string]interface{}
-				if err := json.Unmarshal(item.Metadata, &metadata); err != nil {
-					t.Fatalf("unmarshal evidence metadata: %v", err)
+				if item.Kind == orgAdminCategoryRequestEvidenceKind(tc.wantCategory) && item.CheckpointID == checkpoint.CheckpointID {
+					foundCategoryRequestEvidence = true
 				}
-				inputValues, ok := metadata["inputValues"].(map[string]interface{})
-				if !ok {
-					t.Fatalf("expected inputValues in evidence metadata: %+v", metadata)
-				}
-				if got := normalizeStringOrDefault(normalizeInterfaceString(inputValues[tc.wantInputKey], ""), ""); got == "" {
-					t.Fatalf("evidence inputValues missing %q: %+v", tc.wantInputKey, inputValues)
-				}
-				foundRequestEvidence = true
 			}
 			if !foundRequestEvidence {
 				t.Fatalf("expected org_admin_binding_request evidence for checkpoint %s: %+v", checkpoint.CheckpointID, evidenceList.Items)
 			}
+			if !foundCategoryRequestEvidence {
+				t.Fatalf("expected %s evidence for checkpoint %s: %+v", orgAdminCategoryRequestEvidenceKind(tc.wantCategory), checkpoint.CheckpointID, evidenceList.Items)
+			}
 		})
+	}
+}
+
+func orgAdminCategoryRequestEvidenceKind(category string) string {
+	switch category {
+	case "delegated_admin":
+		return "org_admin_delegated_admin_request"
+	case "break_glass":
+		return "org_admin_break_glass_request"
+	case "directory_sync":
+		return "org_admin_directory_sync_request"
+	case "residency":
+		return "org_admin_residency_exception_request"
+	case "legal_hold":
+		return "org_admin_legal_hold_exception_request"
+	case "quota":
+		return "org_admin_quota_overlay_request"
+	case "chargeback":
+		return "org_admin_chargeback_overlay_request"
+	default:
+		return ""
 	}
 }
 

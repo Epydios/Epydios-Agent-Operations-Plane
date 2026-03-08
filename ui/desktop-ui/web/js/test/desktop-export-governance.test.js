@@ -161,6 +161,10 @@ test("governed export disposition text carries profile audience and retention", 
     exportProfile: "incident_export",
     audience: "security_review",
     retentionClass: "archive",
+    orgAdminOrganizationModels: ["centralized_enterprise"],
+    orgAdminRoleBundles: ["enterprise.tenant_admin"],
+    orgAdminDecisionActorRoles: ["enterprise.tenant_admin"],
+    orgAdminInputValues: ["tenant_id=tenant-a"],
     decisionBindingLabels: ["Centralized Enterprise Admin Delegated Admin Decision Binding"],
     directorySyncMappings: ["Centralized Enterprise Admin Directory Sync Mapping"],
     exceptionProfileLabels: ["Centralized Enterprise Admin Residency Exception"],
@@ -174,6 +178,10 @@ test("governed export disposition text carries profile audience and retention", 
   assert.match(description, /directoryMappings=1/);
   assert.match(description, /exceptionProfiles=1/);
   assert.match(description, /overlayProfiles=1/);
+  assert.match(description, /organizationModels=1/);
+  assert.match(description, /roleBundles=1/);
+  assert.match(description, /decisionActorRoles=1/);
+  assert.match(description, /inputValues=1/);
 });
 
 test("governed export redaction description is empty when nothing was redacted", () => {
@@ -286,4 +294,41 @@ test("desktop incident handoff action preserves governed disposition and text re
   assert.match(describeGovernedExportDisposition(prepared), /audience=security_review/);
   assert.match(describeGovernedExportDisposition(prepared), /retention=standard/);
   assert.match(describeGovernedExportRedactions(prepared, "incident handoff"), /DLP redactions=/);
+});
+
+test("governed export disposition text includes active org-admin review counts", () => {
+  const prepared = prepareGovernedJsonExport(
+    {
+      task: { taskId: "task-1" }
+    },
+    {
+      ...buildDesktopGovernedExportOptions(
+        "audit_export",
+        "security_review",
+        "review",
+        "chat",
+        EXPORT_PROFILE_CATALOG,
+        ""
+      ),
+      approvalCheckpoints: [
+        {
+          checkpointId: "approval-org-admin-export-1",
+          status: "PENDING",
+          annotations: {
+            orgAdminDecisionBinding: {
+              profileId: "centralized_enterprise_admin",
+              bindingId: "centralized_enterprise_admin_delegated_admin_binding",
+              bindingLabel: "Centralized Enterprise Admin Delegated Admin Decision Binding",
+              requestedInputKeys: ["idp_group", "tenant_id"]
+            }
+          }
+        }
+      ]
+    }
+  );
+
+  const description = describeGovernedExportDisposition(prepared);
+  assert.match(description, /activeBindings=1/);
+  assert.match(description, /activeInputKeys=2/);
+  assert.match(description, /pendingReviews=1/);
 });

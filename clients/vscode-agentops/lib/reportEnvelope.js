@@ -541,6 +541,7 @@ function parseOrgAdminDecisionBinding(approval = {}) {
     selectedOverlayProfiles: sortedUnique(binding?.selectedOverlayProfiles || []),
     requiredInputs: sortedUnique(binding?.requiredInputs || []),
     requestedInputKeys: sortedUnique(binding?.requestedInputKeys || []),
+    decisionActorRoles: sortedUnique(binding?.decisionActorRoles || []),
     inputValues: normalizeOrgAdminInputValues(binding?.inputValues),
     decisionSurfaces: sortedUnique(binding?.decisionSurfaces || []),
     boundaryRequirements: sortedUnique(binding?.boundaryRequirements || [])
@@ -593,15 +594,62 @@ function orgAdminCategoryHints(primary = {}) {
 function buildOrgAdminReviewProjection(approvals = []) {
   const bindings = (Array.isArray(approvals) ? approvals : []).map((item) => parseOrgAdminDecisionBinding(item)).filter(Boolean);
   if (!bindings.length) {
-    return { profileId: "", organizationModel: "", roleBundle: "", details: [], actionHints: [] };
+    return {
+      profileId: "",
+      profileLabel: "",
+      organizationModel: "",
+      roleBundle: "",
+      categories: [],
+      bindingLabels: [],
+      inputKeys: [],
+      directoryMappings: [],
+      exceptionProfiles: [],
+      overlayProfiles: [],
+      decisionActorRoles: [],
+      decisionSurfaces: [],
+      boundaryRequirements: [],
+      inputValueLines: [],
+      pendingCount: 0,
+      details: [],
+      actionHints: []
+    };
   }
   const primary = bindings[0];
   const details = [];
   let pendingCount = 0;
+  const categories = new Set();
+  const bindingLabels = new Set();
+  const inputKeys = new Set();
+  const directoryMappings = new Set();
+  const exceptionProfiles = new Set();
+  const overlayProfiles = new Set();
+  const decisionActorRoles = new Set();
+  const decisionSurfaces = new Set();
+  const boundaryRequirements = new Set();
+  const inputValueLines = new Set();
   for (const item of bindings) {
     if (normalizedString(item?.status, "PENDING").toUpperCase() === "PENDING") {
       pendingCount += 1;
     }
+    if (normalizedString(item?.category)) categories.add(normalizedString(item.category));
+    if (normalizedString(item?.bindingLabel, normalizedString(item?.bindingId))) {
+      bindingLabels.add(normalizedString(item?.bindingLabel, normalizedString(item?.bindingId)));
+    }
+    (item?.requestedInputKeys || []).forEach((entry) => inputKeys.add(normalizedString(entry)));
+    (item?.selectedDirectoryMappings || []).forEach((entry) => directoryMappings.add(normalizedString(entry)));
+    (item?.selectedExceptionProfiles || []).forEach((entry) => exceptionProfiles.add(normalizedString(entry)));
+    (item?.selectedOverlayProfiles || []).forEach((entry) => overlayProfiles.add(normalizedString(entry)));
+    (item?.decisionActorRoles || []).forEach((entry) => decisionActorRoles.add(normalizedString(entry)));
+    (item?.decisionSurfaces || []).forEach((entry) => decisionSurfaces.add(normalizedString(entry)));
+    (item?.boundaryRequirements || []).forEach((entry) => boundaryRequirements.add(normalizedString(entry)));
+    Object.entries(item?.inputValues || {}).forEach(([key, value]) => {
+      const normalizedKey = normalizedString(key);
+      const normalizedValue = normalizedString(value);
+      if (normalizedKey && normalizedValue) {
+        inputKeys.add(normalizedKey);
+        inputValueLines.add(`${normalizedKey}=${normalizedValue}`);
+      }
+    });
     const parts = [normalizedString(item?.bindingLabel, normalizedString(item?.bindingId, "org-admin-binding"))];
     if (normalizedString(item?.category)) parts.push(`category=${normalizedString(item.category)}`);
     if (normalizedString(item?.bindingMode)) parts.push(`mode=${normalizedString(item.bindingMode)}`);
@@ -629,8 +677,20 @@ function buildOrgAdminReviewProjection(approvals = []) {
   actionHints.push(...orgAdminCategoryHints(primary));
   return {
     profileId: normalizedString(primary?.profileId),
+    profileLabel: normalizedString(primary?.profileLabel),
     organizationModel: normalizedString(primary?.organizationModel),
     roleBundle: normalizedString(primary?.selectedRoleBundle),
+    categories: sortedUnique(Array.from(categories)),
+    bindingLabels: sortedUnique(Array.from(bindingLabels)),
+    inputKeys: sortedUnique(Array.from(inputKeys)),
+    directoryMappings: sortedUnique(Array.from(directoryMappings)),
+    exceptionProfiles: sortedUnique(Array.from(exceptionProfiles)),
+    overlayProfiles: sortedUnique(Array.from(overlayProfiles)),
+    decisionActorRoles: sortedUnique(Array.from(decisionActorRoles)),
+    decisionSurfaces: sortedUnique(Array.from(decisionSurfaces)),
+    boundaryRequirements: sortedUnique(Array.from(boundaryRequirements)),
+    inputValueLines: sortedUnique(Array.from(inputValueLines)),
+    pendingCount,
     details: sortedUnique(details),
     actionHints: sortedUnique(actionHints)
   };
@@ -728,6 +788,21 @@ function buildGovernedReportEnvelope(model = {}, catalogs = {}, options = {}) {
       ]);
       return surfaces.length > 0 ? surfaces : ["report"];
     })(),
+    activeOrgAdminProfileId: normalizedString(orgAdminReview.profileId),
+    activeOrgAdminProfileLabel: normalizedString(orgAdminReview.profileLabel),
+    activeOrgAdminOrganizationModel: normalizedString(orgAdminReview.organizationModel),
+    activeOrgAdminRoleBundle: normalizedString(orgAdminReview.roleBundle),
+    activeOrgAdminCategories: Array.isArray(orgAdminReview.categories) ? orgAdminReview.categories : [],
+    activeOrgAdminDecisionBindings: Array.isArray(orgAdminReview.bindingLabels) ? orgAdminReview.bindingLabels : [],
+    activeOrgAdminDecisionActorRoles: Array.isArray(orgAdminReview.decisionActorRoles) ? orgAdminReview.decisionActorRoles : [],
+    activeOrgAdminDecisionSurfaces: Array.isArray(orgAdminReview.decisionSurfaces) ? orgAdminReview.decisionSurfaces : [],
+    activeOrgAdminBoundaryRequirements: Array.isArray(orgAdminReview.boundaryRequirements) ? orgAdminReview.boundaryRequirements : [],
+    activeOrgAdminInputKeys: Array.isArray(orgAdminReview.inputKeys) ? orgAdminReview.inputKeys : [],
+    activeOrgAdminDirectoryMappings: Array.isArray(orgAdminReview.directoryMappings) ? orgAdminReview.directoryMappings : [],
+    activeOrgAdminExceptionProfiles: Array.isArray(orgAdminReview.exceptionProfiles) ? orgAdminReview.exceptionProfiles : [],
+    activeOrgAdminOverlayProfiles: Array.isArray(orgAdminReview.overlayProfiles) ? orgAdminReview.overlayProfiles : [],
+    activeOrgAdminInputValues: Array.isArray(orgAdminReview.inputValueLines) ? orgAdminReview.inputValueLines : [],
+    activeOrgAdminPendingReviews: Number(orgAdminReview.pendingCount || 0) || 0,
     allowedAudiences: sortedUnique(
       exportProfileItems.flatMap((item) => [
         normalizedString(item?.defaultAudience),
@@ -826,6 +901,16 @@ function renderGovernedReportEnvelope(envelope = {}) {
   appendSection(lines, "Directory-sync mapping coverage:", envelope.directorySyncMappings);
   appendSection(lines, "Exception profile coverage:", envelope.exceptionProfileLabels);
   appendSection(lines, "Overlay profile coverage:", envelope.overlayProfileLabels);
+  appendSection(lines, "Active org-admin categories:", envelope.activeOrgAdminCategories);
+  appendSection(lines, "Active org-admin decision bindings:", envelope.activeOrgAdminDecisionBindings);
+  appendSection(lines, "Active org-admin decision actor roles:", envelope.activeOrgAdminDecisionActorRoles);
+  appendSection(lines, "Active org-admin decision surfaces:", envelope.activeOrgAdminDecisionSurfaces);
+  appendSection(lines, "Active org-admin boundary requirements:", envelope.activeOrgAdminBoundaryRequirements);
+  appendSection(lines, "Active org-admin input keys:", envelope.activeOrgAdminInputKeys);
+  appendSection(lines, "Active org-admin directory sync mappings:", envelope.activeOrgAdminDirectoryMappings);
+  appendSection(lines, "Active org-admin exception profiles:", envelope.activeOrgAdminExceptionProfiles);
+  appendSection(lines, "Active org-admin overlay profiles:", envelope.activeOrgAdminOverlayProfiles);
+  appendSection(lines, "Active org-admin input values:", envelope.activeOrgAdminInputValues);
   appendSection(lines, "Worker capability coverage:", envelope.workerCapabilityLabels);
   appendSection(lines, "Directory-sync inputs:", envelope.directorySyncInputs);
   appendSection(lines, "Residency profiles:", envelope.residencyProfiles);
@@ -856,5 +941,6 @@ function renderGovernedReportEnvelope(envelope = {}) {
 module.exports = {
   buildGovernedReportEnvelope,
   buildGovernedReportSelectionState,
+  buildOrgAdminReviewProjection,
   renderGovernedReportEnvelope
 };

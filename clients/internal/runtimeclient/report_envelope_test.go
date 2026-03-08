@@ -57,6 +57,7 @@ func TestBuildEnterpriseReportEnvelope(t *testing.T) {
 							"environment":   "prod",
 							"business_unit": "platform",
 						},
+						"decisionActorRoles":   []string{"enterprise.tenant_admin"},
 						"decisionSurfaces":     []string{"policy_pack_assignment"},
 						"boundaryRequirements": []string{"runtime_authz"},
 					},
@@ -235,6 +236,45 @@ func TestBuildEnterpriseReportEnvelope(t *testing.T) {
 	if len(envelope.DecisionBindingLabels) == 0 {
 		t.Fatalf("decision binding labels missing: %+v", envelope)
 	}
+	if envelope.ActiveOrgAdminProfileID != "centralized_enterprise_admin" {
+		t.Fatalf("active org-admin profile=%q want centralized_enterprise_admin", envelope.ActiveOrgAdminProfileID)
+	}
+	if envelope.ActiveOrgAdminRoleBundle != "enterprise.tenant_admin" {
+		t.Fatalf("active org-admin role bundle=%q want enterprise.tenant_admin", envelope.ActiveOrgAdminRoleBundle)
+	}
+	if envelope.ActiveOrgAdminPendingReviews != 1 {
+		t.Fatalf("active org-admin pending reviews=%d want 1", envelope.ActiveOrgAdminPendingReviews)
+	}
+	if len(envelope.ActiveOrgAdminDecisionBindings) == 0 {
+		t.Fatalf("active org-admin decision bindings missing: %+v", envelope)
+	}
+	if len(envelope.ActiveOrgAdminCategories) == 0 {
+		t.Fatalf("active org-admin categories missing: %+v", envelope)
+	}
+	if len(envelope.ActiveOrgAdminDecisionActorRoles) == 0 {
+		t.Fatalf("active org-admin decision actor roles missing: %+v", envelope)
+	}
+	if len(envelope.ActiveOrgAdminDecisionSurfaces) == 0 {
+		t.Fatalf("active org-admin decision surfaces missing: %+v", envelope)
+	}
+	if len(envelope.ActiveOrgAdminBoundaryRequirements) == 0 {
+		t.Fatalf("active org-admin boundary requirements missing: %+v", envelope)
+	}
+	if len(envelope.ActiveOrgAdminInputKeys) == 0 {
+		t.Fatalf("active org-admin input keys missing: %+v", envelope)
+	}
+	if len(envelope.ActiveOrgAdminDirectoryMappings) == 0 {
+		t.Fatalf("active org-admin directory mappings missing: %+v", envelope)
+	}
+	if len(envelope.ActiveOrgAdminExceptionProfiles) == 0 {
+		t.Fatalf("active org-admin exception profiles missing: %+v", envelope)
+	}
+	if len(envelope.ActiveOrgAdminOverlayProfiles) == 0 {
+		t.Fatalf("active org-admin overlay profiles missing: %+v", envelope)
+	}
+	if len(envelope.ActiveOrgAdminInputValues) == 0 {
+		t.Fatalf("active org-admin input values missing: %+v", envelope)
+	}
 	if len(envelope.DecisionSurfaces) != 3 {
 		t.Fatalf("decision surfaces=%v want 3", envelope.DecisionSurfaces)
 	}
@@ -271,6 +311,27 @@ func TestBuildEnterpriseReportEnvelope(t *testing.T) {
 	}
 	if !strings.Contains(rendered, "Decision binding coverage:") {
 		t.Fatalf("rendered report missing decision binding section: %s", rendered)
+	}
+	if !strings.Contains(rendered, "Active org-admin profile:") {
+		t.Fatalf("rendered report missing active org-admin profile: %s", rendered)
+	}
+	if !strings.Contains(rendered, "Active org-admin decision bindings:") {
+		t.Fatalf("rendered report missing active org-admin decision bindings: %s", rendered)
+	}
+	if !strings.Contains(rendered, "Active org-admin categories:") {
+		t.Fatalf("rendered report missing active org-admin categories: %s", rendered)
+	}
+	if !strings.Contains(rendered, "Active org-admin decision actor roles:") {
+		t.Fatalf("rendered report missing active org-admin decision actor roles: %s", rendered)
+	}
+	if !strings.Contains(rendered, "Active org-admin decision surfaces:") {
+		t.Fatalf("rendered report missing active org-admin decision surfaces: %s", rendered)
+	}
+	if !strings.Contains(rendered, "Active org-admin boundary requirements:") {
+		t.Fatalf("rendered report missing active org-admin boundary requirements: %s", rendered)
+	}
+	if !strings.Contains(rendered, "Active org-admin input values:") {
+		t.Fatalf("rendered report missing active org-admin input values: %s", rendered)
 	}
 	if !strings.Contains(rendered, "Export profile: security_review") {
 		t.Fatalf("rendered report missing export profile: %s", rendered)

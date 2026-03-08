@@ -589,8 +589,22 @@ function renderHtml(model, selection = {}) {
       <span class="chip">workerState=${escapeHtml(normalizedString(governedUpdate.workerState, "-"))}</span>
       <span class="chip">openApprovals=${escapeHtml(String(governedUpdate.openApprovals))}</span>
       <span class="chip">pendingProposals=${escapeHtml(String(governedUpdate.pendingProposalCount))}</span>
+      <span class="chip">orgAdminPending=${escapeHtml(String(governedUpdate.orgAdminPendingReviews || 0))}</span>
     </div>
     <p>${escapeHtml(normalizedString(governedUpdate.summary, "Governed thread state refreshed."))}</p>
+    ${normalizedString(governedUpdate.orgAdminProfileId) || normalizedString(governedUpdate.orgAdminProfileLabel)
+      ? `<div class="meta">orgAdminProfile=${escapeHtml(normalizedString(governedUpdate.orgAdminProfileLabel, normalizedString(governedUpdate.orgAdminProfileId, "-")))} | model=${escapeHtml(normalizedString(governedUpdate.orgAdminOrganizationModel, "-"))} | roleBundle=${escapeHtml(normalizedString(governedUpdate.orgAdminRoleBundle, "-"))}</div>`
+      : ""}
+    ${renderEnvelopeSection("Org-admin categories", governedUpdate.orgAdminCategories)}
+    ${renderEnvelopeSection("Org-admin decision bindings", governedUpdate.orgAdminDecisionBindings)}
+    ${renderEnvelopeSection("Org-admin directory-sync mappings", governedUpdate.orgAdminDirectoryMappings)}
+    ${renderEnvelopeSection("Org-admin exception profiles", governedUpdate.orgAdminExceptionProfiles)}
+    ${renderEnvelopeSection("Org-admin overlay profiles", governedUpdate.orgAdminOverlayProfiles)}
+    ${renderEnvelopeSection("Org-admin decision actor roles", governedUpdate.orgAdminDecisionActorRoles)}
+    ${renderEnvelopeSection("Org-admin decision surfaces", governedUpdate.orgAdminDecisionSurfaces)}
+    ${renderEnvelopeSection("Org-admin boundary requirements", governedUpdate.orgAdminBoundaryRequirements)}
+    ${renderEnvelopeSection("Org-admin input keys", governedUpdate.orgAdminInputKeys)}
+    ${renderEnvelopeSection("Org-admin input values", governedUpdate.orgAdminInputValues)}
     ${renderEnvelopeSection("Details", governedUpdate.details)}
     ${renderEnvelopeSection("Recent activity", governedUpdate.recent)}
     ${renderEnvelopeSection("Action hints", governedUpdate.actionHints)}
@@ -624,6 +638,16 @@ function renderHtml(model, selection = {}) {
     ${renderEnvelopeSection("Delegation models", governedReport.delegationModels)}
     ${renderEnvelopeSection("Delegated admin bundles", governedReport.delegatedAdminBundles)}
     ${renderEnvelopeSection("Break-glass bundles", governedReport.breakGlassBundles)}
+    ${renderEnvelopeSection("Active org-admin categories", governedReport.activeOrgAdminCategories)}
+    ${renderEnvelopeSection("Active org-admin decision bindings", governedReport.activeOrgAdminDecisionBindings)}
+    ${renderEnvelopeSection("Active org-admin decision actor roles", governedReport.activeOrgAdminDecisionActorRoles)}
+    ${renderEnvelopeSection("Active org-admin decision surfaces", governedReport.activeOrgAdminDecisionSurfaces)}
+    ${renderEnvelopeSection("Active org-admin boundary requirements", governedReport.activeOrgAdminBoundaryRequirements)}
+    ${renderEnvelopeSection("Active org-admin input keys", governedReport.activeOrgAdminInputKeys)}
+    ${renderEnvelopeSection("Active org-admin directory-sync mappings", governedReport.activeOrgAdminDirectoryMappings)}
+    ${renderEnvelopeSection("Active org-admin exception profiles", governedReport.activeOrgAdminExceptionProfiles)}
+    ${renderEnvelopeSection("Active org-admin overlay profiles", governedReport.activeOrgAdminOverlayProfiles)}
+    ${renderEnvelopeSection("Active org-admin input values", governedReport.activeOrgAdminInputValues)}
     ${renderEnvelopeSection("Worker capability coverage", governedReport.workerCapabilityLabels)}
     ${renderEnvelopeSection("Directory-sync inputs", governedReport.directorySyncInputs)}
     ${renderEnvelopeSection("Residency profiles", governedReport.residencyProfiles)}

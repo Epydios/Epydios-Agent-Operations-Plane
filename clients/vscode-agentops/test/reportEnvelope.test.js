@@ -51,6 +51,7 @@ test("buildGovernedReportEnvelope filters catalogs and redacts secret-like conte
                   environment: "prod",
                   business_unit: "platform"
                 },
+                decisionActorRoles: ["enterprise.tenant_admin"],
                 decisionSurfaces: ["policy_pack_assignment"],
                 boundaryRequirements: ["runtime_authz"]
               }
@@ -200,6 +201,10 @@ test("buildGovernedReportEnvelope filters catalogs and redacts secret-like conte
   assert.ok(envelope.details.some((item) => item.includes("Org-admin decision binding:")));
   assert.ok(envelope.details.some((item) => item.includes("Org-admin input values:")));
   assert.ok(envelope.actionHints.some((item) => item.includes("pending org-admin decision reviews")));
+  assert.deepEqual(envelope.activeOrgAdminCategories, ["delegated_admin"]);
+  assert.deepEqual(envelope.activeOrgAdminDecisionActorRoles, ["enterprise.tenant_admin"]);
+  assert.deepEqual(envelope.activeOrgAdminDecisionSurfaces, ["policy_pack_assignment"]);
+  assert.deepEqual(envelope.activeOrgAdminBoundaryRequirements, ["runtime_authz"]);
   assert.equal(envelope.applicablePolicyPacks[0], "enterprise-default: Enterprise Default");
   assert.match(envelope.workerCapabilityLabels[0], /Managed Codex Worker/);
   assert.match(envelope.summary, /\[REDACTED\]/);
@@ -211,6 +216,10 @@ test("buildGovernedReportEnvelope filters catalogs and redacts secret-like conte
   assert.match(envelope.renderedText, /Directory-sync mapping coverage:/);
   assert.match(envelope.renderedText, /Exception profile coverage:/);
   assert.match(envelope.renderedText, /Overlay profile coverage:/);
+  assert.match(envelope.renderedText, /Active org-admin categories:/);
+  assert.match(envelope.renderedText, /Active org-admin decision actor roles:/);
+  assert.match(envelope.renderedText, /Active org-admin decision surfaces:/);
+  assert.match(envelope.renderedText, /Active org-admin boundary requirements:/);
 });
 
 test("buildGovernedReportEnvelope infers normalized report disposition", () => {

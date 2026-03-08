@@ -79,6 +79,17 @@ func TestEnterpriseReportParityFixture(t *testing.T) {
 			if len(envelope.OverlayProfileLabels) == 0 {
 				t.Fatalf("expected overlay profile coverage in envelope")
 			}
+			if len(item.Subject.ApprovalCheckpoints) > 0 {
+				if len(envelope.ActiveOrgAdminDecisionBindings) == 0 {
+					t.Fatalf("expected active org-admin decision bindings in envelope")
+				}
+				if len(envelope.ActiveOrgAdminInputKeys) == 0 {
+					t.Fatalf("expected active org-admin input keys in envelope")
+				}
+				if envelope.ActiveOrgAdminPendingReviews <= 0 {
+					t.Fatalf("expected active org-admin pending review count in envelope")
+				}
+			}
 			rendered := RenderEnterpriseReportEnvelope(envelope)
 			if strings.Contains(rendered, "sk-abc1234567890123456789") {
 				t.Fatalf("rendered report leaked secret-like content: %s", rendered)
@@ -91,6 +102,9 @@ func TestEnterpriseReportParityFixture(t *testing.T) {
 			}
 			if !strings.Contains(rendered, "Decision binding coverage:") {
 				t.Fatalf("rendered report missing decision binding coverage: %s", rendered)
+			}
+			if len(item.Subject.ApprovalCheckpoints) > 0 && !strings.Contains(rendered, "Active org-admin decision bindings:") {
+				t.Fatalf("rendered report missing active org-admin decision bindings: %s", rendered)
 			}
 		})
 	}

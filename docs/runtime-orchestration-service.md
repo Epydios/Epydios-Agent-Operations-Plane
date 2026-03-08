@@ -114,6 +114,7 @@ This service moves policy/evidence/profile execution flow out of ad-hoc scripts 
   - `deliveryChannels`
   - `redactionMode`
 - Runtime-native audit and evidence exports now resolve governed export disposition from the same runtime export-profile catalog with `clientSurface=runtime` and `reportType=export`, stamp `X-AgentOps-Export-*` headers, and emit `X-AgentOps-Export-Redactions` when secret-like content is sanitized at the server boundary.
+- Runtime-native audit export now also stamps structured `X-AgentOps-Org-Admin-*` headers and JSON summary fields when persisted org-admin binding state is present in the exported audit records.
 
 ## Org Admin Catalog Contract (M20 baseline)
 
@@ -124,6 +125,8 @@ This service moves policy/evidence/profile execution flow out of ad-hoc scripts 
 - catalog entries now also include structured `decisionBindings` that bind delegated-admin, break-glass, directory-sync, residency or legal-hold exception, and quota or chargeback overlay decisions to concrete governed review objects on the same native contract.
 - approval-checkpoint create and decision flows can now persist active org-admin `decisionBindings` in checkpoint annotations, enforce required-input and role-bundle checks for the bound review, and emit org-admin request or resolution evidence on the same native approval/evidence contract.
 - approval-checkpoint create and decision flows now also persist normalized org-admin `inputValues`, enforce category-specific selection/input validation for the active binding, and project those persisted inputs into shared governed review surfaces on the same native contract.
+- approval-checkpoint create and decision flows now also emit structured `runtime.org_admin.binding.requested` and `runtime.org_admin.binding.decision` audit events so the same persisted org-admin review state survives the runtime audit export boundary.
+- approval-checkpoint create and decision flows now also emit category-specific `org_admin.*` session events, category-specific org-admin evidence records, and `runtime.org_admin.<category>.requested|decision` audit events so delegated-admin, break-glass, directory-sync, residency/legal-hold exception, and quota/chargeback overlay activity survives the session, evidence, and audit boundaries on the same native contract.
 - desktop Chat and VS Code governed report surfaces now consume this catalog on the same governed report envelope used by the other ingress surfaces.
 - Supported filters:
   - `profileId`
@@ -186,6 +189,7 @@ This service moves policy/evidence/profile execution flow out of ad-hoc scripts 
   - boundary requirements
   - directory-sync mapping coverage
   - active org-admin review details and action hints derived from persisted approval-checkpoint `decisionBindings`
+  - active org-admin categories, decision actor roles, decision surfaces, boundary requirements, directory-sync mappings, exception profiles, overlay profiles, and normalized input values derived from those same persisted approval-checkpoint annotations
   - exception profile coverage
   - overlay profile coverage
   - `DLP findings`

@@ -1,3 +1,5 @@
+const { buildOrgAdminReviewProjection } = require("./reportEnvelope");
+
 function normalizedString(value, fallback = "") {
   const text = String(value || "").trim();
   return text || fallback;
@@ -15,6 +17,7 @@ function buildGovernedUpdateEnvelope(model = {}, options = {}) {
   const selectedSession = model?.selectedSession && typeof model.selectedSession === "object" ? model.selectedSession : {};
   const selectedSummary = model?.selectedSummary && typeof model.selectedSummary === "object" ? model.selectedSummary : {};
   const selectedWorker = selectedSummary?.selectedWorker && typeof selectedSummary.selectedWorker === "object" ? selectedSummary.selectedWorker : {};
+  const orgAdminReview = buildOrgAdminReviewProjection(selectedSummary?.approvals || []);
   return {
     header: normalizedString(options.header, "AgentOps governed update"),
     updateType: normalizedString(options.updateType, "status"),
@@ -34,9 +37,24 @@ function buildGovernedUpdateEnvelope(model = {}, options = {}) {
     toolActionCount: Number(selectedSummary?.toolActions?.length || 0),
     evidenceCount: Number(selectedSummary?.evidenceRecords?.length || 0),
     summary: normalizedString(options.summary, normalizedString(selectedSummary?.latestWorkerSummary, "Governed thread state refreshed.")),
-    details: normalizeEnvelopeLines(options.details || []),
+    orgAdminProfileId: normalizedString(orgAdminReview?.profileId),
+    orgAdminProfileLabel: normalizedString(orgAdminReview?.profileLabel),
+    orgAdminOrganizationModel: normalizedString(orgAdminReview?.organizationModel),
+    orgAdminRoleBundle: normalizedString(orgAdminReview?.roleBundle),
+    orgAdminCategories: normalizeEnvelopeLines(orgAdminReview?.categories || []),
+    orgAdminDecisionBindings: normalizeEnvelopeLines(orgAdminReview?.bindingLabels || []),
+    orgAdminDirectoryMappings: normalizeEnvelopeLines(orgAdminReview?.directoryMappings || []),
+    orgAdminExceptionProfiles: normalizeEnvelopeLines(orgAdminReview?.exceptionProfiles || []),
+    orgAdminOverlayProfiles: normalizeEnvelopeLines(orgAdminReview?.overlayProfiles || []),
+    orgAdminDecisionActorRoles: normalizeEnvelopeLines(orgAdminReview?.decisionActorRoles || []),
+    orgAdminDecisionSurfaces: normalizeEnvelopeLines(orgAdminReview?.decisionSurfaces || []),
+    orgAdminBoundaryRequirements: normalizeEnvelopeLines(orgAdminReview?.boundaryRequirements || []),
+    orgAdminInputKeys: normalizeEnvelopeLines(orgAdminReview?.inputKeys || []),
+    orgAdminInputValues: normalizeEnvelopeLines(orgAdminReview?.inputValueLines || []),
+    orgAdminPendingReviews: Number(orgAdminReview?.pendingCount || 0),
+    details: normalizeEnvelopeLines([...(options.details || []), ...((orgAdminReview?.details) || [])]),
     recent: normalizeEnvelopeLines(options.recent || []),
-    actionHints: normalizeEnvelopeLines(options.actionHints || [])
+    actionHints: normalizeEnvelopeLines([...(options.actionHints || []), ...((orgAdminReview?.actionHints) || [])])
   };
 }
 

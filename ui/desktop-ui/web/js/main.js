@@ -1117,6 +1117,7 @@ function buildOperatorChatToolActionExport(thread = {}, sessionId, toolActionId)
     task: timeline?.task || null,
     session: timeline?.session || null,
     selectedWorker: timeline?.selectedWorker || null,
+    approvalCheckpoints: Array.isArray(timeline?.approvalCheckpoints) ? timeline.approvalCheckpoints : [],
     toolAction
   };
 }
@@ -1133,6 +1134,7 @@ function buildOperatorChatEvidenceExport(thread = {}, sessionId, evidenceId) {
     task: timeline?.task || null,
     session: timeline?.session || null,
     selectedWorker: timeline?.selectedWorker || null,
+    approvalCheckpoints: Array.isArray(timeline?.approvalCheckpoints) ? timeline.approvalCheckpoints : [],
     evidence
   };
 }
@@ -5191,14 +5193,17 @@ async function main() {
         if (action === "copy-tool-action-json") {
           const prepared = await copyGovernedText(
             serialized,
-            buildDesktopGovernedExportOptions(
+            {
+              ...buildDesktopGovernedExportOptions(
               governedExportSelection.exportProfile,
               governedExportSelection.audience,
               "review",
               "chat",
               operatorChatState?.catalogs?.exportProfiles,
               governedExportSelection.retentionClass
-            )
+              ),
+              approvalCheckpoints: payload?.approvalCheckpoints || []
+            }
           );
           operatorChatState = {
             ...operatorChatState,
@@ -5211,14 +5216,17 @@ async function main() {
           const prepared = exportGovernedJson(
             payload,
             fileName,
-            buildDesktopGovernedExportOptions(
+            {
+              ...buildDesktopGovernedExportOptions(
               governedExportSelection.exportProfile,
               governedExportSelection.audience,
               "review",
               "chat",
               operatorChatState?.catalogs?.exportProfiles,
               governedExportSelection.retentionClass
-            )
+              ),
+              approvalCheckpoints: payload?.approvalCheckpoints || []
+            }
           );
           operatorChatState = {
             ...operatorChatState,
@@ -5261,14 +5269,17 @@ async function main() {
         if (action === "copy-evidence-json") {
           const prepared = await copyGovernedText(
             JSON.stringify(payload, null, 2),
-            buildDesktopGovernedExportOptions(
+            {
+              ...buildDesktopGovernedExportOptions(
               governedExportSelection.exportProfile,
               governedExportSelection.audience,
               "review",
               "chat",
               operatorChatState?.catalogs?.exportProfiles,
               governedExportSelection.retentionClass
-            )
+              ),
+              approvalCheckpoints: payload?.approvalCheckpoints || []
+            }
           );
           operatorChatState = {
             ...operatorChatState,
@@ -5281,14 +5292,17 @@ async function main() {
           const prepared = exportGovernedJson(
             payload,
             fileName,
-            buildDesktopGovernedExportOptions(
+            {
+              ...buildDesktopGovernedExportOptions(
               governedExportSelection.exportProfile,
               governedExportSelection.audience,
               "review",
               "chat",
               operatorChatState?.catalogs?.exportProfiles,
               governedExportSelection.retentionClass
-            )
+              ),
+              approvalCheckpoints: payload?.approvalCheckpoints || []
+            }
           );
           operatorChatState = {
             ...operatorChatState,

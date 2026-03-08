@@ -54,14 +54,18 @@ func TestRenderSessionEventLines(t *testing.T) {
 	lines := RenderSessionEventLines([]runtimeapi.SessionEventRecord{
 		{EventType: runtimeapi.SessionEventType("worker.progress"), Payload: []byte(`{"summary":"Worker collected deployment context."}`)},
 		{EventType: runtimeapi.SessionEventType("tool_proposal.generated"), Payload: []byte(`{"summary":"Tool proposal generated for shell execution."}`)},
+		{
+			EventType: runtimeapi.SessionEventType("org_admin.directory_sync.requested"),
+			Payload:   []byte(`{"bindingLabel":"Centralized Enterprise Admin Directory Sync Binding","category":"directory_sync","selectedDirectorySyncs":["centralized_enterprise_admin_directory_sync_mapping"],"status":"PENDING"}`),
+		},
 	}, 2)
 	if len(lines) != 2 {
 		t.Fatalf("lines=%d", len(lines))
 	}
-	if !strings.Contains(lines[0], "Worker Progress: Worker collected deployment context.") {
+	if !strings.Contains(lines[0], "Tool Proposal: Tool proposal generated for shell execution.") {
 		t.Fatalf("unexpected line: %s", lines[0])
 	}
-	if !strings.Contains(lines[1], "Tool Proposal: Tool proposal generated for shell execution.") {
+	if !strings.Contains(lines[1], "Directory Sync Review: Centralized Enterprise Admin Directory Sync Binding | category=directory_sync | directorySync=centralized_enterprise_admin_directory_sync_mapping | status=PENDING") {
 		t.Fatalf("unexpected line: %s", lines[1])
 	}
 }

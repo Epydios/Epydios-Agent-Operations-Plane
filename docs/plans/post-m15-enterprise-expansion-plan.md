@@ -225,14 +225,34 @@ Current parallel progress:
   - org-admin request and decision evidence now carries those normalized input values on the same native approval/evidence contract
   - the shared Go, desktop Chat, and VS Code governed report surfaces now render persisted org-admin input values and category-specific action hints directly from approval annotations without introducing a second admin-report contract
   - focused runtime API coverage, shared report-envelope coverage, desktop Chat and VS Code JS coverage, the dedicated M20 verifier, `go test ./...`, and the full standing desktop/runtime gate suite remained green after the slice
+- M20 org-admin governed export persistence slice 62 is now complete:
+  - runtime-native session evidence export now derives structured org-admin export metadata from persisted approval-checkpoint annotations and stamps that metadata into governed export headers and JSON output on the same runtime export boundary
+  - desktop Chat governed tool-action, evidence, and governance-report exports now preserve active org-admin review metadata, including pending review counts and input-key coverage, instead of collapsing back to catalog-only export metadata
+  - focused runtime export coverage, desktop governed-export JS coverage, the dedicated M20 verifier, `go test ./...`, and the full standing desktop/runtime gate suite remained green after the slice
+- M20 org-admin governed update projection slice 63 is now complete:
+  - CLI, workflow, and chatops governed update envelopes now project active org-admin review details and action hints directly from persisted approval-checkpoint annotations instead of relying only on pending approval/proposal hints
+  - focused CLI, workflow, and chatops update-envelope coverage now pins those org-admin review details and action hints on the shared native contract
+  - the dedicated M20 verifier, `go test ./...`, and the full standing desktop/runtime gate suite remained green after the slice
+- M20 org-admin runtime audit projection slice 64 is now complete:
+  - runtime approval-checkpoint org-admin bindings now emit structured runtime audit events on both request and decision paths instead of leaving that state only in approval annotations, session events, and evidence records
+  - runtime audit export now derives structured org-admin export metadata and governed export headers from those persisted audit records on the same native export boundary
+  - focused runtime approval/audit/export coverage, the dedicated M20 verifier, `go test ./...`, and the full standing desktop/runtime gate suite remained green after the slice
+- M20 active org-admin governed report projection slice 65 is now complete:
+  - the shared Go enterprise report envelope plus the desktop Chat and VS Code governed report and export surfaces now project active org-admin categories, decision actor roles, decision surfaces, boundary requirements, directory-sync mappings, exception profiles, overlay profiles, and normalized input values from persisted approval-checkpoint annotations instead of stopping at catalog-only coverage
+  - CLI, workflow, and chatops remain aligned to that same active org-admin review state through the shared governed update and report envelope path, so report surfaces no longer lag update surfaces on the native contract
+  - focused Go report-envelope coverage, desktop Chat governed-report JS coverage, VS Code governed-report JS coverage, the dedicated M20 verifier, `go test ./...`, and the full standing desktop/runtime gate suite remained green after the slice
+- M20 org-admin category-artifact persistence slice 66 is now complete:
+  - runtime approval-checkpoint org-admin bindings now emit category-specific session events, evidence records, and runtime audit events for delegated-admin, break-glass, directory-sync, residency/legal-hold exception, and quota/chargeback overlay decisions instead of persisting only generic binding artifacts
+  - shared Go, CLI, workflow, and chatops review paths now render those category-specific org-admin artifacts as meaningful operator activity instead of collapsing them back into generic binding blobs
+  - focused runtime approval/evidence/audit coverage, shared review coverage, the dedicated M20 verifier, `go test ./...`, and the full standing desktop/runtime gate suite remained green after the slice
 
 
 
 Next implementation step:
 
-- Extend runtime-side enforcement and persistence from the current approval-checkpoint org-admin binding path into the broader delegated-admin, break-glass, directory-sync, residency/legal-hold exception, and quota/chargeback overlay admin surfaces.
-- Extend org-admin binding, exception, overlay, and normalized input-value metadata into the remaining governed report and export surfaces without forking the native M16/M18 contract.
-- Extend parity and verifier coverage for structured org-admin binding and input-state metadata across desktop Chat, VS Code, CLI, workflow, and chatops.
+- Extend runtime-side enforcement and persistence from the current approval-checkpoint, runtime-audit, and category-artifact org-admin paths into the broader delegated-admin, break-glass, directory-sync, residency/legal-hold exception, and quota/chargeback overlay admin surfaces.
+- Extend persisted org-admin category-artifact, exception, overlay, normalized input, and audit/export metadata into the remaining governed report, export, and admin-review surfaces that still rely on partial approval projection or catalog-only coverage, without forking the native M16/M18 contract.
+- Extend parity and verifier coverage for structured org-admin category-artifact, exception, overlay, normalized input, audit/export, and active-review metadata across desktop Chat, VS Code, CLI, workflow, and chatops.
 - Keep Chat, VS Code, CLI, workflow, and chatops on the same native M16/M18 contract.
 - Do not introduce client-specific hardening branches.
 
@@ -256,9 +276,9 @@ Exit gate:
 
 Continue M20 from the now-recorded baseline:
 
-- Extend runtime-side enforcement and persistence from the current approval-checkpoint decision-binding path into the remaining break-glass, directory-sync, residency/legal-hold exception, and quota/chargeback overlay flows.
-- Extend org-admin decision-binding, exception, and overlay metadata into the remaining governed report and export surfaces without forking the native M16/M18 contract.
-- Extend parity and verifier coverage for structured org-admin binding, exception, overlay, and active-review metadata across desktop Chat, VS Code, CLI, workflow, and chatops.
+- Extend runtime-side enforcement and persistence from the current approval-checkpoint and runtime-audit org-admin binding paths into the broader delegated-admin, break-glass, directory-sync, residency/legal-hold exception, and quota/chargeback overlay admin surfaces.
+- Extend persisted org-admin exception, overlay, normalized input, and audit/export metadata into the remaining governed report, export, and admin-review surfaces that still rely on partial approval projection or catalog-only coverage, without forking the native M16/M18 contract.
+- Extend parity and verifier coverage for structured org-admin binding, exception, overlay, normalized input, audit/export, and active-review metadata across desktop Chat, VS Code, CLI, workflow, and chatops.
 - Keep Chat, VS Code, CLI, workflow, and chatops on the same native M16/M18 contract.
 - Do not introduce client-specific hardening branches.
 

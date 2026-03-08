@@ -180,6 +180,21 @@ func extractOrgAdminDecisionBindingAnnotation(raw json.RawMessage) (*orgAdminDec
 	if !ok {
 		return nil, false
 	}
+	return parseOrgAdminDecisionBindingAnnotation(value), true
+}
+
+func extractOrgAdminDecisionBindingAnnotationFromMap(record map[string]interface{}) (*orgAdminDecisionBindingAnnotation, bool) {
+	value, ok := normalizeJSONObject(record[orgAdminDecisionBindingAnnotationKey])
+	if !ok {
+		value, ok = normalizeJSONObject(record["orgAdminDecisionBinding"])
+		if !ok {
+			return nil, false
+		}
+	}
+	return parseOrgAdminDecisionBindingAnnotation(value), true
+}
+
+func parseOrgAdminDecisionBindingAnnotation(value JSONObject) *orgAdminDecisionBindingAnnotation {
 	return &orgAdminDecisionBindingAnnotation{
 		ProfileID:                 strings.TrimSpace(normalizeInterfaceString(value["profileId"], "")),
 		ProfileLabel:              strings.TrimSpace(normalizeInterfaceString(value["profileLabel"], "")),
@@ -209,7 +224,7 @@ func extractOrgAdminDecisionBindingAnnotation(raw json.RawMessage) (*orgAdminDec
 		RequestedInputKeys:        normalizeStringSlice(value["requestedInputKeys"]),
 		DecisionActorRoles:        normalizeStringSlice(value["decisionActorRoles"]),
 		InputValues:               normalizeOrgAdminDecisionBindingInputValueObject(value["inputValues"]),
-	}, true
+	}
 }
 
 func authorizeOrgAdminDecisionBinding(identity *RuntimeIdentity, binding OrgAdminDecisionBinding, selectedRoleBundle string) error {
@@ -465,6 +480,7 @@ func appendOrgAdminDecisionBindingRequestedArtifacts(s *APIServer, ctx context.C
 		CreatedAt: now,
 		UpdatedAt: now,
 	})
+	appendOrgAdminCategoryArtifacts(s, ctx, session, checkpoint, binding, "requested", "", now)
 }
 
 func appendOrgAdminDecisionBindingResolvedArtifacts(s *APIServer, ctx context.Context, session *SessionRecord, checkpoint *ApprovalCheckpointRecord, binding *orgAdminDecisionBindingAnnotation, decision string, now time.Time) {
@@ -520,4 +536,180 @@ func appendOrgAdminDecisionBindingResolvedArtifacts(s *APIServer, ctx context.Co
 		CreatedAt: now,
 		UpdatedAt: now,
 	})
+	appendOrgAdminCategoryArtifacts(s, ctx, session, checkpoint, binding, "decision.applied", decision, now)
+}
+
+func appendOrgAdminCategoryArtifacts(s *APIServer, ctx context.Context, session *SessionRecord, checkpoint *ApprovalCheckpointRecord, binding *orgAdminDecisionBindingAnnotation, phase, decision string, now time.Time) {
+	if s == nil || session == nil || checkpoint == nil || binding == nil {
+		return
+	}
+	eventPrefix, evidencePrefix := orgAdminCategoryArtifactPrefix(binding.Category)
+	if eventPrefix == "" || evidencePrefix == "" {
+		return
+	}
+
+	payload := map[string]interface{}{
+		"checkpointId":             checkpoint.CheckpointID,
+		"profileId":                binding.ProfileID,
+		"profileLabel":             binding.ProfileLabel,
+		"organizationModel":        binding.OrganizationModel,
+		"bindingId":                binding.BindingID,
+		"bindingLabel":             binding.BindingLabel,
+		"category":                 binding.Category,
+		"bindingMode":              binding.BindingMode,
+		"status":                   checkpoint.Status,
+		"selectedRoleBundle":       binding.SelectedRoleBundle,
+		"selectedDirectorySyncs":   binding.SelectedDirectoryMappings,
+		"selectedExceptions":       binding.SelectedExceptionProfiles,
+		"selectedOverlays":         binding.SelectedOverlayProfiles,
+		"decisionActorRoles":       binding.DecisionActorRoles,
+		"decisionSurfaces":         binding.DecisionSurfaces,
+		"boundaryRequirements":     binding.BoundaryRequirements,
+		"requestedInputKeys":       binding.RequestedInputKeys,
+		"inputValues":              binding.InputValues,
+		"directorySyncInputs":      binding.DirectorySyncInputs,
+		"residencyExceptionInputs": binding.ResidencyExceptionInputs,
+		"legalHoldExceptionInputs": binding.LegalHoldExceptionInputs,
+		"quotaOverlayInputs":       binding.QuotaOverlayInputs,
+		"chargebackOverlayInputs":  binding.ChargebackOverlayInputs,
+	}
+	if decision = strings.TrimSpace(decision); decision != "" {
+		payload["decision"] = decision
+		payload["reason"] = checkpoint.Reason
+	}
+
+	_ = s.store.AppendSessionEvent(ctx, &SessionEventRecord{
+		SessionID: session.SessionID,
+		EventType: SessionEventType(eventPrefix + "." + phase),
+		Payload:   mustMarshalJSON(payload),
+		Timestamp: now,
+	})
+
+	evidenceKind := evidencePrefix + "_request"
+	timestampField := "createdAt"
+	if decision != "" {
+		evidenceKind = evidencePrefix + "_decision"
+		timestampField = "reviewedAt"
+	}
+	metadata := map[string]interface{}{
+		"profileId":                 binding.ProfileID,
+		"profileLabel":              binding.ProfileLabel,
+		"organizationModel":         binding.OrganizationModel,
+		"bindingId":                 binding.BindingID,
+		"bindingLabel":              binding.BindingLabel,
+		"category":                  binding.Category,
+		"bindingMode":               binding.BindingMode,
+		"selectedRoleBundle":        binding.SelectedRoleBundle,
+		"selectedDirectoryMappings": binding.SelectedDirectoryMappings,
+		"selectedExceptionProfiles": binding.SelectedExceptionProfiles,
+		"selectedOverlayProfiles":   binding.SelectedOverlayProfiles,
+		"decisionActorRoles":        binding.DecisionActorRoles,
+		"decisionSurfaces":          binding.DecisionSurfaces,
+		"boundaryRequirements":      binding.BoundaryRequirements,
+		"requestedInputKeys":        binding.RequestedInputKeys,
+		"inputValues":               binding.InputValues,
+		timestampField:              now.Format(time.RFC3339),
+	}
+	if decision != "" {
+		metadata["decision"] = decision
+		metadata["status"] = checkpoint.Status
+		metadata["reason"] = checkpoint.Reason
+	}
+	_ = s.store.UpsertEvidenceRecord(ctx, &EvidenceRecord{
+		EvidenceID:     fmt.Sprintf("%s-%s", checkpoint.CheckpointID, strings.ReplaceAll(evidenceKind, "_", "-")),
+		SessionID:      session.SessionID,
+		CheckpointID:   checkpoint.CheckpointID,
+		TenantID:       session.TenantID,
+		ProjectID:      session.ProjectID,
+		Kind:           evidenceKind,
+		RetentionClass: chooseOrgAdminCategoryRetentionClass(binding.Category, decision != ""),
+		Metadata:       mustMarshalJSON(metadata),
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	})
+}
+
+func orgAdminCategoryArtifactPrefix(category string) (string, string) {
+	switch strings.TrimSpace(category) {
+	case "delegated_admin":
+		return "org_admin.delegated_admin", "org_admin_delegated_admin"
+	case "break_glass":
+		return "org_admin.break_glass", "org_admin_break_glass"
+	case "directory_sync":
+		return "org_admin.directory_sync", "org_admin_directory_sync"
+	case "residency":
+		return "org_admin.residency_exception", "org_admin_residency_exception"
+	case "legal_hold":
+		return "org_admin.legal_hold_exception", "org_admin_legal_hold_exception"
+	case "quota":
+		return "org_admin.quota_overlay", "org_admin_quota_overlay"
+	case "chargeback":
+		return "org_admin.chargeback_overlay", "org_admin_chargeback_overlay"
+	default:
+		return "", ""
+	}
+}
+
+func chooseOrgAdminCategoryRetentionClass(category string, resolved bool) string {
+	switch strings.TrimSpace(category) {
+	case "break_glass", "legal_hold":
+		if resolved {
+			return "archive"
+		}
+		return "standard"
+	case "residency", "quota", "chargeback":
+		if resolved {
+			return "archive"
+		}
+		return "standard"
+	default:
+		if resolved {
+			return "archive"
+		}
+		return "standard"
+	}
+}
+
+func orgAdminCategoryAuditEventName(category, phase string) string {
+	prefix, _ := orgAdminCategoryArtifactPrefix(category)
+	if prefix == "" {
+		return ""
+	}
+	return "runtime." + prefix + "." + phase
+}
+
+func orgAdminDecisionBindingAuditPayload(binding *orgAdminDecisionBindingAnnotation) map[string]interface{} {
+	if binding == nil {
+		return nil
+	}
+	return map[string]interface{}{
+		"profileId":                     binding.ProfileID,
+		"profileLabel":                  binding.ProfileLabel,
+		"organizationModel":             binding.OrganizationModel,
+		"delegationModel":               binding.DelegationModel,
+		"bindingId":                     binding.BindingID,
+		"bindingLabel":                  binding.BindingLabel,
+		"category":                      binding.Category,
+		"bindingMode":                   binding.BindingMode,
+		"hookIds":                       binding.HookIDs,
+		"directorySyncMappings":         binding.DirectorySyncMappings,
+		"selectedDirectorySyncMappings": binding.SelectedDirectoryMappings,
+		"exceptionProfiles":             binding.ExceptionProfiles,
+		"selectedExceptionProfiles":     binding.SelectedExceptionProfiles,
+		"overlayProfiles":               binding.OverlayProfiles,
+		"selectedOverlayProfiles":       binding.SelectedOverlayProfiles,
+		"roleBundles":                   binding.RoleBundles,
+		"selectedRoleBundle":            binding.SelectedRoleBundle,
+		"requiredInputs":                binding.RequiredInputs,
+		"decisionSurfaces":              binding.DecisionSurfaces,
+		"boundaryRequirements":          binding.BoundaryRequirements,
+		"directorySyncInputs":           binding.DirectorySyncInputs,
+		"residencyExceptionInputs":      binding.ResidencyExceptionInputs,
+		"legalHoldExceptionInputs":      binding.LegalHoldExceptionInputs,
+		"quotaOverlayInputs":            binding.QuotaOverlayInputs,
+		"chargebackOverlayInputs":       binding.ChargebackOverlayInputs,
+		"requestedInputKeys":            binding.RequestedInputKeys,
+		"decisionActorRoles":            binding.DecisionActorRoles,
+		"inputValues":                   binding.InputValues,
+	}
 }

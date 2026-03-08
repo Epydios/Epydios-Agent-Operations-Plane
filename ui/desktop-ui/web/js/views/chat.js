@@ -532,6 +532,16 @@ function renderGovernanceReport(envelope = {}, sessionId = "") {
       ${renderEnvelopeLines("Delegation models", envelope.delegationModels)}
       ${renderEnvelopeLines("Delegated admin bundles", envelope.delegatedAdminBundles)}
       ${renderEnvelopeLines("Break-glass bundles", envelope.breakGlassBundles)}
+      ${renderEnvelopeLines("Active org-admin categories", envelope.activeOrgAdminCategories)}
+      ${renderEnvelopeLines("Active org-admin decision bindings", envelope.activeOrgAdminDecisionBindings)}
+      ${renderEnvelopeLines("Active org-admin decision actor roles", envelope.activeOrgAdminDecisionActorRoles)}
+      ${renderEnvelopeLines("Active org-admin decision surfaces", envelope.activeOrgAdminDecisionSurfaces)}
+      ${renderEnvelopeLines("Active org-admin boundary requirements", envelope.activeOrgAdminBoundaryRequirements)}
+      ${renderEnvelopeLines("Active org-admin input keys", envelope.activeOrgAdminInputKeys)}
+      ${renderEnvelopeLines("Active org-admin directory-sync mappings", envelope.activeOrgAdminDirectoryMappings)}
+      ${renderEnvelopeLines("Active org-admin exception profiles", envelope.activeOrgAdminExceptionProfiles)}
+      ${renderEnvelopeLines("Active org-admin overlay profiles", envelope.activeOrgAdminOverlayProfiles)}
+      ${renderEnvelopeLines("Active org-admin input values", envelope.activeOrgAdminInputValues)}
       ${renderEnvelopeLines("Worker capability coverage", envelope.workerCapabilityLabels)}
       ${renderEnvelopeLines("Directory-sync inputs", envelope.directorySyncInputs)}
       ${renderEnvelopeLines("Residency profiles", envelope.residencyProfiles)}

@@ -66,3 +66,59 @@ test("buildGovernedUpdateEnvelope matches shared M19 parity fixture", () => {
   assert.match(envelope.recent.join("\n"), /Worker Progress: Worker collected deployment context\./);
   assert.match(envelope.actionHints.join("\n"), /--checkpoint-id <id>/);
 });
+
+test("buildGovernedUpdateEnvelope projects structured org-admin review state", () => {
+  const envelope = buildGovernedUpdateEnvelope(
+    {
+      task: { taskId: "task-org-admin-1", title: "Org Admin Thread", status: "IN_PROGRESS" },
+      selectedSession: { sessionId: "sess-org-admin-1", status: "AWAITING_APPROVAL" },
+      selectedSummary: {
+        selectedWorker: { workerId: "worker-1", workerType: "managed_agent", status: "WAITING" },
+        approvals: [
+          {
+            checkpointId: "checkpoint-org-admin-1",
+            status: "PENDING",
+            reason: "Delegated admin scope review is required.",
+            annotations: {
+              orgAdminDecisionBinding: {
+                profileId: "centralized_enterprise_admin",
+                profileLabel: "Centralized Enterprise Admin",
+                organizationModel: "centralized_enterprise",
+                bindingId: "centralized_enterprise_admin_delegated_admin_binding",
+                bindingLabel: "Centralized Enterprise Admin Delegated Admin Decision Binding",
+                category: "delegated_admin",
+                selectedRoleBundle: "enterprise.tenant_admin",
+                selectedDirectorySyncMappings: ["centralized_enterprise_admin_directory_sync_mapping"],
+                selectedExceptionProfiles: ["centralized_enterprise_admin_residency_exception"],
+                selectedOverlayProfiles: ["centralized_enterprise_admin_quota_overlay"],
+                decisionActorRoles: ["enterprise.tenant_admin"],
+                decisionSurfaces: ["policy_pack_assignment"],
+                boundaryRequirements: ["runtime_authz"],
+                requestedInputKeys: ["idp_group", "tenant_id"],
+                inputValues: {
+                  idp_group: "grp-agentops-admins",
+                  tenant_id: "tenant-a"
+                }
+              }
+            }
+          }
+        ],
+        toolProposals: [],
+        toolActions: [],
+        evidenceRecords: [],
+        latestWorkerSummary: "Awaiting org-admin review"
+      }
+    },
+    {
+      header: "AgentOps thread update",
+      updateType: "follow"
+    }
+  );
+
+  assert.equal(envelope.orgAdminProfileId, "centralized_enterprise_admin");
+  assert.equal(envelope.orgAdminRoleBundle, "enterprise.tenant_admin");
+  assert.equal(envelope.orgAdminPendingReviews, 1);
+  assert.match(envelope.orgAdminDecisionBindings.join("\n"), /Centralized Enterprise Admin Delegated Admin Decision Binding/);
+  assert.match(envelope.orgAdminInputValues.join("\n"), /tenant_id=tenant-a/);
+  assert.match(envelope.actionHints.join("\n"), /pending org-admin decision reviews/);
+});

@@ -57,6 +57,7 @@ type chatopsStatusReport struct {
 	SelectedWorkerState     string                                `json:"selectedWorkerStatus,omitempty"`
 	SelectedExecutionMode   string                                `json:"selectedExecutionMode,omitempty"`
 	OpenApprovals           int                                   `json:"openApprovals,omitempty"`
+	ApprovalCheckpoints     []runtimeapi.ApprovalCheckpointRecord `json:"approvalCheckpoints,omitempty"`
 	PendingApprovals        []runtimeapi.ApprovalCheckpointRecord `json:"pendingApprovals,omitempty"`
 	PendingProposals        []runtimeclient.ToolProposalReview    `json:"pendingProposals,omitempty"`
 	ToolActionCount         int                                   `json:"toolActionCount,omitempty"`
@@ -645,6 +646,7 @@ func buildChatopsStatusReport(view *runtimeclient.ThreadReview) *chatopsStatusRe
 	report.ToolActionCount = len(view.Timeline.ToolActions)
 	report.EvidenceCount = len(view.Timeline.EvidenceRecords)
 	report.RecentEvents = append([]runtimeclient.EventSummary(nil), view.RecentEvents...)
+	report.ApprovalCheckpoints = append([]runtimeapi.ApprovalCheckpointRecord(nil), view.Timeline.ApprovalCheckpoints...)
 	pendingApprovals := make([]runtimeapi.ApprovalCheckpointRecord, 0)
 	for _, item := range view.Timeline.ApprovalCheckpoints {
 		if strings.EqualFold(string(item.Status), string(runtimeapi.ApprovalStatusPending)) {
@@ -804,6 +806,9 @@ func renderChatopsThreadEnvelope(updateType, summary string, report *chatopsStat
 		envelope.PendingProposalCount = len(report.PendingProposals)
 		envelope.ToolActionCount = report.ToolActionCount
 		envelope.EvidenceCount = report.EvidenceCount
+		orgAdminReview := runtimeclient.BuildOrgAdminReviewProjection(report.ApprovalCheckpoints)
+		envelope.Details = runtimeclient.MergeEnvelopeLines(envelope.Details, orgAdminReview.Details)
+		envelope.ActionHints = runtimeclient.MergeEnvelopeLines(envelope.ActionHints, orgAdminReview.ActionHints)
 	}
 	return runtimeclient.RenderGovernedUpdateEnvelope(envelope)
 }
@@ -900,7 +905,7 @@ func renderChatopsReport(ctx context.Context, client *runtimeclient.Client, repo
 		PendingProposalCount: len(report.PendingProposals),
 		ToolActionCount:      report.ToolActionCount,
 		EvidenceCount:        report.EvidenceCount,
-		ApprovalCheckpoints:  append([]runtimeapi.ApprovalCheckpointRecord(nil), report.PendingApprovals...),
+		ApprovalCheckpoints:  append([]runtimeapi.ApprovalCheckpointRecord(nil), report.ApprovalCheckpoints...),
 		Summary:              runtimeclient.NormalizeStringOrDefault(report.LatestWorkerSummary, "Enterprise conversation posture refreshed."),
 		Details:              buildChatopsReportDetails(report),
 		Recent:               renderChatopsRecentEventLines(report, 4),
@@ -953,7 +958,7 @@ func renderChatopsDeltaReport(ctx context.Context, client *runtimeclient.Client,
 		PendingProposalCount: len(report.PendingProposals),
 		ToolActionCount:      report.ToolActionCount,
 		EvidenceCount:        report.EvidenceCount,
-		ApprovalCheckpoints:  append([]runtimeapi.ApprovalCheckpointRecord(nil), report.PendingApprovals...),
+		ApprovalCheckpoints:  append([]runtimeapi.ApprovalCheckpointRecord(nil), report.ApprovalCheckpoints...),
 		Summary:              runtimeclient.BuildThreadFollowSummary(items),
 		Details:              runtimeclient.BuildThreadFollowDetails(items),
 		Recent:               runtimeclient.RenderSessionEventLines(items, 4),

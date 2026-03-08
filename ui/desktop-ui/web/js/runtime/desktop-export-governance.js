@@ -55,6 +55,13 @@ export function describeGovernedExportDisposition(result = {}) {
   const directorySyncMappings = Array.isArray(result?.directorySyncMappings) ? result.directorySyncMappings.length : 0;
   const exceptionProfiles = Array.isArray(result?.exceptionProfileLabels) ? result.exceptionProfileLabels.length : 0;
   const overlayProfiles = Array.isArray(result?.overlayProfileLabels) ? result.overlayProfileLabels.length : 0;
+  const organizationModels = Array.isArray(result?.orgAdminOrganizationModels) ? result.orgAdminOrganizationModels.length : 0;
+  const roleBundles = Array.isArray(result?.orgAdminRoleBundles) ? result.orgAdminRoleBundles.length : 0;
+  const decisionActorRoles = Array.isArray(result?.orgAdminDecisionActorRoles) ? result.orgAdminDecisionActorRoles.length : 0;
+  const inputValueLines = Array.isArray(result?.orgAdminInputValues) ? result.orgAdminInputValues.length : 0;
+  const activeBindings = Array.isArray(result?.activeOrgAdminDecisionBindings) ? result.activeOrgAdminDecisionBindings.length : 0;
+  const activeInputKeys = Array.isArray(result?.activeOrgAdminInputKeys) ? result.activeOrgAdminInputKeys.length : 0;
+  const activePendingReviews = Number(result?.activeOrgAdminPendingReviews || 0) || 0;
   if (decisionBindings > 0) {
     suffix.push(`decisionBindings=${decisionBindings}`);
   }
@@ -66,6 +73,27 @@ export function describeGovernedExportDisposition(result = {}) {
   }
   if (overlayProfiles > 0) {
     suffix.push(`overlayProfiles=${overlayProfiles}`);
+  }
+  if (organizationModels > 0) {
+    suffix.push(`organizationModels=${organizationModels}`);
+  }
+  if (roleBundles > 0) {
+    suffix.push(`roleBundles=${roleBundles}`);
+  }
+  if (decisionActorRoles > 0) {
+    suffix.push(`decisionActorRoles=${decisionActorRoles}`);
+  }
+  if (inputValueLines > 0) {
+    suffix.push(`inputValues=${inputValueLines}`);
+  }
+  if (activeBindings > 0) {
+    suffix.push(`activeBindings=${activeBindings}`);
+  }
+  if (activeInputKeys > 0) {
+    suffix.push(`activeInputKeys=${activeInputKeys}`);
+  }
+  if (activePendingReviews > 0) {
+    suffix.push(`pendingReviews=${activePendingReviews}`);
   }
   return ` Governed disposition profile=${exportProfile || "-"}; audience=${audience || "-"}; retention=${retentionClass || "-"}.${suffix.length > 0 ? ` Org admin overlays ${suffix.join("; ")}.` : ""}`;
 }

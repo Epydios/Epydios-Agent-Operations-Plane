@@ -51,12 +51,23 @@ type EventSummary struct {
 }
 
 type OrgAdminReviewProjection struct {
-	ProfileID         string   `json:"profileId,omitempty"`
-	ProfileLabel      string   `json:"profileLabel,omitempty"`
-	OrganizationModel string   `json:"organizationModel,omitempty"`
-	RoleBundle        string   `json:"roleBundle,omitempty"`
-	Details           []string `json:"details,omitempty"`
-	ActionHints       []string `json:"actionHints,omitempty"`
+	ProfileID            string   `json:"profileId,omitempty"`
+	ProfileLabel         string   `json:"profileLabel,omitempty"`
+	OrganizationModel    string   `json:"organizationModel,omitempty"`
+	RoleBundle           string   `json:"roleBundle,omitempty"`
+	Categories           []string `json:"categories,omitempty"`
+	BindingLabels        []string `json:"bindingLabels,omitempty"`
+	InputKeys            []string `json:"inputKeys,omitempty"`
+	DirectoryMappings    []string `json:"directoryMappings,omitempty"`
+	ExceptionProfiles    []string `json:"exceptionProfiles,omitempty"`
+	OverlayProfiles      []string `json:"overlayProfiles,omitempty"`
+	DecisionActorRoles   []string `json:"decisionActorRoles,omitempty"`
+	DecisionSurfaces     []string `json:"decisionSurfaces,omitempty"`
+	BoundaryRequirements []string `json:"boundaryRequirements,omitempty"`
+	InputValueLines      []string `json:"inputValueLines,omitempty"`
+	PendingCount         int      `json:"pendingCount,omitempty"`
+	Details              []string `json:"details,omitempty"`
+	ActionHints          []string `json:"actionHints,omitempty"`
 }
 
 type orgAdminDecisionBindingProjection struct {
@@ -76,6 +87,7 @@ type orgAdminDecisionBindingProjection struct {
 	SelectedOverlayProfiles   []string
 	RequiredInputs            []string
 	RequestedInputKeys        []string
+	DecisionActorRoles        []string
 	DecisionSurfaces          []string
 	BoundaryRequirements      []string
 	InputValues               map[string]string
@@ -162,6 +174,9 @@ func SummarizeEventLabel(eventType string) string {
 	case "evidence.recorded":
 		return "Evidence Recorded"
 	}
+	if label, ok := orgAdminEventLabel(strings.ToLower(strings.TrimSpace(eventType))); ok {
+		return label
+	}
 	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(eventType)), "tool_action.") {
 		return "Tool Action"
 	}
@@ -189,10 +204,95 @@ func SummarizeEventDetail(item runtimeapi.SessionEventRecord) string {
 	case "evidence.recorded":
 		return ClipText(normalizeInterfaceString(payload["kind"], normalizeInterfaceString(payload["evidenceId"], "Evidence recorded.")), 220)
 	}
+	if detail, ok := summarizeOrgAdminEventDetail(typeName, payload); ok {
+		return detail
+	}
 	if strings.HasPrefix(typeName, "tool_action.") {
 		return ClipText(normalizeInterfaceString(payload["summary"], normalizeInterfaceString(payload["toolType"], "Tool action")), 220)
 	}
 	return ClipText(normalizeInterfaceString(payload["summary"], normalizeInterfaceString(payload["status"], normalizeInterfaceString(payload["kind"], "Event recorded."))), 220)
+}
+
+func orgAdminEventLabel(eventType string) (string, bool) {
+	switch eventType {
+	case "org_admin.delegated_admin.requested", "org_admin.delegated_admin.decision.applied":
+		return "Delegated Admin Review", true
+	case "org_admin.break_glass.requested", "org_admin.break_glass.decision.applied":
+		return "Break-Glass Review", true
+	case "org_admin.directory_sync.requested", "org_admin.directory_sync.decision.applied":
+		return "Directory Sync Review", true
+	case "org_admin.residency_exception.requested", "org_admin.residency_exception.decision.applied":
+		return "Residency Exception Review", true
+	case "org_admin.legal_hold_exception.requested", "org_admin.legal_hold_exception.decision.applied":
+		return "Legal Hold Review", true
+	case "org_admin.quota_overlay.requested", "org_admin.quota_overlay.decision.applied":
+		return "Quota Overlay Review", true
+	case "org_admin.chargeback_overlay.requested", "org_admin.chargeback_overlay.decision.applied":
+		return "Chargeback Overlay Review", true
+	default:
+		return "", false
+	}
+}
+
+func summarizeOrgAdminEventDetail(eventType string, payload map[string]interface{}) (string, bool) {
+	if !strings.HasPrefix(eventType, "org_admin.") {
+		return "", false
+	}
+	label, ok := orgAdminEventLabel(eventType)
+	if !ok {
+		return "", false
+	}
+	binding := normalizeInterfaceString(payload["bindingLabel"], normalizeInterfaceString(payload["bindingId"], label))
+	category := normalizeInterfaceString(payload["category"], "")
+	status := normalizeInterfaceString(payload["status"], "")
+	decision := normalizeInterfaceString(payload["decision"], "")
+
+	var fragments []string
+	if binding != "" {
+		fragments = append(fragments, binding)
+	}
+	if category != "" {
+		fragments = append(fragments, "category="+category)
+	}
+	if roleBundle := normalizeInterfaceString(payload["selectedRoleBundle"], ""); roleBundle != "" {
+		fragments = append(fragments, "roleBundle="+roleBundle)
+	}
+	if selected := normalizeEventStringSlice(payload["selectedDirectorySyncs"]); len(selected) > 0 {
+		fragments = append(fragments, "directorySync="+strings.Join(selected, ","))
+	}
+	if selected := normalizeEventStringSlice(payload["selectedExceptions"]); len(selected) > 0 {
+		fragments = append(fragments, "exceptions="+strings.Join(selected, ","))
+	}
+	if selected := normalizeEventStringSlice(payload["selectedOverlays"]); len(selected) > 0 {
+		fragments = append(fragments, "overlays="+strings.Join(selected, ","))
+	}
+	if decision != "" {
+		fragments = append(fragments, "decision="+decision)
+	}
+	if status != "" {
+		fragments = append(fragments, "status="+status)
+	}
+	if len(fragments) == 0 {
+		return label, true
+	}
+	return ClipText(strings.Join(fragments, " | "), 320), true
+}
+
+func normalizeEventStringSlice(raw interface{}) []string {
+	switch value := raw.(type) {
+	case []string:
+		return sortedUniqueStrings(value)
+	case []interface{}:
+		items := make([]string, 0, len(value))
+		for _, item := range value {
+			if text := strings.TrimSpace(normalizeInterfaceString(item, "")); text != "" {
+				items = append(items, text)
+			}
+		}
+		return sortedUniqueStrings(items)
+	default:
+		return nil
+	}
 }
 
 func ListToolProposals(timeline *runtimeapi.SessionTimelineResponse) []ToolProposalReview {
@@ -288,6 +388,16 @@ func ExtractManagedTranscript(timeline *runtimeapi.SessionTimelineResponse) *Man
 func BuildOrgAdminReviewProjection(approvals []runtimeapi.ApprovalCheckpointRecord) OrgAdminReviewProjection {
 	bindings := make([]orgAdminDecisionBindingProjection, 0)
 	pendingCount := 0
+	bindingLabels := make([]string, 0)
+	categories := map[string]struct{}{}
+	inputKeys := map[string]struct{}{}
+	directoryMappings := map[string]struct{}{}
+	exceptionProfiles := map[string]struct{}{}
+	overlayProfiles := map[string]struct{}{}
+	decisionActorRoles := map[string]struct{}{}
+	decisionSurfaces := map[string]struct{}{}
+	boundaryRequirements := map[string]struct{}{}
+	inputValueLines := map[string]struct{}{}
 	for _, item := range approvals {
 		value, ok := parseOrgAdminDecisionBinding(item)
 		if !ok {
@@ -295,6 +405,55 @@ func BuildOrgAdminReviewProjection(approvals []runtimeapi.ApprovalCheckpointReco
 		}
 		if strings.EqualFold(strings.TrimSpace(string(item.Status)), string(runtimeapi.ApprovalStatusPending)) {
 			pendingCount++
+		}
+		if label := NormalizeStringOrDefault(value.BindingLabel, value.BindingID); label != "" {
+			bindingLabels = append(bindingLabels, label)
+		}
+		if trimmed := strings.TrimSpace(value.Category); trimmed != "" {
+			categories[trimmed] = struct{}{}
+		}
+		for _, key := range value.RequestedInputKeys {
+			if trimmed := strings.TrimSpace(key); trimmed != "" {
+				inputKeys[trimmed] = struct{}{}
+			}
+		}
+		for _, key := range value.SelectedDirectoryMappings {
+			if trimmed := strings.TrimSpace(key); trimmed != "" {
+				directoryMappings[trimmed] = struct{}{}
+			}
+		}
+		for _, key := range value.SelectedExceptionProfiles {
+			if trimmed := strings.TrimSpace(key); trimmed != "" {
+				exceptionProfiles[trimmed] = struct{}{}
+			}
+		}
+		for _, key := range value.SelectedOverlayProfiles {
+			if trimmed := strings.TrimSpace(key); trimmed != "" {
+				overlayProfiles[trimmed] = struct{}{}
+			}
+		}
+		for _, key := range value.DecisionActorRoles {
+			if trimmed := strings.TrimSpace(key); trimmed != "" {
+				decisionActorRoles[trimmed] = struct{}{}
+			}
+		}
+		for _, key := range value.DecisionSurfaces {
+			if trimmed := strings.TrimSpace(key); trimmed != "" {
+				decisionSurfaces[trimmed] = struct{}{}
+			}
+		}
+		for _, key := range value.BoundaryRequirements {
+			if trimmed := strings.TrimSpace(key); trimmed != "" {
+				boundaryRequirements[trimmed] = struct{}{}
+			}
+		}
+		for key, item := range value.InputValues {
+			trimmedKey := strings.TrimSpace(key)
+			trimmedValue := strings.TrimSpace(item)
+			if trimmedKey == "" || trimmedValue == "" {
+				continue
+			}
+			inputValueLines[fmt.Sprintf("%s=%s", trimmedKey, trimmedValue)] = struct{}{}
 		}
 		bindings = append(bindings, value)
 	}
@@ -368,13 +527,36 @@ func BuildOrgAdminReviewProjection(approvals []runtimeapi.ApprovalCheckpointReco
 	hints = append(hints, orgAdminCategoryHints(primary)...)
 
 	return OrgAdminReviewProjection{
-		ProfileID:         primary.ProfileID,
-		ProfileLabel:      primary.ProfileLabel,
-		OrganizationModel: primary.OrganizationModel,
-		RoleBundle:        primary.SelectedRoleBundle,
-		Details:           sortedUniqueStrings(details),
-		ActionHints:       sortedUniqueStrings(hints),
+		ProfileID:            primary.ProfileID,
+		ProfileLabel:         primary.ProfileLabel,
+		OrganizationModel:    primary.OrganizationModel,
+		RoleBundle:           primary.SelectedRoleBundle,
+		Categories:           mapKeysSorted(categories),
+		BindingLabels:        sortedUniqueStrings(bindingLabels),
+		InputKeys:            mapKeysSorted(inputKeys),
+		DirectoryMappings:    mapKeysSorted(directoryMappings),
+		ExceptionProfiles:    mapKeysSorted(exceptionProfiles),
+		OverlayProfiles:      mapKeysSorted(overlayProfiles),
+		DecisionActorRoles:   mapKeysSorted(decisionActorRoles),
+		DecisionSurfaces:     mapKeysSorted(decisionSurfaces),
+		BoundaryRequirements: mapKeysSorted(boundaryRequirements),
+		InputValueLines:      mapKeysSorted(inputValueLines),
+		PendingCount:         pendingCount,
+		Details:              sortedUniqueStrings(details),
+		ActionHints:          sortedUniqueStrings(hints),
 	}
+}
+
+func mapKeysSorted(items map[string]struct{}) []string {
+	if len(items) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(items))
+	for item := range items {
+		out = append(out, item)
+	}
+	sort.Strings(out)
+	return out
 }
 
 func rawObject(raw json.RawMessage) map[string]interface{} {
@@ -438,6 +620,7 @@ func parseOrgAdminDecisionBinding(item runtimeapi.ApprovalCheckpointRecord) (org
 		SelectedOverlayProfiles:   normalizeApprovalStringList(binding["selectedOverlayProfiles"]),
 		RequiredInputs:            normalizeApprovalStringList(binding["requiredInputs"]),
 		RequestedInputKeys:        normalizeApprovalStringList(binding["requestedInputKeys"]),
+		DecisionActorRoles:        normalizeApprovalStringList(binding["decisionActorRoles"]),
 		DecisionSurfaces:          normalizeApprovalStringList(binding["decisionSurfaces"]),
 		BoundaryRequirements:      normalizeApprovalStringList(binding["boundaryRequirements"]),
 		InputValues:               normalizeApprovalStringMap(binding["inputValues"]),

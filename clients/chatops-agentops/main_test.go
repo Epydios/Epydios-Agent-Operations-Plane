@@ -79,7 +79,10 @@ func TestBuildChatopsStatusReport(t *testing.T) {
 		Session:             runtimeapi.SessionRecord{SessionID: "sess-1", Status: runtimeapi.SessionStatusAwaitingApproval, SelectedWorkerID: "worker-1"},
 		Task:                &runtimeapi.TaskRecord{TaskID: "task-1", Title: "Chat task", Status: runtimeapi.TaskStatusInProgress, LatestSessionID: "sess-1", Annotations: annotations},
 		SelectedWorker:      &runtimeapi.SessionWorkerRecord{WorkerID: "worker-1", WorkerType: "managed_agent", Status: runtimeapi.WorkerStatusRunning},
-		ApprovalCheckpoints: []runtimeapi.ApprovalCheckpointRecord{{CheckpointID: "approval-1", Status: runtimeapi.ApprovalStatusPending}},
+		ApprovalCheckpoints: []runtimeapi.ApprovalCheckpointRecord{
+			{CheckpointID: "approval-1", Status: runtimeapi.ApprovalStatusPending},
+			{CheckpointID: "approval-2", Status: runtimeapi.ApprovalStatusApproved},
+		},
 		ToolActions:         []runtimeapi.ToolActionRecord{{ToolActionID: "tool-1", ToolType: "managed_agent_turn"}},
 		EvidenceRecords:     []runtimeapi.EvidenceRecord{{EvidenceID: "evidence-1"}},
 		Events: []runtimeapi.SessionEventRecord{
@@ -95,6 +98,12 @@ func TestBuildChatopsStatusReport(t *testing.T) {
 	}
 	if report.OpenApprovals != 1 {
 		t.Fatalf("openApprovals=%d", report.OpenApprovals)
+	}
+	if len(report.ApprovalCheckpoints) != 2 {
+		t.Fatalf("approvalCheckpoints=%d", len(report.ApprovalCheckpoints))
+	}
+	if len(report.PendingApprovals) != 1 {
+		t.Fatalf("pendingApprovals=%d", len(report.PendingApprovals))
 	}
 	if len(report.PendingProposals) != 1 {
 		t.Fatalf("pendingProposals=%d", len(report.PendingProposals))
@@ -223,6 +232,53 @@ func TestRenderChatopsUpdateSinglePendingUsesDirectHint(t *testing.T) {
 	}
 }
 
+func TestRenderChatopsUpdateIncludesOrgAdminReviewHints(t *testing.T) {
+	report := &chatopsStatusReport{
+		SourceSystem:    "slack",
+		ChannelID:       "C123",
+		ThreadID:        "1730.55",
+		TaskID:          "task-1",
+		LatestSessionID: "sess-1",
+		ApprovalCheckpoints: []runtimeapi.ApprovalCheckpointRecord{
+			{
+				CheckpointID: "approval-org-1",
+				Status:       runtimeapi.ApprovalStatusPending,
+				Annotations: mustJSON(map[string]interface{}{
+					"orgAdminDecisionBinding": map[string]interface{}{
+						"profileId":          "centralized_enterprise_admin",
+						"profileLabel":       "Centralized Enterprise Admin",
+						"organizationModel":  "centralized_enterprise",
+						"bindingId":          "break_glass_timebox",
+						"bindingLabel":       "Break-glass timebox",
+						"category":           "break_glass",
+						"bindingMode":        "enforced",
+						"selectedRoleBundle": "enterprise_break_glass_admin",
+						"requiredInputs":     []string{"break_glass_expiry", "incident_id"},
+						"requestedInputKeys": []string{"break_glass_expiry", "incident_id"},
+						"decisionSurfaces":   []string{"chatops", "workflow"},
+						"boundaryRequirements": []string{
+							"runtime_authz",
+						},
+						"inputValues": map[string]interface{}{
+							"break_glass_expiry": "2026-03-09T00:00:00Z",
+							"incident_id":        "INC-9001",
+						},
+					},
+				}),
+			},
+		},
+	}
+	update := renderChatopsUpdate(report)
+	if !containsAll(update,
+		"Org-admin input values: break_glass_expiry=2026-03-09T00:00:00Z, incident_id=INC-9001",
+		"Resolve 1 pending org-admin decision reviews before enterprise handoff.",
+		"Org-admin decision is restricted to role bundle enterprise_break_glass_admin.",
+		"Org-admin review requires input coverage for break_glass_expiry, incident_id.",
+	) {
+		t.Fatalf("unexpected chatops org-admin update: %s", update)
+	}
+}
+
 func TestRenderChatopsDeltaUpdate(t *testing.T) {
 	report := &chatopsStatusReport{
 		SourceSystem: "slack",
@@ -265,6 +321,29 @@ func TestRenderChatopsReport(t *testing.T) {
 		SelectedWorkerState:     "RUNNING",
 		SelectedExecutionMode:   runtimeapi.AgentInvokeExecutionModeManagedCodexWorker,
 		OpenApprovals:           1,
+		ApprovalCheckpoints: []runtimeapi.ApprovalCheckpointRecord{
+			{
+				CheckpointID: "approval-org-1",
+				Status:       runtimeapi.ApprovalStatusPending,
+				Annotations: mustJSON(map[string]interface{}{
+					"orgAdminDecisionBinding": map[string]interface{}{
+						"profileId":          "centralized_enterprise_admin",
+						"profileLabel":       "Centralized Enterprise Admin",
+						"organizationModel":  "centralized_enterprise",
+						"bindingId":          "break_glass_timebox",
+						"bindingLabel":       "Break-glass timebox",
+						"category":           "break_glass",
+						"selectedRoleBundle": "enterprise_break_glass_admin",
+						"requiredInputs":     []string{"break_glass_expiry", "incident_id"},
+						"requestedInputKeys": []string{"break_glass_expiry", "incident_id"},
+						"inputValues": map[string]interface{}{
+							"break_glass_expiry": "2026-03-09T00:00:00Z",
+							"incident_id":        "INC-9001",
+						},
+					},
+				}),
+			},
+		},
 		PendingProposals:        []runtimeclient.ToolProposalReview{{ProposalID: "proposal-1", Summary: "Run pwd"}},
 		ToolActionCount:         2,
 		EvidenceCount:           1,
@@ -283,6 +362,8 @@ func TestRenderChatopsReport(t *testing.T) {
 		"Worker capability coverage:",
 		"Managed Codex Worker | managed_codex_worker | agentops_gateway",
 		"Boundary requirements:",
+		"Org-admin input values: break_glass_expiry=2026-03-09T00:00:00Z, incident_id=INC-9001",
+		"Resolve 1 pending org-admin decision reviews before enterprise handoff.",
 	) {
 		t.Fatalf("unexpected chatops report: %s", rendered)
 	}
