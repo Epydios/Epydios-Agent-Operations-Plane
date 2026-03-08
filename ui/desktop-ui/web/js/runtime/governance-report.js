@@ -744,6 +744,58 @@ function orgAdminCategoryHints(primary = {}) {
   }
 }
 
+function orgAdminEventLabel(eventType = "") {
+  switch (normalizedString(eventType).toLowerCase()) {
+    case "org_admin.binding.requested":
+    case "org_admin.binding.decision.applied":
+      return "Org-Admin Binding Review";
+    case "org_admin.delegated_admin.requested":
+    case "org_admin.delegated_admin.decision.applied":
+      return "Delegated Admin Review";
+    case "org_admin.break_glass.requested":
+    case "org_admin.break_glass.decision.applied":
+      return "Break-Glass Review";
+    case "org_admin.directory_sync.requested":
+    case "org_admin.directory_sync.decision.applied":
+      return "Directory Sync Review";
+    case "org_admin.residency_exception.requested":
+    case "org_admin.residency_exception.decision.applied":
+      return "Residency Exception Review";
+    case "org_admin.legal_hold_exception.requested":
+    case "org_admin.legal_hold_exception.decision.applied":
+      return "Legal Hold Review";
+    case "org_admin.quota_overlay.requested":
+    case "org_admin.quota_overlay.decision.applied":
+      return "Quota Overlay Review";
+    case "org_admin.chargeback_overlay.requested":
+    case "org_admin.chargeback_overlay.decision.applied":
+      return "Chargeback Overlay Review";
+    default:
+      return "";
+  }
+}
+
+function summarizeOrgAdminEventDetail(eventType = "", payload = {}) {
+  if (!normalizedString(eventType).toLowerCase().startsWith("org_admin.")) {
+    return "";
+  }
+  const label = orgAdminEventLabel(eventType);
+  const binding = normalizedString(payload?.bindingLabel, normalizedString(payload?.bindingId, label));
+  const parts = [];
+  if (binding) parts.push(binding);
+  if (normalizedString(payload?.category)) parts.push(`category=${normalizedString(payload.category)}`);
+  if (normalizedString(payload?.selectedRoleBundle)) parts.push(`roleBundle=${normalizedString(payload.selectedRoleBundle)}`);
+  const selectedDirectorySyncs = Array.isArray(payload?.selectedDirectorySyncs) ? payload.selectedDirectorySyncs : (Array.isArray(payload?.selectedMappings) ? payload.selectedMappings : []);
+  const selectedExceptions = Array.isArray(payload?.selectedExceptions) ? payload.selectedExceptions : [];
+  const selectedOverlays = Array.isArray(payload?.selectedOverlays) ? payload.selectedOverlays : [];
+  if (selectedDirectorySyncs.length) parts.push(`directorySync=${selectedDirectorySyncs.map((entry) => normalizedString(entry)).filter(Boolean).join(",")}`);
+  if (selectedExceptions.length) parts.push(`exceptions=${selectedExceptions.map((entry) => normalizedString(entry)).filter(Boolean).join(",")}`);
+  if (selectedOverlays.length) parts.push(`overlays=${selectedOverlays.map((entry) => normalizedString(entry)).filter(Boolean).join(",")}`);
+  if (normalizedString(payload?.decision)) parts.push(`decision=${normalizedString(payload.decision)}`);
+  if (normalizedString(payload?.status)) parts.push(`status=${normalizedString(payload.status)}`);
+  return parts.join(" | ");
+}
+
 function buildOrgAdminReviewProjection(approvals = []) {
   const bindings = (Array.isArray(approvals) ? approvals : [])
     .map((approval) => parseOrgAdminDecisionBinding(approval))
@@ -921,8 +973,59 @@ function buildOrgAdminReviewProjection(approvals = []) {
   };
 }
 
+function buildOrgAdminArtifactProjection(events = [], evidenceRecords = []) {
+  const eventLabels = new Set();
+  const evidenceKinds = new Set();
+  const retentionClasses = new Set();
+  const details = [];
+
+  for (const item of Array.isArray(events) ? events : []) {
+    const eventType = normalizedString(item?.eventType).toLowerCase();
+    if (!eventType.startsWith("org_admin.")) {
+      continue;
+    }
+    const payload = item?.payload && typeof item.payload === "object" ? item.payload : {};
+    const label = normalizedString(orgAdminEventLabel(eventType), "Org-Admin Review Artifact");
+    eventLabels.add(label);
+    details.push(`${label}: ${normalizedString(summarizeOrgAdminEventDetail(eventType, payload), "Org-admin event recorded.")}`);
+  }
+
+  for (const item of Array.isArray(evidenceRecords) ? evidenceRecords : []) {
+    const kind = normalizedString(item?.kind);
+    if (!kind.toLowerCase().startsWith("org_admin_")) {
+      continue;
+    }
+    evidenceKinds.add(kind);
+    if (normalizedString(item?.retentionClass)) {
+      retentionClasses.add(normalizedString(item.retentionClass));
+    }
+    const metadata = item?.metadata && typeof item.metadata === "object" ? item.metadata : {};
+    const parts = [normalizedString(metadata?.bindingLabel, kind)];
+    if (normalizedString(metadata?.category)) parts.push(`category=${normalizedString(metadata.category)}`);
+    if (normalizedString(metadata?.selectedRoleBundle)) parts.push(`roleBundle=${normalizedString(metadata.selectedRoleBundle)}`);
+    const selectedDirectoryMappings = Array.isArray(metadata?.selectedDirectoryMappings) ? metadata.selectedDirectoryMappings : [];
+    const selectedExceptionProfiles = Array.isArray(metadata?.selectedExceptionProfiles) ? metadata.selectedExceptionProfiles : [];
+    const selectedOverlayProfiles = Array.isArray(metadata?.selectedOverlayProfiles) ? metadata.selectedOverlayProfiles : [];
+    if (selectedDirectoryMappings.length) parts.push(`directorySync=${selectedDirectoryMappings.map((entry) => normalizedString(entry)).filter(Boolean).join(",")}`);
+    if (selectedExceptionProfiles.length) parts.push(`exceptions=${selectedExceptionProfiles.map((entry) => normalizedString(entry)).filter(Boolean).join(",")}`);
+    if (selectedOverlayProfiles.length) parts.push(`overlays=${selectedOverlayProfiles.map((entry) => normalizedString(entry)).filter(Boolean).join(",")}`);
+    if (normalizedString(metadata?.decision)) parts.push(`decision=${normalizedString(metadata.decision)}`);
+    if (normalizedString(metadata?.status)) parts.push(`status=${normalizedString(metadata.status)}`);
+    if (normalizedString(item?.retentionClass)) parts.push(`retention=${normalizedString(item.retentionClass)}`);
+    details.push(`Org-admin evidence: ${parts.join(" | ")}`);
+  }
+
+  return {
+    eventLabels: sortedUnique(Array.from(eventLabels)),
+    evidenceKinds: sortedUnique(Array.from(evidenceKinds)),
+    retentionClasses: sortedUnique(Array.from(retentionClasses)),
+    details: sortedUnique(details)
+  };
+}
+
 export function buildEnterpriseReportEnvelope(subject = {}, policyCatalog = {}, capabilityCatalog = {}, exportProfileCatalog = {}, orgAdminCatalog = {}) {
   const orgAdminReview = buildOrgAdminReviewProjection(subject?.approvalCheckpoints || []);
+  const orgAdminArtifacts = buildOrgAdminArtifactProjection(subject?.sessionEvents || [], subject?.evidenceRecords || []);
   const effectiveSubject = {
     ...subject,
     orgAdminProfileId: normalizedString(subject?.orgAdminProfileId, normalizedString(orgAdminReview.profileId)),
@@ -959,7 +1062,7 @@ export function buildEnterpriseReportEnvelope(subject = {}, policyCatalog = {}, 
     toolActionCount: Number(subject.toolActionCount || 0) || 0,
     evidenceCount: Number(subject.evidenceCount || 0) || 0,
     summary: normalizedString(subject.summary),
-    details: sanitizeLines([...(Array.isArray(subject?.details) ? subject.details : []), ...orgAdminReview.details]),
+    details: sanitizeLines([...(Array.isArray(subject?.details) ? subject.details : []), ...orgAdminReview.details, ...orgAdminArtifacts.details]),
     applicableOrgAdmins: renderOrgAdminLabels(orgAdminItems),
     applicablePolicyPacks: renderPolicyPackLabels(policyItems),
     exportProfileLabels: renderExportProfileLabels(exportProfileItems),
@@ -1015,6 +1118,9 @@ export function buildEnterpriseReportEnvelope(subject = {}, policyCatalog = {}, 
     activeOrgAdminOverlayProfiles: Array.isArray(orgAdminReview.overlayProfiles) ? orgAdminReview.overlayProfiles : [],
     activeOrgAdminInputValues: Array.isArray(orgAdminReview.inputValueLines) ? orgAdminReview.inputValueLines : [],
     activeOrgAdminPendingReviews: Number(orgAdminReview.pendingCount || 0) || 0,
+    activeOrgAdminArtifactEvents: Array.isArray(orgAdminArtifacts.eventLabels) ? orgAdminArtifacts.eventLabels : [],
+    activeOrgAdminArtifactEvidence: Array.isArray(orgAdminArtifacts.evidenceKinds) ? orgAdminArtifacts.evidenceKinds : [],
+    activeOrgAdminArtifactRetention: Array.isArray(orgAdminArtifacts.retentionClasses) ? orgAdminArtifacts.retentionClasses : [],
     allowedAudiences: sortedUnique(
       exportProfileItems.flatMap((item) => [
         normalizedString(item?.defaultAudience),
@@ -1136,6 +1242,9 @@ export function renderEnterpriseReportEnvelope(envelope = {}) {
   appendSection(lines, "Active org-admin exception profiles:", envelope.activeOrgAdminExceptionProfiles);
   appendSection(lines, "Active org-admin overlay profiles:", envelope.activeOrgAdminOverlayProfiles);
   appendSection(lines, "Active org-admin input values:", envelope.activeOrgAdminInputValues);
+  appendSection(lines, "Active org-admin artifact events:", envelope.activeOrgAdminArtifactEvents);
+  appendSection(lines, "Active org-admin evidence kinds:", envelope.activeOrgAdminArtifactEvidence);
+  appendSection(lines, "Active org-admin artifact retention classes:", envelope.activeOrgAdminArtifactRetention);
   appendSection(lines, "Worker capability coverage:", envelope.workerCapabilityLabels);
   appendSection(lines, "Directory-sync inputs:", envelope.directorySyncInputs);
   appendSection(lines, "Residency profiles:", envelope.residencyProfiles);
@@ -1168,6 +1277,7 @@ export function prepareGovernedJsonExport(payload, options = {}) {
   const exportProfileItems = filterExportProfileItems(options?.exportProfileCatalog || {}, options, disposition);
   const orgAdminItems = filterOrgAdminItems(options?.orgAdminCatalog || options?.orgAdminProfiles || {}, options);
   const orgAdminReview = buildOrgAdminReviewProjection(options?.approvalCheckpoints || []);
+  const orgAdminArtifacts = buildOrgAdminArtifactProjection(options?.sessionEvents || [], options?.evidenceRecords || []);
   const state = { count: 0 };
   const sanitizedPayload = sanitizeStructuredValue(payload, state);
   const findings = state.count > 0
@@ -1202,6 +1312,9 @@ export function prepareGovernedJsonExport(payload, options = {}) {
     activeOrgAdminPendingReviews: Number(orgAdminReview.pendingCount || 0) || 0,
     activeOrgAdminDetails: Array.isArray(orgAdminReview.details) ? orgAdminReview.details : [],
     activeOrgAdminActionHints: Array.isArray(orgAdminReview.actionHints) ? orgAdminReview.actionHints : [],
+    activeOrgAdminArtifactEvents: Array.isArray(orgAdminArtifacts.eventLabels) ? orgAdminArtifacts.eventLabels : [],
+    activeOrgAdminArtifactEvidence: Array.isArray(orgAdminArtifacts.evidenceKinds) ? orgAdminArtifacts.evidenceKinds : [],
+    activeOrgAdminArtifactRetention: Array.isArray(orgAdminArtifacts.retentionClasses) ? orgAdminArtifacts.retentionClasses : [],
     allowedAudiences: sortedUnique(
       exportProfileItems.flatMap((item) => [
         normalizedString(item?.defaultAudience),
@@ -1232,6 +1345,7 @@ export function prepareGovernedTextExport(text, options = {}) {
   const exportProfileItems = filterExportProfileItems(options?.exportProfileCatalog || {}, options, disposition);
   const orgAdminItems = filterOrgAdminItems(options?.orgAdminCatalog || options?.orgAdminProfiles || {}, options);
   const orgAdminReview = buildOrgAdminReviewProjection(options?.approvalCheckpoints || []);
+  const orgAdminArtifacts = buildOrgAdminArtifactProjection(options?.sessionEvents || [], options?.evidenceRecords || []);
   const result = redactStringWithCount(text, 0);
   return {
     text: result.value,
@@ -1263,6 +1377,9 @@ export function prepareGovernedTextExport(text, options = {}) {
     activeOrgAdminPendingReviews: Number(orgAdminReview.pendingCount || 0) || 0,
     activeOrgAdminDetails: Array.isArray(orgAdminReview.details) ? orgAdminReview.details : [],
     activeOrgAdminActionHints: Array.isArray(orgAdminReview.actionHints) ? orgAdminReview.actionHints : [],
+    activeOrgAdminArtifactEvents: Array.isArray(orgAdminArtifacts.eventLabels) ? orgAdminArtifacts.eventLabels : [],
+    activeOrgAdminArtifactEvidence: Array.isArray(orgAdminArtifacts.evidenceKinds) ? orgAdminArtifacts.evidenceKinds : [],
+    activeOrgAdminArtifactRetention: Array.isArray(orgAdminArtifacts.retentionClasses) ? orgAdminArtifacts.retentionClasses : [],
     allowedAudiences: sortedUnique(
       exportProfileItems.flatMap((item) => [
         normalizedString(item?.defaultAudience),

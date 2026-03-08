@@ -54,6 +54,7 @@ func BuildThreadGovernedUpdateEnvelope(view *ThreadReview, options ThreadEnvelop
 			envelope.WorkerState = string(timeline.SelectedWorker.Status)
 		}
 		orgAdminReview := BuildOrgAdminReviewProjection(timeline.ApprovalCheckpoints)
+		orgAdminArtifacts := BuildOrgAdminArtifactProjection(timeline.Events, timeline.EvidenceRecords)
 		envelope.OrgAdminProfileID = orgAdminReview.ProfileID
 		envelope.OrgAdminProfileLabel = orgAdminReview.ProfileLabel
 		envelope.OrgAdminOrganizationModel = orgAdminReview.OrganizationModel
@@ -69,7 +70,10 @@ func BuildThreadGovernedUpdateEnvelope(view *ThreadReview, options ThreadEnvelop
 		envelope.OrgAdminInputKeys = append([]string(nil), orgAdminReview.InputKeys...)
 		envelope.OrgAdminInputValues = append([]string(nil), orgAdminReview.InputValueLines...)
 		envelope.OrgAdminPendingReviews = orgAdminReview.PendingCount
-		envelope.Details = MergeEnvelopeLines(envelope.Details, orgAdminReview.Details)
+		envelope.OrgAdminArtifactEvents = append([]string(nil), orgAdminArtifacts.EventLabels...)
+		envelope.OrgAdminArtifactEvidence = append([]string(nil), orgAdminArtifacts.EvidenceKinds...)
+		envelope.OrgAdminArtifactRetention = append([]string(nil), orgAdminArtifacts.RetentionClasses...)
+		envelope.Details = MergeEnvelopeLines(envelope.Details, orgAdminReview.Details, orgAdminArtifacts.Details)
 		envelope.ActionHints = MergeEnvelopeLines(envelope.ActionHints, orgAdminReview.ActionHints)
 	}
 	if len(envelope.Recent) == 0 {

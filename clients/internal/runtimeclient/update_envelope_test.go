@@ -26,6 +26,15 @@ func TestRenderGovernedUpdateEnvelope(t *testing.T) {
 		PendingProposalCount: 2,
 		ToolActionCount:      3,
 		EvidenceCount:        1,
+		OrgAdminArtifactEvents: []string{
+			"Directory Sync Review: Centralized Enterprise Admin Directory Sync Binding | category=directory_sync | directorySync=centralized_enterprise_admin_directory_sync_mapping | status=PENDING",
+		},
+		OrgAdminArtifactEvidence: []string{
+			"org_admin_directory_sync_request",
+		},
+		OrgAdminArtifactRetention: []string{
+			"standard",
+		},
 		Summary:              "Governed thread state refreshed.",
 		Details:              []string{"Title: Chat task"},
 		Recent:               []string{"Worker Progress: Worker collected deployment context."},
@@ -39,6 +48,12 @@ func TestRenderGovernedUpdateEnvelope(t *testing.T) {
 		"Summary: Governed thread state refreshed.",
 		"Details:",
 		"- Title: Chat task",
+		"Org-admin artifact events:",
+		"- Directory Sync Review: Centralized Enterprise Admin Directory Sync Binding | category=directory_sync | directorySync=centralized_enterprise_admin_directory_sync_mapping | status=PENDING",
+		"Org-admin evidence kinds:",
+		"- org_admin_directory_sync_request",
+		"Org-admin artifact retention classes:",
+		"- standard",
 		"Recent activity:",
 		"- Worker Progress: Worker collected deployment context.",
 		"Action hints:",

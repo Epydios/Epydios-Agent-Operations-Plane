@@ -75,6 +75,28 @@ test("enterprise governance report envelope filters catalogs and redacts secret-
           }
         }
       ],
+      sessionEvents: [
+        {
+          eventId: "event-org-admin-1",
+          eventType: "org_admin.directory_sync.requested",
+          payload: {
+            bindingLabel: "Centralized Enterprise Admin Directory Sync Binding",
+            category: "directory_sync",
+            selectedDirectorySyncs: ["centralized_enterprise_admin_directory_sync_mapping"],
+            status: "PENDING"
+          }
+        }
+      ],
+      evidenceRecords: [
+        {
+          evidenceId: "evidence-org-admin-1",
+          kind: "org_admin_directory_sync_request",
+          retentionClass: "standard",
+          metadata: {
+            bindingLabel: "Centralized Enterprise Admin Directory Sync Binding"
+          }
+        }
+      ],
       summary: "Bearer sk-abc1234567890123456789 must be removed",
       details: ["Endpoint ref: ref://gateways/litellm/openai-compatible"]
     },
@@ -208,6 +230,9 @@ test("enterprise governance report envelope filters catalogs and redacts secret-
   assert.ok(envelope.overlayProfileLabels.some((item) => item.includes("Quota Overlay")));
   assert.ok(envelope.details.some((item) => item.includes("Org-admin decision binding:")));
   assert.ok(envelope.details.some((item) => item.includes("Org-admin input values:")));
+  assert.ok(envelope.activeOrgAdminArtifactEvents.some((item) => item.includes("Directory Sync Review")));
+  assert.ok(envelope.activeOrgAdminArtifactEvidence.includes("org_admin_directory_sync_request"));
+  assert.ok(envelope.activeOrgAdminArtifactRetention.includes("standard"));
   assert.ok(envelope.actionHints.some((item) => item.includes("pending org-admin decision reviews")));
   assert.match(envelope.workerCapabilityLabels[0], /Managed Codex Worker/);
   assert.match(envelope.summary, /\[REDACTED\]/);
@@ -223,6 +248,9 @@ test("enterprise governance report envelope filters catalogs and redacts secret-
   assert.match(renderEnterpriseReportEnvelope(envelope), /Active org-admin decision actor roles:/);
   assert.match(renderEnterpriseReportEnvelope(envelope), /Active org-admin decision surfaces:/);
   assert.match(renderEnterpriseReportEnvelope(envelope), /Active org-admin boundary requirements:/);
+  assert.match(renderEnterpriseReportEnvelope(envelope), /Active org-admin artifact events:/);
+  assert.match(renderEnterpriseReportEnvelope(envelope), /Active org-admin evidence kinds:/);
+  assert.match(renderEnterpriseReportEnvelope(envelope), /Active org-admin artifact retention classes:/);
 });
 
 test("governed json export redacts structured secret-like content and carries export metadata", () => {

@@ -103,9 +103,30 @@ test("buildGovernedUpdateEnvelope projects structured org-admin review state", (
             }
           }
         ],
+        events: [
+          {
+            eventId: "event-org-admin-1",
+            eventType: "org_admin.directory_sync.requested",
+            payload: {
+              bindingLabel: "Centralized Enterprise Admin Directory Sync Binding",
+              category: "directory_sync",
+              selectedDirectorySyncs: ["centralized_enterprise_admin_directory_sync_mapping"],
+              status: "PENDING"
+            }
+          }
+        ],
         toolProposals: [],
         toolActions: [],
-        evidenceRecords: [],
+        evidenceRecords: [
+          {
+            evidenceId: "evidence-org-admin-1",
+            kind: "org_admin_directory_sync_request",
+            retentionClass: "standard",
+            metadata: {
+              bindingLabel: "Centralized Enterprise Admin Directory Sync Binding"
+            }
+          }
+        ],
         latestWorkerSummary: "Awaiting org-admin review"
       }
     },
@@ -120,5 +141,8 @@ test("buildGovernedUpdateEnvelope projects structured org-admin review state", (
   assert.equal(envelope.orgAdminPendingReviews, 1);
   assert.match(envelope.orgAdminDecisionBindings.join("\n"), /Centralized Enterprise Admin Delegated Admin Decision Binding/);
   assert.match(envelope.orgAdminInputValues.join("\n"), /tenant_id=tenant-a/);
+  assert.match(envelope.orgAdminArtifactEvents.join("\n"), /Directory Sync Review/);
+  assert.match(envelope.orgAdminArtifactEvidence.join("\n"), /org_admin_directory_sync_request/);
+  assert.match(envelope.orgAdminArtifactRetention.join("\n"), /standard/);
   assert.match(envelope.actionHints.join("\n"), /pending org-admin decision reviews/);
 });

@@ -605,6 +605,9 @@ function renderHtml(model, selection = {}) {
     ${renderEnvelopeSection("Org-admin boundary requirements", governedUpdate.orgAdminBoundaryRequirements)}
     ${renderEnvelopeSection("Org-admin input keys", governedUpdate.orgAdminInputKeys)}
     ${renderEnvelopeSection("Org-admin input values", governedUpdate.orgAdminInputValues)}
+    ${renderEnvelopeSection("Org-admin artifact events", governedUpdate.orgAdminArtifactEvents)}
+    ${renderEnvelopeSection("Org-admin evidence kinds", governedUpdate.orgAdminArtifactEvidence)}
+    ${renderEnvelopeSection("Org-admin artifact retention classes", governedUpdate.orgAdminArtifactRetention)}
     ${renderEnvelopeSection("Details", governedUpdate.details)}
     ${renderEnvelopeSection("Recent activity", governedUpdate.recent)}
     ${renderEnvelopeSection("Action hints", governedUpdate.actionHints)}
@@ -648,6 +651,9 @@ function renderHtml(model, selection = {}) {
     ${renderEnvelopeSection("Active org-admin exception profiles", governedReport.activeOrgAdminExceptionProfiles)}
     ${renderEnvelopeSection("Active org-admin overlay profiles", governedReport.activeOrgAdminOverlayProfiles)}
     ${renderEnvelopeSection("Active org-admin input values", governedReport.activeOrgAdminInputValues)}
+    ${renderEnvelopeSection("Active org-admin artifact events", governedReport.activeOrgAdminArtifactEvents)}
+    ${renderEnvelopeSection("Active org-admin evidence kinds", governedReport.activeOrgAdminArtifactEvidence)}
+    ${renderEnvelopeSection("Active org-admin artifact retention classes", governedReport.activeOrgAdminArtifactRetention)}
     ${renderEnvelopeSection("Worker capability coverage", governedReport.workerCapabilityLabels)}
     ${renderEnvelopeSection("Directory-sync inputs", governedReport.directorySyncInputs)}
     ${renderEnvelopeSection("Residency profiles", governedReport.residencyProfiles)}

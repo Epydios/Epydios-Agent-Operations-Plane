@@ -37,6 +37,8 @@ type EnterpriseReportSubject struct {
 	ToolActionCount      int
 	EvidenceCount        int
 	ApprovalCheckpoints  []runtimeapi.ApprovalCheckpointRecord
+	SessionEvents        []runtimeapi.SessionEventRecord
+	EvidenceRecords      []runtimeapi.EvidenceRecord
 	Summary              string
 	Details              []string
 	Recent               []string
@@ -112,6 +114,9 @@ type EnterpriseReportEnvelope struct {
 	ActiveOrgAdminOverlayProfiles      []string
 	ActiveOrgAdminInputValues          []string
 	ActiveOrgAdminPendingReviews       int
+	ActiveOrgAdminArtifactEvents       []string
+	ActiveOrgAdminArtifactEvidence     []string
+	ActiveOrgAdminArtifactRetention    []string
 	ReportingSurfaces                  []string
 	AllowedAudiences                   []string
 	AllowedRetention                   []string
@@ -152,6 +157,7 @@ func ResolveEnterpriseReportDisposition(clientSurface, reportType, exportProfile
 func BuildEnterpriseReportEnvelope(subject EnterpriseReportSubject, policyCatalog *runtimeapi.PolicyPackCatalogResponse, capabilityCatalog *runtimeapi.WorkerCapabilityCatalogResponse, exportProfileCatalog *runtimeapi.ExportProfileCatalogResponse, orgAdminCatalog *runtimeapi.OrgAdminCatalogResponse) EnterpriseReportEnvelope {
 	disposition := ResolveEnterpriseReportDisposition(subject.ClientSurface, subject.ReportType, subject.ExportProfile, subject.Audience)
 	orgAdminReview := BuildOrgAdminReviewProjection(subject.ApprovalCheckpoints)
+	orgAdminArtifacts := BuildOrgAdminArtifactProjection(subject.SessionEvents, subject.EvidenceRecords)
 	effectiveProfileID := NormalizeStringOrDefault(subject.OrgAdminProfileID, orgAdminReview.ProfileID)
 	effectiveOrganizationModel := NormalizeStringOrDefault(subject.OrganizationModel, orgAdminReview.OrganizationModel)
 	effectiveRoleBundle := NormalizeStringOrDefault(subject.OrgAdminRoleBundle, orgAdminReview.RoleBundle)
@@ -188,7 +194,7 @@ func BuildEnterpriseReportEnvelope(subject EnterpriseReportSubject, policyCatalo
 		ToolActionCount:      subject.ToolActionCount,
 		EvidenceCount:        subject.EvidenceCount,
 		Summary:              strings.TrimSpace(subject.Summary),
-		Details:              append(append([]string(nil), subject.Details...), orgAdminReview.Details...),
+		Details:              append(append(append([]string(nil), subject.Details...), orgAdminReview.Details...), orgAdminArtifacts.Details...),
 		Recent:               append([]string(nil), subject.Recent...),
 		ActionHints:          append(append([]string(nil), subject.ActionHints...), orgAdminReview.ActionHints...),
 	}
@@ -238,6 +244,9 @@ func BuildEnterpriseReportEnvelope(subject EnterpriseReportSubject, policyCatalo
 	envelope.ActiveOrgAdminOverlayProfiles = append([]string(nil), orgAdminReview.OverlayProfiles...)
 	envelope.ActiveOrgAdminInputValues = append([]string(nil), orgAdminReview.InputValueLines...)
 	envelope.ActiveOrgAdminPendingReviews = orgAdminReview.PendingCount
+	envelope.ActiveOrgAdminArtifactEvents = append([]string(nil), orgAdminArtifacts.EventLabels...)
+	envelope.ActiveOrgAdminArtifactEvidence = append([]string(nil), orgAdminArtifacts.EvidenceKinds...)
+	envelope.ActiveOrgAdminArtifactRetention = append([]string(nil), orgAdminArtifacts.RetentionClasses...)
 	envelope.ReportingSurfaces = sortedUniqueStrings(append(
 		append(combineReportingSurfaces(policyItems), combineOrgAdminField(orgAdminItems, func(item runtimeapi.OrgAdminCatalogEntry) []string { return item.ReportingSurfaces })...),
 		combineExportProfileDeliveryChannels(exportProfileItems)...,
@@ -353,6 +362,9 @@ func RenderEnterpriseReportEnvelope(env EnterpriseReportEnvelope) string {
 	appendEnvelopeSection(&lines, "Active org-admin exception profiles:", env.ActiveOrgAdminExceptionProfiles)
 	appendEnvelopeSection(&lines, "Active org-admin overlay profiles:", env.ActiveOrgAdminOverlayProfiles)
 	appendEnvelopeSection(&lines, "Active org-admin input values:", env.ActiveOrgAdminInputValues)
+	appendEnvelopeSection(&lines, "Active org-admin artifact events:", env.ActiveOrgAdminArtifactEvents)
+	appendEnvelopeSection(&lines, "Active org-admin evidence kinds:", env.ActiveOrgAdminArtifactEvidence)
+	appendEnvelopeSection(&lines, "Active org-admin artifact retention classes:", env.ActiveOrgAdminArtifactRetention)
 	appendEnvelopeSection(&lines, "Reporting surfaces:", env.ReportingSurfaces)
 	appendEnvelopeSection(&lines, "Allowed audiences:", env.AllowedAudiences)
 	appendEnvelopeSection(&lines, "Allowed retention classes:", env.AllowedRetention)

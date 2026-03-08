@@ -64,6 +64,31 @@ func TestBuildEnterpriseReportEnvelope(t *testing.T) {
 				}),
 			},
 		},
+		SessionEvents: []runtimeapi.SessionEventRecord{
+			{
+				EventID:   "event-org-admin-1",
+				SessionID: "session-1",
+				Sequence:  41,
+				EventType: runtimeapi.SessionEventType("org_admin.directory_sync.requested"),
+				Payload: mustJSONRaw(map[string]interface{}{
+					"bindingLabel":           "Centralized Enterprise Admin Directory Sync Binding",
+					"category":               "directory_sync",
+					"selectedDirectorySyncs": []string{"centralized_enterprise_admin_directory_sync_mapping"},
+					"status":                 "PENDING",
+				}),
+			},
+		},
+		EvidenceRecords: []runtimeapi.EvidenceRecord{
+			{
+				EvidenceID:     "evidence-org-admin-1",
+				SessionID:      "session-1",
+				Kind:           "org_admin_directory_sync_request",
+				RetentionClass: "standard",
+				Metadata: mustJSONRaw(map[string]interface{}{
+					"bindingLabel": "Centralized Enterprise Admin Directory Sync Binding",
+				}),
+			},
+		},
 		Summary:     "Managed worker is awaiting governed approval.",
 		Recent:      []string{"Worker Progress: Waiting on approval."},
 		ActionHints: []string{"- approvals decide --task-id task-1"},
@@ -275,6 +300,15 @@ func TestBuildEnterpriseReportEnvelope(t *testing.T) {
 	if len(envelope.ActiveOrgAdminInputValues) == 0 {
 		t.Fatalf("active org-admin input values missing: %+v", envelope)
 	}
+	if len(envelope.ActiveOrgAdminArtifactEvents) == 0 {
+		t.Fatalf("active org-admin artifact events missing: %+v", envelope)
+	}
+	if len(envelope.ActiveOrgAdminArtifactEvidence) == 0 {
+		t.Fatalf("active org-admin artifact evidence missing: %+v", envelope)
+	}
+	if len(envelope.ActiveOrgAdminArtifactRetention) == 0 {
+		t.Fatalf("active org-admin artifact retention missing: %+v", envelope)
+	}
 	if len(envelope.DecisionSurfaces) != 3 {
 		t.Fatalf("decision surfaces=%v want 3", envelope.DecisionSurfaces)
 	}
@@ -332,6 +366,15 @@ func TestBuildEnterpriseReportEnvelope(t *testing.T) {
 	}
 	if !strings.Contains(rendered, "Active org-admin input values:") {
 		t.Fatalf("rendered report missing active org-admin input values: %s", rendered)
+	}
+	if !strings.Contains(rendered, "Active org-admin artifact events:") {
+		t.Fatalf("rendered report missing active org-admin artifact events: %s", rendered)
+	}
+	if !strings.Contains(rendered, "Active org-admin evidence kinds:") {
+		t.Fatalf("rendered report missing active org-admin artifact evidence: %s", rendered)
+	}
+	if !strings.Contains(rendered, "Active org-admin artifact retention classes:") {
+		t.Fatalf("rendered report missing active org-admin artifact retention: %s", rendered)
 	}
 	if !strings.Contains(rendered, "Export profile: security_review") {
 		t.Fatalf("rendered report missing export profile: %s", rendered)

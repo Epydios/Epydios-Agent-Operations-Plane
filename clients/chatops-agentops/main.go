@@ -60,6 +60,8 @@ type chatopsStatusReport struct {
 	ApprovalCheckpoints     []runtimeapi.ApprovalCheckpointRecord `json:"approvalCheckpoints,omitempty"`
 	PendingApprovals        []runtimeapi.ApprovalCheckpointRecord `json:"pendingApprovals,omitempty"`
 	PendingProposals        []runtimeclient.ToolProposalReview    `json:"pendingProposals,omitempty"`
+	SessionEvents           []runtimeapi.SessionEventRecord       `json:"sessionEvents,omitempty"`
+	EvidenceRecords         []runtimeapi.EvidenceRecord           `json:"evidenceRecords,omitempty"`
 	ToolActionCount         int                                   `json:"toolActionCount,omitempty"`
 	EvidenceCount           int                                   `json:"evidenceCount,omitempty"`
 	LatestWorkerSummary     string                                `json:"latestWorkerSummary,omitempty"`
@@ -647,6 +649,8 @@ func buildChatopsStatusReport(view *runtimeclient.ThreadReview) *chatopsStatusRe
 	report.EvidenceCount = len(view.Timeline.EvidenceRecords)
 	report.RecentEvents = append([]runtimeclient.EventSummary(nil), view.RecentEvents...)
 	report.ApprovalCheckpoints = append([]runtimeapi.ApprovalCheckpointRecord(nil), view.Timeline.ApprovalCheckpoints...)
+	report.SessionEvents = append([]runtimeapi.SessionEventRecord(nil), view.Timeline.Events...)
+	report.EvidenceRecords = append([]runtimeapi.EvidenceRecord(nil), view.Timeline.EvidenceRecords...)
 	pendingApprovals := make([]runtimeapi.ApprovalCheckpointRecord, 0)
 	for _, item := range view.Timeline.ApprovalCheckpoints {
 		if strings.EqualFold(string(item.Status), string(runtimeapi.ApprovalStatusPending)) {
@@ -807,7 +811,26 @@ func renderChatopsThreadEnvelope(updateType, summary string, report *chatopsStat
 		envelope.ToolActionCount = report.ToolActionCount
 		envelope.EvidenceCount = report.EvidenceCount
 		orgAdminReview := runtimeclient.BuildOrgAdminReviewProjection(report.ApprovalCheckpoints)
-		envelope.Details = runtimeclient.MergeEnvelopeLines(envelope.Details, orgAdminReview.Details)
+		orgAdminArtifacts := runtimeclient.BuildOrgAdminArtifactProjection(report.SessionEvents, report.EvidenceRecords)
+		envelope.OrgAdminProfileID = orgAdminReview.ProfileID
+		envelope.OrgAdminProfileLabel = orgAdminReview.ProfileLabel
+		envelope.OrgAdminOrganizationModel = orgAdminReview.OrganizationModel
+		envelope.OrgAdminRoleBundle = orgAdminReview.RoleBundle
+		envelope.OrgAdminCategories = append([]string(nil), orgAdminReview.Categories...)
+		envelope.OrgAdminDecisionBindings = append([]string(nil), orgAdminReview.BindingLabels...)
+		envelope.OrgAdminDirectoryMappings = append([]string(nil), orgAdminReview.DirectoryMappings...)
+		envelope.OrgAdminExceptionProfiles = append([]string(nil), orgAdminReview.ExceptionProfiles...)
+		envelope.OrgAdminOverlayProfiles = append([]string(nil), orgAdminReview.OverlayProfiles...)
+		envelope.OrgAdminDecisionActorRoles = append([]string(nil), orgAdminReview.DecisionActorRoles...)
+		envelope.OrgAdminDecisionSurfaces = append([]string(nil), orgAdminReview.DecisionSurfaces...)
+		envelope.OrgAdminBoundaryRequirements = append([]string(nil), orgAdminReview.BoundaryRequirements...)
+		envelope.OrgAdminInputKeys = append([]string(nil), orgAdminReview.InputKeys...)
+		envelope.OrgAdminInputValues = append([]string(nil), orgAdminReview.InputValueLines...)
+		envelope.OrgAdminPendingReviews = orgAdminReview.PendingCount
+		envelope.OrgAdminArtifactEvents = append([]string(nil), orgAdminArtifacts.EventLabels...)
+		envelope.OrgAdminArtifactEvidence = append([]string(nil), orgAdminArtifacts.EvidenceKinds...)
+		envelope.OrgAdminArtifactRetention = append([]string(nil), orgAdminArtifacts.RetentionClasses...)
+		envelope.Details = runtimeclient.MergeEnvelopeLines(envelope.Details, orgAdminReview.Details, orgAdminArtifacts.Details)
 		envelope.ActionHints = runtimeclient.MergeEnvelopeLines(envelope.ActionHints, orgAdminReview.ActionHints)
 	}
 	return runtimeclient.RenderGovernedUpdateEnvelope(envelope)
@@ -906,6 +929,8 @@ func renderChatopsReport(ctx context.Context, client *runtimeclient.Client, repo
 		ToolActionCount:      report.ToolActionCount,
 		EvidenceCount:        report.EvidenceCount,
 		ApprovalCheckpoints:  append([]runtimeapi.ApprovalCheckpointRecord(nil), report.ApprovalCheckpoints...),
+		SessionEvents:        append([]runtimeapi.SessionEventRecord(nil), report.SessionEvents...),
+		EvidenceRecords:      append([]runtimeapi.EvidenceRecord(nil), report.EvidenceRecords...),
 		Summary:              runtimeclient.NormalizeStringOrDefault(report.LatestWorkerSummary, "Enterprise conversation posture refreshed."),
 		Details:              buildChatopsReportDetails(report),
 		Recent:               renderChatopsRecentEventLines(report, 4),
@@ -959,6 +984,8 @@ func renderChatopsDeltaReport(ctx context.Context, client *runtimeclient.Client,
 		ToolActionCount:      report.ToolActionCount,
 		EvidenceCount:        report.EvidenceCount,
 		ApprovalCheckpoints:  append([]runtimeapi.ApprovalCheckpointRecord(nil), report.ApprovalCheckpoints...),
+		SessionEvents:        append([]runtimeapi.SessionEventRecord(nil), report.SessionEvents...),
+		EvidenceRecords:      append([]runtimeapi.EvidenceRecord(nil), report.EvidenceRecords...),
 		Summary:              runtimeclient.BuildThreadFollowSummary(items),
 		Details:              runtimeclient.BuildThreadFollowDetails(items),
 		Recent:               runtimeclient.RenderSessionEventLines(items, 4),

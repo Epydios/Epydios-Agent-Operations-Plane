@@ -1,7 +1,7 @@
 # M20 Enterprise Hardening Baseline
 
 Date: 2026-03-08
-Status: baseline recorded, org-admin category-artifact persistence slice landed
+Status: baseline recorded, org-admin category-artifact governed report/update projection slice landed
 
 ## Scope
 
@@ -249,6 +249,7 @@ Now projected into governed report surfaces:
 - runtime approval-checkpoint org-admin bindings now also emit structured runtime audit events on request and decision paths, and runtime audit export now stamps structured org-admin export headers and JSON metadata from those persisted audit records on the same governed export boundary
 - the shared Go enterprise report envelope plus the desktop Chat and VS Code governed report and export surfaces now also project active org-admin categories, decision actor roles, decision surfaces, boundary requirements, directory-sync mappings, exception profiles, overlay profiles, and normalized input values directly from persisted approval-checkpoint annotations instead of stopping at catalog-only projection
 - runtime approval-checkpoint org-admin bindings now also emit category-specific session events, evidence records, and runtime audit events for delegated-admin, break-glass, directory-sync, residency/legal-hold exception, and quota/chargeback overlay decisions, and the shared Go, CLI, workflow, and chatops review paths now render those artifacts as meaningful operator activity instead of collapsing them back into generic binding blobs
+- the shared Go enterprise report/update envelopes plus desktop Chat and VS Code governed review surfaces now also project active org-admin artifact events, evidence kinds, and retention classes directly from persisted `org_admin.*` session events and org-admin evidence records instead of stopping at approval-only projection
 
 Still needed:
 - runtime-side enforcement and persistence beyond the current approval-checkpoint, runtime-audit, and category-artifact paths across the broader admin surface area for delegated-admin, break-glass, directory-sync, residency/legal-hold exception, and quota/chargeback overlay review workflows
@@ -259,8 +260,8 @@ Still needed:
 
 ## Exact next M20 batch
 
-1. Extend runtime-side enforcement and persistence from the current approval-checkpoint, runtime-audit, and category-artifact org-admin paths into the broader delegated-admin, break-glass, directory-sync, residency/legal-hold exception, and quota/chargeback overlay admin surfaces.
-2. Extend persisted org-admin category-artifact, exception, overlay, normalized input, and audit/export metadata into the remaining governed report, export, and admin-review surfaces that still rely on partial approval projection or catalog-only coverage, without forking the native M16/M18 contract.
-3. Extend parity and verifier coverage for structured org-admin category-artifact, exception, overlay, normalized input, audit/export, and active-review metadata across desktop Chat, VS Code, CLI, workflow, and chatops.
+1. Extend runtime-side enforcement and persistence from the current approval-checkpoint, runtime-audit, category-artifact, and governed report/update projection paths into the broader delegated-admin, break-glass, directory-sync, residency/legal-hold exception, and quota/chargeback overlay admin surfaces.
+2. Extend parity and verifier coverage for structured org-admin exception, overlay, normalized input, audit/export, active-review, and category-artifact metadata through the remaining admin-review and export surfaces, without forking the native M16/M18 contract.
+3. Run the M20 exit-gate validation slice and close any final parity defects.
 4. Keep Chat, VS Code, CLI, workflow, and chatops on the same native M16/M18 contract.
 5. Do not introduce client-specific hardening branches.
