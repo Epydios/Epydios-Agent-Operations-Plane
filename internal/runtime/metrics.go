@@ -124,6 +124,7 @@ func normalizeRuntimeHTTPPath(path string) string {
 		"/metrics",
 		"/v1alpha1/runtime/runs",
 		"/v1alpha1/runtime/runs/export",
+		"/v1alpha1/runtime/audit/events/export",
 		"/v1alpha1/runtime/runs/retention/prune",
 		"/v1alpha1/runtime/approvals",
 		"/v1alpha1/runtime/audit/events",
@@ -133,7 +134,9 @@ func normalizeRuntimeHTTPPath(path string) string {
 		"/v1alpha2/runtime/tasks",
 		"/v1alpha2/runtime/sessions",
 		"/v1alpha2/runtime/worker-capabilities",
-		"/v1alpha2/runtime/policy-packs":
+		"/v1alpha2/runtime/policy-packs",
+		"/v1alpha2/runtime/export-profiles",
+		"/v1alpha2/runtime/org-admin-profiles":
 		return normalized
 	}
 	if strings.HasPrefix(normalized, "/v1alpha1/runtime/runs/") {
@@ -175,6 +178,9 @@ func normalizeRuntimeHTTPPath(path string) string {
 		}
 		if strings.HasSuffix(normalized, "/evidence") {
 			return "/v1alpha2/runtime/sessions/:sessionId/evidence"
+		}
+		if strings.HasSuffix(normalized, "/evidence/export") {
+			return "/v1alpha2/runtime/sessions/:sessionId/evidence/export"
 		}
 		if strings.HasSuffix(normalized, "/close") {
 			return "/v1alpha2/runtime/sessions/:sessionId/close"

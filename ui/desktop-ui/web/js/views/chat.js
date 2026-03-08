@@ -1,5 +1,11 @@
 import { escapeHTML, formatTime } from "./common.js";
 import { buildNativeSessionActivitySummary, deriveOperatorChatThreadState, listNativeToolProposals, latestManagedWorkerTranscript } from "../runtime/session-client.js";
+import { buildEnterpriseReportEnvelope, buildGovernedExportSelectionState, renderEnterpriseReportEnvelope } from "../runtime/governance-report.js";
+
+function normalizedString(value, fallback = "") {
+  const text = String(value || "").trim();
+  return text || fallback;
+}
 
 function selectedAttr(current, value) {
   return current === value ? "selected" : "";
@@ -347,6 +353,212 @@ function renderProgressItems(items = []) {
   `;
 }
 
+function renderEnvelopeLines(title, items = []) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return "";
+  }
+  return `
+    <div class="chat-report-section">
+      <div class="meta"><strong>${escapeHTML(title)}</strong></div>
+      <ul class="chat-report-list">
+        ${items.map((item) => `<li>${escapeHTML(String(item || "").replace(/^[-*]\s+/, ""))}</li>`).join("")}
+      </ul>
+    </div>
+  `;
+}
+
+function buildChatTurnReportSubject(turn = {}, activity = {}, response = {}, timeline = {}, exportSelection = {}) {
+  const session = timeline?.session || {};
+  const task = timeline?.task || {};
+  const selectedWorker = timeline?.selectedWorker || {};
+  const approvals = Array.isArray(timeline?.approvalCheckpoints) ? timeline.approvalCheckpoints : [];
+  const toolProposals = listNativeToolProposals(turn?.sessionView || {});
+  const toolActions = Array.isArray(timeline?.toolActions) ? timeline.toolActions : [];
+  const evidence = Array.isArray(timeline?.evidenceRecords) ? timeline.evidenceRecords : [];
+  const transcript = latestManagedWorkerTranscript(turn?.sessionView || {});
+  return {
+    header: "AgentOps enterprise governance report",
+    reportType: "review",
+    clientSurface: "chat",
+    exportProfile: normalizedString(exportSelection.exportProfile),
+    audience: normalizedString(exportSelection.audience),
+    retentionClass: normalizedString(exportSelection.retentionClass),
+    contextLabel: "Thread",
+    contextValue: normalizedString(task?.taskId, normalizedString(turn?.taskId, "-")),
+    subjectLabel: "Turn",
+    subjectValue: normalizedString(turn?.requestId, normalizedString(session?.sessionId, "-")),
+    taskId: normalizedString(task?.taskId, normalizedString(turn?.taskId)),
+    taskStatus: normalizedString(activity?.taskStatus, normalizedString(task?.status)),
+    sessionId: normalizedString(session?.sessionId, normalizedString(response?.sessionId)),
+    sessionStatus: normalizedString(activity?.sessionStatus, normalizedString(session?.status)),
+    workerId: normalizedString(selectedWorker?.workerId),
+    workerType: normalizedString(selectedWorker?.workerType),
+    workerAdapterId: normalizedString(selectedWorker?.adapterId),
+    workerState: normalizedString(activity?.selectedWorkerStatus, normalizedString(selectedWorker?.status)),
+    executionMode: normalizedString(activity?.executionMode, normalizedString(response?.executionMode)),
+    openApprovals: Number(activity?.openApprovalCount ?? approvals.filter((item) => String(item?.status || "PENDING").trim().toUpperCase() === "PENDING").length),
+    pendingProposalCount: Number(activity?.pendingProposalCount ?? toolProposals.filter((item) => String(item?.status || "PENDING").trim().toUpperCase() === "PENDING").length),
+    toolActionCount: Number(activity?.toolActionCount ?? toolActions.length),
+    evidenceCount: Number(activity?.evidenceCount ?? evidence.length),
+    approvalCheckpoints: approvals,
+    summary: normalizedString(activity?.latestWorkerSummary, normalizedString(response?.outputText, "Governed thread state refreshed.")),
+    details: [
+      normalizedString(response?.route) ? `Route: ${normalizedString(response.route)}` : "",
+      normalizedString(response?.boundaryProviderId) ? `Boundary provider: ${normalizedString(response.boundaryProviderId)}` : "",
+      normalizedString(response?.endpointRef) ? `Endpoint ref: ${normalizedString(response.endpointRef)}` : "",
+      normalizedString(transcript?.toolActionId) ? `Transcript tool action: ${normalizedString(transcript.toolActionId)}` : ""
+    ],
+    recent: Array.isArray(activity?.progressItems)
+      ? activity.progressItems.slice(-4).map((item) => `${normalizedString(item?.label, item?.eventType)}: ${normalizedString(item?.detail, "Event recorded.")}`)
+      : [],
+    actionHints: [
+      Number(activity?.openApprovalCount ?? 0) > 0 ? `Resolve ${Number(activity.openApprovalCount)} pending approvals before external handoff.` : "",
+      toolProposals.some((item) => String(item?.status || "PENDING").trim().toUpperCase() === "PENDING")
+        ? "Review pending tool proposals before approving governed execution."
+        : "",
+      normalizedString(response?.boundaryProviderId) ? `Provider traffic is pinned to ${normalizedString(response.boundaryProviderId)}.` : ""
+    ]
+  };
+}
+
+export function buildChatTurnGovernanceReport(turn = {}, catalogs = {}, exportSelection = {}) {
+  const sessionView = turn?.sessionView || {};
+  const timeline = sessionView?.timeline && typeof sessionView.timeline === "object" ? sessionView.timeline : {};
+  const activity = buildNativeSessionActivitySummary(sessionView);
+  const response = turn?.response || {};
+  const envelope = buildEnterpriseReportEnvelope(
+    buildChatTurnReportSubject(turn, activity, response, timeline, exportSelection),
+    catalogs?.policyPacks || {},
+    catalogs?.workerCapabilities || {},
+    catalogs?.exportProfiles || {},
+    catalogs?.orgAdminProfiles || {}
+  );
+  return {
+    ...envelope,
+    renderedText: renderEnterpriseReportEnvelope(envelope)
+  };
+}
+
+export function resolveChatGovernedExportSelection(selection = {}, exportProfileCatalog = null) {
+  return buildGovernedExportSelectionState({
+    clientSurface: "chat",
+    reportType: "review",
+    exportProfileCatalog,
+    exportProfile: normalizedString(selection?.exportProfile),
+    audience: normalizedString(selection?.audience),
+    retentionClass: normalizedString(selection?.retentionClass)
+  });
+}
+
+function renderGovernedExportControls(selectionState = {}) {
+  const exportProfileOptions = Array.isArray(selectionState?.exportProfileOptions) ? selectionState.exportProfileOptions : [];
+  const audienceOptions = Array.isArray(selectionState?.audienceOptions) ? selectionState.audienceOptions : [];
+  const retentionClassOptions = Array.isArray(selectionState?.retentionClassOptions) ? selectionState.retentionClassOptions : [];
+  if (!exportProfileOptions.length) {
+    return `
+      <div class="metric settings-metric settings-metric-chat-export">
+        <div class="metric-title-row">
+          <div class="title">Governed Export Profile</div>
+        </div>
+        <div class="meta">Export-profile catalog unavailable. Chat exports will continue using the normalized operator review defaults until the runtime catalog is reachable.</div>
+      </div>
+    `;
+  }
+  return `
+    <div class="metric settings-metric settings-metric-chat-export">
+      <div class="metric-title-row">
+        <div class="title">Governed Export Profile</div>
+        <span class="chip chip-neutral chip-compact">retention=${escapeHTML(String(selectionState?.retentionClass || "-"))}</span>
+      </div>
+      <div class="meta">These selections apply to Chat governance report, tool-action review, and evidence review exports. Choices are constrained by the runtime export-profile catalog.</div>
+      <div class="settings-editor-grid">
+        <label class="field">
+          <span class="label">Export Profile</span>
+          <select class="filter-input" data-chat-export-field="exportProfile">
+            ${exportProfileOptions.map((item) => `<option value="${escapeHTML(item.value)}" ${selectedAttr(String(selectionState?.exportProfile || ""), item.value)}>${escapeHTML(item.label || item.value)}</option>`).join("")}
+          </select>
+        </label>
+        <label class="field">
+          <span class="label">Audience</span>
+          <select class="filter-input" data-chat-export-field="audience">
+            ${audienceOptions.map((item) => `<option value="${escapeHTML(item)}" ${selectedAttr(String(selectionState?.audience || ""), item)}>${escapeHTML(item)}</option>`).join("")}
+          </select>
+        </label>
+        <label class="field">
+          <span class="label">Retention Class</span>
+          <select class="filter-input" data-chat-export-field="retentionClass">
+            ${retentionClassOptions.map((item) => `<option value="${escapeHTML(item)}" ${selectedAttr(String(selectionState?.retentionClass || ""), item)}>${escapeHTML(item)}</option>`).join("")}
+          </select>
+        </label>
+      </div>
+      ${Array.isArray(selectionState?.retentionOverlays) && selectionState.retentionOverlays.length > 0 ? `<div class="meta">overlays=${escapeHTML(selectionState.retentionOverlays.join(", "))}</div>` : ""}
+    </div>
+  `;
+}
+
+function renderGovernanceReport(envelope = {}, sessionId = "") {
+  if (!envelope || typeof envelope !== "object") {
+    return "";
+  }
+  return `
+    <details class="details-shell chat-review-details chat-governance-report" open>
+      <summary>Enterprise Governance Report</summary>
+      <div class="run-detail-chips">
+        <span class="chip chip-neutral chip-compact">export=${escapeHTML(String(envelope.exportProfile || "-"))}</span>
+        <span class="chip chip-neutral chip-compact">audience=${escapeHTML(String(envelope.audience || "-"))}</span>
+        <span class="chip chip-neutral chip-compact">exportCatalog=${escapeHTML(String((envelope.exportProfileLabels || []).length))}</span>
+        <span class="chip chip-neutral chip-compact">orgAdmin=${escapeHTML(String((envelope.applicableOrgAdmins || []).length))}</span>
+        <span class="chip chip-neutral chip-compact">policyPacks=${escapeHTML(String((envelope.applicablePolicyPacks || []).length))}</span>
+        <span class="chip chip-neutral chip-compact">roleBundles=${escapeHTML(String((envelope.roleBundles || []).length))}</span>
+        <span class="chip chip-neutral chip-compact">adminBundles=${escapeHTML(String((envelope.adminRoleBundles || []).length))}</span>
+        <span class="chip chip-neutral chip-compact">workerCoverage=${escapeHTML(String((envelope.workerCapabilityLabels || []).length))}</span>
+        <span class="chip chip-neutral chip-compact">dlpFindings=${escapeHTML(String((envelope.dlpFindings || []).length))}</span>
+      </div>
+      <div class="filter-row settings-editor-actions">
+        <div class="action-hierarchy">
+          <div class="action-group action-group-secondary">
+            <button class="btn btn-secondary btn-small" type="button" data-chat-action="copy-governance-report" data-chat-session-id="${escapeHTML(sessionId)}">Copy Report</button>
+            <button class="btn btn-secondary btn-small" type="button" data-chat-action="download-governance-report" data-chat-session-id="${escapeHTML(sessionId)}">Download Report JSON</button>
+          </div>
+        </div>
+      </div>
+      <div class="meta">${escapeHTML(String(envelope.summary || "Enterprise governance report prepared."))}</div>
+      ${renderEnvelopeLines("Details", envelope.details)}
+      ${renderEnvelopeLines("Applicable org-admin profiles", envelope.applicableOrgAdmins)}
+      ${renderEnvelopeLines("Applicable policy packs", envelope.applicablePolicyPacks)}
+      ${renderEnvelopeLines("Export profile coverage", envelope.exportProfileLabels)}
+      ${renderEnvelopeLines("Role bundles", envelope.roleBundles)}
+      ${renderEnvelopeLines("Admin role bundles", envelope.adminRoleBundles)}
+      ${renderEnvelopeLines("Delegation models", envelope.delegationModels)}
+      ${renderEnvelopeLines("Delegated admin bundles", envelope.delegatedAdminBundles)}
+      ${renderEnvelopeLines("Break-glass bundles", envelope.breakGlassBundles)}
+      ${renderEnvelopeLines("Worker capability coverage", envelope.workerCapabilityLabels)}
+      ${renderEnvelopeLines("Directory-sync inputs", envelope.directorySyncInputs)}
+      ${renderEnvelopeLines("Residency profiles", envelope.residencyProfiles)}
+      ${renderEnvelopeLines("Residency exceptions", envelope.residencyExceptions)}
+      ${renderEnvelopeLines("Legal-hold profiles", envelope.legalHoldProfiles)}
+      ${renderEnvelopeLines("Legal-hold exceptions", envelope.legalHoldExceptions)}
+      ${renderEnvelopeLines("Network boundary profiles", envelope.networkBoundaryProfiles)}
+      ${renderEnvelopeLines("Fleet rollout profiles", envelope.fleetRolloutProfiles)}
+      ${renderEnvelopeLines("Quota dimensions", envelope.quotaDimensions)}
+      ${renderEnvelopeLines("Quota overlays", envelope.quotaOverlays)}
+      ${renderEnvelopeLines("Chargeback dimensions", envelope.chargebackDimensions)}
+      ${renderEnvelopeLines("Chargeback overlays", envelope.chargebackOverlays)}
+      ${renderEnvelopeLines("Enforcement hooks", envelope.enforcementHooks)}
+      ${renderEnvelopeLines("Boundary requirements", envelope.boundaryRequirements)}
+      ${renderEnvelopeLines("Decision surfaces", envelope.decisionSurfaces)}
+      ${renderEnvelopeLines("Reporting surfaces", envelope.reportingSurfaces)}
+      ${renderEnvelopeLines("Allowed audiences", envelope.allowedAudiences)}
+      ${renderEnvelopeLines("Delivery channels", envelope.deliveryChannels)}
+      ${renderEnvelopeLines("Redaction modes", envelope.redactionModes)}
+      ${renderEnvelopeLines("Recent activity", envelope.recent)}
+      ${renderEnvelopeLines("Action hints", envelope.actionHints)}
+      ${renderEnvelopeLines("DLP findings", envelope.dlpFindings)}
+      ${envelope.renderedText ? `<details class="details-shell"><summary>Rendered Report</summary><pre class="code-block">${escapeHTML(String(envelope.renderedText || ""))}</pre></details>` : ""}
+    </details>
+  `;
+}
+
 function renderThreadResolutionPanel(threadState, activitySummary, hasTask) {
   if (!hasTask || !threadState?.isResolvedThread) {
     return "";
@@ -376,7 +588,7 @@ function renderThreadResolutionPanel(threadState, activitySummary, hasTask) {
   `;
 }
 
-function renderTurnCards(turns = []) {
+function renderTurnCards(turns = [], catalogs = {}, exportSelection = {}) {
   if (!Array.isArray(turns) || turns.length === 0) {
     return `
       <div class="chat-empty-state">
@@ -400,6 +612,7 @@ function renderTurnCards(turns = []) {
       const transcript = latestManagedWorkerTranscript(sessionView);
       const streamItems = Array.isArray(activity?.semanticEvents) ? activity.semanticEvents : [];
       const rawTimeline = timeline ? JSON.stringify(timeline, null, 2) : "";
+      const governanceReport = buildChatTurnGovernanceReport(turn, catalogs, exportSelection);
       return `
         <article class="chat-turn-card">
           <div class="chat-turn-header">
@@ -460,6 +673,7 @@ function renderTurnCards(turns = []) {
             <summary>Evidence records (${evidence.length})</summary>
             ${renderEvidenceRecords(evidence)}
           </details>
+          ${renderGovernanceReport(governanceReport, String(session?.sessionId || response?.sessionId || ""))}
           <details class="details-shell">
             <summary>Recent native events (${streamItems.length})</summary>
             ${renderEventRows(streamItems)}
@@ -509,6 +723,8 @@ export function renderChat(ui, settingsPayload = {}, chatState = {}) {
   const sendLabel = taskId && threadState?.isResolvedThread ? "Reopen Thread With Turn" : "Send Turn";
   const executionMode = String(chatState.executionMode || thread?.executionMode || "raw_model_invoke").trim().toLowerCase();
   const selectedWorker = latestTurn?.sessionView?.timeline?.selectedWorker || {};
+  const catalogState = chatState?.catalogs && typeof chatState.catalogs === "object" ? chatState.catalogs : {};
+  const governedExportSelection = resolveChatGovernedExportSelection(chatState?.exportSelection || {}, catalogState?.exportProfiles || null);
   const managedExecution = executionMode === "managed_codex_worker";
   const managedSessionId = String(latestTurn?.sessionView?.timeline?.session?.sessionId || "").trim();
   const managedWorkerId = String(latestActivity?.selectedWorkerId || selectedWorker?.workerId || "").trim();
@@ -560,7 +776,9 @@ export function renderChat(ui, settingsPayload = {}, chatState = {}) {
               : "Managed Codex worker path selected. Launch to attach the bridge, or Recover to create a fresh managed session if the latest managed thread is already resolved.")}</div>`
             : ""
         }
+        ${catalogState?.message ? `<div class="meta">governanceCatalogs=${escapeHTML(String(catalogState.source || "-"))}; ${escapeHTML(String(catalogState.message || ""))}</div>` : ""}
       </div>
+      ${renderGovernedExportControls(governedExportSelection)}
       ${renderThreadResolutionPanel(threadState, latestActivity, Boolean(taskId))}
       <div class="chat-history-layout">
         <div class="metric settings-metric settings-metric-chat-history">
@@ -643,7 +861,7 @@ export function renderChat(ui, settingsPayload = {}, chatState = {}) {
         </div>
       </div>
       <div class="chat-turns-stack">
-        ${renderTurnCards(turns)}
+        ${renderTurnCards(turns, catalogState, governedExportSelection)}
       </div>
     </div>
   `;

@@ -95,6 +95,7 @@ func (s *APIServer) Routes() http.Handler {
 	mux.HandleFunc("/v1alpha1/runtime/runs/", s.handleRunByID)
 	mux.HandleFunc("/v1alpha1/runtime/approvals", s.handleApprovals)
 	mux.HandleFunc("/v1alpha1/runtime/approvals/", s.handleApprovalDecisionByRunID)
+	mux.HandleFunc("/v1alpha1/runtime/audit/events/export", s.handleAuditExport)
 	mux.HandleFunc("/v1alpha1/runtime/audit/events", s.handleAuditEvents)
 	mux.HandleFunc("/v1alpha1/runtime/terminal/sessions", s.handleTerminalSessions)
 	mux.HandleFunc("/v1alpha1/runtime/integrations/settings", s.handleIntegrationSettings)
@@ -106,6 +107,8 @@ func (s *APIServer) Routes() http.Handler {
 	mux.HandleFunc("/v1alpha2/runtime/approvals/", s.handleApprovalCheckpointByIDV1Alpha2)
 	mux.HandleFunc("/v1alpha2/runtime/worker-capabilities", s.handleWorkerCapabilitiesV1Alpha2)
 	mux.HandleFunc("/v1alpha2/runtime/policy-packs", s.handlePolicyPacksV1Alpha2)
+	mux.HandleFunc("/v1alpha2/runtime/export-profiles", s.handleExportProfilesV1Alpha2)
+	mux.HandleFunc("/v1alpha2/runtime/org-admin-profiles", s.handleOrgAdminProfilesV1Alpha2)
 	return loggingMiddleware(mux)
 }
 
@@ -303,6 +306,16 @@ func (s *APIServer) handleRunExport(w http.ResponseWriter, r *http.Request) {
 	}
 	identity, _ := RuntimeIdentityFromContext(r.Context())
 	filtered, deniedByAuthz := filterRunSummariesByAuthorization(items, identity, s.auth, PermissionRunRead)
+	exportItems := make([]RunSummary, 0, len(filtered))
+	redactionCount := 0
+	for _, item := range filtered {
+		sanitized, count := redactRunSummaryForExport(item)
+		exportItems = append(exportItems, sanitized)
+		redactionCount += count
+	}
+	if redactionCount > 0 {
+		w.Header().Set("X-AgentOps-Export-Redactions", strconv.Itoa(redactionCount))
+	}
 
 	emitAuditEvent(r.Context(), "runtime.run.export", map[string]interface{}{
 		"path":            r.URL.Path,
@@ -310,15 +323,16 @@ func (s *APIServer) handleRunExport(w http.ResponseWriter, r *http.Request) {
 		"format":          format,
 		"requestedLimit":  query.Limit,
 		"requestedOffset": query.Offset,
-		"returnedCount":   len(filtered),
+		"returnedCount":   len(exportItems),
 		"unfilteredCount": len(items),
 		"filteredDenied":  deniedByAuthz,
+		"redactionCount":  redactionCount,
 	})
 
 	switch format {
 	case "jsonl":
 		w.Header().Set("Content-Type", "application/x-ndjson")
-		for _, item := range filtered {
+		for _, item := range exportItems {
 			b, err := json.Marshal(item)
 			if err != nil {
 				writeAPIError(w, http.StatusInternalServerError, "EXPORT_ENCODE_FAILED", "failed to encode export record", true, map[string]interface{}{"error": err.Error()})
@@ -339,7 +353,7 @@ func (s *APIServer) handleRunExport(w http.ResponseWriter, r *http.Request) {
 			writeAPIError(w, http.StatusInternalServerError, "EXPORT_ENCODE_FAILED", "failed to write CSV header", true, map[string]interface{}{"error": err.Error()})
 			return
 		}
-		for _, item := range filtered {
+		for _, item := range exportItems {
 			expiresAt := ""
 			if item.ExpiresAt != nil {
 				expiresAt = item.ExpiresAt.UTC().Format(time.RFC3339)
@@ -375,6 +389,107 @@ func (s *APIServer) handleRunExport(w http.ResponseWriter, r *http.Request) {
 			writeAPIError(w, http.StatusInternalServerError, "EXPORT_ENCODE_FAILED", "failed to flush CSV export", true, map[string]interface{}{"error": err.Error()})
 			return
 		}
+	}
+}
+
+func (s *APIServer) handleAuditExport(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeAPIError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "method not allowed", false, nil)
+		return
+	}
+	ctx, ok := s.authorizeRequest(w, r, PermissionRunRead)
+	if !ok {
+		return
+	}
+	r = r.WithContext(ctx)
+
+	limit := 100
+	if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil {
+			writeAPIError(w, http.StatusBadRequest, "INVALID_LIMIT", "limit must be an integer", false, map[string]interface{}{"limit": raw})
+			return
+		}
+		limit = parsed
+	}
+
+	format := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("format")))
+	if format == "" {
+		format = "jsonl"
+	}
+	if format != "jsonl" && format != "json" {
+		writeAPIError(w, http.StatusBadRequest, "INVALID_FORMAT", "format must be one of: jsonl,json", false, map[string]interface{}{"format": format})
+		return
+	}
+
+	disposition, err := resolveRuntimeExportDisposition(r, "audit_export")
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, "INVALID_EXPORT_DISPOSITION", err.Error(), false, nil)
+		return
+	}
+
+	query := RuntimeAuditQuery{
+		Limit:      limit,
+		TenantID:   strings.TrimSpace(r.URL.Query().Get("tenantId")),
+		ProjectID:  strings.TrimSpace(r.URL.Query().Get("projectId")),
+		ProviderID: strings.TrimSpace(r.URL.Query().Get("providerId")),
+		Decision:   strings.TrimSpace(r.URL.Query().Get("decision")),
+		Event:      strings.TrimSpace(r.URL.Query().Get("event")),
+	}
+	items := ListRuntimeAuditEvents(query)
+	identity, _ := RuntimeIdentityFromContext(r.Context())
+	filtered, deniedByAuthz := filterAuditEventsByAuthorization(items, identity, s.auth, PermissionRunRead)
+	exportItems := make([]map[string]interface{}, 0, len(filtered))
+	redactionCount := 0
+	for _, item := range filtered {
+		sanitized, count := redactAuditRecordForExport(item)
+		exportItems = append(exportItems, sanitized)
+		redactionCount += count
+	}
+	applyRuntimeExportHeaders(w, disposition, redactionCount)
+
+	emitAuditEvent(r.Context(), "runtime.audit.export", map[string]interface{}{
+		"path":                 r.URL.Path,
+		"method":               r.Method,
+		"format":               format,
+		"requestedLimit":       limit,
+		"returnedCount":        len(exportItems),
+		"unfilteredCount":      len(items),
+		"filteredDenied":       deniedByAuthz,
+		"tenantFilter":         query.TenantID,
+		"projectFilter":        query.ProjectID,
+		"providerFilter":       query.ProviderID,
+		"decisionFilter":       strings.ToUpper(query.Decision),
+		"eventFilter":          query.Event,
+		"exportProfile":        disposition.ExportProfile,
+		"audience":             disposition.Audience,
+		"exportRetentionClass": disposition.RetentionClass,
+		"redactionCount":       redactionCount,
+	})
+
+	switch format {
+	case "jsonl":
+		w.Header().Set("Content-Type", "application/x-ndjson")
+		for _, item := range exportItems {
+			b, err := json.Marshal(item)
+			if err != nil {
+				writeAPIError(w, http.StatusInternalServerError, "EXPORT_ENCODE_FAILED", "failed to encode audit export record", true, map[string]interface{}{"error": err.Error()})
+				return
+			}
+			_, _ = w.Write(append(b, '\n'))
+		}
+	case "json":
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"source":               "runtime-memory",
+			"count":                len(exportItems),
+			"unfilteredCount":      len(items),
+			"filteredDenied":       deniedByAuthz,
+			"exportProfile":        disposition.ExportProfile,
+			"audience":             disposition.Audience,
+			"exportRetentionClass": disposition.RetentionClass,
+			"redactionCount":       redactionCount,
+			"items":                exportItems,
+		})
 	}
 }
 

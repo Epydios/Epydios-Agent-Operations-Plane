@@ -99,6 +99,7 @@ func runThreadsCommand(ctx context.Context, client *runtimeclient.Client, cfg ru
 		taskID := fs.String("task-id", "", "task id")
 		sessionID := fs.String("session-id", "", "specific session id")
 		render := fs.String("render", "text", "render mode: text, update, or report")
+		reportSelection := runtimeclient.BindEnterpriseReportSelectionFlags(fs)
 		if err := fs.Parse(args[1:]); err != nil {
 			return err
 		}
@@ -148,7 +149,7 @@ func runThreadsCommand(ctx context.Context, client *runtimeclient.Client, cfg ru
 			fmt.Print(renderCLIThreadEnvelope(view))
 			return nil
 		case "report":
-			rendered, err := renderCLIReport(ctx, client, view)
+			rendered, err := renderCLIReport(ctx, client, view, *reportSelection)
 			if err != nil {
 				return err
 			}
@@ -172,6 +173,7 @@ func runSessionsCommand(ctx context.Context, client *runtimeclient.Client, cfg r
 		waitSeconds := fs.Int("wait-seconds", cfg.LiveFollowWait, "server wait seconds")
 		once := fs.Bool("once", false, "fetch one event-stream window and exit")
 		render := fs.String("render", "text", "render mode: text, update, delta-update, report, or delta-report")
+		reportSelection := runtimeclient.BindEnterpriseReportSelectionFlags(fs)
 		if err := fs.Parse(args[1:]); err != nil {
 			return err
 		}
@@ -220,7 +222,7 @@ func runSessionsCommand(ctx context.Context, client *runtimeclient.Client, cfg r
 					if err != nil {
 						return err
 					}
-					rendered, err := renderCLIFollowReport(ctx, client, timeline, items, strings.EqualFold(strings.TrimSpace(*render), "delta-report"))
+					rendered, err := renderCLIFollowReport(ctx, client, timeline, items, strings.EqualFold(strings.TrimSpace(*render), "delta-report"), *reportSelection)
 					if err != nil {
 						return err
 					}
@@ -662,7 +664,7 @@ func renderCLIThreadEnvelope(view *runtimeclient.ThreadReview) string {
 	return runtimeclient.RenderGovernedUpdateEnvelope(envelope)
 }
 
-func renderCLIReport(ctx context.Context, client *runtimeclient.Client, view *runtimeclient.ThreadReview) (string, error) {
+func renderCLIReport(ctx context.Context, client *runtimeclient.Client, view *runtimeclient.ThreadReview, selection runtimeclient.EnterpriseReportSelection) (string, error) {
 	if view == nil {
 		return "", nil
 	}
@@ -675,9 +677,20 @@ func renderCLIReport(ctx context.Context, client *runtimeclient.Client, view *ru
 	if err != nil {
 		return "", err
 	}
+	exportProfiles, disposition, err := runtimeclient.LoadEnterpriseReportSelectionCatalog(ctx, client, "report", "cli", selection)
+	if err != nil {
+		return "", err
+	}
+	orgAdminProfiles, err := client.ListOrgAdminProfiles(ctx, "", "", "", "cli")
+	if err != nil {
+		return "", err
+	}
 	envelope := runtimeclient.BuildEnterpriseReportEnvelope(runtimeclient.EnterpriseReportSubject{
 		Header:               "AgentOps CLI governance report",
 		ReportType:           "report",
+		ExportProfile:        disposition.ExportProfile,
+		Audience:             disposition.Audience,
+		RetentionClass:       disposition.RetentionClass,
 		ClientSurface:        "cli",
 		ContextLabel:         "Thread",
 		ContextValue:         runtimeclient.NormalizeStringOrDefault(view.Task.TaskID, "-"),
@@ -696,15 +709,16 @@ func renderCLIReport(ctx context.Context, client *runtimeclient.Client, view *ru
 		PendingProposalCount: len(runtimeclient.PendingProposalIDsFromThreadReview(view)),
 		ToolActionCount:      cliToolActionCount(view),
 		EvidenceCount:        cliEvidenceCount(view),
+		ApprovalCheckpoints:  cliApprovalCheckpoints(view),
 		Summary:              cliThreadSummary(view),
 		Details:              buildCLIReportDetails(view),
 		Recent:               runtimeclient.RenderEventSummaryLines(view.RecentEvents, 4),
 		ActionHints:          renderCLIActionHints(view),
-	}, policyPacks, workerCapabilities)
+	}, policyPacks, workerCapabilities, exportProfiles, orgAdminProfiles)
 	return runtimeclient.RenderEnterpriseReportEnvelope(envelope), nil
 }
 
-func renderCLIFollowReport(ctx context.Context, client *runtimeclient.Client, timeline *runtimeapi.SessionTimelineResponse, items []runtimeapi.SessionEventRecord, deltaOnly bool) (string, error) {
+func renderCLIFollowReport(ctx context.Context, client *runtimeclient.Client, timeline *runtimeapi.SessionTimelineResponse, items []runtimeapi.SessionEventRecord, deltaOnly bool, selection runtimeclient.EnterpriseReportSelection) (string, error) {
 	if timeline == nil {
 		return "", nil
 	}
@@ -726,9 +740,20 @@ func renderCLIFollowReport(ctx context.Context, client *runtimeclient.Client, ti
 	if deltaOnly {
 		reportType = "delta-report"
 	}
+	exportProfiles, disposition, err := runtimeclient.LoadEnterpriseReportSelectionCatalog(ctx, client, reportType, "cli", selection)
+	if err != nil {
+		return "", err
+	}
+	orgAdminProfiles, err := client.ListOrgAdminProfiles(ctx, "", "", "", "cli")
+	if err != nil {
+		return "", err
+	}
 	envelope := runtimeclient.BuildEnterpriseReportEnvelope(runtimeclient.EnterpriseReportSubject{
 		Header:               "AgentOps CLI governance report",
 		ReportType:           reportType,
+		ExportProfile:        disposition.ExportProfile,
+		Audience:             disposition.Audience,
+		RetentionClass:       disposition.RetentionClass,
 		ClientSurface:        "cli",
 		ContextLabel:         "Thread",
 		ContextValue:         runtimeclient.NormalizeStringOrDefault(task.TaskID, "-"),
@@ -747,11 +772,12 @@ func renderCLIFollowReport(ctx context.Context, client *runtimeclient.Client, ti
 		PendingProposalCount: len(runtimeclient.PendingProposalIDsFromThreadReview(view)),
 		ToolActionCount:      len(timeline.ToolActions),
 		EvidenceCount:        len(timeline.EvidenceRecords),
+		ApprovalCheckpoints:  append([]runtimeapi.ApprovalCheckpointRecord(nil), timeline.ApprovalCheckpoints...),
 		Summary:              runtimeclient.BuildThreadFollowSummary(items),
 		Details:              append(runtimeclient.BuildThreadFollowDetails(items), buildCLITranscriptAndEvidenceDetails(view)...),
 		Recent:               runtimeclient.RenderSessionEventLines(items, 4),
 		ActionHints:          renderCLIActionHints(view),
-	}, policyPacks, workerCapabilities)
+	}, policyPacks, workerCapabilities, exportProfiles, orgAdminProfiles)
 	return runtimeclient.RenderEnterpriseReportEnvelope(envelope), nil
 }
 
@@ -877,6 +903,13 @@ func cliOpenApprovalCount(view *runtimeclient.ThreadReview) int {
 		return view.Timeline.OpenApprovalCount
 	}
 	return 0
+}
+
+func cliApprovalCheckpoints(view *runtimeclient.ThreadReview) []runtimeapi.ApprovalCheckpointRecord {
+	if view != nil && view.Timeline != nil {
+		return append([]runtimeapi.ApprovalCheckpointRecord(nil), view.Timeline.ApprovalCheckpoints...)
+	}
+	return nil
 }
 
 func cliToolActionCount(view *runtimeclient.ThreadReview) int {

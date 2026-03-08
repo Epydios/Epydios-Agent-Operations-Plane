@@ -1,0 +1,292 @@
+{
+  "exportProfiles": {
+    "items": [
+      {
+        "exportProfile": "operator_review",
+        "label": "Operator Review",
+        "reportTypes": ["review", "report"],
+        "defaultAudience": "operator",
+        "allowedAudiences": ["operator", "security_review", "exec_review"],
+        "defaultRetentionClass": "standard",
+        "allowedRetentionClasses": ["standard", "archive"],
+        "audienceRetentionClassOverlays": {
+          "security_review": "archive",
+          "exec_review": "archive"
+        },
+        "clientSurfaces": ["chat", "vscode", "cli"],
+        "deliveryChannels": ["copy", "download", "report"],
+        "redactionMode": "structured_and_text"
+      },
+      {
+        "exportProfile": "workflow_review",
+        "label": "Workflow Review",
+        "reportTypes": ["review", "report"],
+        "defaultAudience": "workflow_operator",
+        "allowedAudiences": ["workflow_operator", "security_review", "ticket_reviewer"],
+        "defaultRetentionClass": "standard",
+        "allowedRetentionClasses": ["standard", "archive"],
+        "audienceRetentionClassOverlays": {
+          "security_review": "archive"
+        },
+        "clientSurfaces": ["workflow"],
+        "deliveryChannels": ["comment", "update", "report"],
+        "redactionMode": "structured_and_text"
+      },
+      {
+        "exportProfile": "conversation_review",
+        "label": "Conversation Review",
+        "reportTypes": ["review", "report"],
+        "defaultAudience": "conversation_operator",
+        "allowedAudiences": ["conversation_operator", "security_review", "channel_reviewer"],
+        "defaultRetentionClass": "standard",
+        "allowedRetentionClasses": ["standard", "archive"],
+        "audienceRetentionClassOverlays": {
+          "security_review": "archive"
+        },
+        "clientSurfaces": ["chatops"],
+        "deliveryChannels": ["update", "thread_reply", "report"],
+        "redactionMode": "structured_and_text"
+      }
+    ]
+  },
+  "orgAdminProfiles": {
+    "items": [
+      {
+        "profileId": "centralized_enterprise_admin",
+        "label": "Centralized Enterprise Admin",
+        "organizationModel": "centralized_enterprise",
+        "delegationModel": "central_it_with_tenant_project_delegation",
+        "adminRoleBundles": ["enterprise.org_admin", "enterprise.security_admin"],
+        "delegatedAdminRoleBundles": ["enterprise.tenant_admin", "enterprise.project_admin"],
+        "breakGlassRoleBundles": ["enterprise.break_glass_admin"],
+        "directorySyncMappings": [
+          {
+            "mappingId": "centralized_enterprise_admin_directory_sync_mapping",
+            "label": "Centralized Enterprise Admin Directory Sync Mapping",
+            "mappingMode": "group_to_role_binding",
+            "sourceSystems": ["directory_sync", "identity_claim"],
+            "requiredInputs": ["idp_group", "tenant_id"],
+            "roleBundles": ["enterprise.org_admin", "enterprise.tenant_admin"],
+            "scopeDimensions": ["tenant_id"],
+            "decisionSurfaces": ["policy_pack_assignment"]
+          }
+        ],
+        "decisionBindings": [
+          {
+            "bindingId": "centralized_enterprise_admin_delegated_admin_binding",
+            "label": "Centralized Enterprise Admin Delegated Admin Decision Binding",
+            "category": "delegated_admin",
+            "bindingMode": "delegated_admin_scope_review",
+            "hookIds": ["delegated_admin_scope_guard"],
+            "directorySyncMappings": ["centralized_enterprise_admin_directory_sync_mapping"],
+            "roleBundles": ["enterprise.tenant_admin"],
+            "requiredInputs": ["idp_group", "tenant_id"],
+            "decisionSurfaces": ["policy_pack_assignment"],
+            "boundaryRequirements": ["runtime_authz"]
+          }
+        ],
+        "directorySyncInputs": ["idp_group", "tenant_id"],
+        "residencyProfiles": ["single_region_tenant_pinning"],
+        "exceptionProfiles": [
+          {
+            "profileId": "centralized_enterprise_admin_residency_exception",
+            "label": "Centralized Enterprise Admin Residency Exception",
+            "category": "residency",
+            "exceptionMode": "ticketed_exception_review",
+            "managedProfiles": ["single_region_tenant_pinning"],
+            "requiredInputs": ["residency_exception_ticket"],
+            "roleBundles": ["enterprise.org_admin", "enterprise.tenant_admin"],
+            "decisionSurfaces": ["export_profile_override"],
+            "boundaryRequirements": ["runtime_authz", "governed_export_redaction"]
+          }
+        ],
+        "legalHoldProfiles": ["litigation_hold"],
+        "overlayProfiles": [
+          {
+            "overlayId": "centralized_enterprise_admin_quota_overlay",
+            "label": "Centralized Enterprise Admin Quota Overlay",
+            "category": "quota",
+            "overlayMode": "quota_override_review",
+            "targetDimensions": ["organization", "tenant", "project"],
+            "requiredInputs": ["tenant_id"],
+            "roleBundles": ["enterprise.org_admin", "enterprise.tenant_admin"],
+            "decisionSurfaces": ["quota_override"],
+            "boundaryRequirements": ["org_quota_metering", "audit_emission"]
+          }
+        ],
+        "quotaDimensions": ["organization", "tenant", "project"],
+        "chargebackDimensions": ["cost_center", "project"],
+        "enforcementHooks": ["delegated_admin_scope_guard", "break_glass_timebox"],
+        "clientSurfaces": ["chat", "vscode", "cli", "workflow", "chatops"],
+        "reportingSurfaces": ["report", "admin_report"]
+      }
+    ]
+  },
+  "cases": [
+    {
+      "id": "chat_review",
+      "subject": {
+        "reportType": "review",
+        "exportProfile": "operator_review",
+        "audience": "security_review",
+        "clientSurface": "chat",
+        "contextLabel": "Thread",
+        "contextValue": "chat-thread-1",
+        "subjectLabel": "Turn",
+        "subjectValue": "chat-turn-1",
+        "taskId": "task-chat-1",
+        "taskStatus": "RUNNING",
+        "sessionId": "session-chat-1",
+        "sessionStatus": "RUNNING",
+        "workerId": "worker-chat-1",
+        "workerType": "managed_agent",
+        "workerAdapterId": "codex",
+        "workerState": "RUNNING",
+        "executionMode": "managed_codex_worker",
+        "summary": "Bearer sk-abc1234567890123456789 must be removed before governed review.",
+        "details": ["Evidence preview contains sk-abc1234567890123456789"],
+        "recent": ["Worker output includes Bearer sk-abc1234567890123456789"],
+        "actionHints": ["Review the governed report before external sharing."]
+      },
+      "expect": {
+        "exportProfile": "operator_review",
+        "audience": "security_review",
+        "retentionClass": "archive",
+        "clientSurface": "chat",
+        "redactionCountMin": 3
+      }
+    },
+    {
+      "id": "vscode_review",
+      "subject": {
+        "reportType": "review",
+        "exportProfile": "operator_review",
+        "audience": "security_review",
+        "clientSurface": "vscode",
+        "contextLabel": "Workspace thread",
+        "contextValue": "vscode-thread-1",
+        "subjectLabel": "Turn",
+        "subjectValue": "vscode-turn-1",
+        "taskId": "task-vscode-1",
+        "taskStatus": "RUNNING",
+        "sessionId": "session-vscode-1",
+        "sessionStatus": "RUNNING",
+        "workerId": "worker-vscode-1",
+        "workerType": "managed_agent",
+        "workerAdapterId": "codex",
+        "workerState": "RUNNING",
+        "executionMode": "managed_codex_worker",
+        "summary": "Bearer sk-abc1234567890123456789 must be removed before VS Code report copy.",
+        "details": ["Transcript preview contains sk-abc1234567890123456789"],
+        "recent": ["Worker output includes Bearer sk-abc1234567890123456789"],
+        "actionHints": ["Use the governed export profile before sharing."]
+      },
+      "expect": {
+        "exportProfile": "operator_review",
+        "audience": "security_review",
+        "retentionClass": "archive",
+        "clientSurface": "vscode",
+        "redactionCountMin": 3
+      }
+    },
+    {
+      "id": "cli_review",
+      "subject": {
+        "reportType": "report",
+        "exportProfile": "operator_review",
+        "audience": "exec_review",
+        "clientSurface": "cli",
+        "contextLabel": "CLI thread",
+        "contextValue": "cli-thread-1",
+        "subjectLabel": "Turn",
+        "subjectValue": "cli-turn-1",
+        "taskId": "task-cli-1",
+        "taskStatus": "RUNNING",
+        "sessionId": "session-cli-1",
+        "sessionStatus": "RUNNING",
+        "workerId": "worker-cli-1",
+        "workerType": "managed_agent",
+        "workerAdapterId": "codex",
+        "workerState": "RUNNING",
+        "executionMode": "managed_codex_worker",
+        "summary": "Bearer sk-abc1234567890123456789 must be removed before CLI report output.",
+        "details": ["CLI details contain sk-abc1234567890123456789"],
+        "recent": ["CLI recent output includes Bearer sk-abc1234567890123456789"],
+        "actionHints": ["Export only through the governed report path."]
+      },
+      "expect": {
+        "exportProfile": "operator_review",
+        "audience": "exec_review",
+        "retentionClass": "archive",
+        "clientSurface": "cli",
+        "redactionCountMin": 3
+      }
+    },
+    {
+      "id": "workflow_review",
+      "subject": {
+        "reportType": "report",
+        "exportProfile": "workflow_review",
+        "audience": "security_review",
+        "clientSurface": "workflow",
+        "contextLabel": "Workflow",
+        "contextValue": "jira | WF-100",
+        "subjectLabel": "Ticket",
+        "subjectValue": "OPS-100",
+        "taskId": "task-workflow-1",
+        "taskStatus": "RUNNING",
+        "sessionId": "session-workflow-1",
+        "sessionStatus": "RUNNING",
+        "workerId": "worker-workflow-1",
+        "workerType": "managed_agent",
+        "workerAdapterId": "codex",
+        "workerState": "RUNNING",
+        "executionMode": "managed_codex_worker",
+        "summary": "Bearer sk-abc1234567890123456789 must be removed before workflow status export.",
+        "details": ["Workflow details contain sk-abc1234567890123456789"],
+        "recent": ["Workflow recent output includes Bearer sk-abc1234567890123456789"],
+        "actionHints": ["Post only the governed report envelope back to the ticket."]
+      },
+      "expect": {
+        "exportProfile": "workflow_review",
+        "audience": "security_review",
+        "retentionClass": "archive",
+        "clientSurface": "workflow",
+        "redactionCountMin": 3
+      }
+    },
+    {
+      "id": "chatops_review",
+      "subject": {
+        "reportType": "report",
+        "exportProfile": "conversation_review",
+        "audience": "security_review",
+        "clientSurface": "chatops",
+        "contextLabel": "Conversation",
+        "contextValue": "chatops-thread-1",
+        "subjectLabel": "Message",
+        "subjectValue": "chatops-message-1",
+        "taskId": "task-chatops-1",
+        "taskStatus": "RUNNING",
+        "sessionId": "session-chatops-1",
+        "sessionStatus": "RUNNING",
+        "workerId": "worker-chatops-1",
+        "workerType": "managed_agent",
+        "workerAdapterId": "codex",
+        "workerState": "RUNNING",
+        "executionMode": "managed_codex_worker",
+        "summary": "Bearer sk-abc1234567890123456789 must be removed before conversation report output.",
+        "details": ["Conversation details contain sk-abc1234567890123456789"],
+        "recent": ["Conversation recent output includes Bearer sk-abc1234567890123456789"],
+        "actionHints": ["Post the governed update envelope or governed report only."]
+      },
+      "expect": {
+        "exportProfile": "conversation_review",
+        "audience": "security_review",
+        "retentionClass": "archive",
+        "clientSurface": "chatops",
+        "redactionCountMin": 3
+      }
+    }
+  ]
+}

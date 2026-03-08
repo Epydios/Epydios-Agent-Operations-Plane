@@ -271,7 +271,7 @@ func TestRenderWorkflowReport(t *testing.T) {
 		LatestWorkerSummary:     "Managed worker is awaiting governed approval.",
 		RecentEvents:            []runtimeclient.EventSummary{{Label: "Worker Progress", Detail: "Awaiting approval."}},
 	}
-	rendered, err := renderWorkflowReport(context.Background(), client, report)
+	rendered, err := renderWorkflowReport(context.Background(), client, report, runtimeclient.EnterpriseReportSelection{})
 	if err != nil {
 		t.Fatalf("render workflow report: %v", err)
 	}
@@ -428,6 +428,51 @@ func newWorkflowCatalogTestClient(t *testing.T) (*runtimeclient.Client, func()) 
 					ClientSurfaces:           []string{"workflow"},
 					ReportingSurfaces:        []string{"report"},
 					BoundaryRequirements:     []string{"agentops_gateway_boundary"},
+				}},
+			}
+		case "/v1alpha2/runtime/export-profiles":
+			reportType := req.URL.Query().Get("reportType")
+			payload = runtimeapi.ExportProfileCatalogResponse{
+				Count: 1,
+				Items: []runtimeapi.ExportProfileCatalogEntry{{
+					ExportProfile:           map[bool]string{true: "workflow_follow", false: "workflow_review"}[strings.Contains(reportType, "delta")],
+					Label:                   map[bool]string{true: "Workflow Follow", false: "Workflow Review"}[strings.Contains(reportType, "delta")],
+					DefaultAudience:         "workflow_operator",
+					AllowedAudiences:        []string{"workflow_operator", "ticket_reviewer", "security_review"},
+					DefaultRetentionClass:   map[bool]string{true: "short", false: "standard"}[strings.Contains(reportType, "delta")],
+					AllowedRetentionClasses: []string{"short", "standard", "archive"},
+					ClientSurfaces:          []string{"workflow"},
+					ReportTypes:             []string{"report", "delta-report"},
+					DeliveryChannels:        []string{"report", "update", "stream"},
+					RedactionMode:           "structured_and_text",
+				}},
+			}
+		case "/v1alpha2/runtime/org-admin-profiles":
+			payload = runtimeapi.OrgAdminCatalogResponse{
+				Count: 1,
+				Items: []runtimeapi.OrgAdminCatalogEntry{{
+					ProfileID:                 "centralized_enterprise_admin",
+					Label:                     "Centralized Enterprise Admin",
+					OrganizationModel:         "centralized_enterprise",
+					DelegationModel:           "central_it_with_tenant_project_delegation",
+					AdminRoleBundles:          []string{"enterprise.org_admin"},
+					DelegatedAdminRoleBundles: []string{"enterprise.tenant_admin"},
+					BreakGlassRoleBundles:     []string{"enterprise.break_glass_admin"},
+					DirectorySyncInputs:       []string{"idp_group", "tenant_id"},
+					ResidencyProfiles:         []string{"single_region_tenant_pinning"},
+					ResidencyExceptionInputs:  []string{"residency_exception_ticket"},
+					LegalHoldProfiles:         []string{"litigation_hold"},
+					LegalHoldExceptionInputs:  []string{"legal_hold_case_id"},
+					NetworkBoundaryProfiles:   []string{"enterprise_proxy_required"},
+					FleetRolloutProfiles:      []string{"mdm_managed_desktop_ring"},
+					QuotaDimensions:           []string{"organization", "tenant"},
+					QuotaOverlayInputs:        []string{"tenant_id"},
+					ChargebackDimensions:      []string{"cost_center"},
+					ChargebackOverlayInputs:   []string{"cost_center"},
+					EnforcementHooks:          []string{"delegated_admin_scope_guard"},
+					BoundaryRequirements:      []string{"runtime_authz"},
+					ReportingSurfaces:         []string{"admin_report"},
+					ClientSurfaces:            []string{"workflow"},
 				}},
 			}
 		default:

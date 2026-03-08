@@ -227,6 +227,138 @@ type PolicyPackCatalogResponse struct {
 	Items       []PolicyPackCatalogEntry `json:"items"`
 }
 
+type ExportProfileCatalogEntry struct {
+	ExportProfile                  string            `json:"exportProfile"`
+	Label                          string            `json:"label"`
+	Description                    string            `json:"description,omitempty"`
+	ReportTypes                    []string          `json:"reportTypes,omitempty"`
+	DefaultAudience                string            `json:"defaultAudience,omitempty"`
+	AllowedAudiences               []string          `json:"allowedAudiences,omitempty"`
+	DefaultRetentionClass          string            `json:"defaultRetentionClass,omitempty"`
+	AllowedRetentionClasses        []string          `json:"allowedRetentionClasses,omitempty"`
+	AudienceRetentionClassOverlays map[string]string `json:"audienceRetentionClassOverlays,omitempty"`
+	ClientSurfaces                 []string          `json:"clientSurfaces,omitempty"`
+	DeliveryChannels               []string          `json:"deliveryChannels,omitempty"`
+	RedactionMode                  string            `json:"redactionMode,omitempty"`
+}
+
+type ExportProfileCatalogResponse struct {
+	GeneratedAt time.Time                   `json:"generatedAt"`
+	Source      string                      `json:"source"`
+	Count       int                         `json:"count"`
+	Items       []ExportProfileCatalogEntry `json:"items"`
+}
+
+type OrgAdminGroupMappingInput struct {
+	Field       string `json:"field"`
+	Source      string `json:"source"`
+	Required    bool   `json:"required"`
+	Description string `json:"description,omitempty"`
+	Example     string `json:"example,omitempty"`
+}
+
+type OrgAdminEnforcementProfile struct {
+	HookID               string   `json:"hookId"`
+	Label                string   `json:"label"`
+	Category             string   `json:"category,omitempty"`
+	EnforcementMode      string   `json:"enforcementMode,omitempty"`
+	Description          string   `json:"description,omitempty"`
+	RoleBundles          []string `json:"roleBundles,omitempty"`
+	RequiredInputs       []string `json:"requiredInputs,omitempty"`
+	DecisionSurfaces     []string `json:"decisionSurfaces,omitempty"`
+	BoundaryRequirements []string `json:"boundaryRequirements,omitempty"`
+}
+
+type OrgAdminDirectorySyncMapping struct {
+	MappingID        string   `json:"mappingId"`
+	Label            string   `json:"label"`
+	MappingMode      string   `json:"mappingMode,omitempty"`
+	SourceSystems    []string `json:"sourceSystems,omitempty"`
+	RequiredInputs   []string `json:"requiredInputs,omitempty"`
+	RoleBundles      []string `json:"roleBundles,omitempty"`
+	ScopeDimensions  []string `json:"scopeDimensions,omitempty"`
+	DecisionSurfaces []string `json:"decisionSurfaces,omitempty"`
+}
+
+type OrgAdminExceptionProfile struct {
+	ProfileID            string   `json:"profileId"`
+	Label                string   `json:"label"`
+	Category             string   `json:"category,omitempty"`
+	ExceptionMode        string   `json:"exceptionMode,omitempty"`
+	ManagedProfiles      []string `json:"managedProfiles,omitempty"`
+	RequiredInputs       []string `json:"requiredInputs,omitempty"`
+	RoleBundles          []string `json:"roleBundles,omitempty"`
+	DecisionSurfaces     []string `json:"decisionSurfaces,omitempty"`
+	BoundaryRequirements []string `json:"boundaryRequirements,omitempty"`
+}
+
+type OrgAdminOverlayProfile struct {
+	OverlayID            string   `json:"overlayId"`
+	Label                string   `json:"label"`
+	Category             string   `json:"category,omitempty"`
+	OverlayMode          string   `json:"overlayMode,omitempty"`
+	TargetDimensions     []string `json:"targetDimensions,omitempty"`
+	RequiredInputs       []string `json:"requiredInputs,omitempty"`
+	RoleBundles          []string `json:"roleBundles,omitempty"`
+	DecisionSurfaces     []string `json:"decisionSurfaces,omitempty"`
+	BoundaryRequirements []string `json:"boundaryRequirements,omitempty"`
+}
+
+type OrgAdminDecisionBinding struct {
+	BindingID             string   `json:"bindingId"`
+	Label                 string   `json:"label"`
+	Category              string   `json:"category,omitempty"`
+	BindingMode           string   `json:"bindingMode,omitempty"`
+	HookIDs               []string `json:"hookIds,omitempty"`
+	DirectorySyncMappings []string `json:"directorySyncMappings,omitempty"`
+	ExceptionProfiles     []string `json:"exceptionProfiles,omitempty"`
+	OverlayProfiles       []string `json:"overlayProfiles,omitempty"`
+	RoleBundles           []string `json:"roleBundles,omitempty"`
+	RequiredInputs        []string `json:"requiredInputs,omitempty"`
+	DecisionSurfaces      []string `json:"decisionSurfaces,omitempty"`
+	BoundaryRequirements  []string `json:"boundaryRequirements,omitempty"`
+}
+
+type OrgAdminCatalogEntry struct {
+	ProfileID                 string                         `json:"profileId"`
+	Label                     string                         `json:"label"`
+	Description               string                         `json:"description,omitempty"`
+	OrganizationModel         string                         `json:"organizationModel,omitempty"`
+	DelegationModel           string                         `json:"delegationModel,omitempty"`
+	AdminRoleBundles          []string                       `json:"adminRoleBundles,omitempty"`
+	DelegatedAdminRoleBundles []string                       `json:"delegatedAdminRoleBundles,omitempty"`
+	BreakGlassRoleBundles     []string                       `json:"breakGlassRoleBundles,omitempty"`
+	GroupRoleMappingInputs    []OrgAdminGroupMappingInput    `json:"groupRoleMappingInputs,omitempty"`
+	DirectorySyncInputs       []string                       `json:"directorySyncInputs,omitempty"`
+	ResidencyProfiles         []string                       `json:"residencyProfiles,omitempty"`
+	ResidencyExceptionInputs  []string                       `json:"residencyExceptionInputs,omitempty"`
+	LegalHoldProfiles         []string                       `json:"legalHoldProfiles,omitempty"`
+	LegalHoldExceptionInputs  []string                       `json:"legalHoldExceptionInputs,omitempty"`
+	NetworkBoundaryProfiles   []string                       `json:"networkBoundaryProfiles,omitempty"`
+	FleetRolloutProfiles      []string                       `json:"fleetRolloutProfiles,omitempty"`
+	QuotaDimensions           []string                       `json:"quotaDimensions,omitempty"`
+	QuotaOverlayInputs        []string                       `json:"quotaOverlayInputs,omitempty"`
+	ChargebackDimensions      []string                       `json:"chargebackDimensions,omitempty"`
+	ChargebackOverlayInputs   []string                       `json:"chargebackOverlayInputs,omitempty"`
+	DecisionSurfaces          []string                       `json:"decisionSurfaces,omitempty"`
+	EnforcementHooks          []string                       `json:"enforcementHooks,omitempty"`
+	EnforcementProfiles       []OrgAdminEnforcementProfile   `json:"enforcementProfiles,omitempty"`
+	DirectorySyncMappings     []OrgAdminDirectorySyncMapping `json:"directorySyncMappings,omitempty"`
+	ExceptionProfiles         []OrgAdminExceptionProfile     `json:"exceptionProfiles,omitempty"`
+	OverlayProfiles           []OrgAdminOverlayProfile       `json:"overlayProfiles,omitempty"`
+	DecisionBindings          []OrgAdminDecisionBinding      `json:"decisionBindings,omitempty"`
+	BoundaryRequirements      []string                       `json:"boundaryRequirements,omitempty"`
+	ClientSurfaces            []string                       `json:"clientSurfaces,omitempty"`
+	ReportingSurfaces         []string                       `json:"reportingSurfaces,omitempty"`
+}
+
+type OrgAdminCatalogResponse struct {
+	GeneratedAt time.Time              `json:"generatedAt"`
+	Source      string                 `json:"source"`
+	Count       int                    `json:"count"`
+	Items       []OrgAdminCatalogEntry `json:"items"`
+}
+
 type WorkerEventCreateRequest struct {
 	Meta      ObjectMeta      `json:"meta"`
 	EventType string          `json:"eventType,omitempty"`
@@ -317,24 +449,25 @@ type SessionEventListQuery struct {
 }
 
 type ApprovalCheckpointRecord struct {
-	CheckpointID           string         `json:"checkpointId"`
-	SessionID              string         `json:"sessionId"`
-	LegacyRunID            string         `json:"legacyRunId,omitempty"`
-	RequestID              string         `json:"requestId,omitempty"`
-	TenantID               string         `json:"tenantId,omitempty"`
-	ProjectID              string         `json:"projectId,omitempty"`
-	Scope                  string         `json:"scope,omitempty"`
-	Tier                   int            `json:"tier,omitempty"`
-	TargetOS               string         `json:"targetOs,omitempty"`
-	TargetExecutionProfile string         `json:"targetExecutionProfile,omitempty"`
-	RequestedCapabilities  []string       `json:"requestedCapabilities,omitempty"`
-	RequiredVerifierIDs    []string       `json:"requiredVerifierIds,omitempty"`
-	Status                 ApprovalStatus `json:"status"`
-	Reason                 string         `json:"reason,omitempty"`
-	CreatedAt              time.Time      `json:"createdAt"`
-	ExpiresAt              *time.Time     `json:"expiresAt,omitempty"`
-	ReviewedAt             *time.Time     `json:"reviewedAt,omitempty"`
-	UpdatedAt              time.Time      `json:"updatedAt"`
+	CheckpointID           string          `json:"checkpointId"`
+	SessionID              string          `json:"sessionId"`
+	LegacyRunID            string          `json:"legacyRunId,omitempty"`
+	RequestID              string          `json:"requestId,omitempty"`
+	TenantID               string          `json:"tenantId,omitempty"`
+	ProjectID              string          `json:"projectId,omitempty"`
+	Scope                  string          `json:"scope,omitempty"`
+	Tier                   int             `json:"tier,omitempty"`
+	TargetOS               string          `json:"targetOs,omitempty"`
+	TargetExecutionProfile string          `json:"targetExecutionProfile,omitempty"`
+	RequestedCapabilities  []string        `json:"requestedCapabilities,omitempty"`
+	RequiredVerifierIDs    []string        `json:"requiredVerifierIds,omitempty"`
+	Annotations            json.RawMessage `json:"annotations,omitempty"`
+	Status                 ApprovalStatus  `json:"status"`
+	Reason                 string          `json:"reason,omitempty"`
+	CreatedAt              time.Time       `json:"createdAt"`
+	ExpiresAt              *time.Time      `json:"expiresAt,omitempty"`
+	ReviewedAt             *time.Time      `json:"reviewedAt,omitempty"`
+	UpdatedAt              time.Time       `json:"updatedAt"`
 }
 
 type ApprovalCheckpointCreateRequest struct {
@@ -345,6 +478,7 @@ type ApprovalCheckpointCreateRequest struct {
 	TargetExecutionProfile string     `json:"targetExecutionProfile,omitempty"`
 	RequestedCapabilities  []string   `json:"requestedCapabilities,omitempty"`
 	RequiredVerifierIDs    []string   `json:"requiredVerifierIds,omitempty"`
+	Annotations            JSONObject `json:"annotations,omitempty"`
 	Reason                 string     `json:"reason,omitempty"`
 	TTLSeconds             int        `json:"ttlSeconds,omitempty"`
 }

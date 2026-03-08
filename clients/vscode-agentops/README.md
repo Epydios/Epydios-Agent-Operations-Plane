@@ -8,6 +8,7 @@ Scope of this slice:
 - follow live native session events via `/v1alpha2/runtime/sessions/{sessionId}/events/stream`
 - show managed worker review state from native `timeline`, `approval`, `tool_action`, `evidence`, and `tool_proposal` data
 - package thread review and live follow into a shared governed update panel so operator guidance stays aligned with the other ingress surfaces
+- render the enterprise governance report against the same worker-capability and policy-pack catalogs used by the other enterprise surfaces
 - approve or deny native approval checkpoints and tool proposals from the IDE review surface
 - submit a governed turn against the existing task through `POST /v1alpha1/runtime/integrations/invoke`
 - auto-select a single pending approval or proposal from the selected session when raw ids are not needed
@@ -42,6 +43,7 @@ This slice does not add a second orchestration model. It consumes the same nativ
 Inside a thread review panel you can now:
 - approve or deny pending approval checkpoints
 - approve or deny pending tool proposals
+- copy the governed enterprise report for the selected native session
 - send the next governed turn against the current task with either:
   - `raw_model_invoke`
   - `managed_codex_worker`
@@ -57,5 +59,6 @@ node --check lib/runtimeClient.js
 node --check lib/sessionReview.js
 node --check lib/threadContext.js
 node --check lib/updateEnvelope.js
+node --check lib/reportEnvelope.js
 node --test ./test/*.test.js
 ```

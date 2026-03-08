@@ -287,6 +287,51 @@ func (c *Client) ListPolicyPacks(ctx context.Context, permission, executionMode,
 	return &response, nil
 }
 
+func (c *Client) ListExportProfiles(ctx context.Context, exportProfile, reportType, clientSurface, audience, retentionClass string) (*runtimeapi.ExportProfileCatalogResponse, error) {
+	query := url.Values{}
+	if strings.TrimSpace(exportProfile) != "" {
+		query.Set("exportProfile", strings.TrimSpace(exportProfile))
+	}
+	if strings.TrimSpace(reportType) != "" {
+		query.Set("reportType", strings.TrimSpace(reportType))
+	}
+	if strings.TrimSpace(clientSurface) != "" {
+		query.Set("clientSurface", strings.TrimSpace(clientSurface))
+	}
+	if strings.TrimSpace(audience) != "" {
+		query.Set("audience", strings.TrimSpace(audience))
+	}
+	if strings.TrimSpace(retentionClass) != "" {
+		query.Set("retentionClass", strings.TrimSpace(retentionClass))
+	}
+	var response runtimeapi.ExportProfileCatalogResponse
+	if err := c.request(ctx, http.MethodGet, "/v1alpha2/runtime/export-profiles", query, nil, "application/json", &response); err != nil {
+		return nil, err
+	}
+	return &response, nil
+}
+
+func (c *Client) ListOrgAdminProfiles(ctx context.Context, profileID, organizationModel, roleBundle, clientSurface string) (*runtimeapi.OrgAdminCatalogResponse, error) {
+	query := url.Values{}
+	if strings.TrimSpace(profileID) != "" {
+		query.Set("profileId", strings.TrimSpace(profileID))
+	}
+	if strings.TrimSpace(organizationModel) != "" {
+		query.Set("organizationModel", strings.TrimSpace(organizationModel))
+	}
+	if strings.TrimSpace(roleBundle) != "" {
+		query.Set("roleBundle", strings.TrimSpace(roleBundle))
+	}
+	if strings.TrimSpace(clientSurface) != "" {
+		query.Set("clientSurface", strings.TrimSpace(clientSurface))
+	}
+	var response runtimeapi.OrgAdminCatalogResponse
+	if err := c.request(ctx, http.MethodGet, "/v1alpha2/runtime/org-admin-profiles", query, nil, "application/json", &response); err != nil {
+		return nil, err
+	}
+	return &response, nil
+}
+
 func (c *Client) GetSessionTimeline(ctx context.Context, sessionID string) (*runtimeapi.SessionTimelineResponse, error) {
 	var response runtimeapi.SessionTimelineResponse
 	if err := c.request(ctx, http.MethodGet, "/v1alpha2/runtime/sessions/"+url.PathEscape(strings.TrimSpace(sessionID))+"/timeline", nil, nil, "application/json", &response); err != nil {

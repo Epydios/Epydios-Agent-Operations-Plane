@@ -101,6 +101,116 @@ func (s *APIServer) handleListPolicyPacksV1Alpha2(w http.ResponseWriter, r *http
 	})
 }
 
+func (s *APIServer) handleExportProfilesV1Alpha2(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeAPIError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "method not allowed", false, nil)
+		return
+	}
+	ctx, ok := s.authorizeRequest(w, r, PermissionRunRead)
+	if !ok {
+		return
+	}
+	s.handleListExportProfilesV1Alpha2(w, r.WithContext(ctx))
+}
+
+func (s *APIServer) handleListExportProfilesV1Alpha2(w http.ResponseWriter, r *http.Request) {
+	items := defaultExportProfileCatalog()
+	exportProfile := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("exportProfile")))
+	reportType := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("reportType")))
+	clientSurface := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("clientSurface")))
+	audience := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("audience")))
+	retentionClass := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("retentionClass")))
+	filtered := make([]ExportProfileCatalogEntry, 0, len(items))
+	for _, item := range items {
+		if exportProfile != "" && !strings.EqualFold(item.ExportProfile, exportProfile) {
+			continue
+		}
+		if reportType != "" && len(item.ReportTypes) > 0 && !selectorMatches(item.ReportTypes, reportType) {
+			continue
+		}
+		if clientSurface != "" && len(item.ClientSurfaces) > 0 && !selectorMatches(item.ClientSurfaces, clientSurface) {
+			continue
+		}
+		if audience != "" {
+			allowedAudiences := append([]string(nil), item.AllowedAudiences...)
+			if item.DefaultAudience != "" {
+				allowedAudiences = append(allowedAudiences, item.DefaultAudience)
+			}
+			if len(allowedAudiences) > 0 && !selectorMatches(allowedAudiences, audience) {
+				continue
+			}
+		}
+		if retentionClass != "" {
+			allowedRetention := append([]string(nil), item.AllowedRetentionClasses...)
+			if item.DefaultRetentionClass != "" {
+				allowedRetention = append(allowedRetention, item.DefaultRetentionClass)
+			}
+			for _, overlay := range item.AudienceRetentionClassOverlays {
+				if strings.TrimSpace(overlay) != "" {
+					allowedRetention = append(allowedRetention, overlay)
+				}
+			}
+			if len(allowedRetention) > 0 && !selectorMatches(allowedRetention, retentionClass) {
+				continue
+			}
+		}
+		filtered = append(filtered, item)
+	}
+	writeJSON(w, http.StatusOK, ExportProfileCatalogResponse{
+		GeneratedAt: time.Now().UTC(),
+		Source:      "m20.enterprise.export_profile_catalog",
+		Count:       len(filtered),
+		Items:       filtered,
+	})
+}
+
+func (s *APIServer) handleOrgAdminProfilesV1Alpha2(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeAPIError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "method not allowed", false, nil)
+		return
+	}
+	ctx, ok := s.authorizeRequest(w, r, PermissionRunRead)
+	if !ok {
+		return
+	}
+	s.handleListOrgAdminProfilesV1Alpha2(w, r.WithContext(ctx))
+}
+
+func (s *APIServer) handleListOrgAdminProfilesV1Alpha2(w http.ResponseWriter, r *http.Request) {
+	items := defaultOrgAdminCatalog()
+	profileID := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("profileId")))
+	organizationModel := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("organizationModel")))
+	roleBundle := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("roleBundle")))
+	clientSurface := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("clientSurface")))
+	filtered := make([]OrgAdminCatalogEntry, 0, len(items))
+	for _, item := range items {
+		if profileID != "" && !strings.EqualFold(item.ProfileID, profileID) {
+			continue
+		}
+		if organizationModel != "" && !strings.EqualFold(item.OrganizationModel, organizationModel) {
+			continue
+		}
+		if roleBundle != "" {
+			roleBundles := append([]string(nil), item.AdminRoleBundles...)
+			roleBundles = append(roleBundles, item.DelegatedAdminRoleBundles...)
+			roleBundles = append(roleBundles, item.BreakGlassRoleBundles...)
+			if len(roleBundles) > 0 && !selectorMatches(roleBundles, roleBundle) {
+				continue
+			}
+		}
+		if clientSurface != "" && len(item.ClientSurfaces) > 0 && !selectorMatches(item.ClientSurfaces, clientSurface) {
+			continue
+		}
+		filtered = append(filtered, item)
+	}
+	writeJSON(w, http.StatusOK, OrgAdminCatalogResponse{
+		GeneratedAt: time.Now().UTC(),
+		Source:      "m20.enterprise.org_admin_catalog",
+		Count:       len(filtered),
+		Items:       filtered,
+	})
+}
+
 func (s *APIServer) handleTasksV1Alpha2(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPost:
@@ -294,6 +404,13 @@ func (s *APIServer) handleSessionByIDV1Alpha2(w http.ResponseWriter, r *http.Req
 			return
 		}
 		s.handleListEvidenceRecordsV1Alpha2(w, r.WithContext(ctx), sessionID)
+		return
+	case len(parts) == 3 && parts[1] == "evidence" && parts[2] == "export" && r.Method == http.MethodGet:
+		ctx, ok := s.authorizeRequest(w, r, PermissionRunRead)
+		if !ok {
+			return
+		}
+		s.handleExportEvidenceRecordsV1Alpha2(w, r.WithContext(ctx), sessionID)
 		return
 	case len(parts) == 2 && parts[1] == "evidence" && r.Method == http.MethodPost:
 		ctx, ok := s.authorizeRequest(w, r, PermissionRunCreate)
@@ -797,6 +914,20 @@ func (s *APIServer) handleCreateApprovalCheckpointV1Alpha2(w http.ResponseWriter
 	if reason == "" {
 		reason = "approval requested"
 	}
+	normalizedAnnotations, orgAdminBinding, err := normalizeApprovalCheckpointAnnotations(req, identity)
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, "INVALID_APPROVAL_ANNOTATIONS", err.Error(), false, map[string]interface{}{"sessionId": sessionID})
+		return
+	}
+	if orgAdminBinding != nil {
+		scope = normalizeStringOrDefault(scope, "org_admin_binding")
+		if scope == "session" {
+			scope = "org_admin_binding"
+		}
+		if reason == "approval requested" {
+			reason = fmt.Sprintf("org-admin decision review requested for %s", normalizeStringOrDefault(orgAdminBinding.BindingLabel, orgAdminBinding.BindingID))
+		}
+	}
 	expiresAt := now.Add(time.Duration(ttlSeconds) * time.Second)
 	checkpoint := &ApprovalCheckpointRecord{
 		CheckpointID:           fmt.Sprintf("checkpoint-%d", now.UnixNano()),
@@ -810,11 +941,16 @@ func (s *APIServer) handleCreateApprovalCheckpointV1Alpha2(w http.ResponseWriter
 		TargetExecutionProfile: strings.TrimSpace(req.TargetExecutionProfile),
 		RequestedCapabilities:  normalizeStringList(req.RequestedCapabilities),
 		RequiredVerifierIDs:    normalizeStringList(req.RequiredVerifierIDs),
+		Annotations:            mustMarshalJSONObject(nil, normalizedAnnotations),
 		Status:                 ApprovalStatusPending,
 		Reason:                 reason,
 		CreatedAt:              now,
 		ExpiresAt:              &expiresAt,
 		UpdatedAt:              now,
+	}
+	if orgAdminBinding != nil {
+		checkpoint.RequestedCapabilities = normalizeStringList(append(checkpoint.RequestedCapabilities, orgAdminBinding.DecisionSurfaces...))
+		checkpoint.RequiredVerifierIDs = normalizeStringList(append(checkpoint.RequiredVerifierIDs, orgAdminBinding.BoundaryRequirements...))
 	}
 	if err := s.store.UpsertApprovalCheckpoint(r.Context(), checkpoint); err != nil {
 		writeAPIError(w, http.StatusInternalServerError, "STORE_UPDATE_FAILED", "failed to persist approval checkpoint", true, map[string]interface{}{"error": err.Error(), "sessionId": session.SessionID})
@@ -859,6 +995,9 @@ func (s *APIServer) handleCreateApprovalCheckpointV1Alpha2(w http.ResponseWriter
 			}),
 			Timestamp: now,
 		})
+	}
+	if orgAdminBinding != nil {
+		appendOrgAdminDecisionBindingRequestedArtifacts(s, r.Context(), session, checkpoint, orgAdminBinding, now)
 	}
 
 	writeJSON(w, http.StatusCreated, checkpoint)
@@ -950,6 +1089,13 @@ func (s *APIServer) handleApprovalCheckpointDecisionV1Alpha2(w http.ResponseWrit
 		writeAPIError(w, http.StatusConflict, "APPROVAL_ALREADY_RESOLVED", "approval checkpoint is already resolved", false, map[string]interface{}{"checkpointId": checkpointID, "status": checkpoint.Status})
 		return
 	}
+	orgAdminBinding, _ := extractOrgAdminDecisionBindingAnnotation(checkpoint.Annotations)
+	if orgAdminBinding != nil {
+		if err := authorizeOrgAdminDecisionBinding(identity, OrgAdminDecisionBinding{RoleBundles: orgAdminBinding.RoleBundles}, orgAdminBinding.SelectedRoleBundle); err != nil {
+			s.writeAuthError(w, err)
+			return
+		}
+	}
 
 	reason := strings.TrimSpace(req.Reason)
 	if reason == "" {
@@ -1036,6 +1182,9 @@ func (s *APIServer) handleApprovalCheckpointDecisionV1Alpha2(w http.ResponseWrit
 			})
 		}
 	}
+	if orgAdminBinding != nil {
+		appendOrgAdminDecisionBindingResolvedArtifacts(s, r.Context(), session, &checkpoint, orgAdminBinding, decision, now)
+	}
 
 	writeJSON(w, http.StatusOK, ApprovalCheckpointDecisionResponse{
 		Applied:      true,
@@ -1110,7 +1259,7 @@ func (s *APIServer) handleAttachSessionWorkerV1Alpha2(w http.ResponseWriter, r *
 		Transport:         strings.TrimSpace(req.Transport),
 		Model:             strings.TrimSpace(req.Model),
 		TargetEnvironment: strings.TrimSpace(req.TargetEnvironment),
-		Annotations:       mustMarshalJSONObject(req.Meta.Actor, req.Annotations),
+		Annotations:       mustMarshalJSONObject(nil, req.Annotations),
 		CreatedAt:         now,
 		UpdatedAt:         now,
 	}
@@ -2230,6 +2379,109 @@ func (s *APIServer) handleListEvidenceRecordsV1Alpha2(w http.ResponseWriter, r *
 		"sessionId": sessionID,
 		"items":     items,
 	})
+}
+
+func (s *APIServer) handleExportEvidenceRecordsV1Alpha2(w http.ResponseWriter, r *http.Request, sessionID string) {
+	session, err := s.getSessionForRead(r.Context(), sessionID)
+	if err != nil {
+		s.writeSessionLookupError(w, sessionID, err)
+		return
+	}
+	identity, _ := RuntimeIdentityFromContext(r.Context())
+	if err := enforceRunRecordScope(session.TenantID, session.ProjectID, identity); err != nil {
+		s.writeAuthError(w, err)
+		return
+	}
+	if err := s.authorizeScoped(identity, PermissionRunRead, session.TenantID, session.ProjectID); err != nil {
+		s.writeAuthError(w, err)
+		return
+	}
+
+	format := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("format")))
+	if format == "" {
+		format = "jsonl"
+	}
+	if format != "jsonl" && format != "json" {
+		writeAPIError(w, http.StatusBadRequest, "INVALID_FORMAT", "format must be one of: jsonl,json", false, map[string]interface{}{"format": format})
+		return
+	}
+
+	disposition, err := resolveRuntimeExportDisposition(r, "evidence_export")
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, "INVALID_EXPORT_DISPOSITION", err.Error(), false, nil)
+		return
+	}
+
+	query := EvidenceRecordListQuery{
+		SessionID:      sessionID,
+		TenantID:       session.TenantID,
+		ProjectID:      session.ProjectID,
+		Kind:           strings.TrimSpace(r.URL.Query().Get("kind")),
+		RetentionClass: strings.TrimSpace(r.URL.Query().Get("retentionClass")),
+		Limit:          100,
+	}
+	if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil {
+			writeAPIError(w, http.StatusBadRequest, "INVALID_LIMIT", "limit must be an integer", false, map[string]interface{}{"limit": raw})
+			return
+		}
+		query.Limit = parsed
+	}
+	items, err := s.store.ListEvidenceRecords(r.Context(), query)
+	if err != nil {
+		writeAPIError(w, http.StatusInternalServerError, "STORE_QUERY_FAILED", "failed to fetch evidence records for export", true, map[string]interface{}{"error": err.Error(), "sessionId": sessionID})
+		return
+	}
+
+	exportItems := make([]EvidenceRecord, 0, len(items))
+	redactionCount := 0
+	for _, item := range items {
+		sanitized, count := redactEvidenceRecordForExport(item)
+		exportItems = append(exportItems, sanitized)
+		redactionCount += count
+	}
+	applyRuntimeExportHeaders(w, disposition, redactionCount)
+
+	emitAuditEvent(r.Context(), "runtime.session.evidence.export", map[string]interface{}{
+		"path":                 r.URL.Path,
+		"method":               r.Method,
+		"format":               format,
+		"sessionId":            sessionID,
+		"tenantId":             session.TenantID,
+		"projectId":            session.ProjectID,
+		"kindFilter":           query.Kind,
+		"retentionFilter":      query.RetentionClass,
+		"requestedLimit":       query.Limit,
+		"returnedCount":        len(exportItems),
+		"exportProfile":        disposition.ExportProfile,
+		"audience":             disposition.Audience,
+		"exportRetentionClass": disposition.RetentionClass,
+		"redactionCount":       redactionCount,
+	})
+
+	switch format {
+	case "jsonl":
+		w.Header().Set("Content-Type", "application/x-ndjson")
+		for _, item := range exportItems {
+			b, err := json.Marshal(item)
+			if err != nil {
+				writeAPIError(w, http.StatusInternalServerError, "EXPORT_ENCODE_FAILED", "failed to encode evidence export record", true, map[string]interface{}{"error": err.Error(), "sessionId": sessionID})
+				return
+			}
+			_, _ = w.Write(append(b, '\n'))
+		}
+	case "json":
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"sessionId":            sessionID,
+			"count":                len(exportItems),
+			"exportProfile":        disposition.ExportProfile,
+			"audience":             disposition.Audience,
+			"exportRetentionClass": disposition.RetentionClass,
+			"redactionCount":       redactionCount,
+			"items":                exportItems,
+		})
+	}
 }
 
 func (s *APIServer) handleCloseSessionV1Alpha2(w http.ResponseWriter, r *http.Request, sessionID string) {

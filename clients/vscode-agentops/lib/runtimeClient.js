@@ -141,6 +141,22 @@ class AgentOpsRuntimeClient {
     };
   }
 
+  async listWorkerCapabilities(query = {}) {
+    return this.request("/v1alpha2/runtime/worker-capabilities", { query });
+  }
+
+  async listPolicyPacks(query = {}) {
+    return this.request("/v1alpha2/runtime/policy-packs", { query });
+  }
+
+  async listExportProfiles(query = {}) {
+    return this.request("/v1alpha2/runtime/export-profiles", { query });
+  }
+
+  async listOrgAdminProfiles(query = {}) {
+    return this.request("/v1alpha2/runtime/org-admin-profiles", { query });
+  }
+
   async submitSessionApprovalDecision(sessionId, checkpointId, decision, options = {}) {
     const normalizedSessionId = normalizedString(sessionId);
     const normalizedCheckpointId = normalizedString(checkpointId);

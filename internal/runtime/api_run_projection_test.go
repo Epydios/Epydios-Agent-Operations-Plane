@@ -222,3 +222,71 @@ func TestRuntimeRunViewsProjectM16SessionState(t *testing.T) {
 		t.Fatalf("export missing projected run: %s", rr.Body.String())
 	}
 }
+
+func TestRuntimeRunExportRedactsSecretLikeFields(t *testing.T) {
+	store := newMemoryRunStore()
+	server := NewAPIServer(store, nil, nil)
+	handler := server.Routes()
+
+	createdAt := time.Date(2026, 3, 7, 6, 15, 0, 0, time.UTC)
+	completedAt := createdAt.Add(time.Minute)
+
+	task := &TaskRecord{
+		TaskID:      "task-export-redact-1",
+		RequestID:   "sk-1234567890abcdefghijklmnop",
+		TenantID:    "tenant-redact",
+		ProjectID:   "project-redact",
+		Title:       "Redaction export test",
+		Status:      TaskStatusCompleted,
+		CreatedAt:   createdAt,
+		UpdatedAt:   completedAt,
+		Annotations: mustMarshalJSON(map[string]interface{}{"source": "test"}),
+	}
+	if err := store.UpsertTask(context.Background(), task); err != nil {
+		t.Fatalf("upsert task: %v", err)
+	}
+	session := &SessionRecord{
+		SessionID:        "session-export-redact-1",
+		TaskID:           task.TaskID,
+		RequestID:        task.RequestID,
+		TenantID:         task.TenantID,
+		ProjectID:        task.ProjectID,
+		SessionType:      "model_invoke",
+		Status:           SessionStatusCompleted,
+		Source:           "v1alpha1.runtime.integrations.invoke",
+		SelectedWorkerID: "worker-export-redact-1",
+		Summary:          mustMarshalJSON(map[string]interface{}{"agentProfileId": "openai"}),
+		CreatedAt:        createdAt,
+		StartedAt:        createdAt,
+		UpdatedAt:        completedAt,
+		CompletedAt:      &completedAt,
+	}
+	if err := store.UpsertSession(context.Background(), session); err != nil {
+		t.Fatalf("upsert session: %v", err)
+	}
+
+	rr := requestJSON(t, handler, http.MethodGet, "/v1alpha1/runtime/runs/export?format=jsonl&tenantId=tenant-redact&projectId=project-redact", nil)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("GET run export status=%d body=%s", rr.Code, rr.Body.String())
+	}
+	if strings.Contains(rr.Body.String(), "sk-1234567890abcdefghijklmnop") {
+		t.Fatalf("jsonl export leaked secret-like request id: %s", rr.Body.String())
+	}
+	if !strings.Contains(rr.Body.String(), "[REDACTED]") {
+		t.Fatalf("jsonl export missing redaction marker: %s", rr.Body.String())
+	}
+	if rr.Header().Get("X-AgentOps-Export-Redactions") == "" {
+		t.Fatalf("expected redaction header on jsonl export")
+	}
+
+	rr = requestJSON(t, handler, http.MethodGet, "/v1alpha1/runtime/runs/export?format=csv&tenantId=tenant-redact&projectId=project-redact", nil)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("GET csv export status=%d body=%s", rr.Code, rr.Body.String())
+	}
+	if strings.Contains(rr.Body.String(), "sk-1234567890abcdefghijklmnop") {
+		t.Fatalf("csv export leaked secret-like request id: %s", rr.Body.String())
+	}
+	if !strings.Contains(rr.Body.String(), "[REDACTED]") {
+		t.Fatalf("csv export missing redaction marker: %s", rr.Body.String())
+	}
+}

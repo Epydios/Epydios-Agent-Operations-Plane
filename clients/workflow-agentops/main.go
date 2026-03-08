@@ -256,6 +256,7 @@ func runTicketStatus(ctx context.Context, client *runtimeclient.Client, cfg runt
 	fs.SetOutput(os.Stderr)
 	sessionID := fs.String("session-id", "", "optional session id override")
 	render := fs.String("render", "text", "render mode: text, comment, update, report, or json")
+	reportSelection := runtimeclient.BindEnterpriseReportSelectionFlags(fs)
 	lookup := bindWorkflowLookupFlags(fs)
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -273,7 +274,7 @@ func runTicketStatus(ctx context.Context, client *runtimeclient.Client, cfg runt
 		return printJSON(report)
 	}
 	if format == "report" {
-		rendered, err := renderWorkflowReport(ctx, client, report)
+		rendered, err := renderWorkflowReport(ctx, client, report, *reportSelection)
 		if err != nil {
 			return err
 		}
@@ -295,6 +296,7 @@ func runTicketFollow(ctx context.Context, client *runtimeclient.Client, cfg runt
 	waitSeconds := fs.Int("wait-seconds", cfg.LiveFollowWait, "server wait seconds")
 	once := fs.Bool("once", false, "fetch one event-stream window and exit")
 	render := fs.String("render", "text", "render mode: update, delta-update, report, delta-report, text, or json")
+	reportSelection := runtimeclient.BindEnterpriseReportSelectionFlags(fs)
 	lookup := bindWorkflowLookupFlags(fs)
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -339,7 +341,7 @@ func runTicketFollow(ctx context.Context, client *runtimeclient.Client, cfg runt
 			if err != nil {
 				return err
 			}
-			rendered, err := renderWorkflowDeltaReport(ctx, client, current, items)
+			rendered, err := renderWorkflowDeltaReport(ctx, client, current, items, *reportSelection)
 			if err != nil {
 				return err
 			}
@@ -349,7 +351,7 @@ func runTicketFollow(ctx context.Context, client *runtimeclient.Client, cfg runt
 			if err != nil {
 				return err
 			}
-			rendered, err := renderWorkflowReport(ctx, client, current)
+			rendered, err := renderWorkflowReport(ctx, client, current, *reportSelection)
 			if err != nil {
 				return err
 			}
@@ -817,7 +819,7 @@ func renderWorkflowDeltaUpdate(report *workflowStatusReport, items []runtimeapi.
 	return renderWorkflowEnvelope("follow_delta", summary, report, details, runtimeclient.RenderSessionEventLines(items, 4))
 }
 
-func renderWorkflowReport(ctx context.Context, client *runtimeclient.Client, report *workflowStatusReport) (string, error) {
+func renderWorkflowReport(ctx context.Context, client *runtimeclient.Client, report *workflowStatusReport, selection runtimeclient.EnterpriseReportSelection) (string, error) {
 	if report == nil {
 		return "", nil
 	}
@@ -829,9 +831,20 @@ func renderWorkflowReport(ctx context.Context, client *runtimeclient.Client, rep
 	if err != nil {
 		return "", err
 	}
+	exportProfiles, disposition, err := runtimeclient.LoadEnterpriseReportSelectionCatalog(ctx, client, "report", "workflow", selection)
+	if err != nil {
+		return "", err
+	}
+	orgAdminProfiles, err := client.ListOrgAdminProfiles(ctx, "", "", "", "workflow")
+	if err != nil {
+		return "", err
+	}
 	envelope := runtimeclient.BuildEnterpriseReportEnvelope(runtimeclient.EnterpriseReportSubject{
 		Header:               "AgentOps workflow governance report",
 		ReportType:           "report",
+		ExportProfile:        disposition.ExportProfile,
+		Audience:             disposition.Audience,
+		RetentionClass:       disposition.RetentionClass,
 		ClientSurface:        "workflow",
 		ContextLabel:         "Workflow",
 		ContextValue:         buildWorkflowReportContext(report),
@@ -850,15 +863,16 @@ func renderWorkflowReport(ctx context.Context, client *runtimeclient.Client, rep
 		PendingProposalCount: len(report.PendingProposals),
 		ToolActionCount:      report.ToolActionCount,
 		EvidenceCount:        report.EvidenceCount,
+		ApprovalCheckpoints:  append([]runtimeapi.ApprovalCheckpointRecord(nil), report.PendingApprovals...),
 		Summary:              runtimeclient.NormalizeStringOrDefault(report.LatestWorkerSummary, "Enterprise workflow posture refreshed."),
 		Details:              buildWorkflowReportDetails(report),
 		Recent:               workflowRecentEventLines(report, 4),
 		ActionHints:          renderWorkflowActionHints(report),
-	}, policyPacks, workerCapabilities)
+	}, policyPacks, workerCapabilities, exportProfiles, orgAdminProfiles)
 	return runtimeclient.RenderEnterpriseReportEnvelope(envelope), nil
 }
 
-func renderWorkflowDeltaReport(ctx context.Context, client *runtimeclient.Client, report *workflowStatusReport, items []runtimeapi.SessionEventRecord) (string, error) {
+func renderWorkflowDeltaReport(ctx context.Context, client *runtimeclient.Client, report *workflowStatusReport, items []runtimeapi.SessionEventRecord, selection runtimeclient.EnterpriseReportSelection) (string, error) {
 	if len(items) == 0 {
 		return "", nil
 	}
@@ -870,10 +884,21 @@ func renderWorkflowDeltaReport(ctx context.Context, client *runtimeclient.Client
 	if err != nil {
 		return "", err
 	}
+	exportProfiles, disposition, err := runtimeclient.LoadEnterpriseReportSelectionCatalog(ctx, client, "delta-report", "workflow", selection)
+	if err != nil {
+		return "", err
+	}
+	orgAdminProfiles, err := client.ListOrgAdminProfiles(ctx, "", "", "", "workflow")
+	if err != nil {
+		return "", err
+	}
 	summary := runtimeclient.BuildThreadFollowSummary(items)
 	envelope := runtimeclient.BuildEnterpriseReportEnvelope(runtimeclient.EnterpriseReportSubject{
 		Header:               "AgentOps workflow governance report",
 		ReportType:           "delta-report",
+		ExportProfile:        disposition.ExportProfile,
+		Audience:             disposition.Audience,
+		RetentionClass:       disposition.RetentionClass,
 		ClientSurface:        "workflow",
 		ContextLabel:         "Workflow",
 		ContextValue:         buildWorkflowReportContext(report),
@@ -892,11 +917,12 @@ func renderWorkflowDeltaReport(ctx context.Context, client *runtimeclient.Client
 		PendingProposalCount: len(report.PendingProposals),
 		ToolActionCount:      report.ToolActionCount,
 		EvidenceCount:        report.EvidenceCount,
+		ApprovalCheckpoints:  append([]runtimeapi.ApprovalCheckpointRecord(nil), report.PendingApprovals...),
 		Summary:              summary,
 		Details:              runtimeclient.BuildThreadFollowDetails(items),
 		Recent:               runtimeclient.RenderSessionEventLines(items, 4),
 		ActionHints:          renderWorkflowActionHints(report),
-	}, policyPacks, workerCapabilities)
+	}, policyPacks, workerCapabilities, exportProfiles, orgAdminProfiles)
 	return runtimeclient.RenderEnterpriseReportEnvelope(envelope), nil
 }
 
