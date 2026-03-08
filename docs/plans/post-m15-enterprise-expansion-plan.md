@@ -286,8 +286,9 @@ Exit gate:
 
 M20 is complete:
 
-- hold the post-M15 enterprise expansion track here
-- do not start another hardening slice unless a new milestone is explicitly defined
+- planned next milestone is `M21`: stabilize the existing live-mode/browser, runtime, and Mac-local managed-Codex operator path before adding new expansion work
+- keep `M21` planned but inactive until explicitly started
+- planned follow-on after that is `M22` for local or customer-hosted AIMXS decision-provider work on the existing policy boundary
 - keep Chat, VS Code, CLI, workflow, and chatops on the same native M16/M18 contract
 
 Do not:
@@ -300,3 +301,36 @@ Do not:
 ## Planning rule
 
 All future client and worker work should be traceable back to the M16 session/task/worker contract.
+
+
+### M21
+
+Stabilization and turnkey local operator path. Planned, not active.
+
+Deliverables:
+
+- fix the live-mode browser `data: refresh failed` path and related diagnostics
+- make the live Chat empty-state explicit when no native M16 tasks or sessions exist
+- tighten `ui/desktop-ui/.tmp` cache hygiene and cleanup policy
+- document and verify the OpenAI live-test path for Mac operators
+- provide a turnkey local-Mac runtime path for the managed Codex process bridge
+- verify the local managed-Codex operator flow end-to-end on Mac without topology guesswork
+
+Exit gate:
+
+- a Mac operator can run the live system cleanly, see stable refresh and chat behavior, and exercise the local managed Codex path with a documented turnkey flow
+
+### M22
+
+Local or customer-hosted AIMXS decision-provider boundary. Planned, not active.
+
+Deliverables:
+
+- decide the local or customer-hosted AIMXS testing posture on the existing `PolicyProvider` boundary
+- add a local AIMXS test harness on the same provider contract
+- verify no-egress or local-boundary operation for AIMXS local mode
+- document the runtime and operator path for local AIMXS testing
+
+Exit gate:
+
+- AIMXS can be exercised locally on the existing policy-provider boundary without introducing client-specific logic or bypassing the governed contract

@@ -188,8 +188,36 @@
         "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/m20-enterprise-hardening/verify-m20-enterprise-hardening-exit-gate-latest.summary.json",
         "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/desktop-closeout/m13-m14-closeout-latest.summary.json"
       ]
+    },
+    {
+      "id": "M21",
+      "name": "stabilization_and_turnkey_local_operator_path",
+      "goal": "stabilize the existing live-mode browser and Mac-local operator flows and make the current managed Codex path turnkey before adding new expansion scope",
+      "deliverables": [
+        "live-mode refresh failure investigation and fix",
+        "operator chat live empty-state and data-loading clarity",
+        "ui desktop tmp cache hygiene and cleanup policy",
+        "documented openai live-test path for mac operators",
+        "local mac runtime launcher for managed codex process mode",
+        "turnkey mac local managed-codex verification path"
+      ],
+      "exit_gate": "a mac operator can run the live system cleanly, see stable chat and data refresh behavior, and exercise the local managed Codex path without topology guesswork",
+      "status": "planned_not_active_until_explicit_start"
+    },
+    {
+      "id": "M22",
+      "name": "local_aimxs_decision_provider_boundary",
+      "goal": "evaluate and then implement local or customer-hosted AIMXS decision-provider operation on the existing policy boundary after M21 stabilization is complete",
+      "deliverables": [
+        "local or customer-hosted AIMXS provider mode decision record",
+        "AIMXS local test harness on the existing PolicyProvider boundary",
+        "no-egress or local-boundary verification for AIMXS local mode",
+        "runtime and operator documentation for local AIMXS testing"
+      ],
+      "exit_gate": "AIMXS can be exercised locally through the existing policy-provider boundary without introducing client-specific logic or bypassing the governed contract",
+      "status": "planned_not_active_until_m21_closes_or_explicit_parallelization"
     }
   ],
-  "recommended_immediate_next_step": "M20 is complete. No further parallel post-M15 enterprise expansion slice is active; hold this track until a new milestone is explicitly defined.",
+  "recommended_immediate_next_step": "M20 is complete. Planned next post-M15 milestone is M21: stabilize the existing live-mode/browser, runtime, and Mac-local managed-Codex operator path before starting new expansion work. Keep M21 planned but inactive until explicitly started. Planned follow-on after that is M22 for local/customer-hosted AIMXS decision-provider work on the existing PolicyProvider or ExtensionProvider boundary.",
   "parallel_execution_note": "M16 architecture/spec work may begin while M15 remains blocked on Windows execution-host proof, but M15 must not be marked complete until Phase D and final launch sign-off are closed."
 }
