@@ -1,7 +1,7 @@
 {
   "id": "m20_enterprise_hardening_baseline_20260307",
   "date": "2026-03-08",
-  "status": "baseline_recorded_org_admin_category_artifact_governed_report_update_projection_slice_landed",
+  "status": "m20_complete_governed_run_export_and_exit_gate_passed",
   "scope": "Inventory the current enterprise posture after M19 and land the first shared M20 hardening artifact without forking the native M16/M18 contract.",
   "baseline": {
     "multi_tenant_policy": {
@@ -23,7 +23,7 @@
       ]
     },
     "dlp_and_secret_handling": {
-      "status": "implemented_for_settings_ingress_platform_hardening_governed_report_redaction_and_runtime_run_audit_evidence_export_redaction",
+      "status": "implemented_for_settings_ingress_platform_hardening_governed_report_redaction_and_runtime_run_audit_evidence_export_redaction_with_governed_run_export_disposition",
       "evidence": [
         "EPYDIOS_AGENTOPS_DESKTOP_REPO/docs/runtime-orchestration-service.md",
         "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api.go",
@@ -40,7 +40,13 @@
         "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/main.js",
         "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/export_disposition.go",
         "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api_v1alpha2.go",
-        "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api_export_runtime_test.go"
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api_export_runtime_test.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/export_profile_catalog.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/export_org_admin.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api_export_profiles_test.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/platform/local/bin/verify-m20-enterprise-hardening-exit-gate.sh",
+        "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/m20-enterprise-hardening/verify-m20-enterprise-hardening-exit-gate-latest.log",
+        "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/m20-enterprise-hardening/verify-m20-enterprise-hardening-exit-gate-latest.summary.json"
       ]
     },
     "worker_capabilities": {
@@ -53,7 +59,7 @@
       ]
     },
     "reporting_and_export": {
-      "status": "shared_enterprise_report_envelope_with_runtime_native_export_hardening_and_persisted_org_admin_active_review_audit_export_and_category_artifact_projection_landed",
+      "status": "shared_enterprise_report_envelope_with_runtime_native_export_hardening_persisted_org_admin_projection_governed_run_export_and_exit_gate_landed",
       "evidence": [
         "EPYDIOS_AGENTOPS_DESKTOP_REPO/docs/runtime-orchestration-service.md",
         "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api.go",
@@ -91,7 +97,11 @@
         "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/internal/runtimeclient/review.go",
         "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/runtime/desktop-export-governance.js",
         "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/test/desktop-export-governance.test.js",
-        "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/internal/runtimeclient/thread_envelope.go"
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/internal/runtimeclient/thread_envelope.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api_run_projection_test.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/platform/local/bin/verify-m20-enterprise-hardening-exit-gate.sh",
+        "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/m20-enterprise-hardening/verify-m20-enterprise-hardening-exit-gate-latest.log",
+        "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/m20-enterprise-hardening/verify-m20-enterprise-hardening-exit-gate-latest.summary.json"
       ]
     },
     "policy_packs": {
@@ -104,7 +114,7 @@
       ]
     },
     "export_profiles": {
-      "status": "explicit_catalog_with_runtime_audit_evidence_export_profiles_and_retention_overlays_landed",
+      "status": "explicit_catalog_with_runtime_run_audit_evidence_export_profiles_retention_overlays_and_exit_gate_coverage_landed",
       "evidence": [
         "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/export_profile_catalog.go",
         "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api_export_profiles_test.go",
@@ -123,7 +133,12 @@
         "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/test/chat.test.js",
         "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/vscode-agentops/extension.js",
         "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/export_disposition.go",
-        "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api_export_runtime_test.go"
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api_export_runtime_test.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/export_org_admin.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api_run_projection_test.go",
+        "EPYDIOS_AGENTOPS_DESKTOP_REPO/platform/local/bin/verify-m20-enterprise-hardening-exit-gate.sh",
+        "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/m20-enterprise-hardening/verify-m20-enterprise-hardening-exit-gate-latest.log",
+        "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/m20-enterprise-hardening/verify-m20-enterprise-hardening-exit-gate-latest.summary.json"
       ]
     }
   },
@@ -188,11 +203,9 @@
     ]
   },
   "next_batch": [
-    "Extend runtime-side enforcement and persistence from the current approval-checkpoint, runtime-audit, category-artifact, and governed report/update projection paths into the broader delegated-admin, break-glass, directory-sync, residency/legal-hold exception, and quota/chargeback overlay admin surfaces.",
-    "Extend parity and verifier coverage for structured org-admin exception, overlay, normalized input, audit/export, active-review, and category-artifact metadata through the remaining admin-review and export surfaces without forking the native M16/M18 contract.",
-    "Run the M20 exit-gate validation slice and close any final parity defects.",
-    "Keep Chat, VS Code, CLI, workflow, and chatops on the same native M16/M18 contract.",
-    "Do not introduce client-specific hardening branches."
+    "M20 is complete.",
+    "No further M20 implementation slice is active.",
+    "Treat remaining enterprise IT/admin and org-scale items as follow-on scope only unless a new milestone is explicitly defined."
   ],
   "second_shared_hardening_artifact": {
     "name": "runtime_policy_pack_catalog",
@@ -377,5 +390,11 @@
       "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/vscode-agentops/test/updateEnvelope.test.js",
       "EPYDIOS_AGENTOPS_DESKTOP_REPO/platform/local/bin/verify-m20-enterprise-hardening-baseline.sh"
     ]
+  },
+  "exit_gate": {
+    "path": "EPYDIOS_AGENTOPS_DESKTOP_REPO/platform/local/bin/verify-m20-enterprise-hardening-exit-gate.sh",
+    "latest_log": "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/m20-enterprise-hardening/verify-m20-enterprise-hardening-exit-gate-latest.log",
+    "latest_summary": "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/m20-enterprise-hardening/verify-m20-enterprise-hardening-exit-gate-latest.summary.json",
+    "status": "pass"
   }
 }

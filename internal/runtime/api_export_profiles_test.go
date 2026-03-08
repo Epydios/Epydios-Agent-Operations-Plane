@@ -20,13 +20,14 @@ func TestRuntimeV1Alpha2ExportProfileCatalog(t *testing.T) {
 	if response.Count != len(response.Items) {
 		t.Fatalf("catalog count=%d want %d", response.Count, len(response.Items))
 	}
-	if response.Count < 9 {
-		t.Fatalf("catalog count=%d want at least 9", response.Count)
+	if response.Count < 10 {
+		t.Fatalf("catalog count=%d want at least 10", response.Count)
 	}
 
 	var sawOperatorReview bool
 	var sawIncidentExport bool
 	var sawEvidenceExport bool
+	var sawRunExport bool
 	for _, item := range response.Items {
 		switch item.ExportProfile {
 		case "operator_review":
@@ -59,6 +60,17 @@ func TestRuntimeV1Alpha2ExportProfileCatalog(t *testing.T) {
 			if item.DefaultAudience == "" || item.DefaultRetentionClass == "" {
 				t.Fatalf("evidence_export defaults missing: %+v", item)
 			}
+		case "run_export":
+			sawRunExport = true
+			if len(item.ClientSurfaces) == 0 || item.ClientSurfaces[0] != "runtime" {
+				t.Fatalf("run_export runtime surface missing: %+v", item)
+			}
+			if item.DefaultAudience != "downstream_review" {
+				t.Fatalf("run_export defaultAudience=%q want downstream_review", item.DefaultAudience)
+			}
+			if item.DefaultRetentionClass != "archive" {
+				t.Fatalf("run_export defaultRetentionClass=%q want archive", item.DefaultRetentionClass)
+			}
 		}
 	}
 	if !sawOperatorReview {
@@ -69,6 +81,9 @@ func TestRuntimeV1Alpha2ExportProfileCatalog(t *testing.T) {
 	}
 	if !sawEvidenceExport {
 		t.Fatalf("evidence_export export profile missing: %+v", response.Items)
+	}
+	if !sawRunExport {
+		t.Fatalf("run_export export profile missing: %+v", response.Items)
 	}
 }
 
