@@ -7,12 +7,15 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
 
 type codexProcessRequest struct {
 	CLIPath      string
+	HomeDir      string
 	Prompt       string
 	SystemPrompt string
 	Model        string
@@ -26,6 +29,7 @@ type codexStructuredProposal struct {
 	Type              string `json:"type"`
 	Summary           string `json:"summary"`
 	Command           string `json:"command"`
+	Stdin             string `json:"stdin"`
 	CWD               string `json:"cwd"`
 	TimeoutSeconds    int    `json:"timeoutSeconds"`
 	ReadOnlyRequested bool   `json:"readOnlyRequested"`
@@ -54,6 +58,12 @@ type codexProcessItem struct {
 	Status           string `json:"status,omitempty"`
 }
 
+var (
+	codexPrintfRedirectPattern = regexp.MustCompile(`^printf\s+('(?:[^']|\\')*'|"(?:[^"\\]|\\.)*")\s*>\s*([^\s]+)$`)
+	codexPrintfTeePattern      = regexp.MustCompile(`^printf\s+('(?:[^']|\\')*'|"(?:[^"\\]|\\.)*")\s*\|\s*tee\s+([^\s]+)$`)
+	codexPythonWritePattern    = regexp.MustCompile(`^python3\s+-c\s+(".*"|'[^']*')$`)
+)
+
 func (a codexManagedWorkerAdapter) runCodexProcessTurn(ctx context.Context, req AgentInvokeRequest, profile agentProfileConfig, boundary *managedWorkerProviderBoundary) (*managedWorkerTurnResult, error) {
 	workdir := strings.TrimSpace(a.workdir)
 	if workdir == "" {
@@ -63,6 +73,7 @@ func (a codexManagedWorkerAdapter) runCodexProcessTurn(ctx context.Context, req 
 	}
 	processReq := codexProcessRequest{
 		CLIPath:      strings.TrimSpace(a.cliPath),
+		HomeDir:      strings.TrimSpace(a.homeDir),
 		Prompt:       strings.TrimSpace(req.Prompt),
 		SystemPrompt: strings.TrimSpace(req.SystemPrompt),
 		Model:        strings.TrimSpace(profile.Model),
@@ -116,6 +127,12 @@ func runCodexProcess(parent context.Context, req codexProcessRequest) ([]byte, e
 		if envVar := strings.TrimSpace(req.Boundary.TokenEnvVar); envVar != "" && strings.TrimSpace(req.Boundary.TokenValue) != "" {
 			env = append(env, envVar+"="+req.Boundary.TokenValue)
 		}
+		if token := strings.TrimSpace(req.Boundary.TokenValue); token != "" {
+			env = append(env, "OPENAI_API_KEY="+token)
+		}
+	}
+	if homeDir := strings.TrimSpace(req.HomeDir); homeDir != "" {
+		env = append(env, "CODEX_HOME="+homeDir)
 	}
 	if strings.TrimSpace(req.Workdir) != "" {
 		args = append(args, "-C", strings.TrimSpace(req.Workdir))
@@ -155,10 +172,14 @@ func buildCodexBoundaryConfigArgs(boundary *managedWorkerProviderBoundary) []str
 	}
 	providerID := normalizeStringOrDefault(boundary.ProviderID, "agentops_gateway")
 	items := []string{
+		`forced_login_method="api"`,
+		`model_reasoning_effort="high"`,
+		`plan_mode_reasoning_effort="high"`,
 		fmt.Sprintf("model_provider=%q", providerID),
 		fmt.Sprintf("model_providers.%s.name=%q", providerID, normalizeStringOrDefault(boundary.ProviderName, "AgentOps Gateway")),
 		fmt.Sprintf("model_providers.%s.base_url=%q", providerID, strings.TrimSpace(boundary.BaseURL)),
 		fmt.Sprintf("model_providers.%s.wire_api=%q", providerID, normalizeStringOrDefault(boundary.WireAPI, "responses")),
+		fmt.Sprintf("model_providers.%s.env_key=%q", providerID, "OPENAI_API_KEY"),
 	}
 	if envVar := strings.TrimSpace(boundary.TokenEnvVar); envVar != "" {
 		items = append(items, fmt.Sprintf("model_providers.%s.bearer_token_env_var=%q", providerID, envVar))
@@ -234,7 +255,7 @@ func writeCodexOutputSchema() (string, error) {
 		return "", err
 	}
 	defer file.Close()
-	schema := `{"type":"object","properties":{"message":{"type":"string"},"tool_proposals":{"type":"array","items":{"type":"object","properties":{"type":{"type":"string"},"summary":{"type":"string"},"command":{"type":"string"},"cwd":{"type":"string"},"timeoutSeconds":{"type":"integer"},"readOnlyRequested":{"type":"boolean"},"confidence":{"type":"string"}},"required":["type","summary","command","cwd","timeoutSeconds","readOnlyRequested","confidence"],"additionalProperties":false}}},"required":["message","tool_proposals"],"additionalProperties":false}`
+	schema := `{"type":"object","properties":{"message":{"type":"string"},"tool_proposals":{"type":"array","items":{"type":"object","properties":{"type":{"type":"string"},"summary":{"type":"string"},"command":{"type":"string"},"stdin":{"type":"string"},"cwd":{"type":"string"},"timeoutSeconds":{"type":"integer"},"readOnlyRequested":{"type":"boolean"},"confidence":{"type":"string"}},"required":["type","summary","command","stdin","cwd","timeoutSeconds","readOnlyRequested","confidence"],"additionalProperties":false}}},"required":["message","tool_proposals"],"additionalProperties":false}`
 	if _, err := file.WriteString(schema); err != nil {
 		return "", err
 	}
@@ -251,8 +272,14 @@ func buildManagedCodexPrompt(req codexProcessRequest) string {
 		"Return final operator-facing text in the `message` field.",
 		"Use `tool_proposals` for terminal commands that should be reviewed before execution.",
 		"Never execute mutating or environment-changing commands directly.",
-		"If you use shell commands, keep them read-only inspection commands only.",
-		"Each terminal proposal must use type=`terminal_command` and include command, cwd, timeoutSeconds, readOnlyRequested, and confidence.",
+		"If the operator request requires creating or modifying a file, express that work as a governed `tool_proposals` terminal command using `command` = `tee <target>` and `stdin` = the exact file contents.",
+		"If the operator request requires deleting a file, express that work as a governed `tool_proposals` terminal command using `command` = `rm <target>`.",
+		"If the operator request requires reading a file, prefer `command` = `cat <target>` with `readOnlyRequested=true`.",
+		"Read-only inspection commands should set `readOnlyRequested=true`; mutating commands that require approval should set `readOnlyRequested=false`.",
+		"Do not use shell redirection, pipes, heredocs, interpreter wrappers, or shell control operators in governed terminal proposals.",
+		"Do not answer with only a sandbox refusal when the request can be satisfied by returning a governed proposal.",
+		"Each terminal proposal must use type=`terminal_command` and include command, stdin, cwd, timeoutSeconds, readOnlyRequested, and confidence.",
+		"If a command does not need input content, set `stdin` to the empty string.",
 		"If no tool proposal is needed, return an empty `tool_proposals` array.",
 	}, "\n"))
 	sections = append(sections, "Operator request:\n"+strings.TrimSpace(req.Prompt))
@@ -270,6 +297,11 @@ func buildManagedCodexContinuationPrompt(req managedWorkerContinuationRequest) s
 		"Return final operator-facing text in the `message` field.",
 		"Use `tool_proposals` only if another governed tool step is strictly required.",
 		"Never execute mutating or environment-changing commands directly.",
+		"If another file creation or modification step is required, return it as a governed `tool_proposals` terminal command using `command` = `tee <target>` and `stdin` = the exact file contents.",
+		"If another file deletion step is required, return it as a governed `tool_proposals` terminal command using `command` = `rm <target>`.",
+		"If another file read step is required, prefer `command` = `cat <target>` with `readOnlyRequested=true`.",
+		"Each terminal proposal must include `stdin`; use the empty string when the command does not need input content.",
+		"Do not use shell redirection, pipes, heredocs, interpreter wrappers, or shell control operators in governed terminal proposals.",
 	}, "\n"))
 	if req.Task != nil && strings.TrimSpace(req.Task.Intent) != "" {
 		sections = append(sections, "Original task intent:\n"+strings.TrimSpace(req.Task.Intent))
@@ -292,8 +324,12 @@ func buildManagedCodexContinuationPrompt(req managedWorkerContinuationRequest) s
 		}
 		sections = append(sections, "Approved governed tool proposal:\n"+strings.Join(details, "\n"))
 	}
+	toolActionStatus := "UNKNOWN"
+	if req.ToolAction != nil {
+		toolActionStatus = normalizeStringOrDefault(string(req.ToolAction.Status), "UNKNOWN")
+	}
 	resultLines := []string{
-		fmt.Sprintf("- status: %s", normalizeStringOrDefault(string(req.ToolAction.Status), "UNKNOWN")),
+		fmt.Sprintf("- status: %s", toolActionStatus),
 	}
 	if req.ExecutionResult != nil {
 		resultLines = append(resultLines,
@@ -326,7 +362,7 @@ func buildManagedCodexLegacyContinuationSummary(req managedWorkerContinuationReq
 		return summary
 	}
 	statusText := "completed"
-	if strings.TrimSpace(req.ExecutionError) != "" || req.ToolAction.Status == ToolActionStatusFailed {
+	if strings.TrimSpace(req.ExecutionError) != "" || (req.ToolAction != nil && req.ToolAction.Status == ToolActionStatusFailed) {
 		statusText = "failed"
 	}
 	base := fmt.Sprintf("Managed Codex reviewed the governed tool result (%s, exitCode=%d).", statusText, req.ExecutionResult.ExitCode)
@@ -415,12 +451,14 @@ func parseCodexProcessTranscript(transcript []byte) (*managedWorkerTurnResult, e
 	}
 	toolProposals := make([]JSONObject, 0, len(structured.ToolProposals))
 	for idx, proposal := range structured.ToolProposals {
+		proposal = normalizeCodexStructuredProposal(proposal)
 		proposalID := fmt.Sprintf("codex-proposal-%d", idx+1)
 		toolProposals = append(toolProposals, JSONObject{
 			"proposalId":        proposalID,
 			"type":              normalizeStringOrDefault(proposal.Type, "terminal_command"),
 			"summary":           strings.TrimSpace(proposal.Summary),
 			"command":           strings.TrimSpace(proposal.Command),
+			"stdin":             proposal.Stdin,
 			"cwd":               strings.TrimSpace(proposal.CWD),
 			"timeoutSeconds":    proposal.TimeoutSeconds,
 			"readOnlyRequested": proposal.ReadOnlyRequested,
@@ -444,6 +482,121 @@ func parseStructuredCodexTurn(text string) (codexStructuredTurn, bool) {
 		return codexStructuredTurn{}, false
 	}
 	return payload, true
+}
+
+func normalizeCodexStructuredProposal(proposal codexStructuredProposal) codexStructuredProposal {
+	proposal.Type = normalizeStringOrDefault(proposal.Type, "terminal_command")
+	proposal.Command = strings.TrimSpace(proposal.Command)
+	proposal.CWD = strings.TrimSpace(proposal.CWD)
+	proposal.Confidence = normalizeStringOrDefault(proposal.Confidence, "medium")
+	if !strings.EqualFold(proposal.Type, "terminal_command") {
+		return proposal
+	}
+	if normalized, ok := normalizeCodexFileWriteProposal(proposal); ok {
+		return normalized
+	}
+	return proposal
+}
+
+func normalizeCodexFileWriteProposal(proposal codexStructuredProposal) (codexStructuredProposal, bool) {
+	commandText := strings.TrimSpace(proposal.Command)
+	if commandText == "" {
+		return proposal, false
+	}
+	if match := codexPrintfRedirectPattern.FindStringSubmatch(commandText); len(match) == 3 {
+		if stdin, ok := decodeCodexShellQuotedContent(match[1]); ok {
+			proposal.Command = "tee " + match[2]
+			proposal.Stdin = stdin
+			proposal.ReadOnlyRequested = false
+			return proposal, true
+		}
+	}
+	if match := codexPrintfTeePattern.FindStringSubmatch(commandText); len(match) == 3 {
+		if stdin, ok := decodeCodexShellQuotedContent(match[1]); ok {
+			proposal.Command = "tee " + match[2]
+			proposal.Stdin = stdin
+			proposal.ReadOnlyRequested = false
+			return proposal, true
+		}
+	}
+	if match := codexPythonWritePattern.FindStringSubmatch(commandText); len(match) == 2 {
+		if fileName, stdin, ok := decodeCodexPythonWrite(match[1]); ok {
+			proposal.Command = "tee " + fileName
+			proposal.Stdin = stdin
+			proposal.ReadOnlyRequested = false
+			return proposal, true
+		}
+	}
+	return proposal, false
+}
+
+func decodeCodexShellQuotedContent(raw string) (string, bool) {
+	trimmed := strings.TrimSpace(raw)
+	if len(trimmed) < 2 {
+		return "", false
+	}
+	switch trimmed[0] {
+	case '"':
+		if trimmed[len(trimmed)-1] != '"' {
+			return "", false
+		}
+		value, err := strconv.Unquote(trimmed)
+		if err != nil {
+			return "", false
+		}
+		return value, true
+	case '\'':
+		if trimmed[len(trimmed)-1] != '\'' {
+			return "", false
+		}
+		value := trimmed[1 : len(trimmed)-1]
+		value = strings.ReplaceAll(value, `\n`, "\n")
+		value = strings.ReplaceAll(value, `\t`, "\t")
+		return value, true
+	default:
+		return "", false
+	}
+}
+
+func decodeCodexPythonWrite(raw string) (string, string, bool) {
+	trimmed := strings.TrimSpace(raw)
+	if len(trimmed) < 2 {
+		return "", "", false
+	}
+	if trimmed[0] == '"' && trimmed[len(trimmed)-1] == '"' {
+		unquoted, err := strconv.Unquote(trimmed)
+		if err != nil {
+			return "", "", false
+		}
+		trimmed = unquoted
+	} else if trimmed[0] == '\'' && trimmed[len(trimmed)-1] == '\'' {
+		trimmed = trimmed[1 : len(trimmed)-1]
+	}
+	patterns := []struct {
+		re        *regexp.Regexp
+		quoteChar string
+	}{
+		{
+			re:        regexp.MustCompile(`open\('([^']+)'\s*,\s*'w'\)\.write\('((?:[^'\\]|\\.)*)'\)`),
+			quoteChar: "'",
+		},
+		{
+			re:        regexp.MustCompile(`open\("([^"]+)"\s*,\s*"w"\)\.write\("((?:[^"\\]|\\.)*)"\)`),
+			quoteChar: `"`,
+		},
+	}
+	for _, pattern := range patterns {
+		match := pattern.re.FindStringSubmatch(trimmed)
+		if len(match) != 3 {
+			continue
+		}
+		content, ok := decodeCodexShellQuotedContent(pattern.quoteChar + match[2] + pattern.quoteChar)
+		if !ok {
+			return "", "", false
+		}
+		return match[1], content, true
+	}
+	return "", "", false
 }
 
 func summarizeCodexCommandExecution(item codexProcessItem) string {

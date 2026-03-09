@@ -62,7 +62,9 @@ var terminalAllowedCommands = map[string]struct{}{
 	"ls":       {},
 	"printenv": {},
 	"pwd":      {},
+	"rm":       {},
 	"tail":     {},
+	"tee":      {},
 	"true":     {},
 	"uname":    {},
 	"wc":       {},
@@ -1138,7 +1140,7 @@ func (s *APIServer) handleCreateTerminalSession(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	execResult, execErr := executeTerminalCommand(r.Context(), commandName, commandArgs, req.Command.CWD, normalizeTerminalTimeoutSeconds(req.Command.TimeoutSeconds))
+	execResult, execErr := executeTerminalCommand(r.Context(), commandName, commandArgs, req.Command.CWD, normalizeTerminalTimeoutSeconds(req.Command.TimeoutSeconds), req.Command.Stdin)
 	response.Applied = true
 	response.SessionID = fmt.Sprintf("term-%d", issuedAt.UnixNano())
 	response.Result = execResult
@@ -1922,7 +1924,7 @@ func normalizeTerminalTimeoutSeconds(value int) int {
 	return value
 }
 
-func executeTerminalCommand(parent context.Context, commandName string, args []string, cwd string, timeoutSeconds int) (*TerminalExecutionResult, error) {
+func executeTerminalCommand(parent context.Context, commandName string, args []string, cwd string, timeoutSeconds int, stdin string) (*TerminalExecutionResult, error) {
 	if parent == nil {
 		parent = context.Background()
 	}
@@ -1933,6 +1935,9 @@ func executeTerminalCommand(parent context.Context, commandName string, args []s
 	cmd := exec.CommandContext(ctx, commandName, args...)
 	if trimmed := strings.TrimSpace(cwd); trimmed != "" {
 		cmd.Dir = trimmed
+	}
+	if stdin != "" {
+		cmd.Stdin = strings.NewReader(stdin)
 	}
 	output, err := cmd.CombinedOutput()
 

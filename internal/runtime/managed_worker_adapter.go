@@ -58,6 +58,7 @@ type managedWorkerAdapter interface {
 type codexManagedWorkerAdapter struct {
 	mode        string
 	cliPath     string
+	homeDir     string
 	workdir     string
 	sandboxMode string
 	timeout     time.Duration
@@ -74,12 +75,15 @@ func newCodexManagedWorkerAdapter(cfg AgentInvokerConfig) codexManagedWorkerAdap
 		timeout = 2 * time.Minute
 	}
 	sandboxMode := strings.TrimSpace(cfg.CodexSandboxMode)
-	if sandboxMode == "" {
+	if mode == "process" {
+		sandboxMode = "read-only"
+	} else if sandboxMode == "" {
 		sandboxMode = "read-only"
 	}
 	return codexManagedWorkerAdapter{
 		mode:        mode,
 		cliPath:     strings.TrimSpace(cfg.CodexCLIPath),
+		homeDir:     strings.TrimSpace(cfg.CodexHome),
 		workdir:     strings.TrimSpace(cfg.CodexWorkdir),
 		sandboxMode: sandboxMode,
 		timeout:     timeout,

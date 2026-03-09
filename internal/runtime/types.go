@@ -296,6 +296,7 @@ type TerminalSessionScope struct {
 
 type TerminalCommandRequest struct {
 	Text              string `json:"text"`
+	Stdin             string `json:"stdin,omitempty"`
 	CWD               string `json:"cwd,omitempty"`
 	TimeoutSeconds    int    `json:"timeoutSeconds,omitempty"`
 	ReadOnlyRequested bool   `json:"readOnlyRequested,omitempty"`

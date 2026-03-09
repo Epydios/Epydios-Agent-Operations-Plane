@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -675,6 +677,319 @@ func TestRuntimeV1Alpha2ToolProposalDecisionPromotesAuthorizedToolAction(t *test
 	}
 	if !sawCompletedAction {
 		t.Fatalf("session events missing tool_action.completed: %+v", eventList.Items)
+	}
+}
+
+func TestRuntimeV1Alpha2ToolProposalDecisionExecutesTeeWithStdin(t *testing.T) {
+	store := newMemoryRunStore()
+	server := NewAPIServer(store, nil, nil)
+	handler := server.Routes()
+
+	rr := requestJSON(t, handler, http.MethodPost, "/v1alpha2/runtime/tasks", map[string]interface{}{
+		"meta": map[string]interface{}{
+			"requestId": "task-proposal-tee-1",
+			"tenantId":  "tenant-a",
+			"projectId": "project-a",
+		},
+		"source": "desktop-ui",
+		"title":  "Proposal stdin flow",
+		"intent": "Validate stdin-backed governed file creation.",
+	})
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("POST task status=%d body=%s", rr.Code, rr.Body.String())
+	}
+	var task TaskRecord
+	decodeResponseBody(t, rr, &task)
+
+	rr = requestJSON(t, handler, http.MethodPost, "/v1alpha2/runtime/tasks/"+task.TaskID+"/sessions", map[string]interface{}{
+		"meta": map[string]interface{}{
+			"requestId": "session-proposal-tee-1",
+			"tenantId":  "tenant-a",
+			"projectId": "project-a",
+		},
+		"sessionType": "managed_agent_turn",
+		"source":      "desktop-ui",
+	})
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("POST session status=%d body=%s", rr.Code, rr.Body.String())
+	}
+	var session SessionRecord
+	decodeResponseBody(t, rr, &session)
+
+	rr = requestJSON(t, handler, http.MethodPost, "/v1alpha2/runtime/sessions/"+session.SessionID+"/workers", map[string]interface{}{
+		"meta": map[string]interface{}{
+			"requestId": "worker-proposal-tee-1",
+			"tenantId":  "tenant-a",
+			"projectId": "project-a",
+		},
+		"workerType":        "managed_agent",
+		"adapterId":         "codex",
+		"agentProfileId":    "codex",
+		"targetEnvironment": "codex",
+		"capabilities":      []string{"agent_turn", "tool_proposal"},
+	})
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("POST worker status=%d body=%s", rr.Code, rr.Body.String())
+	}
+	var worker SessionWorkerRecord
+	decodeResponseBody(t, rr, &worker)
+
+	tmpDir := t.TempDir()
+	rr = requestJSON(t, handler, http.MethodPost, "/v1alpha2/runtime/sessions/"+session.SessionID+"/workers/"+worker.WorkerID+"/events", map[string]interface{}{
+		"meta": map[string]interface{}{
+			"requestId": "proposal-generated-tee-1",
+			"tenantId":  "tenant-a",
+			"projectId": "project-a",
+		},
+		"eventType": "tool_proposal.generated",
+		"summary":   "Managed Codex suggested tee-based file creation.",
+		"payload": map[string]interface{}{
+			"proposalId":        "proposal-terminal-tee-1",
+			"proposalType":      "terminal_command",
+			"command":           "tee agentops_m21_probe.txt",
+			"stdin":             "agentops-managed-worker-ok\n",
+			"cwd":               tmpDir,
+			"timeoutSeconds":    5,
+			"readOnlyRequested": false,
+			"confidence":        "structured",
+		},
+	})
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("POST generated proposal event status=%d body=%s", rr.Code, rr.Body.String())
+	}
+
+	rr = requestJSON(t, handler, http.MethodPost, "/v1alpha2/runtime/sessions/"+session.SessionID+"/tool-proposals/proposal-terminal-tee-1/decision", map[string]interface{}{
+		"meta": map[string]interface{}{
+			"requestId": "proposal-decision-tee-1",
+			"tenantId":  "tenant-a",
+			"projectId": "project-a",
+		},
+		"decision": "APPROVE",
+		"reason":   "approved for governed file creation",
+	})
+	if rr.Code != http.StatusOK {
+		t.Fatalf("POST tool proposal decision status=%d body=%s", rr.Code, rr.Body.String())
+	}
+	var decisionResp ToolProposalDecisionResponse
+	decodeResponseBody(t, rr, &decisionResp)
+	if decisionResp.ActionStatus != ToolActionStatusCompleted {
+		t.Fatalf("tool proposal actionStatus=%q want %q", decisionResp.ActionStatus, ToolActionStatusCompleted)
+	}
+
+	content, err := os.ReadFile(filepath.Join(tmpDir, "agentops_m21_probe.txt"))
+	if err != nil {
+		t.Fatalf("read created file: %v", err)
+	}
+	if string(content) != "agentops-managed-worker-ok\n" {
+		t.Fatalf("file content=%q want exact stdin-backed output", string(content))
+	}
+}
+
+func TestRuntimeV1Alpha2ToolProposalDecisionNormalizesPrintfRedirect(t *testing.T) {
+	store := newMemoryRunStore()
+	server := NewAPIServer(store, nil, nil)
+	handler := server.Routes()
+
+	rr := requestJSON(t, handler, http.MethodPost, "/v1alpha2/runtime/tasks", map[string]interface{}{
+		"meta": map[string]interface{}{
+			"requestId": "task-proposal-printf-1",
+			"tenantId":  "tenant-a",
+			"projectId": "project-a",
+		},
+		"source": "desktop-ui.operator_chat",
+		"title":  "Managed worker proposal redirect normalization",
+		"intent": "Validate governed redirect proposals normalize into deterministic tee execution.",
+	})
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("POST task status=%d body=%s", rr.Code, rr.Body.String())
+	}
+	var task TaskRecord
+	decodeResponseBody(t, rr, &task)
+
+	rr = requestJSON(t, handler, http.MethodPost, "/v1alpha2/runtime/tasks/"+task.TaskID+"/sessions", map[string]interface{}{
+		"meta": map[string]interface{}{
+			"requestId": "session-proposal-printf-1",
+			"tenantId":  "tenant-a",
+			"projectId": "project-a",
+		},
+		"sessionType": "managed_agent_turn",
+		"source":      "desktop-ui",
+	})
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("POST session status=%d body=%s", rr.Code, rr.Body.String())
+	}
+	var session SessionRecord
+	decodeResponseBody(t, rr, &session)
+
+	rr = requestJSON(t, handler, http.MethodPost, "/v1alpha2/runtime/sessions/"+session.SessionID+"/workers", map[string]interface{}{
+		"meta": map[string]interface{}{
+			"requestId": "worker-proposal-printf-1",
+			"tenantId":  "tenant-a",
+			"projectId": "project-a",
+		},
+		"workerType":        "managed_agent",
+		"adapterId":         "codex",
+		"agentProfileId":    "codex",
+		"targetEnvironment": "codex",
+		"capabilities":      []string{"agent_turn", "tool_proposal"},
+	})
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("POST worker status=%d body=%s", rr.Code, rr.Body.String())
+	}
+	var worker SessionWorkerRecord
+	decodeResponseBody(t, rr, &worker)
+
+	tmpDir := t.TempDir()
+	rr = requestJSON(t, handler, http.MethodPost, "/v1alpha2/runtime/sessions/"+session.SessionID+"/workers/"+worker.WorkerID+"/events", map[string]interface{}{
+		"meta": map[string]interface{}{
+			"requestId": "proposal-generated-printf-1",
+			"tenantId":  "tenant-a",
+			"projectId": "project-a",
+		},
+		"eventType": "tool_proposal.generated",
+		"summary":   "Managed Codex suggested redirect-based file creation.",
+		"payload": map[string]interface{}{
+			"proposalId":        "proposal-terminal-printf-1",
+			"proposalType":      "terminal_command",
+			"command":           "printf 'agentops-managed-worker-ok\\n' > agentops_m21_probe.txt",
+			"cwd":               tmpDir,
+			"timeoutSeconds":    5,
+			"readOnlyRequested": false,
+			"confidence":        "structured",
+		},
+	})
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("POST generated proposal event status=%d body=%s", rr.Code, rr.Body.String())
+	}
+
+	rr = requestJSON(t, handler, http.MethodPost, "/v1alpha2/runtime/sessions/"+session.SessionID+"/tool-proposals/proposal-terminal-printf-1/decision", map[string]interface{}{
+		"meta": map[string]interface{}{
+			"requestId": "proposal-decision-printf-1",
+			"tenantId":  "tenant-a",
+			"projectId": "project-a",
+		},
+		"decision": "APPROVE",
+		"reason":   "approved for normalized redirect execution",
+	})
+	if rr.Code != http.StatusOK {
+		t.Fatalf("POST tool proposal decision status=%d body=%s", rr.Code, rr.Body.String())
+	}
+	var decisionResp ToolProposalDecisionResponse
+	decodeResponseBody(t, rr, &decisionResp)
+	if decisionResp.ActionStatus != ToolActionStatusCompleted {
+		t.Fatalf("tool proposal actionStatus=%q want %q", decisionResp.ActionStatus, ToolActionStatusCompleted)
+	}
+
+	content, err := os.ReadFile(filepath.Join(tmpDir, "agentops_m21_probe.txt"))
+	if err != nil {
+		t.Fatalf("read created file: %v", err)
+	}
+	if string(content) != "agentops-managed-worker-ok\n" {
+		t.Fatalf("file content=%q want exact normalized output", string(content))
+	}
+}
+
+func TestRuntimeV1Alpha2ToolProposalDecisionNormalizesPythonWrite(t *testing.T) {
+	store := newMemoryRunStore()
+	server := NewAPIServer(store, nil, nil)
+	handler := server.Routes()
+
+	rr := requestJSON(t, handler, http.MethodPost, "/v1alpha2/runtime/tasks", map[string]interface{}{
+		"meta": map[string]interface{}{
+			"requestId": "task-proposal-python-1",
+			"tenantId":  "tenant-a",
+			"projectId": "project-a",
+		},
+		"source": "desktop-ui.operator_chat",
+		"title":  "Managed worker proposal python normalization",
+		"intent": "Validate governed python file-write proposals normalize into deterministic tee execution.",
+	})
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("POST task status=%d body=%s", rr.Code, rr.Body.String())
+	}
+	var task TaskRecord
+	decodeResponseBody(t, rr, &task)
+
+	rr = requestJSON(t, handler, http.MethodPost, "/v1alpha2/runtime/tasks/"+task.TaskID+"/sessions", map[string]interface{}{
+		"meta": map[string]interface{}{
+			"requestId": "session-proposal-python-1",
+			"tenantId":  "tenant-a",
+			"projectId": "project-a",
+		},
+		"sessionType": "managed_agent_turn",
+		"source":      "desktop-ui",
+	})
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("POST session status=%d body=%s", rr.Code, rr.Body.String())
+	}
+	var session SessionRecord
+	decodeResponseBody(t, rr, &session)
+
+	rr = requestJSON(t, handler, http.MethodPost, "/v1alpha2/runtime/sessions/"+session.SessionID+"/workers", map[string]interface{}{
+		"meta": map[string]interface{}{
+			"requestId": "worker-proposal-python-1",
+			"tenantId":  "tenant-a",
+			"projectId": "project-a",
+		},
+		"workerType":        "managed_agent",
+		"adapterId":         "codex",
+		"agentProfileId":    "codex",
+		"targetEnvironment": "codex",
+		"capabilities":      []string{"agent_turn", "tool_proposal"},
+	})
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("POST worker status=%d body=%s", rr.Code, rr.Body.String())
+	}
+	var worker SessionWorkerRecord
+	decodeResponseBody(t, rr, &worker)
+
+	tmpDir := t.TempDir()
+	rr = requestJSON(t, handler, http.MethodPost, "/v1alpha2/runtime/sessions/"+session.SessionID+"/workers/"+worker.WorkerID+"/events", map[string]interface{}{
+		"meta": map[string]interface{}{
+			"requestId": "proposal-generated-python-1",
+			"tenantId":  "tenant-a",
+			"projectId": "project-a",
+		},
+		"eventType": "tool_proposal.generated",
+		"summary":   "Managed Codex suggested python-based file creation.",
+		"payload": map[string]interface{}{
+			"proposalId":        "proposal-terminal-python-1",
+			"proposalType":      "terminal_command",
+			"command":           "python3 -c \"open('agentops_m21_probe.txt','w').write('agentops-managed-worker-ok\\n')\"",
+			"cwd":               tmpDir,
+			"timeoutSeconds":    5,
+			"readOnlyRequested": false,
+			"confidence":        "structured",
+		},
+	})
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("POST generated proposal event status=%d body=%s", rr.Code, rr.Body.String())
+	}
+
+	rr = requestJSON(t, handler, http.MethodPost, "/v1alpha2/runtime/sessions/"+session.SessionID+"/tool-proposals/proposal-terminal-python-1/decision", map[string]interface{}{
+		"meta": map[string]interface{}{
+			"requestId": "proposal-decision-python-1",
+			"tenantId":  "tenant-a",
+			"projectId": "project-a",
+		},
+		"decision": "APPROVE",
+		"reason":   "approved for normalized python-write execution",
+	})
+	if rr.Code != http.StatusOK {
+		t.Fatalf("POST tool proposal decision status=%d body=%s", rr.Code, rr.Body.String())
+	}
+	var decisionResp ToolProposalDecisionResponse
+	decodeResponseBody(t, rr, &decisionResp)
+	if decisionResp.ActionStatus != ToolActionStatusCompleted {
+		t.Fatalf("tool proposal actionStatus=%q want %q", decisionResp.ActionStatus, ToolActionStatusCompleted)
+	}
+
+	content, err := os.ReadFile(filepath.Join(tmpDir, "agentops_m21_probe.txt"))
+	if err != nil {
+		t.Fatalf("read created file: %v", err)
+	}
+	if string(content) != "agentops-managed-worker-ok\n" {
+		t.Fatalf("file content=%q want exact normalized output", string(content))
 	}
 }
 

@@ -396,7 +396,7 @@ func TestRuntimeIntegrationInvokeManagedCodexWorkerProcessMode(t *testing.T) {
 			return []byte(strings.Join([]string{
 				`{"type":"thread.started","thread_id":"thread-1"}`,
 				`{"type":"turn.started"}`,
-				`{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"{\"message\":\"Process-backed managed Codex completed the turn.\",\"tool_proposals\":[{\"type\":\"terminal_command\",\"summary\":\"Run pwd to verify the workspace root.\",\"command\":\"pwd\",\"cwd\":\"/tmp\",\"timeoutSeconds\":5,\"readOnlyRequested\":true,\"confidence\":\"structured\"}]}"}}`,
+				`{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"{\"message\":\"Process-backed managed Codex completed the turn.\",\"tool_proposals\":[{\"type\":\"terminal_command\",\"summary\":\"Run pwd to verify the workspace root.\",\"command\":\"pwd\",\"stdin\":\"\",\"cwd\":\"/tmp\",\"timeoutSeconds\":5,\"readOnlyRequested\":true,\"confidence\":\"structured\"}]}"}}`,
 				`{"type":"turn.completed","usage":{"input_tokens":10,"output_tokens":20}}`,
 			}, "\n")), nil
 		},
@@ -491,7 +491,7 @@ func TestRuntimeIntegrationInvokeManagedCodexWorkerProcessContinuation(t *testin
 			return []byte(strings.Join([]string{
 				`{"type":"thread.started","thread_id":"thread-1"}`,
 				`{"type":"turn.started"}`,
-				`{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"{\"message\":\"I need one governed check before I can finish this task.\",\"tool_proposals\":[{\"type\":\"terminal_command\",\"summary\":\"Run pwd to verify the workspace root.\",\"command\":\"pwd\",\"cwd\":\"/tmp\",\"timeoutSeconds\":5,\"readOnlyRequested\":true,\"confidence\":\"structured\"}]}"}}`,
+				`{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"{\"message\":\"I need one governed check before I can finish this task.\",\"tool_proposals\":[{\"type\":\"terminal_command\",\"summary\":\"Run pwd to verify the workspace root.\",\"command\":\"pwd\",\"stdin\":\"\",\"cwd\":\"/tmp\",\"timeoutSeconds\":5,\"readOnlyRequested\":true,\"confidence\":\"structured\"}]}"}}`,
 				`{"type":"turn.completed","usage":{"input_tokens":10,"output_tokens":20}}`,
 			}, "\n")), nil
 		},
