@@ -15,10 +15,13 @@ POSTGRES_DB="${POSTGRES_DB:-aios_core}"
 POSTGRES_SECRET="${POSTGRES_SECRET:-epydios-postgres-app}"
 REF_VALUES_PATH="${RUNTIME_REF_VALUES_PATH:-}"
 REF_VALUES_JSON="${RUNTIME_REF_VALUES_JSON:-}"
+EFFECTIVE_REF_VALUES_PATH=""
+SYNTHESIZED_REF_KEYS=()
+CODEX_HOME_DIR=""
 MANAGED_CODEX_MODE="${RUNTIME_MANAGED_CODEX_MODE:-process}"
 CODEX_CLI_PATH="${RUNTIME_CODEX_CLI_PATH:-/Applications/Codex.app/Contents/Resources/codex}"
 CODEX_WORKDIR="${RUNTIME_CODEX_WORKDIR:-$(cd "${MODULE_ROOT}/../.." && pwd)}"
-CODEX_SANDBOX_MODE="${RUNTIME_CODEX_SANDBOX_MODE:-workspace-write}"
+CODEX_SANDBOX_MODE="${RUNTIME_CODEX_SANDBOX_MODE:-read-only}"
 CODEX_EXEC_TIMEOUT="${RUNTIME_CODEX_EXEC_TIMEOUT:-45s}"
 
 usage() {
@@ -41,7 +44,7 @@ Options:
   --managed-codex-mode MODE   legacy|process (default: process)
   --codex-cli-path PATH       Local Codex CLI path (default: /Applications/Codex.app/Contents/Resources/codex)
   --codex-workdir PATH        Managed Codex workdir (default: repo root)
-  --codex-sandbox-mode MODE   Sandbox mode (default: workspace-write)
+  --codex-sandbox-mode MODE   Sandbox mode (default: read-only)
   --codex-exec-timeout DUR    Managed Codex exec timeout (default: 45s)
   -h, --help                  Show usage
 EOF
@@ -104,6 +107,80 @@ wait_for_http() {
     tail -n 80 "${log_path}" >&2 || true
   fi
   return 1
+}
+
+bootstrap_codex_home() {
+  local openai_api_key=""
+  if [[ "${MANAGED_CODEX_MODE}" != "process" ]]; then
+    return 0
+  fi
+  openai_api_key="$(jq -r '."ref://projects/{projectId}/providers/openai-compatible/api-key" // ."ref://projects/{projectId}/providers/openai/api-key" // empty' "${EFFECTIVE_REF_VALUES_PATH}")"
+  if [[ -z "${openai_api_key}" ]]; then
+    echo "Managed Codex process mode requires an OpenAI API key in the ref values." >&2
+    exit 1
+  fi
+  CODEX_HOME_DIR="${SESSION_DIR}/codex-home"
+  mkdir -p "${CODEX_HOME_DIR}"
+  printf "%s" "${openai_api_key}" | CODEX_HOME="${CODEX_HOME_DIR}" "${CODEX_CLI_PATH}" login -c 'cli_auth_credentials_store="file"' --with-api-key >/dev/null
+}
+
+join_by() {
+  local delimiter="$1"
+  shift
+  local first=1
+  local item=""
+  for item in "$@"; do
+    if [[ ${first} -eq 1 ]]; then
+      printf "%s" "${item}"
+      first=0
+    else
+      printf "%s%s" "${delimiter}" "${item}"
+    fi
+  done
+}
+
+load_ref_values_json() {
+  if [[ -n "${REF_VALUES_PATH}" ]]; then
+    jq -c . "${REF_VALUES_PATH}"
+    return
+  fi
+  if [[ -n "${REF_VALUES_JSON}" ]]; then
+    printf "%s" "${REF_VALUES_JSON}" | jq -c .
+    return
+  fi
+  printf "{}"
+}
+
+prepare_effective_ref_values() {
+  local source_json=""
+  local merged_json=""
+  local openai_api_key=""
+  source_json="$(load_ref_values_json)"
+  merged_json="${source_json}"
+  SYNTHESIZED_REF_KEYS=()
+
+  if [[ "${MANAGED_CODEX_MODE}" == "process" ]]; then
+    openai_api_key="$(printf "%s" "${source_json}" | jq -r '."ref://projects/{projectId}/providers/openai-compatible/api-key" // ."ref://projects/{projectId}/providers/openai/api-key" // empty')"
+    if [[ -n "${openai_api_key}" ]]; then
+      if [[ "$(printf "%s" "${merged_json}" | jq -r '."ref://gateways/litellm/openai-compatible" // empty')" == "" ]]; then
+        SYNTHESIZED_REF_KEYS+=("ref://gateways/litellm/openai-compatible")
+      fi
+      if [[ "$(printf "%s" "${merged_json}" | jq -r '."ref://gateways/litellm/openai" // empty')" == "" ]]; then
+        SYNTHESIZED_REF_KEYS+=("ref://gateways/litellm/openai")
+      fi
+      if [[ "$(printf "%s" "${merged_json}" | jq -r '."ref://projects/{projectId}/gateways/litellm/bearer-token" // empty')" == "" ]]; then
+        SYNTHESIZED_REF_KEYS+=("ref://projects/{projectId}/gateways/litellm/bearer-token")
+      fi
+      merged_json="$(printf "%s" "${merged_json}" | jq -c --arg openai_base_url "https://api.openai.com" --arg openai_key "${openai_api_key}" '
+        if has("ref://gateways/litellm/openai-compatible") then . else . + {"ref://gateways/litellm/openai-compatible": $openai_base_url} end
+        | if has("ref://gateways/litellm/openai") then . else . + {"ref://gateways/litellm/openai": $openai_base_url} end
+        | if has("ref://projects/{projectId}/gateways/litellm/bearer-token") then . else . + {"ref://projects/{projectId}/gateways/litellm/bearer-token": $openai_key} end
+      ')"
+    fi
+  fi
+
+  EFFECTIVE_REF_VALUES_PATH="${SESSION_DIR}/effective-ref-values.json"
+  printf "%s\n" "${merged_json}" > "${EFFECTIVE_REF_VALUES_PATH}"
 }
 
 check_port_available() {
@@ -260,6 +337,10 @@ export PATH="${HOME}/bin:${HOME}/.local/bin:${PATH}"
 export GOCACHE="$(m21_go_cache_root)"
 export GOMODCACHE="$(m21_go_mod_cache_root)"
 
+prepare_effective_ref_values
+
+bootstrap_codex_home
+
 (
   cd "${M21_REPO_ROOT}"
   go build -buildvcs=false -o "${RUNTIME_BINARY}" ./cmd/control-plane-runtime >/dev/null
@@ -270,9 +351,16 @@ echo "  runtime_url=http://${LISTEN_HOST}:${LISTEN_PORT}"
 echo "  runtime_log=${RUNTIME_LOG}"
 echo "  postgres_port_forward_log=${POSTGRES_PORT_FORWARD_LOG}"
 echo "  session_dir=${SESSION_DIR}"
+echo "  effective_ref_values=${EFFECTIVE_REF_VALUES_PATH}"
 echo "  codex_mode=${MANAGED_CODEX_MODE}"
 echo "  codex_cli_path=${CODEX_CLI_PATH}"
+if [[ -n "${CODEX_HOME_DIR}" ]]; then
+  echo "  codex_home=${CODEX_HOME_DIR}"
+fi
 echo "  codex_workdir=${CODEX_WORKDIR}"
+if [[ ${#SYNTHESIZED_REF_KEYS[@]} -gt 0 ]]; then
+  echo "  synthesized_ref_values=$(join_by ', ' "${SYNTHESIZED_REF_KEYS[@]}")"
+fi
 
 (
   export NAMESPACE="${NAMESPACE}"
@@ -282,10 +370,11 @@ echo "  codex_workdir=${CODEX_WORKDIR}"
   export POSTGRES_USER="${POSTGRES_USER}"
   export POSTGRES_PASSWORD="${POSTGRES_PASSWORD}"
   export POSTGRES_SSLMODE="disable"
-  export RUNTIME_REF_VALUES_PATH="${REF_VALUES_PATH}"
-  export RUNTIME_REF_VALUES_JSON="${REF_VALUES_JSON}"
+  export RUNTIME_REF_VALUES_PATH="${EFFECTIVE_REF_VALUES_PATH}"
+  export RUNTIME_REF_VALUES_JSON=""
   export RUNTIME_MANAGED_CODEX_MODE="${MANAGED_CODEX_MODE}"
   export RUNTIME_CODEX_CLI_PATH="${CODEX_CLI_PATH}"
+  export RUNTIME_CODEX_HOME="${CODEX_HOME_DIR}"
   export RUNTIME_CODEX_WORKDIR="${CODEX_WORKDIR}"
   export RUNTIME_CODEX_SANDBOX_MODE="${CODEX_SANDBOX_MODE}"
   export RUNTIME_CODEX_EXEC_TIMEOUT="${CODEX_EXEC_TIMEOUT}"

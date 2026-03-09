@@ -293,7 +293,11 @@ Exit gate:
 - completed slice 5: corrected live invoke error mapping so upstream quota failures surface as operator-visible `429` errors instead of generic `502` responses, repaired the missing native session view import that broke local invoke hydration, paused background refresh while operators are actively editing fields, and clarified `System Instructions` versus `Turn Prompt` in Chat and Settings
 - completed slice 6: fixed the dark-theme invoke output contrast bug, persisted Settings and Chat disclosure shells across live background rerenders so expanded review panels no longer collapse on sync, and confirmed that the `codex` and `openai` profiles are distinct routes that can intentionally share the same OpenAI key when both local ref values are populated
 - completed slice 7: delayed the topbar `Data: refreshing` indicator so fast background polls keep showing the last synced timestamp instead of flashing a transient loading state on every cycle
-- next batch: continue the local managed-Codex operator verification flow on Mac and close any remaining defects exposed by operator testing
+- completed slice 8: made the local Mac runtime launcher synthesize the required LiteLLM-style gateway refs from the standard OpenAI API-key refs during managed Codex `process` testing, so operators can start the managed worker path without hand-authoring hidden gateway endpoint or bearer-token refs
+- completed slice 9: isolated local managed Codex process auth under a per-session `CODEX_HOME`, bootstrapped that home with `codex login --with-api-key`, and forced API-login mode on the Codex boundary config so managed worker turns use the OpenAI API key instead of falling back to the operator's desktop ChatGPT session scopes
+- completed slice 10: clamped the managed Codex process boundary to supported reasoning effort levels by forcing `model_reasoning_effort="high"` and `plan_mode_reasoning_effort="high"` so `gpt-5-codex` no longer rejects the local managed-worker path with `unsupported_value` for `reasoning.effort=xhigh`
+- completed slice 11: locked the local managed Codex process path to `read-only` sandbox mode at both the Mac runtime launcher and the runtime adapter boundary so the worker can no longer mutate the scratch workspace directly before proposal/approval review
+- next batch: continue the local managed-Codex operator verification flow on Mac against the synthesized gateway, API-login, and read-only-sandbox boundary and close any remaining defects exposed by operator testing
 - planned follow-on inside M21: add secure Settings-side credential capture using encrypted or keychain-backed local storage so operators do not have to pre-seed local ref-values files for routine Mac testing
 - planned follow-on after that is `M22` for local or customer-hosted AIMXS decision-provider work on the existing policy boundary
 - keep Chat, VS Code, CLI, workflow, and chatops on the same native M16/M18 contract
@@ -347,6 +351,32 @@ Completed slices:
   - delayed the topbar refresh-status transition so fast background sync cycles keep showing the last `synced` timestamp instead of flashing `refreshing` for a fraction of a second on every poll
   - left error and sign-in states immediate while suppressing only the low-value fast-poll flicker
   - recorded secure Settings-side credential capture using encrypted or keychain-backed local storage as planned follow-on M21 work instead of active implementation
+- slice 8: local managed-Codex gateway synthesis
+  - updated `./bin/run-local-runtime-macos.sh` so local managed Codex `process` mode now writes an effective non-repo ref-values file per session instead of mutating the operator-supplied file
+  - when the standard OpenAI key refs are present but the local LiteLLM-style gateway refs are absent, the launcher now synthesizes:
+    - `ref://gateways/litellm/openai-compatible`
+    - `ref://gateways/litellm/openai`
+    - `ref://projects/{projectId}/gateways/litellm/bearer-token`
+  - this closes the turnkey gap that previously caused managed Codex worker startup to fail on `ref://gateways/litellm/openai-compatible` missing from runtime ref values during local Mac testing
+- slice 9: isolated managed-Codex API-key auth bootstrap
+  - updated `./bin/run-local-runtime-macos.sh` so local managed Codex testing now bootstraps a per-session `CODEX_HOME` under the non-repo session directory instead of inheriting the operator's desktop Codex auth state
+  - the launcher now runs `codex login --with-api-key` against that isolated home using the OpenAI key from the effective ref-values file, so the managed worker path gets API-backed auth without mutating the operator's normal Codex desktop session
+  - the managed Codex process boundary now forces `forced_login_method=\"api\"`, sets `OPENAI_API_KEY` from the resolved boundary token, and passes the isolated `CODEX_HOME` through the runtime so `codex exec` stops failing on missing `api.responses.write` scopes from ChatGPT-session auth
+- slice 10: managed-Codex reasoning-effort clamp
+  - updated `internal/runtime/managed_worker_codex_process.go` so the managed Codex process boundary now forces `model_reasoning_effort=\"high\"` and `plan_mode_reasoning_effort=\"high\"` in the generated Codex config overrides
+  - this prevents local managed-worker turns from inheriting unsupported `xhigh` reasoning defaults that `gpt-5-codex` rejects at the Responses API boundary
+- slice 11: managed-Codex read-only sandbox enforcement
+  - updated `ui/desktop-ui/bin/run-local-runtime-macos.sh` so the local managed Codex launcher defaults to `--codex-sandbox-mode read-only` instead of `workspace-write`
+  - updated `internal/runtime/managed_worker_adapter.go` so process-mode managed Codex turns always clamp the adapter sandbox to `read-only` even if an operator-supplied environment tries to request `workspace-write`
+  - this closes the policy gap where the local managed worker could create or modify files directly before the governed proposal or approval path had a chance to intercept the action
+- slice 12: managed-Codex governed proposal contract
+  - updated `internal/runtime/managed_worker_codex_process.go` so the managed Codex prompt contract explicitly requires governed `tool_proposals` for file creation, modification, deletion, or other environment-changing work instead of replying with only a read-only sandbox refusal
+  - made the managed Codex continuation path nil-safe when tool-action context is incomplete so governed resume logic no longer panics on missing tool-action state
+  - updated the managed Codex process tests so they validate the built governed prompt contract directly instead of asserting against the raw operator prompt field
+- slice 13: approved managed-Codex proposal execution normalization
+  - updated `internal/runtime/api_v1alpha2.go` so approved terminal-command proposals are normalized through the same managed-Codex proposal normalizer used on transcript parsing before the governed execution path runs them
+  - preserved exact stdin content for normalized `tee`-style executions so approved file-write proposals stop failing on raw shell redirection or python-write variants and no longer recurse into replacement proposals after operator approval
+  - added runtime coverage proving approved file-write proposals execute through the governed `tee` path instead of the raw `>` or `python3 -c` forms
 
 Completed deliverables:
 
@@ -355,12 +385,16 @@ Completed deliverables:
 - tighten `ui/desktop-ui/.tmp` cache hygiene and cleanup policy
 - document and verify the OpenAI live-test path for Mac operators
 - provide a turnkey local-Mac runtime path for the managed Codex process bridge
+- make the local managed-Codex browser test path work with the normal OpenAI ref-values file instead of requiring operators to author hidden gateway refs by hand
+- make the local managed-Codex browser test path use isolated API-key auth instead of inheriting the desktop Codex ChatGPT session
 - stabilize local invoke error surfacing and background editing behavior in live mode
 - suppress the topbar refresh-status flicker during fast background polls
+- force the managed Codex process path into read-only until approval and require governed proposals for mutating work instead of silent direct filesystem mutation or refusal-only fallbacks
+- normalize approved managed-Codex file-write proposals into governed executable commands instead of letting raw redirection or python-write variants fail after operator approval
 
 Remaining deliverable:
 
-- verify the local managed-Codex operator flow end-to-end on Mac without topology guesswork and close any remaining defects exposed by operator testing
+- verify the local managed-Codex operator flow end-to-end on Mac on a fresh thread by proving: deny leaves the scratch file absent, approve creates it exactly once, same-thread read resumes correctly, and governed delete removes it cleanly; then close any remaining defects exposed by that operator test
 
 Planned follow-on inside M21:
 

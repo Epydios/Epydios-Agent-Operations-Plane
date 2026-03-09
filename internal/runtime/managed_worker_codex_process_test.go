@@ -11,6 +11,7 @@ func TestCodexManagedWorkerAdapterProcessModeParsesStructuredTurn(t *testing.T) 
 	adapter := codexManagedWorkerAdapter{
 		mode:        "process",
 		cliPath:     "codex",
+		homeDir:     "/tmp/codex-home",
 		workdir:     "/tmp",
 		sandboxMode: "read-only",
 		timeout:     15 * time.Second,
@@ -20,6 +21,9 @@ func TestCodexManagedWorkerAdapterProcessModeParsesStructuredTurn(t *testing.T) 
 			}
 			if req.Workdir != "/tmp" {
 				t.Fatalf("workdir=%q want /tmp", req.Workdir)
+			}
+			if req.HomeDir != "/tmp/codex-home" {
+				t.Fatalf("homeDir=%q want /tmp/codex-home", req.HomeDir)
 			}
 			if req.Boundary == nil {
 				t.Fatal("boundary should be present in process mode")
@@ -38,7 +42,7 @@ func TestCodexManagedWorkerAdapterProcessModeParsesStructuredTurn(t *testing.T) 
 				`{"type":"turn.started"}`,
 				`{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"Inspecting the workspace before deciding what needs approval."}}`,
 				`{"type":"item.completed","item":{"id":"item_1","type":"command_execution","command":"/bin/zsh -lc pwd","aggregated_output":"/tmp\n","exit_code":0,"status":"completed"}}`,
-				`{"type":"item.completed","item":{"id":"item_2","type":"agent_message","text":"{\"message\":\"Managed Codex summarized the workspace and queued one governed command.\",\"tool_proposals\":[{\"type\":\"terminal_command\",\"summary\":\"Run the runtime tests before proceeding.\",\"command\":\"go test ./internal/runtime\",\"cwd\":\"/tmp\",\"timeoutSeconds\":30,\"readOnlyRequested\":true,\"confidence\":\"structured\"}]}"}}`,
+				`{"type":"item.completed","item":{"id":"item_2","type":"agent_message","text":"{\"message\":\"Managed Codex summarized the workspace and queued one governed command.\",\"tool_proposals\":[{\"type\":\"terminal_command\",\"summary\":\"Run the runtime tests before proceeding.\",\"command\":\"go test ./internal/runtime\",\"stdin\":\"\",\"cwd\":\"/tmp\",\"timeoutSeconds\":30,\"readOnlyRequested\":true,\"confidence\":\"structured\"}]}"}}`,
 				`{"type":"turn.completed","usage":{"input_tokens":12,"output_tokens":34}}`,
 			}, "\n")), nil
 		},
@@ -84,5 +88,103 @@ func TestCodexManagedWorkerAdapterProcessModeParsesStructuredTurn(t *testing.T) 
 	}
 	if !strings.Contains(string(result.rawResponse), "command_execution") {
 		t.Fatalf("rawResponse missing command_execution: %s", string(result.rawResponse))
+	}
+}
+
+func TestBuildManagedCodexPromptAllowsGovernedMutationProposals(t *testing.T) {
+	prompt := buildManagedCodexPrompt(codexProcessRequest{
+		Prompt:       "summarize the workspace and propose any governed command",
+		SystemPrompt: "stay concise",
+	})
+	if !strings.Contains(prompt, "creating or modifying a file") {
+		t.Fatalf("prompt missing governed mutation proposal guidance: %s", prompt)
+	}
+	if !strings.Contains(prompt, "Do not answer with only a sandbox refusal") {
+		t.Fatalf("prompt missing governed proposal requirement: %s", prompt)
+	}
+	if !strings.Contains(prompt, "readOnlyRequested=false") {
+		t.Fatalf("prompt missing mutating command approval guidance: %s", prompt)
+	}
+	if !strings.Contains(prompt, "`command` = `tee <target>` and `stdin` = the exact file contents") {
+		t.Fatalf("prompt missing deterministic tee+stdin guidance: %s", prompt)
+	}
+	if !strings.Contains(prompt, "set `stdin` to the empty string") {
+		t.Fatalf("prompt missing empty stdin guidance: %s", prompt)
+	}
+}
+
+func TestBuildCodexBoundaryConfigArgsForcesAPILoginAuth(t *testing.T) {
+	items := buildCodexBoundaryConfigArgs(&managedWorkerProviderBoundary{
+		ProviderID:  "agentops_gateway",
+		BaseURL:     "https://gateway.local/v1",
+		WireAPI:     "responses",
+		TokenEnvVar: "AGENTOPS_CODEX_GATEWAY_TOKEN",
+	})
+	joined := strings.Join(items, "\n")
+	if !strings.Contains(joined, `forced_login_method="api"`) {
+		t.Fatalf("missing forced api login config: %s", joined)
+	}
+	if !strings.Contains(joined, `model_reasoning_effort="high"`) {
+		t.Fatalf("missing supported model reasoning config: %s", joined)
+	}
+	if !strings.Contains(joined, `plan_mode_reasoning_effort="high"`) {
+		t.Fatalf("missing supported plan reasoning config: %s", joined)
+	}
+	if !strings.Contains(joined, `model_providers.agentops_gateway.env_key="OPENAI_API_KEY"`) {
+		t.Fatalf("missing provider env_key config: %s", joined)
+	}
+	if !strings.Contains(joined, `model_providers.agentops_gateway.bearer_token_env_var="AGENTOPS_CODEX_GATEWAY_TOKEN"`) {
+		t.Fatalf("missing bearer token env config: %s", joined)
+	}
+}
+
+func TestNewCodexManagedWorkerAdapterProcessModeForcesReadOnlySandbox(t *testing.T) {
+	adapter := newCodexManagedWorkerAdapter(AgentInvokerConfig{
+		ManagedCodexMode: "process",
+		CodexSandboxMode: "workspace-write",
+	})
+	if adapter.sandboxMode != "read-only" {
+		t.Fatalf("sandboxMode=%q want read-only", adapter.sandboxMode)
+	}
+}
+
+func TestBuildManagedCodexContinuationPromptAllowsGovernedMutationProposals(t *testing.T) {
+	prompt := buildManagedCodexContinuationPrompt(managedWorkerContinuationRequest{})
+	if !strings.Contains(prompt, "return it as a governed `tool_proposals` terminal command") {
+		t.Fatalf("continuation prompt missing governed mutation guidance: %s", prompt)
+	}
+}
+
+func TestNormalizeCodexStructuredProposalConvertsPrintfRedirectToTee(t *testing.T) {
+	proposal := normalizeCodexStructuredProposal(codexStructuredProposal{
+		Type:           "terminal_command",
+		Summary:        "Create file",
+		Command:        `printf 'agentops-managed-worker-ok\n' > agentops_m21_probe.txt`,
+		CWD:            "/tmp",
+		TimeoutSeconds: 120,
+		Confidence:     "medium",
+	})
+	if proposal.Command != "tee agentops_m21_probe.txt" {
+		t.Fatalf("command=%q want tee form", proposal.Command)
+	}
+	if proposal.Stdin != "agentops-managed-worker-ok\n" {
+		t.Fatalf("stdin=%q want normalized file content", proposal.Stdin)
+	}
+}
+
+func TestNormalizeCodexStructuredProposalConvertsPythonWriteToTee(t *testing.T) {
+	proposal := normalizeCodexStructuredProposal(codexStructuredProposal{
+		Type:           "terminal_command",
+		Summary:        "Create file",
+		Command:        `python3 -c "open('agentops_m21_probe.txt','w').write('agentops-managed-worker-ok\n')"`,
+		CWD:            "/tmp",
+		TimeoutSeconds: 120,
+		Confidence:     "high",
+	})
+	if proposal.Command != "tee agentops_m21_probe.txt" {
+		t.Fatalf("command=%q want tee form", proposal.Command)
+	}
+	if proposal.Stdin != "agentops-managed-worker-ok\n" {
+		t.Fatalf("stdin=%q want normalized file content", proposal.Stdin)
 	}
 }

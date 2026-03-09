@@ -1808,7 +1808,20 @@ func (s *APIServer) executeApprovedToolProposalAction(ctx context.Context, sessi
 	if !strings.EqualFold(toolType, "terminal_command") {
 		return ToolActionStatusAuthorized
 	}
+	normalizedProposal := normalizeCodexStructuredProposal(codexStructuredProposal{
+		Type:              normalizeStringOrDefault(normalizedInterfaceString(proposalPayloadValue(proposal, "type")), toolType),
+		Summary:           normalizedInterfaceString(proposalPayloadValue(proposal, "summary")),
+		Command:           normalizedInterfaceString(proposalPayloadValue(proposal, "command")),
+		Stdin:             exactInterfaceString(proposalPayloadValue(proposal, "stdin")),
+		CWD:               normalizedInterfaceString(proposalPayloadValue(proposal, "cwd")),
+		TimeoutSeconds:    normalizeToolProposalTimeoutSeconds(proposalPayloadValue(proposal, "timeoutSeconds")),
+		ReadOnlyRequested: normalizedInterfaceBool(proposalPayloadValue(proposal, "readOnlyRequested")),
+		Confidence:        normalizedInterfaceString(proposalPayloadValue(proposal, "confidence")),
+	})
 	commandText := strings.TrimSpace(fmt.Sprintf("%v", proposalPayloadValue(proposal, "command")))
+	if strings.TrimSpace(normalizedProposal.Command) != "" {
+		commandText = strings.TrimSpace(normalizedProposal.Command)
+	}
 	if commandText == "" || commandText == "<nil>" {
 		var requestPayload map[string]interface{}
 		if err := json.Unmarshal(action.RequestPayload, &requestPayload); err == nil {
@@ -1820,6 +1833,18 @@ func (s *APIServer) executeApprovedToolProposalAction(ctx context.Context, sessi
 	commandText = normalizeStringOrDefault(commandText, "")
 	if commandText == "" {
 		return ToolActionStatusAuthorized
+	}
+	stdinText := exactInterfaceString(proposalPayloadValue(proposal, "stdin"))
+	if normalizedProposal.Stdin != "" {
+		stdinText = normalizedProposal.Stdin
+	}
+	if stdinText == "" {
+		var requestPayload map[string]interface{}
+		if err := json.Unmarshal(action.RequestPayload, &requestPayload); err == nil {
+			if rawProposal, ok := requestPayload["proposal"].(map[string]interface{}); ok {
+				stdinText = exactInterfaceString(rawProposal["stdin"])
+			}
+		}
 	}
 
 	startedAt := time.Now().UTC()
@@ -1843,6 +1868,7 @@ func (s *APIServer) executeApprovedToolProposalAction(ctx context.Context, sessi
 				"status":       ToolActionStatusStarted,
 				"proposalId":   proposal.ProposalID,
 				"command":      commandText,
+				"stdinPresent": stdinText != "",
 				"summary":      "Approved tool proposal started execution.",
 			}),
 			Timestamp: startedAt,
@@ -1886,6 +1912,7 @@ func (s *APIServer) executeApprovedToolProposalAction(ctx context.Context, sessi
 				"status":       ToolActionStatusFailed,
 				"proposalId":   proposal.ProposalID,
 				"command":      commandText,
+				"stdinPresent": stdinText != "",
 				"error":        parseErr.Error(),
 				"summary":      "Approved tool proposal failed deterministic command validation.",
 			}),
@@ -1915,8 +1942,14 @@ func (s *APIServer) executeApprovedToolProposalAction(ctx context.Context, sessi
 	}
 
 	cwd := strings.TrimSpace(fmt.Sprintf("%v", proposalPayloadValue(proposal, "cwd")))
+	if strings.TrimSpace(normalizedProposal.CWD) != "" {
+		cwd = strings.TrimSpace(normalizedProposal.CWD)
+	}
 	timeoutSeconds := normalizeToolProposalTimeoutSeconds(proposalPayloadValue(proposal, "timeoutSeconds"))
-	execResult, execErr := executeTerminalCommand(ctx, commandName, commandArgs, cwd, timeoutSeconds)
+	if normalizedProposal.TimeoutSeconds > 0 {
+		timeoutSeconds = normalizedProposal.TimeoutSeconds
+	}
+	execResult, execErr := executeTerminalCommand(ctx, commandName, commandArgs, cwd, timeoutSeconds, stdinText)
 	finishedAt := time.Now().UTC()
 	finalStatus := ToolActionStatusCompleted
 	if execErr != nil {
@@ -1933,6 +1966,7 @@ func (s *APIServer) executeApprovedToolProposalAction(ctx context.Context, sessi
 		"commandName":     commandName,
 		"commandArgs":     commandArgs,
 		"cwd":             cwd,
+		"stdinPresent":    stdinText != "",
 		"timeoutSeconds":  timeoutSeconds,
 		"status":          finalStatus,
 		"exitCode":        execResult.ExitCode,
@@ -1969,6 +2003,7 @@ func (s *APIServer) executeApprovedToolProposalAction(ctx context.Context, sessi
 				"outputTruncated": execResult.Truncated,
 				"executedCommand": commandText,
 				"executedWorkdir": cwd,
+				"stdinPresent":    stdinText != "",
 				"timeoutSeconds":  timeoutSeconds,
 			}),
 			CreatedAt: finishedAt,
@@ -2004,6 +2039,7 @@ func (s *APIServer) executeApprovedToolProposalAction(ctx context.Context, sessi
 			"status":       finalStatus,
 			"proposalId":   proposal.ProposalID,
 			"command":      commandText,
+			"stdinPresent": stdinText != "",
 			"exitCode":     execResult.ExitCode,
 			"timedOut":     execResult.TimedOut,
 			"outputSha256": execResult.OutputSHA256,
@@ -3106,7 +3142,7 @@ func findSessionToolProposal(events []SessionEventRecord, proposalID string) (*s
 			if proposal.Payload == nil {
 				proposal.Payload = JSONObject{}
 			}
-			for _, key := range []string{"proposalType", "command", "cwd", "timeoutSeconds", "readOnlyRequested", "confidence"} {
+			for _, key := range []string{"proposalType", "command", "stdin", "cwd", "timeoutSeconds", "readOnlyRequested", "confidence"} {
 				if _, ok := proposal.Payload[key]; ok {
 					continue
 				}
@@ -3179,6 +3215,45 @@ func normalizedInterfaceString(value interface{}) string {
 			return ""
 		}
 		return rendered
+	}
+}
+
+func exactInterfaceString(value interface{}) string {
+	switch typed := value.(type) {
+	case nil:
+		return ""
+	case string:
+		if typed == "<nil>" {
+			return ""
+		}
+		return typed
+	default:
+		rendered := fmt.Sprintf("%v", typed)
+		if rendered == "<nil>" {
+			return ""
+		}
+		return rendered
+	}
+}
+
+func normalizedInterfaceBool(value interface{}) bool {
+	switch typed := value.(type) {
+	case nil:
+		return false
+	case bool:
+		return typed
+	case string:
+		parsed, err := strconv.ParseBool(strings.TrimSpace(typed))
+		if err != nil {
+			return false
+		}
+		return parsed
+	default:
+		parsed, err := strconv.ParseBool(strings.TrimSpace(fmt.Sprintf("%v", typed)))
+		if err != nil {
+			return false
+		}
+		return parsed
 	}
 }
 

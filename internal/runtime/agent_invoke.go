@@ -71,6 +71,7 @@ type AgentInvokerConfig struct {
 	HTTPTimeout      time.Duration
 	ManagedCodexMode string
 	CodexCLIPath     string
+	CodexHome        string
 	CodexWorkdir     string
 	CodexSandboxMode string
 	CodexExecTimeout time.Duration
@@ -141,6 +142,7 @@ func DefaultAgentInvokerConfigFromEnv() AgentInvokerConfig {
 		HTTPTimeout:      45 * time.Second,
 		ManagedCodexMode: strings.TrimSpace(os.Getenv("RUNTIME_MANAGED_CODEX_MODE")),
 		CodexCLIPath:     strings.TrimSpace(os.Getenv("RUNTIME_CODEX_CLI_PATH")),
+		CodexHome:        strings.TrimSpace(os.Getenv("RUNTIME_CODEX_HOME")),
 		CodexWorkdir:     strings.TrimSpace(os.Getenv("RUNTIME_CODEX_WORKDIR")),
 		CodexSandboxMode: strings.TrimSpace(os.Getenv("RUNTIME_CODEX_SANDBOX_MODE")),
 		CodexExecTimeout: codexExecTimeout,

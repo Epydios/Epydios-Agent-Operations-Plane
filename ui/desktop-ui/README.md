@@ -294,6 +294,12 @@ Explicit endpoint refs are still required for:
 Minimal operator path:
 1. Start the local runtime on macOS:
    - `./bin/run-local-runtime-macos.sh --ref-values-path "/absolute/path/to/ref-values.json" --codex-workdir "/absolute/path/to/workdir"`
+   - for local Mac testing, if the ref-values file includes only the normal OpenAI API key refs, the launcher now synthesizes:
+     - `ref://gateways/litellm/openai-compatible`
+     - `ref://gateways/litellm/openai`
+     - `ref://projects/{projectId}/gateways/litellm/bearer-token`
+     so managed Codex `process` mode can use the same local key without requiring a separate LiteLLM setup first
+   - the launcher also bootstraps an isolated per-session `CODEX_HOME` under the non-repo session directory and runs `codex login --with-api-key` against that home, so local managed Codex testing uses API-key auth instead of inheriting the operator's desktop Codex ChatGPT session
 2. Start the browser UI against that runtime:
    - `./bin/run-macos-local.sh --mode live --runtime-base-url "http://127.0.0.1:18080"`
 3. Open `Chat`.

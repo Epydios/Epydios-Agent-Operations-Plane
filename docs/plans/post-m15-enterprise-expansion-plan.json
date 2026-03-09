@@ -199,7 +199,8 @@
         "ui desktop tmp cache hygiene and cleanup policy",
         "documented openai live-test path for mac operators",
         "local mac runtime launcher for managed codex process mode",
-        "turnkey mac local managed-codex verification path"
+        "turnkey mac local managed-codex verification path",
+        "isolated API-key auth for local managed-codex process mode"
       ],
       "exit_gate": "a mac operator can run the live system cleanly, see stable chat and data refresh behavior, and exercise the local managed Codex path without topology guesswork",
       "status": "in_progress_active_by_request_2026_03_09",
@@ -287,10 +288,76 @@
             "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/desktop-closeout/m13-m14-closeout-20260309T021631Z.summary.json",
             "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/desktop-closeout/m13-m14-closeout-latest.summary.json"
           ]
+        },
+        {
+          "id": "m21_local_managed_codex_gateway_synthesis_slice08_2026_03_09",
+          "summary": "Updated the local Mac runtime launcher so managed Codex process mode now synthesizes the required LiteLLM-style gateway endpoint and bearer-token refs from the standard OpenAI API-key refs in a per-session effective ref-values file instead of forcing operators to author hidden gateway refs by hand.",
+          "evidence": [
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/bin/run-local-runtime-macos.sh",
+            "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/desktop-closeout/m13-m14-closeout-20260309T023257Z.summary.json",
+            "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/desktop-closeout/m13-m14-closeout-latest.summary.json"
+          ]
+        },
+        {
+          "id": "m21_local_managed_codex_api_auth_bootstrap_slice09_2026_03_09",
+          "summary": "Updated the local Mac runtime launcher to synthesize gateway refs, bootstrap an isolated per-session CODEX_HOME with codex login --with-api-key, and force API-login mode on the managed Codex process boundary so local managed-worker turns use the OpenAI API key instead of inheriting desktop ChatGPT session scopes.",
+          "evidence": [
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/bin/run-local-runtime-macos.sh",
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/agent_invoke.go",
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/managed_worker_adapter.go",
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/managed_worker_codex_process.go",
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/managed_worker_codex_process_test.go",
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/README.md",
+            "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/desktop-closeout/m13-m14-closeout-20260309T024431Z.summary.json",
+            "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/desktop-closeout/m13-m14-closeout-latest.summary.json"
+          ]
+        },
+        {
+          "id": "m21_managed_codex_reasoning_effort_clamp_slice10_2026_03_09",
+          "summary": "Clamped the managed Codex process boundary to supported reasoning effort levels by forcing model_reasoning_effort and plan_mode_reasoning_effort to high so gpt-5-codex no longer rejects the local managed-worker path with unsupported xhigh reasoning settings.",
+          "evidence": [
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/managed_worker_codex_process.go",
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/managed_worker_codex_process_test.go",
+            "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/desktop-closeout/m13-m14-closeout-20260309T030409Z.summary.json",
+            "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/desktop-closeout/m13-m14-closeout-latest.summary.json"
+          ]
+        },
+        {
+          "id": "m21_managed_codex_read_only_sandbox_slice11_2026_03_09",
+          "summary": "Locked the local managed Codex process path to read-only sandbox mode at both the Mac runtime launcher and the runtime adapter boundary so the worker can no longer mutate the scratch workspace directly before proposal or approval review.",
+          "evidence": [
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/bin/run-local-runtime-macos.sh",
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/managed_worker_adapter.go",
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/managed_worker_codex_process_test.go",
+            "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/desktop-closeout/m13-m14-closeout-20260309T031105Z.summary.json",
+            "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/desktop-closeout/m13-m14-closeout-latest.summary.json"
+          ]
+        },
+        {
+          "id": "m21_managed_codex_governed_proposal_contract_slice12_2026_03_09",
+          "summary": "Updated the managed Codex process prompt contract so file mutation and other environment-changing work must be returned as governed tool proposals instead of a read-only refusal, and made the continuation prompt nil-safe when tool-action context is incomplete.",
+          "evidence": [
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/managed_worker_codex_process.go",
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/managed_worker_codex_process_test.go",
+            "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/desktop-closeout/m13-m14-closeout-20260309T032106Z.summary.json",
+            "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/desktop-closeout/m13-m14-closeout-latest.summary.json"
+          ]
+        },
+        {
+          "id": "m21_managed_codex_approved_proposal_execution_normalization_slice13_2026_03_09",
+          "summary": "Normalized approved managed-Codex terminal-command proposals through the same governed proposal normalizer used on transcript parsing, preserved exact stdin for normalized tee execution, and stopped approved file-write proposals from failing on raw redirection or python-write variants and recursively spawning replacement proposals after operator approval.",
+          "evidence": [
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api_v1alpha2.go",
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api_v1alpha2_test.go",
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/managed_worker_codex_process.go",
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/managed_worker_codex_process_test.go",
+            "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/desktop-closeout/m13-m14-closeout-20260309T035133Z.summary.json",
+            "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/desktop-closeout/m13-m14-closeout-latest.summary.json"
+          ]
         }
       ],
       "next_batch": [
-        "verify the local managed-Codex operator flow end-to-end on Mac after API billing is active",
+        "continue the local managed-Codex operator verification flow on Mac against the synthesized gateway, API-login, read-only-sandbox, governed-proposal prompt boundary, and approved-proposal execution path",
         "close any remaining defects found during operator testing without regressing the shared contract",
         "keep the live browser and local runtime paths on the same native M16/M18 contract"
       ],
@@ -312,6 +379,6 @@
       "status": "planned_not_active_until_m21_closes_or_explicit_parallelization"
     }
   ],
-  "recommended_immediate_next_step": "M21 is active. Completed slices: browser live-mode stabilization, repo-local desktop cache hygiene, the documented local-Mac runtime/operator diagnostics path, live polling refresh stability, local invoke/operator-editing stabilization, and live disclosure/output stabilization. Next batch: continue the local managed-Codex operator verification flow on Mac and close any remaining defects exposed by operator testing.",
-  "parallel_execution_note": "M15 remains open globally, but the active follow-on engineering work is M21 stabilization. Keep every client surface on the same native M16/M18 contract, keep M22 parked for local or customer-hosted AIMXS work, and do not create client-specific branches while closing the local managed-Codex verification defects."
+  "recommended_immediate_next_step": "M21 is active. Completed slices: browser live-mode stabilization, repo-local desktop cache hygiene, the documented local-Mac runtime/operator diagnostics path, live polling refresh stability, local invoke/operator-editing stabilization, live disclosure/output stabilization, refresh-status debounce, local managed-Codex gateway-boundary synthesis, isolated per-session CODEX_HOME plus API-key auth bootstrap for managed Codex process mode, reasoning-effort clamping, read-only sandbox enforcement, governed-proposal prompt enforcement for mutating work, and approved-proposal execution normalization. Next batch: continue the local managed-Codex operator verification flow on Mac, use a fresh thread to prove deny leaves the scratch file absent, approve creates it exactly once, same-thread read resumes correctly, and governed delete removes it cleanly, then close any remaining defects exposed by operator testing.",
+  "parallel_execution_note": "M15 remains open globally, but the active follow-on engineering work is M21 stabilization. Keep every client surface on the same native M16/M18 contract, keep M22 parked for local or customer-hosted AIMXS work, do not reopen M20, and focus M21 only on operator-visible stabilization, turnkey local managed-Codex testing, isolated API-key auth for local process mode, and secure credential handling follow-ons."
 }
