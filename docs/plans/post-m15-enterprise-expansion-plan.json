@@ -1,6 +1,6 @@
 {
   "id": "post_m15_enterprise_expansion_plan_20260307",
-  "status": "parallelized_m20_hardening_complete_while_m15_remains_open",
+  "status": "parallelized_m21_stabilization_active_while_m15_remains_open",
   "created_on": "2026-03-07",
   "product_stance": {
     "control_plane": "AgentOps",
@@ -202,7 +202,101 @@
         "turnkey mac local managed-codex verification path"
       ],
       "exit_gate": "a mac operator can run the live system cleanly, see stable chat and data refresh behavior, and exercise the local managed Codex path without topology guesswork",
-      "status": "planned_not_active_until_explicit_start"
+      "status": "in_progress_active_by_request_2026_03_09",
+      "completed_slices": [
+        {
+          "id": "m21_live_browser_stabilization_slice01_2026_03_09",
+          "summary": "Fixed browser live-mode launcher topology, added live contract preflight, seeded runtime scope into first-run UI state, and repaired live Chat client initialization.",
+          "evidence": [
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/bin/bootstrap-macos-local.sh",
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/bin/run-macos-local.sh",
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/api.js",
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/main.js",
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/views/session.js",
+            "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/desktop-closeout/m13-m14-closeout-20260309T004440Z.summary.json",
+            "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/desktop-closeout/m13-m14-closeout-latest.summary.json"
+          ]
+        },
+        {
+          "id": "m21_repo_local_cache_hygiene_slice02_2026_03_09",
+          "summary": "Moved future macOS browser-run artifacts out of the repo tree and added explicit cleanup for legacy repo-local desktop cache.",
+          "evidence": [
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/bin/lib-m21-paths.sh",
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/bin/cleanup-macos-local-cache.sh",
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/bin/run-macos-local.sh",
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/README.md",
+            "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/desktop-closeout/m13-m14-closeout-20260309T004440Z.summary.json",
+            "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/desktop-closeout/m13-m14-closeout-latest.summary.json"
+          ]
+        },
+        {
+          "id": "m21_operator_diagnostics_local_runtime_chat_empty_state_slice03_2026_03_09",
+          "summary": "Documented the live operator diagnostics and OpenAI live-test path, added the local-Mac runtime launcher plus browser runtime override, and made the live Chat first-run empty state explicit and operator-grade.",
+          "evidence": [
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/bin/run-local-runtime-macos.sh",
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/bin/run-macos-local.sh",
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/bin/lib-m21-paths.sh",
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/README.md",
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/views/chat.js",
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/css/main.css",
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/test/chat.test.js",
+            "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/desktop-closeout/m13-m14-closeout-20260309T010122Z.summary.json",
+            "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/desktop-closeout/m13-m14-closeout-latest.summary.json"
+          ]
+        },
+        {
+          "id": "m21_live_polling_refresh_stability_slice04_2026_03_09",
+          "summary": "Stopped live polling refresh from wiping hydrated panels back to loading placeholders and preserved viewport position across background sync refreshes.",
+          "evidence": [
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/main.js",
+            "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/desktop-closeout/m13-m14-closeout-20260309T011358Z.summary.json",
+            "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/desktop-closeout/m13-m14-closeout-latest.summary.json"
+          ]
+        },
+        {
+          "id": "m21_local_invoke_error_editing_ux_slice05_2026_03_09",
+          "summary": "Mapped upstream invoke quota failures to operator-visible 429 errors instead of generic 502 responses, repaired the missing native session view import in live mode, paused background refresh while operators are actively editing fields, and clarified System Instructions versus Turn Prompt in Chat and Settings.",
+          "evidence": [
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/main.js",
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/views/settings.js",
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/views/chat.js",
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/api.js",
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api.go",
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api_agent_invoke_test.go",
+            "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/desktop-closeout/m13-m14-closeout-20260309T014432Z.summary.json",
+            "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/desktop-closeout/m13-m14-closeout-latest.summary.json"
+          ]
+        },
+        {
+          "id": "m21_live_disclosure_persistence_slice06_2026_03_09",
+          "summary": "Fixed the dark-theme invoke output contrast bug, persisted stable disclosure keys across Settings and Chat review shells so background sync no longer collapses expanded panels, and confirmed that the codex and openai profiles are separate logical routes that can intentionally share one OpenAI API key when both local ref bindings are populated.",
+          "evidence": [
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/css/main.css",
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/views/settings.js",
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/views/chat.js",
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/test/settings.test.js",
+            "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/desktop-closeout/m13-m14-closeout-20260309T020229Z.summary.json",
+            "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/desktop-closeout/m13-m14-closeout-latest.summary.json"
+          ]
+        },
+        {
+          "id": "m21_refresh_status_debounce_slice07_2026_03_09",
+          "summary": "Delayed the topbar refresh-status transition so fast background polls keep showing the last synced timestamp instead of flashing Data: refreshing on every cycle, while still surfacing sign-in and error states immediately.",
+          "evidence": [
+            "EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/main.js",
+            "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/desktop-closeout/m13-m14-closeout-20260309T021631Z.summary.json",
+            "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/desktop-closeout/m13-m14-closeout-latest.summary.json"
+          ]
+        }
+      ],
+      "next_batch": [
+        "verify the local managed-Codex operator flow end-to-end on Mac after API billing is active",
+        "close any remaining defects found during operator testing without regressing the shared contract",
+        "keep the live browser and local runtime paths on the same native M16/M18 contract"
+      ],
+      "planned_follow_on_backlog": [
+        "add secure Settings-side credential capture using encrypted or keychain-backed local storage so operators do not have to pre-seed local ref-values files for routine Mac testing"
+      ]
     },
     {
       "id": "M22",
@@ -218,6 +312,6 @@
       "status": "planned_not_active_until_m21_closes_or_explicit_parallelization"
     }
   ],
-  "recommended_immediate_next_step": "M20 is complete. Planned next post-M15 milestone is M21: stabilize the existing live-mode/browser, runtime, and Mac-local managed-Codex operator path before starting new expansion work. Keep M21 planned but inactive until explicitly started. Planned follow-on after that is M22 for local/customer-hosted AIMXS decision-provider work on the existing PolicyProvider or ExtensionProvider boundary.",
-  "parallel_execution_note": "M16 architecture/spec work may begin while M15 remains blocked on Windows execution-host proof, but M15 must not be marked complete until Phase D and final launch sign-off are closed."
+  "recommended_immediate_next_step": "M21 is active. Completed slices: browser live-mode stabilization, repo-local desktop cache hygiene, the documented local-Mac runtime/operator diagnostics path, live polling refresh stability, local invoke/operator-editing stabilization, and live disclosure/output stabilization. Next batch: continue the local managed-Codex operator verification flow on Mac and close any remaining defects exposed by operator testing.",
+  "parallel_execution_note": "M15 remains open globally, but the active follow-on engineering work is M21 stabilization. Keep every client surface on the same native M16/M18 contract, keep M22 parked for local or customer-hosted AIMXS work, and do not create client-specific branches while closing the local managed-Codex verification defects."
 }

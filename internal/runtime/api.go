@@ -1434,12 +1434,13 @@ func (s *APIServer) handlePostIntegrationInvoke(w http.ResponseWriter, r *http.R
 			"requestId":      strings.TrimSpace(req.Meta.RequestID),
 			"error":          err.Error(),
 		})
+		statusCode, errorCode, message, retryable := classifyIntegrationInvokeError(err)
 		writeAPIError(
 			w,
-			http.StatusBadGateway,
-			"INTEGRATION_INVOKE_FAILED",
-			"integration invocation failed",
-			true,
+			statusCode,
+			errorCode,
+			message,
+			retryable,
 			map[string]interface{}{"error": err.Error()},
 		)
 		return
@@ -1466,6 +1467,27 @@ func (s *APIServer) handlePostIntegrationInvoke(w http.ResponseWriter, r *http.R
 		"finishReason":   response.FinishReason,
 	})
 	writeJSON(w, http.StatusOK, response)
+}
+
+func classifyIntegrationInvokeError(err error) (int, string, string, bool) {
+	if err == nil {
+		return http.StatusBadGateway, "INTEGRATION_INVOKE_FAILED", "integration invocation failed", true
+	}
+	message := strings.TrimSpace(err.Error())
+	lower := strings.ToLower(message)
+	if strings.Contains(lower, "status=429") || strings.Contains(lower, "insufficient_quota") {
+		return http.StatusTooManyRequests, "INTEGRATION_INVOKE_QUOTA_EXCEEDED", "integration invocation quota exceeded", false
+	}
+	if strings.Contains(lower, "status=401") || strings.Contains(lower, "unauthorized") {
+		return http.StatusUnauthorized, "INTEGRATION_INVOKE_UNAUTHORIZED", "integration invocation credentials were rejected", false
+	}
+	if strings.Contains(lower, "status=403") || strings.Contains(lower, "forbidden") {
+		return http.StatusForbidden, "INTEGRATION_INVOKE_FORBIDDEN", "integration invocation was forbidden by the upstream provider", false
+	}
+	if strings.Contains(lower, "status=400") || strings.Contains(lower, "invalid_request_error") {
+		return http.StatusBadRequest, "INTEGRATION_INVOKE_INVALID_REQUEST", "integration invocation request was rejected by the upstream provider", false
+	}
+	return http.StatusBadGateway, "INTEGRATION_INVOKE_FAILED", "integration invocation failed", true
 }
 
 func truncatePromptPreview(value string) string {

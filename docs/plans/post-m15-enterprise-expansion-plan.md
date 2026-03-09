@@ -284,10 +284,17 @@ Exit gate:
 
 ## Recommended immediate next step
 
-M20 is complete:
+`M21` is active:
 
-- planned next milestone is `M21`: stabilize the existing live-mode/browser, runtime, and Mac-local managed-Codex operator path before adding new expansion work
-- keep `M21` planned but inactive until explicitly started
+- completed slice 1: fixed the browser live-mode topology, added live contract preflight, and made live first-run scope seeding and chat initialization stable enough to render usable operator state
+- completed slice 2: moved future local browser-run artifacts out of the repo tree and added explicit cleanup for legacy repo-local desktop cache
+- completed slice 3: documented the live operator diagnostics and OpenAI test path, added the turnkey local-Mac runtime launcher plus browser runtime override, and made the live Chat first-run empty state explicit and operator-grade
+- completed slice 4: stopped polling refresh from wiping visible panels back to loading placeholders after first hydration, which removed the recurring blink and page-scroll reset during live sync
+- completed slice 5: corrected live invoke error mapping so upstream quota failures surface as operator-visible `429` errors instead of generic `502` responses, repaired the missing native session view import that broke local invoke hydration, paused background refresh while operators are actively editing fields, and clarified `System Instructions` versus `Turn Prompt` in Chat and Settings
+- completed slice 6: fixed the dark-theme invoke output contrast bug, persisted Settings and Chat disclosure shells across live background rerenders so expanded review panels no longer collapse on sync, and confirmed that the `codex` and `openai` profiles are distinct routes that can intentionally share the same OpenAI key when both local ref values are populated
+- completed slice 7: delayed the topbar `Data: refreshing` indicator so fast background polls keep showing the last synced timestamp instead of flashing a transient loading state on every cycle
+- next batch: continue the local managed-Codex operator verification flow on Mac and close any remaining defects exposed by operator testing
+- planned follow-on inside M21: add secure Settings-side credential capture using encrypted or keychain-backed local storage so operators do not have to pre-seed local ref-values files for routine Mac testing
 - planned follow-on after that is `M22` for local or customer-hosted AIMXS decision-provider work on the existing policy boundary
 - keep Chat, VS Code, CLI, workflow, and chatops on the same native M16/M18 contract
 
@@ -305,16 +312,59 @@ All future client and worker work should be traceable back to the M16 session/ta
 
 ### M21
 
-Stabilization and turnkey local operator path. Planned, not active.
+Stabilization and turnkey local operator path. Active.
 
-Deliverables:
+Completed slices:
+
+- slice 1: browser live-mode stabilization
+  - fixed the local live launcher topology so browser traffic proxies to the runtime on one same-origin base URL instead of miswiring provider discovery
+  - added live contract preflight so missing runtime routes fail early instead of leaving the UI on indefinite loading
+  - seeded tenant and project scope from live runtime data so first-run Settings and Chat resolve to real scope instead of `scope-unavailable`
+  - fixed the live chat client initialization bug that left governance catalogs or history refresh stuck on `api`-missing failures
+- slice 2: repo-local cache and run-artifact hygiene
+  - moved future local browser session artifacts to `EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/m21-local-cache`
+  - added `./bin/cleanup-macos-local-cache.sh` to remove legacy repo-local cache and optional legacy browser launch sessions from `ui/desktop-ui/.tmp`
+  - documented the non-repo cache location and cleanup path in the desktop README
+- slice 3: live operator diagnostics, local runtime launcher, and first-run chat clarity
+  - documented the live operator diagnostics path and OpenAI live-test path for Mac operators in the desktop README
+  - added `./bin/run-local-runtime-macos.sh` to run the current repo runtime contract locally against cluster-backed Postgres with managed Codex process defaults
+  - added `--runtime-base-url` to `./bin/run-macos-local.sh` so browser live mode can target the local runtime instead of only the cluster port-forwarded runtime
+  - made the live Chat empty state explicit and operator-grade when no native M16 tasks exist or when the live runtime contract is incomplete
+- slice 4: live polling refresh stability
+  - stopped the polling refresh loop from replacing hydrated panels with loading placeholders on every sync cycle
+  - preserved the current viewport position across background sync refreshes so operators can keep reading deep panels without being snapped back to the top
+  - revalidated the desktop gate stack after the change
+- slice 5: invoke error surfacing, edit-safe background sync, and prompt wording clarity
+  - mapped upstream quota and related invoke failures to their correct operator-visible HTTP statuses instead of collapsing them into generic `502 Bad Gateway` responses
+  - repaired the missing `loadNativeSessionView` import that broke local invoke session hydration in live mode
+  - paused background polling while operators are actively editing fields so refresh cycles no longer steal focus or deselect the current input
+  - clarified `System Instructions` versus `Turn Prompt` in Chat and Settings to reduce prompt authoring confusion
+- slice 6: live disclosure persistence, dark-theme invoke readability, and profile-route clarification
+  - fixed the dark-theme invoke output and raw-response surfaces so code-block text remains readable instead of rendering white text on a white panel background
+  - persisted Settings and Chat disclosure shells with stable `data-detail-key` values so background sync no longer collapses expanded raw-response, timeline, tool-action, evidence, proposal, and transcript review panels
+  - confirmed that the `codex` and `openai` profiles are separate logical routes (`gpt-5-codex` via `openai_compatible` versus `gpt-5` via `openai_responses`) even when both use the same locally supplied OpenAI API key through distinct `ref://...` bindings
+- slice 7: refresh-status debounce and secure-credential follow-on tracking
+  - delayed the topbar refresh-status transition so fast background sync cycles keep showing the last `synced` timestamp instead of flashing `refreshing` for a fraction of a second on every poll
+  - left error and sign-in states immediate while suppressing only the low-value fast-poll flicker
+  - recorded secure Settings-side credential capture using encrypted or keychain-backed local storage as planned follow-on M21 work instead of active implementation
+
+Completed deliverables:
 
 - fix the live-mode browser `data: refresh failed` path and related diagnostics
 - make the live Chat empty-state explicit when no native M16 tasks or sessions exist
 - tighten `ui/desktop-ui/.tmp` cache hygiene and cleanup policy
 - document and verify the OpenAI live-test path for Mac operators
 - provide a turnkey local-Mac runtime path for the managed Codex process bridge
-- verify the local managed-Codex operator flow end-to-end on Mac without topology guesswork
+- stabilize local invoke error surfacing and background editing behavior in live mode
+- suppress the topbar refresh-status flicker during fast background polls
+
+Remaining deliverable:
+
+- verify the local managed-Codex operator flow end-to-end on Mac without topology guesswork and close any remaining defects exposed by operator testing
+
+Planned follow-on inside M21:
+
+- add secure Settings-side credential capture using encrypted or keychain-backed local storage instead of requiring pre-seeded local ref-values files for normal Mac operator testing
 
 Exit gate:
 

@@ -238,53 +238,75 @@ Notes:
 7. Optional browser stress scenario: `RUN_M14_BROWSER_STRESS=1 ./bin/verify-m14-ui-028.sh`
 8. Optional auth/session robustness: `RUN_M14_AUTH_STRESS=1 ./bin/verify-m14-ui-029.sh`
 
-## Live Provider Invocation Testing
+## Live Browser Diagnostics (M21)
 
-- `mock` mode does not hit real model providers; it returns a synthetic integration-invoke response.
-- To test real provider calls, the runtime API must expose `POST /v1alpha1/runtime/integrations/invoke` and must have runtime ref values configured.
+- `mock` mode does not hit real model providers; it returns synthetic runtime data.
+- `live` mode proxies browser requests through the local launcher. By default that launcher still uses `kubectl port-forward` to `epydios-system/orchestration-runtime`.
+- If the cluster runtime image is older than the repo contract, the browser can still load but Settings or Chat will show partial live warnings. The local diagnostics path is:
+  1. `curl -s http://127.0.0.1:4173/config/runtime-config.json | jq '{mockMode,environment,runtimeApiBaseUrl,registryApiBaseUrl}'`
+  2. `curl -i http://127.0.0.1:8080/healthz`
+  3. `curl -i http://127.0.0.1:8080/v1alpha1/runtime/runs?limit=1`
+  4. `curl -i http://127.0.0.1:8080/v1alpha1/runtime/approvals?limit=1`
+  5. `curl -i "http://127.0.0.1:8080/v1alpha1/runtime/integrations/settings?tenantId=tenant-demo&projectId=project-core"`
+  6. `curl -i http://127.0.0.1:8080/v1alpha1/providers`
+- If those contract checks fail, switch to the repo-local runtime path below instead of continuing to debug the browser UI against an older cluster image.
+
+## OpenAI Live Test Path (Recommended)
+
 - Runtime ref resolution sources:
   - `RUNTIME_REF_VALUES_PATH=/absolute/path/to/ref-values.json`
   - `RUNTIME_REF_VALUES_JSON='{"ref://...":"..."}'`
 - The UI settings editor remains reference-only. Concrete secrets stay outside the UI and are resolved by the runtime.
-- Minimal operator path:
-  1. Start or update the runtime with `RUNTIME_REF_VALUES_PATH` or `RUNTIME_REF_VALUES_JSON`.
-  2. Run the UI in `live` mode so it talks to the real runtime API.
-  3. Open `Settings -> Configuration`.
-  4. Set `modelRouting=direct_first` if no LiteLLM gateway is available.
-  5. Use `Agent Invocation Test` to invoke the selected profile.
-- Direct defaults exist for:
-  - `codex` / `openai` -> `https://api.openai.com`
-  - `anthropic` -> `https://api.anthropic.com`
-  - `google` -> `https://generativelanguage.googleapis.com`
-- Explicit endpoint refs are still required for:
-  - `azure_openai`
-  - `bedrock`
 - A non-repo template for the ref-values JSON is kept under `EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/integration-invoke/`.
+
+Recommended operator path:
+1. Create a ref-values JSON outside the repo with your OpenAI key mapped to the `ref://.../openai.../api-key` entries.
+2. Start the repo runtime locally on macOS:
+   - `./bin/run-local-runtime-macos.sh --ref-values-path "/absolute/path/to/ref-values.json"`
+3. In a second terminal, run the browser UI against that local runtime:
+   - `./bin/run-macos-local.sh --mode live --runtime-base-url "http://127.0.0.1:18080"`
+4. Open `Settings -> Configuration`.
+5. Set `modelRouting=direct_first` if no LiteLLM gateway is available.
+6. Use `Agent Invocation Test` with a low-risk prompt such as `Reply with exactly: agentops-live-ok`.
+
+Direct defaults exist for:
+- `codex` / `openai` -> `https://api.openai.com`
+- `anthropic` -> `https://api.anthropic.com`
+- `google` -> `https://generativelanguage.googleapis.com`
+
+Explicit endpoint refs are still required for:
+- `azure_openai`
+- `bedrock`
 
 ## Managed Codex Worker Testing
 
 - `Execution Path = Raw Model Invoke` keeps the request on the provider API path.
 - `Execution Path = Managed Codex Worker` uses the native M16 session or worker contract and managed worker review surfaces in `Chat`.
-- For the real Codex CLI bridge instead of the legacy provider-route-backed bridge, start the runtime with:
+- The supported macOS operator path is to run the repo runtime locally on the same host as the Codex.app bundle, then point browser live mode at that runtime.
+- Default local Codex process settings in the local runtime launcher are:
   - `RUNTIME_MANAGED_CODEX_MODE=process`
   - `RUNTIME_CODEX_CLI_PATH=/Applications/Codex.app/Contents/Resources/codex`
-  - `RUNTIME_CODEX_WORKDIR=/absolute/path/to/workdir`
+  - `RUNTIME_CODEX_WORKDIR=<repo root unless overridden>`
   - `RUNTIME_CODEX_SANDBOX_MODE=workspace-write`
   - `RUNTIME_CODEX_EXEC_TIMEOUT=45s`
-- In `process` mode, AgentOps now launches Codex against an AgentOps-owned gateway boundary instead of letting the local Codex process choose a provider path itself. The managed turn review shows that boundary back as `route`, `boundary`, and `endpointRef`.
-- Minimal operator path:
-  1. Start the runtime in `live` mode with the Codex process env vars above.
-  2. Run the desktop UI in `live` mode.
-  3. Open `Chat`.
-  4. Set `Execution Path` to `Managed Codex Worker`.
-  5. Start a thread and submit a turn.
-  6. Review structured tool proposals in chat.
-  7. Approve or deny proposals directly in chat.
-  8. After approval, confirm the same native session continues instead of creating a detached follow-up path.
-  9. Review resulting tool-action status changes (`AUTHORIZED`, `STARTED`, `COMPLETED`, or `FAILED`), managed worker transcript, evidence, and worker progress in the same thread.
-- Policy boundary note:
-  - current process mode governs operator turns, Codex-generated tool proposals, governed tool execution, the resumed worker session, and Codex -> model-provider traffic on one M16 timeline through the AgentOps gateway boundary
-  - the review surfaces expose the mediated boundary explicitly so operator chat can show which gateway path controlled the turn
+- In `process` mode, AgentOps launches Codex against an AgentOps-owned gateway boundary instead of letting the local Codex process choose a provider path itself. The managed turn review shows that boundary back as `route`, `boundary`, and `endpointRef`.
+
+Minimal operator path:
+1. Start the local runtime on macOS:
+   - `./bin/run-local-runtime-macos.sh --ref-values-path "/absolute/path/to/ref-values.json" --codex-workdir "/absolute/path/to/workdir"`
+2. Start the browser UI against that runtime:
+   - `./bin/run-macos-local.sh --mode live --runtime-base-url "http://127.0.0.1:18080"`
+3. Open `Chat`.
+4. Set `Execution Path` to `Managed Codex Worker`.
+5. Start a thread and submit a turn.
+6. Review structured tool proposals in chat.
+7. Approve or deny proposals directly in chat.
+8. After approval, confirm the same native session continues instead of creating a detached follow-up path.
+9. Review resulting tool-action status changes (`AUTHORIZED`, `STARTED`, `COMPLETED`, or `FAILED`), managed worker transcript, evidence, and worker progress in the same thread.
+
+Policy boundary note:
+- current process mode governs operator turns, Codex-generated tool proposals, governed tool execution, the resumed worker session, and Codex -> model-provider traffic on one M16 timeline through the AgentOps gateway boundary
+- the review surfaces expose the mediated boundary explicitly so operator chat can show which gateway path controlled the turn
 
 ## macOS Program Path
 
@@ -293,11 +315,21 @@ Notes:
   - `./bin/bootstrap-macos-local.sh --mode live`
 - Launch:
   - mock mode (no runtime dependency): `./bin/run-macos-local.sh --mode mock`
-  - live mode (port-forwards `epydios-system/orchestration-runtime`): `./bin/run-macos-local.sh --mode live`
+  - cluster live mode (port-forwards `epydios-system/orchestration-runtime`): `./bin/run-macos-local.sh --mode live`
+  - local runtime live mode (recommended for full repo contract): `./bin/run-macos-local.sh --mode live --runtime-base-url "http://127.0.0.1:18080"`
+- Local runtime:
+  - `./bin/run-local-runtime-macos.sh`
+  - this script port-forwards Postgres from the active cluster, runs `cmd/control-plane-runtime` locally, and writes logs/caches outside the repo
 - Optional install of double-click launcher:
   - `./bin/install-macos-launcher.sh`
   - installed path default: `~/Applications/Epydios AgentOps Desktop.command`
   - default launcher mode is `mock`; override per launch with `EPYDIOS_DESKTOP_MODE=live`
+- Local browser-run artifacts now live under the non-repo cache root:
+  - `../../../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/m21-local-cache/macos-launch/<timestamp>`
+- Legacy repo-local browser cache cleanup:
+  - dry run: `./bin/cleanup-macos-local-cache.sh --dry-run`
+  - remove legacy repo-local build cache only: `./bin/cleanup-macos-local-cache.sh`
+  - remove legacy repo-local browser sessions too: `./bin/cleanup-macos-local-cache.sh --include-launch-sessions`
 
 ## Native App Track (No Browser)
 

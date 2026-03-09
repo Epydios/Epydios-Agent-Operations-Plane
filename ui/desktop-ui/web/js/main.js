@@ -51,6 +51,7 @@ import {
   followOperatorChatThread,
   invokeOperatorChatTurn,
   launchManagedCodexWorker,
+  loadNativeSessionView,
   listOperatorChatThreads,
   loadOperatorChatThread,
   normalizeOperatorChatDraft,
@@ -213,6 +214,15 @@ const ui = {
   logoutButton: document.getElementById("logout-button"),
   refreshButton: document.getElementById("refresh-button")
 };
+
+let runtimeApiClient = null;
+
+function requireRuntimeApiClient() {
+  if (!runtimeApiClient) {
+    throw new Error("Runtime API client is not initialized yet.");
+  }
+  return runtimeApiClient;
+}
 
 const store = createAppStore();
 const THEME_PREF_KEY = "epydios.agentops.desktop.theme.mode";
@@ -536,11 +546,22 @@ function normalizeProjectScopeKey(projectID) {
 }
 
 function activeProjectScope(session) {
-  const fromSelect = String(ui.contextProjectSelect?.value || "").trim();
-  if (fromSelect) {
-    return fromSelect;
+  const candidateSources = [
+    ui.contextProjectSelect?.value,
+    readSavedValue(PROJECT_PREF_KEY),
+    ui.runsProjectFilter?.value,
+    ui.auditProjectFilter?.value,
+    ui.approvalsProjectFilter?.value,
+    ui.rbProjectId?.value,
+    session?.claims?.project_id
+  ];
+  for (const value of candidateSources) {
+    const normalized = String(value || "").trim();
+    if (normalized) {
+      return normalized;
+    }
   }
-  return String(session?.claims?.project_id || "").trim();
+  return "";
 }
 
 function activeTenantScope(session) {
@@ -561,6 +582,19 @@ function activeTenantScope(session) {
     }
   }
   return "";
+}
+
+function applyTenantContext(tenantID) {
+  const selectedTenant = String(tenantID || "").trim();
+  if (ui.runsTenantFilter) {
+    ui.runsTenantFilter.value = selectedTenant;
+  }
+  if (ui.auditTenantFilter) {
+    ui.auditTenantFilter.value = selectedTenant;
+  }
+  if (ui.approvalsTenantFilter) {
+    ui.approvalsTenantFilter.value = selectedTenant;
+  }
 }
 
 function looksLikeRawSecret(value) {
@@ -968,7 +1002,7 @@ function validateAgentInvokeDraft(draft, choices) {
 }
 
 async function hydrateAgentInvokeSessionView(sessionId) {
-  return loadNativeSessionView(api, sessionId, { tailCount: 6, waitSeconds: 1 });
+  return loadNativeSessionView(requireRuntimeApiClient(), sessionId, { tailCount: 6, waitSeconds: 1 });
 }
 
 async function refreshOperatorChatHistory(sessionValue) {
@@ -989,7 +1023,7 @@ async function refreshOperatorChatHistory(sessionValue) {
     return;
   }
   try {
-    const history = await listOperatorChatThreads(api, scope, { limit: 12 });
+    const history = await listOperatorChatThreads(requireRuntimeApiClient(), scope, { limit: 12 });
     const archivedTaskIds = archivedOperatorChatTaskIds(scope);
     const allItems = (Array.isArray(history?.items) ? history.items : []).map((item) => ({
       ...item,
@@ -1013,12 +1047,16 @@ async function refreshOperatorChatHistory(sessionValue) {
       }
     };
   } catch (error) {
+    const endpointUnavailable =
+      error && [404, 405, 501].includes(Number(error.status || 0));
     operatorChatState = {
       ...operatorChatState,
       history: {
-        source: "error",
+        source: endpointUnavailable ? "endpoint-unavailable" : "error",
         count: 0,
-        message: `Native thread history failed to load: ${error.message}`,
+        message: endpointUnavailable
+          ? `Native task/session endpoints are unavailable in the current live runtime (HTTP ${error.status}). Chat history cannot load until the local runtime contract is updated.`
+          : `Native thread history failed to load: ${error.message}`,
         items: []
       }
     };
@@ -1045,17 +1083,26 @@ async function refreshOperatorChatGovernanceCatalogs(sessionValue) {
     return;
   }
   try {
+    const apiClient = requireRuntimeApiClient();
     const [workerCapabilities, policyPacks, exportProfiles, orgAdminProfiles] = await Promise.all([
-      api.listRuntimeWorkerCapabilities({}),
-      api.listRuntimePolicyPacks({ clientSurface: "chat" }),
-      api.listRuntimeExportProfiles({ clientSurface: "chat" }),
-      api.listRuntimeOrgAdminProfiles({ clientSurface: "chat" })
+      apiClient.listRuntimeWorkerCapabilities({}),
+      apiClient.listRuntimePolicyPacks({ clientSurface: "chat" }),
+      apiClient.listRuntimeExportProfiles({ clientSurface: "chat" }),
+      apiClient.listRuntimeOrgAdminProfiles({ clientSurface: "chat" })
     ]);
+    const responses = [workerCapabilities, policyPacks, exportProfiles, orgAdminProfiles];
+    const unavailableWarnings = responses
+      .filter((item) => String(item?.source || "").trim().toLowerCase() === "endpoint-unavailable")
+      .map((item) => String(item?.warning || "").trim())
+      .filter(Boolean);
     operatorChatState = {
       ...operatorChatState,
       catalogs: {
-        source: "runtime-endpoint",
-        message: "Enterprise governance catalogs loaded for Chat review, report, governed export, and org-admin posture.",
+        source: unavailableWarnings.length > 0 ? "endpoint-unavailable" : "runtime-endpoint",
+        message:
+          unavailableWarnings.length > 0
+            ? `Enterprise governance catalogs are unavailable in the current live runtime. ${unavailableWarnings.join(" ")}`
+            : "Enterprise governance catalogs loaded for Chat review, report, governed export, and org-admin posture.",
         workerCapabilities,
         policyPacks,
         exportProfiles,
@@ -1079,13 +1126,22 @@ async function refreshOperatorChatGovernanceCatalogs(sessionValue) {
 
 async function refreshDesktopGovernedExportCatalogs() {
   try {
+    const apiClient = requireRuntimeApiClient();
     const [exportProfiles, orgAdminProfiles] = await Promise.all([
-      api.listRuntimeExportProfiles({ clientSurface: "desktop" }),
-      api.listRuntimeOrgAdminProfiles({ clientSurface: "desktop" })
+      apiClient.listRuntimeExportProfiles({ clientSurface: "desktop" }),
+      apiClient.listRuntimeOrgAdminProfiles({ clientSurface: "desktop" })
     ]);
+    const responses = [exportProfiles, orgAdminProfiles];
+    const unavailableWarnings = responses
+      .filter((item) => String(item?.source || "").trim().toLowerCase() === "endpoint-unavailable")
+      .map((item) => String(item?.warning || "").trim())
+      .filter(Boolean);
     desktopGovernedExportCatalogState = {
-      source: "runtime-endpoint",
-      message: "Enterprise governed export profiles and org-admin overlays loaded for desktop export and handoff paths.",
+      source: unavailableWarnings.length > 0 ? "endpoint-unavailable" : "runtime-endpoint",
+      message:
+        unavailableWarnings.length > 0
+          ? `Enterprise governed export catalogs are unavailable in the current live runtime. ${unavailableWarnings.join(" ")}`
+          : "Enterprise governed export profiles and org-admin overlays loaded for desktop export and handoff paths.",
       exportProfiles,
       orgAdminProfiles
     };
@@ -1733,6 +1789,8 @@ function formatRefreshClock() {
   }
 }
 
+const REFRESH_STATUS_LOADING_DELAY_MS = 750;
+
 function setRefreshStatus(tone, detail = "") {
   if (!(ui.refreshStatus instanceof HTMLElement)) {
     return;
@@ -2103,6 +2161,79 @@ function collectProjectScopeIDs(snapshot, session) {
     }
   }
   return Array.from(ids).sort((a, b) => a.localeCompare(b));
+}
+
+function collectRuntimeScopePairs(snapshot, session) {
+  const pairs = [];
+  const seen = new Set();
+  const addPair = (tenantID, projectID) => {
+    const tenant = String(tenantID || "").trim();
+    const project = String(projectID || "").trim();
+    if (!tenant || !project) {
+      return;
+    }
+    const key = `${tenant}::${project}`;
+    if (seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    pairs.push({ tenantId: tenant, projectId: project });
+  };
+
+  addPair(session?.claims?.tenant_id, session?.claims?.project_id);
+
+  const sources = [
+    snapshot?.runs?.items,
+    snapshot?.approvals?.items,
+    snapshot?.audit?.items
+  ];
+  for (const list of sources) {
+    for (const item of list || []) {
+      addPair(item?.tenantId, item?.projectId);
+    }
+  }
+  return pairs;
+}
+
+function deriveRuntimeScopeSeed(snapshot, session) {
+  const currentTenant = activeTenantScope(session);
+  const currentProject = activeProjectScope(session);
+  if (currentTenant && currentProject) {
+    return null;
+  }
+  const pairs = collectRuntimeScopePairs(snapshot, session);
+  if (pairs.length === 0) {
+    return null;
+  }
+  if (currentProject && !currentTenant) {
+    return pairs.find((item) => item.projectId === currentProject) || pairs[0];
+  }
+  if (!currentProject && currentTenant) {
+    return pairs.find((item) => item.tenantId === currentTenant) || pairs[0];
+  }
+  return pairs[0];
+}
+
+function seedRuntimeScopeFromSnapshot(snapshot, session) {
+  const seed = deriveRuntimeScopeSeed(snapshot, session);
+  if (!seed) {
+    return false;
+  }
+
+  let changed = false;
+  if (!activeTenantScope(session) && seed.tenantId) {
+    applyTenantContext(seed.tenantId);
+    changed = true;
+  }
+  if (!activeProjectScope(session) && seed.projectId) {
+    saveValue(PROJECT_PREF_KEY, seed.projectId);
+    applyProjectContext(seed.projectId);
+    if (ui.contextProjectSelect) {
+      ui.contextProjectSelect.value = seed.projectId;
+    }
+    changed = true;
+  }
+  return changed;
 }
 
 function renderContextBar(snapshot, session, settings) {
@@ -2897,6 +3028,36 @@ function renderPanelLoadingStates() {
   }
 }
 
+function isEditableElement(node) {
+  if (node instanceof HTMLTextAreaElement) {
+    return true;
+  }
+  if (node instanceof HTMLSelectElement) {
+    return true;
+  }
+  if (node instanceof HTMLInputElement) {
+    const type = String(node.type || "text").trim().toLowerCase();
+    return !["button", "submit", "reset", "checkbox", "radio", "range", "file", "color"].includes(type);
+  }
+  return node instanceof HTMLElement && node.isContentEditable;
+}
+
+function shouldPauseBackgroundRefresh() {
+  const activeElement = document.activeElement;
+  if (!isEditableElement(activeElement)) {
+    return false;
+  }
+  return [
+    ui.chatContent,
+    ui.settingsContent,
+    ui.runsContent,
+    ui.approvalsContent,
+    ui.auditContent,
+    ui.triageContent,
+    ui.executionDefaultsContent
+  ].some((root) => root instanceof HTMLElement && root.contains(activeElement));
+}
+
 function startRealtimeRefreshLoop(choices, refreshFn) {
   if (choices.realtime.mode !== "polling") {
     return () => {};
@@ -2904,6 +3065,9 @@ function startRealtimeRefreshLoop(choices, refreshFn) {
 
   const timer = window.setInterval(() => {
     if (document.visibilityState !== "hidden") {
+      if (shouldPauseBackgroundRefresh()) {
+        return;
+      }
       refreshFn().catch(() => {});
     }
   }, choices.realtime.pollIntervalMs);
@@ -3880,6 +4044,7 @@ async function main() {
   renderIncidentHistoryPanel();
 
   const api = new AgentOpsApi(config, () => getSession().token);
+  runtimeApiClient = api;
   const runtimeIntegrationSyncStateByProject = {};
   const resolveIntegrationScope = (currentSession, projectHint = "") => {
     const tenantID = activeTenantScope(currentSession);
@@ -3980,6 +4145,26 @@ async function main() {
   renderContextPanel();
   let refreshInFlight = false;
   let refreshQueued = false;
+  let hasHydratedPanels = false;
+  let refreshStatusLoadingTimer = 0;
+
+  function clearRefreshStatusLoadingTimer() {
+    if (!refreshStatusLoadingTimer) {
+      return;
+    }
+    window.clearTimeout(refreshStatusLoadingTimer);
+    refreshStatusLoadingTimer = 0;
+  }
+
+  function scheduleRefreshStatusLoading(detail = "refreshing") {
+    clearRefreshStatusLoadingTimer();
+    refreshStatusLoadingTimer = window.setTimeout(() => {
+      refreshStatusLoadingTimer = 0;
+      if (refreshInFlight) {
+        setRefreshStatus("loading", detail);
+      }
+    }, REFRESH_STATUS_LOADING_DELAY_MS);
+  }
 
   async function refresh() {
     if (refreshInFlight) {
@@ -3987,14 +4172,14 @@ async function main() {
       return;
     }
     refreshInFlight = true;
-    setRefreshStatus("loading", "refreshing");
+    scheduleRefreshStatusLoading("refreshing");
     let refreshSucceeded = false;
 
     session = getSession();
     setAuthDisplay(ui, session);
-    const projectID = activeProjectScope(session);
+    let projectID = activeProjectScope(session);
     await syncProjectIntegrationSettings(projectID, session);
-    const currentChoices = resolveProjectChoices(projectID);
+    let currentChoices = resolveProjectChoices(projectID);
     renderExecutionDefaults(ui, currentChoices);
     refreshRunBuilderPreview(session);
     refreshTerminalPreview(session, currentChoices);
@@ -4002,136 +4187,165 @@ async function main() {
     if (config.auth?.enabled && !session.authenticated && !config.mockMode) {
       renderError(ui, "Sign in is required to view runtime and provider data.");
       clearDataPanels();
+      clearRefreshStatusLoadingTimer();
       setRefreshStatus("warn", "sign-in required");
       refreshInFlight = false;
       return;
     }
 
-    renderPanelLoadingStates();
+    const previousViewport = {
+      x: window.scrollX,
+      y: window.scrollY
+    };
+    if (!hasHydratedPanels) {
+      renderPanelLoadingStates();
+    }
 
     try {
-      const runScope = readRunFilters(ui);
-      const auditScope = readAuditFilters(ui);
-      const approvalScope = readApprovalFilters(ui);
-      persistListFilterStateFromUI();
+      for (let refreshAttempt = 0; refreshAttempt < 2; refreshAttempt += 1) {
+        const runScope = readRunFilters(ui);
+        const auditScope = readAuditFilters(ui);
+        const approvalScope = readApprovalFilters(ui);
+        persistListFilterStateFromUI();
 
-      const [health, pipeline, providers, runs] = await Promise.all([
-        api.getHealth(),
-        api.getPipelineStatus(),
-        api.getProviders(),
-        api.getRuntimeRuns(runScope.limit)
-      ]);
+        const [health, pipeline, providers, runs] = await Promise.all([
+          api.getHealth(),
+          api.getPipelineStatus(),
+          api.getProviders(),
+          api.getRuntimeRuns(runScope.limit)
+        ]);
 
-      const [audit, approvals] = await Promise.all([
-        api.getAuditEvents(auditScope, runs.items || []),
-        api.getApprovalQueue(approvalScope, runs.items || [])
-      ]);
+        const [audit, approvals] = await Promise.all([
+          api.getAuditEvents(auditScope, runs.items || []),
+          api.getApprovalQueue(approvalScope, runs.items || [])
+        ]);
 
-      const selectedThemeMode = normalizeThemeMode(
-        ui.settingsThemeMode?.value,
-        currentChoices?.theme?.mode || "system"
-      );
-      const selectedAgentProfileId = String(
-        ui.settingsAgentProfile?.value || currentChoices?.integrations?.selectedAgentProfileId || ""
-      )
-        .trim()
-        .toLowerCase();
-      const effectiveChoices = deepClone(currentChoices);
-      effectiveChoices.theme = effectiveChoices.theme || {};
-      effectiveChoices.theme.mode = selectedThemeMode;
-      effectiveChoices.integrations = effectiveChoices.integrations || {};
-      effectiveChoices.integrations.selectedAgentProfileId = selectedAgentProfileId;
-      const latestRunId = String(runs?.items?.[0]?.runId || "").trim();
-      if (!String(ui.terminalRunId?.value || "").trim() && latestRunId && ui.terminalRunId) {
-        ui.terminalRunId.value = latestRunId;
-      }
-      refreshTerminalPreview(session, effectiveChoices);
-      const settings = api.getSettingsSnapshot({
-        choices: effectiveChoices,
-        providers,
-        runs,
-        approvals,
-        audit,
-        themeMode: selectedThemeMode,
-        selectedAgentProfileId
-      });
-      const settingsWithConfigChanges = {
-        ...settings,
-        configChanges: buildSettingsConfigChanges(configChangeHistory, audit)
-      };
-      await Promise.all([
-        refreshOperatorChatHistory(session),
-        refreshOperatorChatGovernanceCatalogs(session),
-        refreshDesktopGovernedExportCatalogs()
-      ]);
+        if (refreshAttempt === 0 && seedRuntimeScopeFromSnapshot({ runs, approvals, audit }, session)) {
+          session = getSession();
+          setAuthDisplay(ui, session);
+          projectID = activeProjectScope(session);
+          await syncProjectIntegrationSettings(projectID, session, { force: true });
+          currentChoices = resolveProjectChoices(projectID);
+          renderExecutionDefaults(ui, currentChoices);
+          renderConfigSummary(currentChoices);
+          refreshRunBuilderPreview(session);
+          refreshTerminalPreview(session, currentChoices);
+          continue;
+        }
 
-      latestSettingsSnapshot = settingsWithConfigChanges;
-      triageSnapshot = { runs, approvals, audit };
-      latestAuditPayload = audit || { items: [] };
-      renderTriagePanel();
-      renderContextPanel();
-      renderHealth(ui, health, pipeline);
-      renderProviders(ui, providers);
-      renderChat(ui, settingsWithConfigChanges, {
-        ...operatorChatState,
-        agentProfileId:
-          String(
-            operatorChatState.agentProfileId ||
-              selectedAgentProfileId ||
-              settingsWithConfigChanges?.integrations?.selectedAgentProfileId ||
-              ""
-          )
-            .trim()
-            .toLowerCase()
-      });
-      const editorState = buildSettingsEditorState(
-        activeProjectScope(session),
-        settingsWithConfigChanges,
-        store.getState().integrationEditorDraftsByProject || {},
-        store.getState().integrationEditorStatusByProject || {},
-        integrationOverrides,
-        runtimeIntegrationSyncStateByProject
-      );
-      const selectedApprovalRunId = String(ui.approvalsDetailContent?.dataset?.selectedRunId || "").trim();
-      renderSettings(ui, settingsWithConfigChanges, editorState, {
-        subview: settingsSubviewState,
-        aimxsEditor: aimxsEditorState,
-        agentTest: {
-          ...agentInvokeState,
+        const selectedThemeMode = normalizeThemeMode(
+          ui.settingsThemeMode?.value,
+          currentChoices?.theme?.mode || "system"
+        );
+        const selectedAgentProfileId = String(
+          ui.settingsAgentProfile?.value || currentChoices?.integrations?.selectedAgentProfileId || ""
+        )
+          .trim()
+          .toLowerCase();
+        const effectiveChoices = deepClone(currentChoices);
+        effectiveChoices.theme = effectiveChoices.theme || {};
+        effectiveChoices.theme.mode = selectedThemeMode;
+        effectiveChoices.integrations = effectiveChoices.integrations || {};
+        effectiveChoices.integrations.selectedAgentProfileId = selectedAgentProfileId;
+        const latestRunId = String(runs?.items?.[0]?.runId || "").trim();
+        if (!String(ui.terminalRunId?.value || "").trim() && latestRunId && ui.terminalRunId) {
+          ui.terminalRunId.value = latestRunId;
+        }
+        refreshTerminalPreview(session, effectiveChoices);
+        const settings = api.getSettingsSnapshot({
+          choices: effectiveChoices,
+          providers,
+          runs,
+          approvals,
+          audit,
+          themeMode: selectedThemeMode,
+          selectedAgentProfileId
+        });
+        const settingsWithConfigChanges = {
+          ...settings,
+          configChanges: buildSettingsConfigChanges(configChangeHistory, audit)
+        };
+        await Promise.all([
+          refreshOperatorChatHistory(session),
+          refreshOperatorChatGovernanceCatalogs(session),
+          refreshDesktopGovernedExportCatalogs()
+        ]);
+
+        latestSettingsSnapshot = settingsWithConfigChanges;
+        triageSnapshot = { runs, approvals, audit };
+        latestAuditPayload = audit || { items: [] };
+        renderTriagePanel();
+        renderContextPanel();
+        renderHealth(ui, health, pipeline);
+        renderProviders(ui, providers);
+        renderChat(ui, settingsWithConfigChanges, {
+          ...operatorChatState,
           agentProfileId:
             String(
-              agentInvokeState.agentProfileId ||
+              operatorChatState.agentProfileId ||
                 selectedAgentProfileId ||
                 settingsWithConfigChanges?.integrations?.selectedAgentProfileId ||
                 ""
             )
               .trim()
               .toLowerCase()
+        });
+        const editorState = buildSettingsEditorState(
+          activeProjectScope(session),
+          settingsWithConfigChanges,
+          store.getState().integrationEditorDraftsByProject || {},
+          store.getState().integrationEditorStatusByProject || {},
+          integrationOverrides,
+          runtimeIntegrationSyncStateByProject
+        );
+        const selectedApprovalRunId = String(ui.approvalsDetailContent?.dataset?.selectedRunId || "").trim();
+        renderSettings(ui, settingsWithConfigChanges, editorState, {
+          subview: settingsSubviewState,
+          aimxsEditor: aimxsEditorState,
+          agentTest: {
+            ...agentInvokeState,
+            agentProfileId:
+              String(
+                agentInvokeState.agentProfileId ||
+                  selectedAgentProfileId ||
+                  settingsWithConfigChanges?.integrations?.selectedAgentProfileId ||
+                  ""
+              )
+                .trim()
+                .toLowerCase()
+          }
+        });
+        setSettingsSubview(settingsSubviewState);
+        renderApprovals(ui, store, approvals, approvalScope, selectedApprovalRunId);
+        renderApprovalsDetail(ui, store.getApprovalByRunID(selectedApprovalRunId));
+        renderRuns(ui, store, runs, runScope);
+        renderAudit(ui, audit, auditScope, {
+          actor: String(
+            session?.claims?.sub || session?.claims?.email || session?.claims?.client_id || ""
+          ).trim(),
+          source: audit?.source || ""
+        });
+        applyAdvancedState();
+        applyDetailsOpenState();
+        if (hasHydratedPanels) {
+          window.requestAnimationFrame(() => {
+            window.scrollTo(previousViewport.x, previousViewport.y);
+          });
         }
-      });
-      setSettingsSubview(settingsSubviewState);
-      renderApprovals(ui, store, approvals, approvalScope, selectedApprovalRunId);
-      renderApprovalsDetail(ui, store.getApprovalByRunID(selectedApprovalRunId));
-      renderRuns(ui, store, runs, runScope);
-      renderAudit(ui, audit, auditScope, {
-        actor: String(
-          session?.claims?.sub || session?.claims?.email || session?.claims?.client_id || ""
-        ).trim(),
-        source: audit?.source || ""
-      });
-      applyAdvancedState();
-      applyDetailsOpenState();
-      refreshSucceeded = true;
+        hasHydratedPanels = true;
+        refreshSucceeded = true;
+        break;
+      }
     } catch (error) {
+      clearRefreshStatusLoadingTimer();
       renderError(ui, `Refresh failed: ${error.message}`);
       setRefreshStatus("error", "refresh failed");
     } finally {
       reconcileOperatorChatFollowLoop();
+      clearRefreshStatusLoadingTimer();
       refreshInFlight = false;
       if (refreshSucceeded) {
         setRefreshStatus("ok", `synced ${formatRefreshClock()}`);
-      } else if (refreshQueued) {
-        setRefreshStatus("loading", "refreshing");
       }
       if (refreshQueued) {
         refreshQueued = false;
@@ -5521,7 +5735,7 @@ async function main() {
         ...draft,
         status: validation.valid ? "dirty" : "invalid",
         message: validation.valid
-          ? "Agent test draft changed. Run Invoke Selected Agent to exercise the live runtime integration path."
+          ? "Draft changed since the last result. Run Invoke Selected Agent to exercise the live runtime integration path again."
           : validation.errors.join(" "),
         response: null,
         sessionView: null

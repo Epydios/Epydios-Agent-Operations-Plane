@@ -225,3 +225,70 @@ test("chat governed report includes active org-admin review metadata from approv
   assert.ok(report.actionHints.some((item) => item.includes("pending org-admin decision reviews")));
   assert.ok(report.applicableOrgAdmins.includes("centralized_enterprise_admin: Centralized Enterprise Admin"));
 });
+
+test("chat view renders an operator-grade first-run live empty state", () => {
+  const ui = { chatContent: { innerHTML: "" } };
+  renderChat(
+    ui,
+    {
+      mockMode: false,
+      integrations: {
+        selectedAgentProfileId: "openai",
+        agentProfiles: [{ id: "openai", label: "OpenAI" }]
+      }
+    },
+    {
+      thread: {
+        tenantId: "tenant-demo",
+        projectId: "project-core",
+        turns: []
+      },
+      history: {
+        source: "runtime",
+        count: 0,
+        archivedCount: 0,
+        showArchived: false,
+        message: "No native operator chat threads exist yet for the current scope.",
+        items: []
+      },
+      catalogs: {
+        source: "endpoint-unavailable",
+        message: "Enterprise governance catalogs are unavailable in the current live runtime."
+      }
+    }
+  );
+
+  assert.match(ui.chatContent.innerHTML, /No governed chat threads exist yet|Live runtime contract is incomplete for Chat history/);
+  assert.match(ui.chatContent.innerHTML, /tenant=tenant-demo; project=project-core/);
+  assert.match(ui.chatContent.innerHTML, /expected on first live load/i);
+  assert.match(ui.chatContent.innerHTML, /Start Thread/);
+  assert.match(ui.chatContent.innerHTML, /local-runtime launcher/i);
+});
+
+test("chat composer explains system instructions versus the turn prompt", () => {
+  const ui = { chatContent: { innerHTML: "" } };
+  renderChat(
+    ui,
+    {
+      integrations: {
+        selectedAgentProfileId: "codex",
+        agentProfiles: [{ id: "codex", label: "Codex" }]
+      }
+    },
+    {
+      history: {
+        items: [],
+        count: 0,
+        archivedCount: 0,
+        showArchived: false,
+        message: "",
+        source: "runtime"
+      }
+    }
+  );
+
+  assert.match(ui.chatContent.innerHTML, /System Instructions/);
+  assert.match(ui.chatContent.innerHTML, /durable guidance/i);
+  assert.match(ui.chatContent.innerHTML, /Turn Prompt/);
+  assert.match(ui.chatContent.innerHTML, /specific request/i);
+});
