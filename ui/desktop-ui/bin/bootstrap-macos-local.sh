@@ -63,7 +63,8 @@ if [[ "${MODE}" == "live" ]]; then
     exit 1
   }
 
-  kubectl -n epydios-system get svc orchestration-runtime >/dev/null 2>&1 || {
+  runtime_service="$(kubectl -n epydios-system get svc orchestration-runtime -o name 2>/dev/null || true)"
+  [[ -n "${runtime_service}" ]] || {
     echo "Missing service: epydios-system/orchestration-runtime" >&2
     exit 1
   }

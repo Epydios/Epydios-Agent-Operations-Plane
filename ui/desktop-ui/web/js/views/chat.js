@@ -52,13 +52,43 @@ function executionModeLabel(value) {
   return "Raw Model Invoke";
 }
 
-function renderHistoryItems(history = {}, activeTaskId = "") {
+function detailKey(...parts) {
+  return parts
+    .map((value) => String(value || "").trim().toLowerCase().replace(/[^a-z0-9._-]+/g, "_"))
+    .filter(Boolean)
+    .join(".");
+}
+
+function renderHistoryItems(history = {}, activeTaskId = "", context = {}) {
   const items = Array.isArray(history?.items) ? history.items : [];
   if (items.length === 0) {
+    const tenantId = String(context?.tenantId || "").trim();
+    const projectId = String(context?.projectId || "").trim();
+    const historyMessage = String(history?.message || "").trim()
+      || "No native operator chat threads exist yet for the current scope.";
+    const catalogsMessage = String(context?.catalogsMessage || "").trim();
+    const liveMode = String(context?.mode || "").trim().toLowerCase() === "live";
+    const endpointUnavailable =
+      String(history?.source || "").trim().toLowerCase() === "endpoint-unavailable"
+      || /unavailable|incomplete|updated/i.test(catalogsMessage);
+    const scopeSummary = tenantId && projectId
+      ? `tenant=${tenantId}; project=${projectId}`
+      : "tenant/project scope is still resolving";
     return `
       <div class="chat-empty-state">
-        <div class="title">No native chat threads found</div>
-        <div class="meta">Threads will appear here after you start them against the current tenant and project scope.</div>
+        <div class="title">${escapeHTML(endpointUnavailable ? "Live runtime contract is incomplete for Chat history" : "No governed chat threads exist yet")}</div>
+        <div class="meta">${escapeHTML(historyMessage)}</div>
+        <div class="meta">${escapeHTML(scopeSummary)}</div>
+        ${
+          catalogsMessage
+            ? `<div class="meta">${escapeHTML(catalogsMessage)}</div>`
+            : ""
+        }
+        <ol class="workflow-guide-list chat-empty-state-list">
+          <li>${escapeHTML(liveMode ? "This is expected on first live load before the first native task is created." : "This surface stays empty until you create the first native chat task.")}</li>
+          <li>Use <strong>Start Thread</strong> to create the governed task for the current scope.</li>
+          <li>${escapeHTML(endpointUnavailable ? "If the runtime contract warning persists, use the M21 local-runtime launcher so Chat can read the full repo contract." : "If provider routing is not ready yet, use Settings or Agent Invocation Test to validate the live runtime first.")}</li>
+        </ol>
       </div>
     `;
   }
@@ -168,9 +198,10 @@ function renderEvidenceRecords(items = []) {
         .map((item) => {
           const sessionId = String(item?.sessionId || "").trim();
           const evidenceId = String(item?.evidenceId || "").trim();
+          const evidenceDetailKey = detailKey("chat", "evidence", sessionId || "unknown", evidenceId || "unknown");
           const metadata = item?.metadata && typeof item.metadata === "object" ? JSON.stringify(item.metadata, null, 2) : "";
           return `
-            <details class="details-shell chat-review-details" open>
+            <details class="details-shell chat-review-details" data-detail-key="${escapeHTML(evidenceDetailKey)}" open>
               <summary>${escapeHTML(String(item?.evidenceId || "-"))} · ${escapeHTML(String(item?.kind || "-"))}</summary>
               <div class="run-detail-chips">
                 <span class="chip chip-neutral chip-compact">toolAction=${escapeHTML(String(item?.toolActionId || "-"))}</span>
@@ -204,6 +235,9 @@ function renderToolActions(items = []) {
         .map((item) => {
           const sessionId = String(item?.sessionId || "").trim();
           const toolActionId = String(item?.toolActionId || "").trim();
+          const toolActionDetailKey = detailKey("chat", "tool_action", sessionId || "unknown", toolActionId || "unknown");
+          const requestDetailKey = detailKey(toolActionDetailKey, "request");
+          const resultDetailKey = detailKey(toolActionDetailKey, "result");
           const requestPayload = item?.requestPayload && typeof item.requestPayload === "object"
             ? JSON.stringify(item.requestPayload, null, 2)
             : "";
@@ -211,7 +245,7 @@ function renderToolActions(items = []) {
             ? JSON.stringify(item.resultPayload, null, 2)
             : "";
           return `
-            <details class="details-shell chat-review-details" open>
+            <details class="details-shell chat-review-details" data-detail-key="${escapeHTML(toolActionDetailKey)}" open>
               <summary>${escapeHTML(String(item?.toolActionId || "-"))} · ${escapeHTML(String(item?.toolType || "-"))} · ${escapeHTML(String(item?.status || "-"))}</summary>
               <div class="run-detail-chips">
                 <span class="chip chip-neutral chip-compact">source=${escapeHTML(String(item?.source || "-"))}</span>
@@ -226,8 +260,8 @@ function renderToolActions(items = []) {
                   </div>
                 </div>
               </div>
-              ${requestPayload ? `<details class="details-shell"><summary>Request Payload</summary><pre class="code-block">${escapeHTML(requestPayload)}</pre></details>` : `<div class="meta">No request payload captured.</div>`}
-              ${resultPayload ? `<details class="details-shell"><summary>Result Payload</summary><pre class="code-block">${escapeHTML(resultPayload)}</pre></details>` : `<div class="meta">No result payload captured.</div>`}
+              ${requestPayload ? `<details class="details-shell" data-detail-key="${escapeHTML(requestDetailKey)}"><summary>Request Payload</summary><pre class="code-block">${escapeHTML(requestPayload)}</pre></details>` : `<div class="meta">No request payload captured.</div>`}
+              ${resultPayload ? `<details class="details-shell" data-detail-key="${escapeHTML(resultDetailKey)}"><summary>Result Payload</summary><pre class="code-block">${escapeHTML(resultPayload)}</pre></details>` : `<div class="meta">No result payload captured.</div>`}
             </details>
           `;
         })
@@ -249,8 +283,9 @@ function renderToolProposals(items = []) {
           const status = String(item?.status || "PENDING").trim().toUpperCase();
           const command = String(item?.command || "").trim();
           const pending = status === "PENDING";
+          const proposalDetailKey = detailKey("chat", "tool_proposal", sessionId || "unknown", proposalId || "unknown");
           return `
-            <details class="details-shell chat-review-details" open data-chat-tool-proposal-row data-chat-session-id="${escapeHTML(sessionId)}" data-chat-proposal-id="${escapeHTML(proposalId)}">
+            <details class="details-shell chat-review-details" data-detail-key="${escapeHTML(proposalDetailKey)}" open data-chat-tool-proposal-row data-chat-session-id="${escapeHTML(sessionId)}" data-chat-proposal-id="${escapeHTML(proposalId)}">
               <summary>${escapeHTML(proposalId || "-")} · ${escapeHTML(String(item?.proposalType || "-"))} · ${escapeHTML(status)}</summary>
               <div class="run-detail-chips">
                 <span class="chip chip-neutral chip-compact">worker=${escapeHTML(String(item?.workerId || "-"))}</span>
@@ -502,8 +537,10 @@ function renderGovernanceReport(envelope = {}, sessionId = "") {
   if (!envelope || typeof envelope !== "object") {
     return "";
   }
+  const reportDetailKey = detailKey("chat", "governance_report", sessionId || "unknown");
+  const renderedReportDetailKey = detailKey(reportDetailKey, "rendered");
   return `
-    <details class="details-shell chat-review-details chat-governance-report" open>
+    <details class="details-shell chat-review-details chat-governance-report" data-detail-key="${escapeHTML(reportDetailKey)}" open>
       <summary>Enterprise Governance Report</summary>
       <div class="run-detail-chips">
         <span class="chip chip-neutral chip-compact">export=${escapeHTML(String(envelope.exportProfile || "-"))}</span>
@@ -569,7 +606,7 @@ function renderGovernanceReport(envelope = {}, sessionId = "") {
       ${renderEnvelopeLines("Recent activity", envelope.recent)}
       ${renderEnvelopeLines("Action hints", envelope.actionHints)}
       ${renderEnvelopeLines("DLP findings", envelope.dlpFindings)}
-      ${envelope.renderedText ? `<details class="details-shell"><summary>Rendered Report</summary><pre class="code-block">${escapeHTML(String(envelope.renderedText || ""))}</pre></details>` : ""}
+      ${envelope.renderedText ? `<details class="details-shell" data-detail-key="${escapeHTML(renderedReportDetailKey)}"><summary>Rendered Report</summary><pre class="code-block">${escapeHTML(String(envelope.renderedText || ""))}</pre></details>` : ""}
     </details>
   `;
 }
@@ -628,6 +665,14 @@ function renderTurnCards(turns = [], catalogs = {}, exportSelection = {}) {
       const streamItems = Array.isArray(activity?.semanticEvents) ? activity.semanticEvents : [];
       const rawTimeline = timeline ? JSON.stringify(timeline, null, 2) : "";
       const governanceReport = buildChatTurnGovernanceReport(turn, catalogs, exportSelection);
+      const turnDetailBaseKey = detailKey("chat", "turn", session?.sessionId || response?.sessionId || turn?.requestId || "unknown");
+      const transcriptDetailKey = detailKey(turnDetailBaseKey, "transcript");
+      const approvalsDetailKey = detailKey(turnDetailBaseKey, "approvals");
+      const proposalsDetailKey = detailKey(turnDetailBaseKey, "proposals");
+      const actionsDetailKey = detailKey(turnDetailBaseKey, "actions");
+      const evidenceDetailKey = detailKey(turnDetailBaseKey, "evidence");
+      const eventsDetailKey = detailKey(turnDetailBaseKey, "events");
+      const timelineDetailKey = detailKey(turnDetailBaseKey, "timeline_json");
       return `
         <article class="chat-turn-card">
           <div class="chat-turn-header">
@@ -671,29 +716,29 @@ function renderTurnCards(turns = [], catalogs = {}, exportSelection = {}) {
             ${activity?.latestOutputText ? `<pre class="code-block chat-output-preview">${escapeHTML(String(activity.latestOutputText))}</pre>` : ""}
             ${renderProgressItems(activity?.progressItems)}
           </div>
-          ${transcript ? `<details class="details-shell" open><summary>Raw Worker Transcript (${escapeHTML(String(transcript.eventCount || 0))} events)</summary><div class="meta">managedTurn=${escapeHTML(String(transcript.toolActionId || "-"))}</div><pre class="code-block">${escapeHTML(String(transcript.pretty || ""))}</pre></details>` : ""}
-          <details class="details-shell" open>
+          ${transcript ? `<details class="details-shell" data-detail-key="${escapeHTML(transcriptDetailKey)}" open><summary>Raw Worker Transcript (${escapeHTML(String(transcript.eventCount || 0))} events)</summary><div class="meta">managedTurn=${escapeHTML(String(transcript.toolActionId || "-"))}</div><pre class="code-block">${escapeHTML(String(transcript.pretty || ""))}</pre></details>` : ""}
+          <details class="details-shell" data-detail-key="${escapeHTML(approvalsDetailKey)}" open>
             <summary>Approval checkpoints (${approvals.length})</summary>
             ${renderApprovalCheckpoints(approvals)}
           </details>
-          <details class="details-shell" open>
+          <details class="details-shell" data-detail-key="${escapeHTML(proposalsDetailKey)}" open>
             <summary>Tool proposals (${toolProposals.length})</summary>
             ${renderToolProposals(toolProposals)}
           </details>
-          <details class="details-shell" open>
+          <details class="details-shell" data-detail-key="${escapeHTML(actionsDetailKey)}" open>
             <summary>Tool actions (${toolActions.length})</summary>
             ${renderToolActions(toolActions)}
           </details>
-          <details class="details-shell" open>
+          <details class="details-shell" data-detail-key="${escapeHTML(evidenceDetailKey)}" open>
             <summary>Evidence records (${evidence.length})</summary>
             ${renderEvidenceRecords(evidence)}
           </details>
           ${renderGovernanceReport(governanceReport, String(session?.sessionId || response?.sessionId || ""))}
-          <details class="details-shell">
+          <details class="details-shell" data-detail-key="${escapeHTML(eventsDetailKey)}">
             <summary>Recent native events (${streamItems.length})</summary>
             ${renderEventRows(streamItems)}
           </details>
-          ${rawTimeline ? `<details class="details-shell"><summary>Native Session Timeline JSON</summary><pre class="code-block">${escapeHTML(rawTimeline)}</pre></details>` : ""}
+          ${rawTimeline ? `<details class="details-shell" data-detail-key="${escapeHTML(timelineDetailKey)}"><summary>Native Session Timeline JSON</summary><pre class="code-block">${escapeHTML(rawTimeline)}</pre></details>` : ""}
         </article>
       `;
     })
@@ -815,7 +860,12 @@ export function renderChat(ui, settingsPayload = {}, chatState = {}) {
             </div>
           </div>
           <div class="chat-thread-list">
-            ${renderHistoryItems(history, taskId)}
+            ${renderHistoryItems(history, taskId, {
+              tenantId,
+              projectId,
+              catalogsMessage: catalogState?.message || "",
+              mode: settingsPayload?.mockMode ? "mock" : "live"
+            })}
           </div>
         </div>
       </div>
@@ -840,11 +890,13 @@ export function renderChat(ui, settingsPayload = {}, chatState = {}) {
           <input id="chat-thread-intent" class="filter-input" type="text" value="${escapeHTML(String(chatState.intent || ""))}" data-chat-field="intent" />
         </label>
         <label class="field field-wide">
-          <span class="label">System Prompt</span>
+          <span class="label">System Instructions</span>
+          <span class="meta">Use this for durable guidance that should stay in effect for the whole governed thread.</span>
           <textarea id="chat-system-prompt" class="filter-input settings-agent-test-textarea" rows="3" data-chat-field="systemPrompt">${escapeHTML(String(chatState.systemPrompt || ""))}</textarea>
         </label>
         <label class="field field-wide">
-          <span class="label">Operator Prompt</span>
+          <span class="label">Turn Prompt</span>
+          <span class="meta">Use this for the specific request you want the worker or model to perform in this turn.</span>
           <textarea id="chat-prompt" class="filter-input settings-agent-test-textarea" rows="5" data-chat-field="prompt">${escapeHTML(String(chatState.prompt || ""))}</textarea>
         </label>
       </div>

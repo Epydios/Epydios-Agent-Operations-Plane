@@ -2779,8 +2779,33 @@ export class AgentOpsApi {
 
     const response = await fetch(url.toString(), { method, headers, body });
     if (!response.ok) {
-      const error = new Error(`HTTP ${response.status} ${response.statusText}`);
+      let apiError = null;
+      let bodyText = "";
+      try {
+        bodyText = await response.text();
+      } catch (_) {
+        bodyText = "";
+      }
+      if (bodyText) {
+        try {
+          apiError = JSON.parse(bodyText);
+        } catch (_) {
+          apiError = null;
+        }
+      }
+      let message = `HTTP ${response.status} ${response.statusText}`;
+      const apiMessage = String(apiError?.message || "").trim();
+      const apiDetailError = String(apiError?.details?.error || "").trim();
+      if (apiMessage) {
+        message = `${message}: ${apiMessage}`;
+      }
+      if (apiDetailError) {
+        message = `${message} (${apiDetailError})`;
+      }
+      const error = new Error(message);
       error.status = response.status;
+      error.apiError = apiError;
+      error.responseText = bodyText;
       throw error;
     }
     if (response.status === 204) {
@@ -3031,6 +3056,12 @@ export class AgentOpsApi {
     } catch (error) {
       if (error.status === 404 || error.status === 405 || error.status === 501) {
         this.updateEndpointStatus("workerCapabilities", "unavailable", `Runtime worker-capability endpoint returned HTTP ${error.status}.`);
+        return {
+          source: "endpoint-unavailable",
+          warning: `Runtime worker-capability endpoint returned HTTP ${error.status}.`,
+          count: 0,
+          items: []
+        };
       } else {
         this.updateEndpointStatus("workerCapabilities", "error", `Runtime worker-capability request failed (${error.message}).`);
       }
@@ -3057,6 +3088,12 @@ export class AgentOpsApi {
     } catch (error) {
       if (error.status === 404 || error.status === 405 || error.status === 501) {
         this.updateEndpointStatus("policyPacks", "unavailable", `Runtime policy-pack endpoint returned HTTP ${error.status}.`);
+        return {
+          source: "endpoint-unavailable",
+          warning: `Runtime policy-pack endpoint returned HTTP ${error.status}.`,
+          count: 0,
+          items: []
+        };
       } else {
         this.updateEndpointStatus("policyPacks", "error", `Runtime policy-pack request failed (${error.message}).`);
       }
@@ -3083,6 +3120,12 @@ export class AgentOpsApi {
     } catch (error) {
       if (error.status === 404 || error.status === 405 || error.status === 501) {
         this.updateEndpointStatus("exportProfiles", "unavailable", `Runtime export-profile endpoint returned HTTP ${error.status}.`);
+        return {
+          source: "endpoint-unavailable",
+          warning: `Runtime export-profile endpoint returned HTTP ${error.status}.`,
+          count: 0,
+          items: []
+        };
       } else {
         this.updateEndpointStatus("exportProfiles", "error", `Runtime export-profile request failed (${error.message}).`);
       }
@@ -3109,6 +3152,12 @@ export class AgentOpsApi {
     } catch (error) {
       if (error.status === 404 || error.status === 405 || error.status === 501) {
         this.updateEndpointStatus("orgAdminProfiles", "unavailable", `Runtime org-admin endpoint returned HTTP ${error.status}.`);
+        return {
+          source: "endpoint-unavailable",
+          warning: `Runtime org-admin endpoint returned HTTP ${error.status}.`,
+          count: 0,
+          items: []
+        };
       } else {
         this.updateEndpointStatus("orgAdminProfiles", "error", `Runtime org-admin request failed (${error.message}).`);
       }

@@ -228,7 +228,7 @@ function renderNativeSessionConsumerPanel(invokeState = {}) {
           <tbody>${eventRows}</tbody>
         </table>
       </details>
-      ${rawTimeline ? `<details class="details-shell"><summary>Native Timeline JSON</summary><pre class="code-block">${escapeHTML(rawTimeline)}</pre></details>` : ""}
+      ${rawTimeline ? `<details class="details-shell" data-detail-key="settings.agent_session_timeline_json"><summary>Native Timeline JSON</summary><pre class="code-block">${escapeHTML(rawTimeline)}</pre></details>` : ""}
     </div>
   `;
 }
@@ -933,11 +933,13 @@ function renderIntegrationInvokePanel(settings, invokeState = {}) {
           <input id="settings-agent-test-max-output-tokens" class="filter-input" type="number" min="1" step="1" value="${escapeHTML(String(maxOutputTokens))}" data-settings-agent-test-field="maxOutputTokens" />
         </label>
         <label class="field field-wide">
-          <span class="label">System Prompt</span>
+          <span class="label">System Instructions</span>
+          <span class="meta">Use this for durable behavior constraints and role guidance that should apply to the whole invoke.</span>
           <textarea id="settings-agent-test-system-prompt" class="filter-input settings-agent-test-textarea" rows="3" data-settings-agent-test-field="systemPrompt">${escapeHTML(systemPrompt)}</textarea>
         </label>
         <label class="field field-wide">
-          <span class="label">Prompt</span>
+          <span class="label">Turn Prompt</span>
+          <span class="meta">Use this for the actual one-off request you want the model to answer right now.</span>
           <textarea id="settings-agent-test-prompt" class="filter-input settings-agent-test-textarea" rows="5" data-settings-agent-test-field="prompt">${escapeHTML(prompt)}</textarea>
         </label>
       </div>
@@ -955,7 +957,7 @@ function renderIntegrationInvokePanel(settings, invokeState = {}) {
       <div class="settings-agent-test-output">
         <div class="meta">route=${escapeHTML(route || "-")}; boundary=${escapeHTML(boundaryProviderId || "-")}; finishReason=${escapeHTML(String(invokeState.response?.finishReason || "-"))}</div>
         <pre class="code-block">${escapeHTML(outputText || "No response yet.")}</pre>
-        ${rawResponse ? `<details class="details-shell"><summary>Raw Response</summary><pre class="code-block">${escapeHTML(rawResponse)}</pre></details>` : ""}
+        ${rawResponse ? `<details class="details-shell" data-detail-key="settings.agent_test.raw_response"><summary>Raw Response</summary><pre class="code-block">${escapeHTML(rawResponse)}</pre></details>` : ""}
       </div>
       ${nativeSessionPanel}
     </div>

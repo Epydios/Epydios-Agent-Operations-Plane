@@ -308,6 +308,47 @@ func TestRuntimeIntegrationInvokeManagedCodexWorkerBridge(t *testing.T) {
 	}
 }
 
+func TestRuntimeIntegrationInvokeMapsQuotaFailureToTooManyRequests(t *testing.T) {
+	const (
+		tenantID  = "tenant-a"
+		projectID = "project-a"
+	)
+	store := newMemoryRunStore()
+	handler := newTestAPIServerWithInvoker(t, store, map[string]interface{}{
+		"ref://projects/project-a/providers/openai/api-key": "test-key",
+	}, roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		return jsonHTTPResponse(http.StatusTooManyRequests, map[string]interface{}{
+			"error": map[string]interface{}{
+				"message": "You exceeded your current quota, please check your plan and billing details.",
+				"type":    "insufficient_quota",
+				"code":    "insufficient_quota",
+			},
+		})
+	}))
+
+	rr := requestJSON(t, handler, http.MethodPost, "/v1alpha1/runtime/integrations/invoke", map[string]interface{}{
+		"meta": map[string]interface{}{
+			"tenantId":  tenantID,
+			"projectId": projectID,
+			"requestId": "req-openai-quota",
+		},
+		"agentProfileId": "openai",
+		"prompt":         "Reply with exactly: local-runtime-ok",
+	})
+	if rr.Code != http.StatusTooManyRequests {
+		t.Fatalf("POST integration invoke code=%d body=%s", rr.Code, rr.Body.String())
+	}
+
+	var response APIError
+	decodeResponseBody(t, rr, &response)
+	if response.ErrorCode != "INTEGRATION_INVOKE_QUOTA_EXCEEDED" {
+		t.Fatalf("errorCode=%q want %q", response.ErrorCode, "INTEGRATION_INVOKE_QUOTA_EXCEEDED")
+	}
+	if !strings.Contains(strings.ToLower(response.Details["error"].(string)), "insufficient_quota") {
+		t.Fatalf("details.error=%v want insufficient_quota", response.Details["error"])
+	}
+}
+
 func TestRuntimeIntegrationInvokeManagedCodexWorkerProcessMode(t *testing.T) {
 	const (
 		tenantID  = "tenant-a"
