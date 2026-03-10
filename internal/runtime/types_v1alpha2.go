@@ -420,17 +420,21 @@ type ToolProposalDecisionRequest struct {
 }
 
 type ToolProposalDecisionResponse struct {
-	Applied      bool             `json:"applied"`
-	SessionID    string           `json:"sessionId"`
-	ProposalID   string           `json:"proposalId"`
-	Decision     string           `json:"decision"`
-	Status       string           `json:"status"`
-	Reason       string           `json:"reason,omitempty"`
-	ToolActionID string           `json:"toolActionId,omitempty"`
-	WorkerID     string           `json:"workerId,omitempty"`
-	ToolType     string           `json:"toolType,omitempty"`
-	ActionStatus ToolActionStatus `json:"actionStatus,omitempty"`
-	ReviewedAt   string           `json:"reviewedAt,omitempty"`
+	Applied                bool             `json:"applied"`
+	SessionID              string           `json:"sessionId"`
+	ProposalID             string           `json:"proposalId"`
+	Decision               string           `json:"decision"`
+	Status                 string           `json:"status"`
+	Reason                 string           `json:"reason,omitempty"`
+	ToolActionID           string           `json:"toolActionId,omitempty"`
+	WorkerID               string           `json:"workerId,omitempty"`
+	ToolType               string           `json:"toolType,omitempty"`
+	ActionStatus           ToolActionStatus `json:"actionStatus,omitempty"`
+	RunID                  string           `json:"runId,omitempty"`
+	RunStatus              RunStatus        `json:"runStatus,omitempty"`
+	PolicyDecision         string           `json:"policyDecision,omitempty"`
+	SelectedPolicyProvider string           `json:"selectedPolicyProvider,omitempty"`
+	ReviewedAt             string           `json:"reviewedAt,omitempty"`
 }
 
 type SessionEventRecord struct {

@@ -42,6 +42,7 @@ type managedWorkerContinuationRequest struct {
 	TimeoutSeconds      int
 	ExecutionResult     *TerminalExecutionResult
 	ExecutionError      string
+	GovernedRun         *RunRecord
 	SystemPrompt        string
 	MaxOutputTokens     int
 	PreviousOutputText  string

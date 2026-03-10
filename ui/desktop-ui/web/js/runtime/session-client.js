@@ -81,6 +81,18 @@ function nestedEventPayload(payload = {}) {
   return payload?.payload && typeof payload.payload === "object" ? payload.payload : {};
 }
 
+function objectValue(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+function stringArrayValue(value) {
+  return Array.isArray(value)
+    ? value
+        .map((item) => normalizedString(item))
+        .filter(Boolean)
+    : [];
+}
+
 function eventTone(eventType, payload = {}) {
   const type = normalizedString(eventType).toLowerCase();
   const severity = normalizedString(payload?.severity).toLowerCase();
@@ -202,6 +214,17 @@ function summarizeEventDetail(item) {
   }
   if (type === "tool_proposal.generated") {
     const proposalPayload = nestedEventPayload(payload);
+    if (normalizedString(payload?.proposalType).toLowerCase() === "governed_action_request") {
+      const requestLabel = normalizedString(proposalPayload?.requestLabel, "Governed action request");
+      const requestSummary = normalizedString(proposalPayload?.requestSummary);
+      return clipText(
+        normalizedString(
+          payload?.summary,
+          requestSummary ? `${requestLabel}: ${requestSummary}` : requestLabel
+        ),
+        320
+      );
+    }
     const command = normalizedString(proposalPayload?.command);
     return clipText(
       normalizedString(
@@ -214,6 +237,15 @@ function summarizeEventDetail(item) {
   if (type === "tool_proposal.decided") {
     const decision = normalizedString(payload?.decision, normalizedString(payload?.status, "DECIDED"));
     const reason = normalizedString(payload?.reason);
+    const policyDecision = normalizedString(payload?.policyDecision).toUpperCase();
+    const provider = normalizedString(payload?.selectedPolicyProvider);
+    const decisionTail = [policyDecision, provider].filter(Boolean).join(" via ");
+    if (reason && decisionTail) {
+      return clipText(`${decision}: ${reason} (${decisionTail})`, 220);
+    }
+    if (decisionTail) {
+      return clipText(`${decision}: ${decisionTail}`, 220);
+    }
     return clipText(reason ? `${decision}: ${reason}` : decision, 220);
   }
   if (type.startsWith("tool_action.")) {
@@ -391,11 +423,27 @@ export function listNativeToolProposals(sessionView = {}) {
         proposalType: normalizedString(payload?.proposalType),
         summary: normalizedString(payload?.summary),
         command: normalizedString(proposalPayload?.command),
+        requestLabel: normalizedString(proposalPayload?.requestLabel),
+        requestSummary: normalizedString(proposalPayload?.requestSummary),
+        demoProfile: normalizedString(proposalPayload?.demoProfile),
+        actionType: normalizedString(proposalPayload?.actionType),
+        resourceKind: normalizedString(proposalPayload?.resourceKind),
+        resourceName: normalizedString(proposalPayload?.resourceName),
+        boundaryClass: normalizedString(proposalPayload?.boundaryClass),
+        riskTier: normalizedString(proposalPayload?.riskTier),
+        requiredGrants: stringArrayValue(proposalPayload?.requiredGrants),
+        evidenceReadiness: normalizedString(proposalPayload?.evidenceReadiness),
+        handshakeRequired: proposalPayload?.handshakeRequired === true,
+        financeOrder: objectValue(proposalPayload?.financeOrder),
         confidence: normalizedString(proposalPayload?.confidence),
         decision: "",
         status: "PENDING",
         reason: "",
         toolActionId: "",
+        runId: "",
+        runStatus: "",
+        policyDecision: "",
+        selectedPolicyProvider: "",
         reviewedAt: "",
         generatedAt: normalizedString(item?.timestamp),
         sequence: Number(item?.sequence || 0) || 0,
@@ -430,6 +478,10 @@ export function listNativeToolProposals(sessionView = {}) {
         reason: normalizedString(payload?.reason),
         toolActionId: normalizedString(payload?.toolActionId),
         actionStatus: normalizedString(payload?.actionStatus, existing.actionStatus),
+        runId: normalizedString(payload?.runId, existing.runId),
+        runStatus: normalizedString(payload?.runStatus, existing.runStatus),
+        policyDecision: normalizedString(payload?.policyDecision, existing.policyDecision),
+        selectedPolicyProvider: normalizedString(payload?.selectedPolicyProvider, existing.selectedPolicyProvider),
         reviewedAt: normalizedString(item?.timestamp),
         decisionSequence: Number(item?.sequence || 0) || 0
       });
@@ -440,10 +492,20 @@ export function listNativeToolProposals(sessionView = {}) {
     if (!action) {
       return item;
     }
+    const actionRequestPayload = objectValue(action?.requestPayload);
+    const actionResultPayload = objectValue(action?.resultPayload);
+    const governedRun = objectValue(actionResultPayload?.governedRun);
     return {
       ...item,
       actionStatus: normalizedString(action?.status, item?.actionStatus),
-      toolType: normalizedString(action?.toolType, item?.proposalType)
+      toolType: normalizedString(action?.toolType, item?.proposalType),
+      requestPayload: actionRequestPayload,
+      resultPayload: actionResultPayload,
+      governedRun,
+      runId: normalizedString(governedRun?.runId, item?.runId),
+      runStatus: normalizedString(governedRun?.status, item?.runStatus),
+      policyDecision: normalizedString(governedRun?.policyDecision, item?.policyDecision),
+      selectedPolicyProvider: normalizedString(governedRun?.selectedPolicyProvider, item?.selectedPolicyProvider)
     };
   }).sort((a, b) => {
     const aSeq = Number(a?.sequence || 0) || 0;

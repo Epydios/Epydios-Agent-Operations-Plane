@@ -85,6 +85,157 @@ test("chat view renders parity fixture state from the native contract", async ()
   assert.match(ui.chatContent.innerHTML, /enterprise-default: Enterprise Default/);
 });
 
+test("chat view surfaces governed action proposals and linked run detail from the same thread", () => {
+  const ui = { chatContent: { innerHTML: "" } };
+  renderChat(
+    ui,
+    {
+      integrations: {
+        selectedAgentProfileId: "codex",
+        agentProfiles: [{ id: "codex", label: "Codex" }]
+      }
+    },
+    {
+      agentProfileId: "codex",
+      executionMode: "managed_codex_worker",
+      thread: {
+        taskId: "task-governed-chat-1",
+        tenantId: "tenant-demo",
+        projectId: "project-demo",
+        turns: [
+          {
+            requestId: "request-governed-chat-1",
+            taskId: "task-governed-chat-1",
+            prompt: "Place a paper trade for 25 AAPL shares in the paper-main account.",
+            response: {
+              sessionId: "session-governed-chat-1",
+              outputText: "I translated the request into a governed paper-trade action for review.",
+              route: "managed-worker-bridge",
+              boundaryProviderId: "agentops_gateway",
+              completedAt: "2026-03-10T14:00:00Z"
+            },
+            sessionView: {
+              timeline: {
+                task: {
+                  taskId: "task-governed-chat-1",
+                  status: "IN_PROGRESS"
+                },
+                session: {
+                  sessionId: "session-governed-chat-1",
+                  status: "RUNNING"
+                },
+                selectedWorker: {
+                  workerId: "worker-governed-chat-1",
+                  workerType: "managed_agent",
+                  adapterId: "codex",
+                  status: "RUNNING"
+                },
+                approvalCheckpoints: [],
+                toolActions: [
+                  {
+                    toolActionId: "tool-action-governed-chat-1",
+                    toolType: "governed_action_request",
+                    status: "COMPLETED",
+                    workerId: "worker-governed-chat-1",
+                    source: "runtime.tool-proposal-decision",
+                    requestPayload: {
+                      proposalId: "proposal-governed-chat-1"
+                    },
+                    resultPayload: {
+                      governedRun: {
+                        runId: "run-governed-chat-1",
+                        status: "COMPLETED",
+                        policyDecision: "DEFER",
+                        selectedPolicyProvider: "aimxs-full",
+                        policyGrantTokenPresent: false,
+                        policyResponse: {
+                          decision: "DEFER",
+                          reasons: [
+                            {
+                              code: "grant_missing",
+                              message: "Supervisor trading grant is still required."
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                ],
+                evidenceRecords: [],
+                events: [
+                  {
+                    eventId: "event-governed-generated-1",
+                    sessionId: "session-governed-chat-1",
+                    sequence: 20,
+                    eventType: "tool_proposal.generated",
+                    timestamp: "2026-03-10T14:00:01Z",
+                    payload: {
+                      proposalId: "proposal-governed-chat-1",
+                      proposalType: "governed_action_request",
+                      workerId: "worker-governed-chat-1",
+                      summary: "Managed Codex proposed a governed paper trade request.",
+                      payload: {
+                        type: "governed_action_request",
+                        summary: "BUY 25 AAPL in paper account paper-main",
+                        requestLabel: "Paper Trade Request: AAPL",
+                        requestSummary: "BUY 25 AAPL in paper account paper-main",
+                        demoProfile: "finance_paper_trade",
+                        actionType: "trade.execute",
+                        resourceKind: "broker-order",
+                        resourceName: "paper-order-aapl",
+                        boundaryClass: "external_actuator",
+                        riskTier: "high",
+                        requiredGrants: ["grant.trading.supervisor"],
+                        evidenceReadiness: "PARTIAL",
+                        handshakeRequired: true,
+                        financeOrder: {
+                          symbol: "AAPL",
+                          side: "buy",
+                          quantity: 25,
+                          account: "paper-main"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    eventId: "event-governed-decided-1",
+                    sessionId: "session-governed-chat-1",
+                    sequence: 22,
+                    eventType: "tool_proposal.decided",
+                    timestamp: "2026-03-10T14:00:05Z",
+                    payload: {
+                      proposalId: "proposal-governed-chat-1",
+                      proposalType: "governed_action_request",
+                      workerId: "worker-governed-chat-1",
+                      decision: "APPROVE",
+                      status: "APPROVED",
+                      reason: "approved for governed policy evaluation",
+                      toolActionId: "tool-action-governed-chat-1",
+                      actionStatus: "COMPLETED",
+                      runId: "run-governed-chat-1",
+                      runStatus: "COMPLETED",
+                      policyDecision: "DEFER",
+                      selectedPolicyProvider: "aimxs-full"
+                    }
+                  }
+                ]
+              },
+              streamItems: []
+            }
+          }
+        ]
+      }
+    }
+  );
+
+  assert.match(ui.chatContent.innerHTML, /Paper Trade Request: AAPL/);
+  assert.match(ui.chatContent.innerHTML, /BUY 25 AAPL in paper account paper-main/);
+  assert.match(ui.chatContent.innerHTML, /grant\.trading\.supervisor/);
+  assert.match(ui.chatContent.innerHTML, /aimxs-full/);
+  assert.match(ui.chatContent.innerHTML, /Open Run Detail/);
+  assert.match(ui.chatContent.innerHTML, /Governed Run Result/);
+});
+
 test("chat view renders governed export profile controls from the export-profile catalog", () => {
   const ui = { chatContent: { innerHTML: "" } };
   renderChat(

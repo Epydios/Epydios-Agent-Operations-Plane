@@ -111,6 +111,12 @@ func TestBuildManagedCodexPromptAllowsGovernedMutationProposals(t *testing.T) {
 	if !strings.Contains(prompt, "set `stdin` to the empty string") {
 		t.Fatalf("prompt missing empty stdin guidance: %s", prompt)
 	}
+	if !strings.Contains(prompt, "`governed_action_request`") {
+		t.Fatalf("prompt missing governed action proposal guidance: %s", prompt)
+	}
+	if !strings.Contains(prompt, "paper-trade or finance requests") {
+		t.Fatalf("prompt missing finance governed-action guidance: %s", prompt)
+	}
 }
 
 func TestBuildCodexBoundaryConfigArgsForcesAPILoginAuth(t *testing.T) {
@@ -152,6 +158,66 @@ func TestBuildManagedCodexContinuationPromptAllowsGovernedMutationProposals(t *t
 	prompt := buildManagedCodexContinuationPrompt(managedWorkerContinuationRequest{})
 	if !strings.Contains(prompt, "return it as a governed `tool_proposals` terminal command") {
 		t.Fatalf("continuation prompt missing governed mutation guidance: %s", prompt)
+	}
+	if !strings.Contains(prompt, "If the next step is a real-world external action, return a `governed_action_request` proposal") {
+		t.Fatalf("continuation prompt missing governed action continuation guidance: %s", prompt)
+	}
+}
+
+func TestCodexManagedWorkerAdapterProcessModeParsesGovernedActionProposal(t *testing.T) {
+	adapter := codexManagedWorkerAdapter{
+		mode:        "process",
+		cliPath:     "codex",
+		homeDir:     "/tmp/codex-home",
+		workdir:     "/tmp",
+		sandboxMode: "read-only",
+		timeout:     15 * time.Second,
+		runProcess: func(_ context.Context, _ codexProcessRequest) ([]byte, error) {
+			return []byte(strings.Join([]string{
+				`{"type":"thread.started","thread_id":"thread-1"}`,
+				`{"type":"turn.started"}`,
+				`{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"{\"message\":\"I converted the operator request into a governed trade proposal.\",\"tool_proposals\":[{\"type\":\"governed_action_request\",\"summary\":\"BUY 25 AAPL in paper account paper-main\",\"confidence\":\"structured\",\"requestLabel\":\"Paper Trade Request: AAPL\",\"requestSummary\":\"BUY 25 AAPL in paper account paper-main\",\"demoProfile\":\"finance_paper_trade\",\"actionType\":\"trade.execute\",\"actionClass\":\"execute\",\"actionVerb\":\"execute\",\"actionTarget\":\"paper-broker-order\",\"resourceKind\":\"broker-order\",\"resourceNamespace\":\"epydios-system\",\"resourceName\":\"paper-order-aapl\",\"resourceId\":\"paper-order-aapl\",\"boundaryClass\":\"external_actuator\",\"riskTier\":\"high\",\"requiredGrants\":[\"grant.trading.supervisor\"],\"evidenceReadiness\":\"PARTIAL\",\"handshakeRequired\":true,\"workflowKind\":\"external_action_request\",\"financeOrder\":{\"symbol\":\"AAPL\",\"side\":\"buy\",\"quantity\":25,\"account\":\"paper-main\"}}]}"}}`,
+				`{"type":"turn.completed","usage":{"input_tokens":12,"output_tokens":34}}`,
+			}, "\n")), nil
+		},
+	}
+
+	result, err := adapter.RunTurn(context.Background(), AgentInvokeRequest{
+		Prompt:       "place a paper trade for 25 AAPL",
+		SystemPrompt: "stay concise",
+	}, agentProfileConfig{
+		ID:    "codex",
+		Model: "gpt-5-codex",
+	}, nil, nil)
+	if err != nil {
+		t.Fatalf("RunTurn error: %v", err)
+	}
+	if len(result.toolProposals) != 1 {
+		t.Fatalf("toolProposals=%d want 1", len(result.toolProposals))
+	}
+	proposal := result.toolProposals[0]
+	if got := strings.TrimSpace(normalizedInterfaceString(proposal["type"])); got != governedActionProposalType {
+		t.Fatalf("proposal type=%q want %q", got, governedActionProposalType)
+	}
+	if got := strings.TrimSpace(normalizedInterfaceString(proposal["requestLabel"])); got != "Paper Trade Request: AAPL" {
+		t.Fatalf("requestLabel=%q", got)
+	}
+	if got := strings.TrimSpace(normalizedInterfaceString(proposal["actionType"])); got != "trade.execute" {
+		t.Fatalf("actionType=%q", got)
+	}
+	if got := strings.TrimSpace(normalizedInterfaceString(proposal["riskTier"])); got != "high" {
+		t.Fatalf("riskTier=%q", got)
+	}
+	grants := normalizeGovernedActionStringSlice(proposal["requiredGrants"])
+	if len(grants) != 1 || grants[0] != "grant.trading.supervisor" {
+		t.Fatalf("requiredGrants=%v", grants)
+	}
+	financeOrder, ok := proposal["financeOrder"].(JSONObject)
+	if !ok {
+		t.Fatalf("financeOrder missing or wrong type: %#v", proposal["financeOrder"])
+	}
+	if got := strings.TrimSpace(normalizedInterfaceString(financeOrder["symbol"])); got != "AAPL" {
+		t.Fatalf("finance symbol=%q", got)
 	}
 }
 

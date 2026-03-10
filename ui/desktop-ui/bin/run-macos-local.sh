@@ -376,9 +376,12 @@ secure_ref_index_version = 1
 aimxs_primary_provider_name = "aimxs-policy-primary"
 aimxs_full_provider_name = "aimxs-full"
 oss_policy_provider_name = "oss-policy-opa"
+oss_profile_provider_name = "oss-profile-static-resolver"
+oss_evidence_provider_name = "oss-evidence-memory"
 aimxs_bearer_secret_name = "aimxs-policy-token"
 aimxs_client_tls_secret_name = "epydios-controller-mtls-client"
 aimxs_ca_secret_name = "epydios-provider-ca"
+provider_override_file_version = 1
 
 
 def json_response(handler, status_code, payload):
@@ -422,6 +425,142 @@ def remove_file(path):
         os.remove(path)
     except FileNotFoundError:
         return
+
+
+def normalize_provider_override_entry(raw):
+    if not isinstance(raw, dict):
+        return None
+    provider_type = str(raw.get("providerType") or "").strip()
+    endpoint_url = str(raw.get("endpointUrl") or "").strip()
+    if not provider_type or not endpoint_url:
+        return None
+    capabilities = []
+    for item in raw.get("capabilities") or []:
+        value = str(item or "").strip()
+        if value:
+            capabilities.append(value)
+    return {
+        "active": bool(raw.get("active")),
+        "providerType": provider_type,
+        "providerId": str(raw.get("providerId") or "").strip(),
+        "providerName": str(raw.get("providerName") or "").strip(),
+        "endpointUrl": endpoint_url,
+        "timeoutSeconds": int(raw.get("timeoutSeconds") or 10),
+        "authMode": str(raw.get("authMode") or "None").strip() or "None",
+        "capabilities": capabilities,
+        "mode": str(raw.get("mode") or "").strip(),
+        "updatedAt": str(raw.get("updatedAt") or "").strip(),
+    }
+
+
+def read_provider_override_file():
+    payload = read_json_file(aimxs_override_path, {})
+    overrides_raw = payload.get("overrides") if isinstance(payload, dict) else None
+    overrides = []
+    if isinstance(overrides_raw, list):
+        for item in overrides_raw:
+            normalized = normalize_provider_override_entry(item)
+            if normalized:
+                overrides.append(normalized)
+    else:
+        normalized = normalize_provider_override_entry(payload)
+        if normalized:
+            overrides.append(normalized)
+    return {
+        "version": provider_override_file_version,
+        "overrides": overrides,
+    }
+
+
+def write_provider_override_file(payload):
+    write_json_file(
+        aimxs_override_path,
+        {
+            "version": provider_override_file_version,
+            "overrides": payload.get("overrides") or [],
+        },
+    )
+
+
+def list_provider_overrides():
+    return list(read_provider_override_file().get("overrides") or [])
+
+
+def write_provider_overrides(overrides):
+    write_provider_override_file({"overrides": overrides})
+
+
+def find_policy_override(mode_name="", active_only=False):
+    requested_mode = str(mode_name or "").strip().lower()
+    for item in list_provider_overrides():
+        if str(item.get("providerType") or "").strip() != "PolicyProvider":
+            continue
+        if active_only and not bool(item.get("active")):
+            continue
+        current_mode = str(item.get("mode") or "").strip().lower()
+        if requested_mode and current_mode != requested_mode:
+            continue
+        return dict(item)
+    return {}
+
+
+def set_policy_override(next_override):
+    normalized = normalize_provider_override_entry(next_override)
+    if not normalized:
+        raise RuntimeError("Policy override payload is invalid.")
+    normalized["active"] = True
+    normalized["updatedAt"] = datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+    target_mode = str(normalized.get("mode") or "").strip().lower()
+    updated = []
+    replaced = False
+    for item in list_provider_overrides():
+        if str(item.get("providerType") or "").strip() != "PolicyProvider":
+            updated.append(item)
+            continue
+        current_mode = str(item.get("mode") or "").strip().lower()
+        if target_mode and current_mode == target_mode and not replaced:
+            updated.append(dict(normalized))
+            replaced = True
+            continue
+        item = dict(item)
+        item["active"] = False
+        updated.append(item)
+    if not replaced:
+        updated.append(dict(normalized))
+    write_provider_overrides(updated)
+    return normalized
+
+
+def deactivate_policy_overrides():
+    updated = []
+    for item in list_provider_overrides():
+        if str(item.get("providerType") or "").strip() == "PolicyProvider":
+            item = dict(item)
+            item["active"] = False
+        updated.append(item)
+    write_provider_overrides(updated)
+
+
+def activate_policy_override_mode(mode_name):
+    requested_mode = str(mode_name or "").strip().lower()
+    updated = []
+    selected = {}
+    for item in list_provider_overrides():
+        if str(item.get("providerType") or "").strip() != "PolicyProvider":
+            updated.append(item)
+            continue
+        item = dict(item)
+        item["active"] = str(item.get("mode") or "").strip().lower() == requested_mode
+        if item["active"]:
+            item["updatedAt"] = datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+            selected = dict(item)
+        updated.append(item)
+    if not selected:
+        raise RuntimeError(
+            f"Local runtime is missing the {requested_mode or 'requested'} policy bridge entry. Restart terminal 1 first."
+        )
+    write_provider_overrides(updated)
+    return selected
 
 
 def http_json(url, *, method="GET", payload=None, headers=None, timeout=3):
@@ -940,15 +1079,10 @@ def build_aimxs_full_override(endpoint_url=""):
 
 
 def read_aimxs_override():
-    return read_json_file(aimxs_override_path, {})
-
-
-def write_aimxs_override(payload):
-    write_json_file(aimxs_override_path, payload)
-
-
-def clear_aimxs_override():
-    remove_file(aimxs_override_path)
+    active_override = find_policy_override("aimxs-full", active_only=True)
+    if active_override:
+        return active_override
+    return find_policy_override("aimxs-full", active_only=False)
 
 
 def collect_aimxs_full_local_status():
@@ -1284,7 +1418,7 @@ def wait_for_aimxs_mode(target_mode, timeout_seconds=25):
 
 
 def apply_oss_only_mode():
-    clear_aimxs_override()
+    activate_policy_override_mode("oss-only")
     kubectl_apply_kustomize(os.path.join(repo_root, "platform", "modes", "oss-only"))
     kubectl_patch_provider(
         oss_policy_provider_name,
@@ -1301,11 +1435,11 @@ def apply_oss_only_mode():
 def apply_full_mode(endpoint_url=""):
     apply_oss_only_mode()
     override = build_aimxs_full_override(endpoint_url)
-    write_aimxs_override(override)
+    set_policy_override(override)
 
 
 def apply_secure_mode(requested_mode, endpoint_url, bearer_token, client_tls_cert, client_tls_key, ca_cert):
-    clear_aimxs_override()
+    deactivate_policy_overrides()
     kubectl_apply_manifest(
         build_secret_manifest(
             aimxs_bearer_secret_name,

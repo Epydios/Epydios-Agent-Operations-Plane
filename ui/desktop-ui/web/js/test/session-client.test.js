@@ -21,3 +21,100 @@ test("chat session client matches the shared M19 parity fixture", async () => {
   assert.equal(threadState.openApprovalCount, fixture.expected.approvalIds.length);
   assert.match(threadState.message, /waiting/i);
 });
+
+test("session client preserves governed action proposal richness and linked run output", () => {
+  const sessionView = {
+    timeline: {
+      session: { sessionId: "session-governed-1" },
+      toolActions: [
+        {
+          toolActionId: "tool-action-governed-1",
+          toolType: "governed_action_request",
+          status: "COMPLETED",
+          requestPayload: {
+            proposalId: "proposal-governed-1"
+          },
+          resultPayload: {
+            governedRun: {
+              runId: "run-governed-1",
+              status: "COMPLETED",
+              policyDecision: "DEFER",
+              selectedPolicyProvider: "aimxs-full",
+              policyResponse: {
+                decision: "DEFER"
+              }
+            }
+          }
+        }
+      ],
+      events: [
+        {
+          eventId: "event-generated-governed-1",
+          sessionId: "session-governed-1",
+          sequence: 10,
+          eventType: "tool_proposal.generated",
+          timestamp: "2026-03-10T13:00:00Z",
+          payload: {
+            proposalId: "proposal-governed-1",
+            proposalType: "governed_action_request",
+            workerId: "worker-governed-1",
+            summary: "Managed Codex proposed a governed paper-trade request.",
+            payload: {
+              type: "governed_action_request",
+              summary: "BUY 25 AAPL in paper account paper-main",
+              requestLabel: "Paper Trade Request: AAPL",
+              requestSummary: "BUY 25 AAPL in paper account paper-main",
+              demoProfile: "finance_paper_trade",
+              actionType: "trade.execute",
+              resourceKind: "broker-order",
+              resourceName: "paper-order-aapl",
+              boundaryClass: "external_actuator",
+              riskTier: "high",
+              requiredGrants: ["grant.trading.supervisor"],
+              evidenceReadiness: "PARTIAL",
+              handshakeRequired: true,
+              financeOrder: {
+                symbol: "AAPL",
+                side: "buy",
+                quantity: 25,
+                account: "paper-main"
+              }
+            }
+          }
+        },
+        {
+          eventId: "event-decided-governed-1",
+          sessionId: "session-governed-1",
+          sequence: 14,
+          eventType: "tool_proposal.decided",
+          timestamp: "2026-03-10T13:01:00Z",
+          payload: {
+            proposalId: "proposal-governed-1",
+            proposalType: "governed_action_request",
+            workerId: "worker-governed-1",
+            decision: "APPROVE",
+            status: "APPROVED",
+            reason: "approved for governed evaluation",
+            toolActionId: "tool-action-governed-1",
+            actionStatus: "COMPLETED",
+            runId: "run-governed-1",
+            runStatus: "COMPLETED",
+            policyDecision: "DEFER",
+            selectedPolicyProvider: "aimxs-full"
+          }
+        }
+      ]
+    },
+    streamItems: []
+  };
+
+  const [proposal] = listNativeToolProposals(sessionView);
+  assert.equal(proposal.proposalType, "governed_action_request");
+  assert.equal(proposal.requestLabel, "Paper Trade Request: AAPL");
+  assert.equal(proposal.requestSummary, "BUY 25 AAPL in paper account paper-main");
+  assert.deepEqual(proposal.requiredGrants, ["grant.trading.supervisor"]);
+  assert.equal(proposal.runId, "run-governed-1");
+  assert.equal(proposal.policyDecision, "DEFER");
+  assert.equal(proposal.selectedPolicyProvider, "aimxs-full");
+  assert.equal(proposal.governedRun.runId, "run-governed-1");
+});

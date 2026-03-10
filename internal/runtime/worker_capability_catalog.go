@@ -36,6 +36,7 @@ func managedCodexWorkerCapabilityEntry() WorkerCapabilityCatalogEntry {
 		SupportedToolActionTypes: []string{
 			descriptor.toolActionType,
 			"terminal_command",
+			governedActionProposalType,
 		},
 		SupportedEvidenceKinds: []string{
 			descriptor.evidenceKind,

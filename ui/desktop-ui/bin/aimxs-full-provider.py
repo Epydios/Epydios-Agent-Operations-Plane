@@ -12,11 +12,11 @@ import hashlib
 import json
 import os
 import sys
+from copy import deepcopy
 from dataclasses import asdict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from types import SimpleNamespace
-from typing import Any, Dict, Iterable, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 AIMXS_PROVIDER_ID = "aimxs-full"
 AIMXS_PROVIDER_VERSION = "local-v74"
@@ -29,6 +29,8 @@ AIMXS_CAPABILITIES = [
     "evidence.policy_decision_refs",
     "policy.defer",
     "policy.grant_tokens",
+    "governance.current_state",
+    "audit.local_sink",
 ]
 
 
@@ -170,9 +172,92 @@ def normalize_governed_action_context(payload: Dict[str, Any]) -> Dict[str, Any]
     }
 
 
+def normalize_mapping(value: Any) -> Dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+
+
+def resolve_local_aimxs_root() -> Path:
+    explicit = os.environ.get("EPYDIOS_AIMXS_LOCAL_ROOT", "").strip()
+    if explicit:
+        return Path(explicit).expanduser().resolve()
+    cache_root = os.environ.get("EPYDIOS_M21_CACHE_ROOT", "").strip()
+    if cache_root:
+        return Path(cache_root).expanduser().resolve() / "local-runtime" / "aimxs-full"
+    repo_root = Path(__file__).resolve().parents[3]
+    workspace_root = repo_root.parent
+    return (
+        workspace_root
+        / "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB"
+        / "internal-readiness"
+        / "m21-local-cache"
+        / "local-runtime"
+        / "aimxs-full"
+    )
+
+
+class LocalJsonlAuditSink:
+    def __init__(self, root: Path):
+        self.root = root
+        self.audit_root = root / "audit"
+        self.events_path = self.audit_root / "events.jsonl"
+        self.latest_path = self.audit_root / "last-event.json"
+        self.audit_root.mkdir(parents=True, exist_ok=True)
+        self.last_event: Dict[str, Any] = {}
+        self.last_event_ref = ""
+
+    def emit_audit_event(self, event: Dict[str, Any]) -> None:
+        payload = deepcopy(event if isinstance(event, dict) else {})
+        event_hash = canonical_hash(payload)
+        event_id = first_non_empty(payload.get("event_id"), f"aimxs-audit-{event_hash[:20]}")
+        event_ref = f"aimxs://local-full/audit/{event_id}"
+        payload["event_id"] = event_id
+        payload["event_ref"] = event_ref
+        payload["provider_id"] = AIMXS_PROVIDER_ID
+        line = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+        with self.events_path.open("a", encoding="utf-8") as handle:
+            handle.write(line)
+            handle.write("\n")
+        self.latest_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+        self.last_event = payload
+        self.last_event_ref = event_ref
+
+    def flush(self) -> None:
+        return None
+
+
+class AimxsStateStore:
+    def __init__(self, root: Path):
+        self.root = root
+        self.path = root / "state-store.json"
+        self.root.mkdir(parents=True, exist_ok=True)
+
+    def _read_all(self) -> Dict[str, Any]:
+        if not self.path.exists():
+            return {}
+        try:
+            payload = json.loads(self.path.read_text(encoding="utf-8"))
+        except Exception:
+            return {}
+        return payload if isinstance(payload, dict) else {}
+
+    def read_state(self, state_id: str) -> Dict[str, Any]:
+        entries = self._read_all()
+        value = entries.get(state_id)
+        return value if isinstance(value, dict) else {}
+
+    def write_state(self, state_id: str, payload: Dict[str, Any]) -> None:
+        entries = self._read_all()
+        entries[state_id] = payload
+        self.path.write_text(json.dumps(entries, indent=2, sort_keys=True), encoding="utf-8")
+
+
 class AimxsLocalFullRuntime:
-    def __init__(self, extracted_root: Path):
+    def __init__(self, extracted_root: Path, local_root: Path):
         self.extracted_root = extracted_root
+        self.local_root = local_root
+        self.local_root.mkdir(parents=True, exist_ok=True)
+        self._audit_sink = LocalJsonlAuditSink(local_root)
+        self._state_store = AimxsStateStore(local_root)
         addon_root = (
             extracted_root
             / "CANONICAL_INPUTS"
@@ -191,7 +276,7 @@ class AimxsLocalFullRuntime:
         from AIMX_OPERATIONAL_CORE_PROVIDER_INTERFACE_v1 import TransitionProposal
 
         self._transition_proposal = TransitionProposal
-        self._governance_provider = BAAKGovernanceProvider()
+        self._governance_provider = BAAKGovernanceProvider(audit_sink=self._audit_sink)
 
     def provider_capabilities(self) -> Dict[str, Any]:
         return {
@@ -203,7 +288,20 @@ class AimxsLocalFullRuntime:
         }
 
     def health_payload(self) -> Dict[str, Any]:
-        return {"status": "ok", "providerId": AIMXS_PROVIDER_ID, "providerVersion": AIMXS_PROVIDER_VERSION}
+        return {
+            "status": "ok",
+            "providerId": AIMXS_PROVIDER_ID,
+            "providerVersion": AIMXS_PROVIDER_VERSION,
+            "auditSink": {
+                "active": True,
+                "eventsPath": str(self._audit_sink.events_path),
+                "lastEventRef": self._audit_sink.last_event_ref,
+            },
+            "stateStore": {
+                "active": True,
+                "path": str(self._state_store.path),
+            },
+        }
 
     def evaluate(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         policy = normalize_policy_stratification(payload)
@@ -255,6 +353,77 @@ class AimxsLocalFullRuntime:
             return True
         return False
 
+    def _current_state(self, payload: Dict[str, Any], proposal_id: str, state_id: str, policy: Dict[str, Any], contract: Dict[str, Any]) -> Dict[str, Any]:
+        meta = normalize_mapping(payload.get("meta"))
+        subject = normalize_mapping(payload.get("subject"))
+        action = normalize_mapping(payload.get("action"))
+        resource = normalize_mapping(payload.get("resource"))
+        task = normalize_mapping(payload.get("task"))
+        context = normalize_mapping(payload.get("context"))
+        annotations = normalize_mapping(payload.get("annotations"))
+        raw_governed_action = normalize_mapping(context.get("governed_action") or context.get("governedAction"))
+        prior_state = self._state_store.read_state(state_id)
+        prior_continuity = normalize_mapping(prior_state.get("state_continuity"))
+        governed_action = deepcopy(contract)
+        finance_order = normalize_mapping(raw_governed_action.get("finance_order") or raw_governed_action.get("financeOrder"))
+        if finance_order:
+            governed_action["finance_order"] = finance_order
+        current_state = {
+            "meta": {
+                "tenantId": first_non_empty(meta.get("tenantId"), meta.get("tenant_id")),
+                "projectId": first_non_empty(meta.get("projectId"), meta.get("project_id")),
+                "environment": first_non_empty(meta.get("environment"), "dev"),
+                "requestId": first_non_empty(meta.get("requestId"), meta.get("request_id"), proposal_id),
+            },
+            "subject": subject,
+            "action": action,
+            "resource": resource,
+            "task": task,
+            "annotations": annotations,
+            "governed_action": governed_action,
+            "policy_stratification": deepcopy(policy),
+            "runtime_state": {
+                "provider_id": AIMXS_PROVIDER_ID,
+                "provider_version": AIMXS_PROVIDER_VERSION,
+                "proposal_id": proposal_id,
+                "state_id": state_id,
+                "request_hash": canonical_hash(payload),
+            },
+            "state_continuity": {
+                "prior_event_ref": first_non_empty(prior_continuity.get("audit_event_ref")),
+                "prior_kernel_state_out_sha256": first_non_empty(prior_continuity.get("kernel_state_out_sha256")),
+            },
+        }
+        prior_kernel_state = prior_state.get("baak_kernel_state")
+        if isinstance(prior_kernel_state, str) and prior_kernel_state.strip():
+            current_state["baak_kernel_state"] = prior_kernel_state.strip()
+        elif isinstance(prior_kernel_state, dict) and prior_kernel_state:
+            current_state["baak_kernel_state"] = deepcopy(prior_kernel_state)
+        return current_state
+
+    def _persist_state(self, state_id: str, current_state: Dict[str, Any], provider_meta: Dict[str, Any]) -> None:
+        continuity = normalize_mapping(provider_meta.get("state_continuity"))
+        last_event = self._audit_sink.last_event
+        raw_kernel_state_out = last_event.get("kernel_state_out")
+        payload = {
+            "current_state_sha256": first_non_empty(
+                normalize_mapping(provider_meta.get("current_state")).get("sha256"),
+                canonical_hash(current_state),
+            ),
+            "audit_event_ref": self._audit_sink.last_event_ref,
+            "state_continuity": {
+                "continuity_enabled": continuity.get("continuity_enabled") is True,
+                "kernel_state_in_sha256": first_non_empty(continuity.get("kernel_state_in_sha256")),
+                "kernel_state_out_sha256": first_non_empty(continuity.get("kernel_state_out_sha256")),
+                "audit_event_ref": self._audit_sink.last_event_ref,
+            },
+        }
+        if isinstance(raw_kernel_state_out, str) and raw_kernel_state_out.strip():
+            payload["baak_kernel_state"] = raw_kernel_state_out.strip()
+        elif isinstance(raw_kernel_state_out, dict) and raw_kernel_state_out:
+            payload["baak_kernel_state"] = deepcopy(raw_kernel_state_out)
+        self._state_store.write_state(state_id, payload)
+
     def _evaluate_with_governance_provider(self, payload: Dict[str, Any], policy: Dict[str, Any], contract: Dict[str, Any]) -> Dict[str, Any]:
         proposal_id, state_id = self._request_ids(payload)
         requested_change = {
@@ -268,6 +437,7 @@ class AimxsLocalFullRuntime:
                 "gates": policy["gates"],
             }
         }
+        current_state = self._current_state(payload, proposal_id, state_id, requested_change["policy_stratification"], contract)
         proposal = self._transition_proposal(
             proposal_id=proposal_id,
             state_id=state_id,
@@ -275,15 +445,33 @@ class AimxsLocalFullRuntime:
             reason="AIMXS local full governance evaluation",
             evidence_pointers=[],
         )
-        decision, evidence = self._governance_provider.evaluate_transition(proposal, {})
+        decision, evidence = self._governance_provider.evaluate_transition(proposal, current_state)
         decision_payload = asdict(decision)
         evidence_payload = asdict(evidence)
+        provider_meta = normalize_mapping(decision_payload.get("provider_meta"))
+        provider_meta["providerId"] = AIMXS_PROVIDER_ID
+        provider_meta["providerVersion"] = AIMXS_PROVIDER_VERSION
+        provider_meta["decision_path"] = "governance_provider"
+        provider_meta["request_contract"] = contract
+        provider_meta["audit_sink"] = {
+            "active": True,
+            "event_ref": self._audit_sink.last_event_ref,
+            "events_path": str(self._audit_sink.events_path),
+        }
+        provider_meta["current_state"] = {
+            **normalize_mapping(provider_meta.get("current_state")),
+            "present": bool(current_state),
+            "sha256": canonical_hash(current_state),
+            "keys": sorted(current_state.keys()),
+        }
+        decision_payload["provider_meta"] = provider_meta
+        self._persist_state(state_id, current_state, provider_meta)
         output: Dict[str, Any] = {
             "aimxs": {
                 "providerId": AIMXS_PROVIDER_ID,
                 "providerVersion": AIMXS_PROVIDER_VERSION,
                 "mode": "aimxs-full",
-                "providerMeta": decision_payload.get("provider_meta") or {},
+                "providerMeta": provider_meta,
                 "requestContract": contract,
                 "policyStratification": requested_change["policy_stratification"],
                 "evidence": evidence_payload,
@@ -321,6 +509,7 @@ class AimxsLocalFullRuntime:
 
     def _evaluate_allow_path(self, payload: Dict[str, Any], policy: Dict[str, Any], contract: Dict[str, Any]) -> Dict[str, Any]:
         proposal_id, state_id = self._request_ids(payload)
+        current_state = self._current_state(payload, proposal_id, state_id, policy, contract)
         request_hash = canonical_hash({"proposalId": proposal_id, "stateId": state_id, "payload": payload, "policy": policy})
         evidence = {
             "evidence_id": f"EVIDENCE_{proposal_id}",
@@ -348,6 +537,22 @@ class AimxsLocalFullRuntime:
             "baak_engaged": True,
             "decision_path": "local_allow",
             "request_contract": contract,
+            "audit_sink": {
+                "active": True,
+                "event_ref": "",
+                "events_path": str(self._audit_sink.events_path),
+            },
+            "current_state": {
+                "present": bool(current_state),
+                "sha256": canonical_hash(current_state),
+                "keys": sorted(current_state.keys()),
+            },
+            "state_continuity": {
+                "continuity_enabled": bool(policy.get("gates", {}).get("core18.kernel_state.continuity") is True),
+                "kernel_state_in_sha256": "",
+                "kernel_state_out_sha256": "",
+                "kernel_state_out_present": False,
+            },
             "policy_stratification": {
                 "boundary_class": policy["boundary_class"],
                 "required_grants": list(policy["required_grants"]),
@@ -357,6 +562,21 @@ class AimxsLocalFullRuntime:
                 "policy_bucket_id": policy["policy_bucket_id"],
             },
         }
+        self._audit_sink.emit_audit_event(
+            {
+                "event_type": "aimxs_local_full_allow",
+                "proposal_id": proposal_id,
+                "state_id": state_id,
+                "decision_id": f"DECISION_{proposal_id}",
+                "outcome": "ALLOW",
+                "policy_stratification": provider_meta["policy_stratification"],
+                "current_state_hash": provider_meta["current_state"]["sha256"],
+                "current_state_keys": provider_meta["current_state"]["keys"],
+                "continuity_enabled": provider_meta["state_continuity"]["continuity_enabled"],
+            }
+        )
+        provider_meta["audit_sink"]["event_ref"] = self._audit_sink.last_event_ref
+        self._persist_state(state_id, current_state, provider_meta)
         return {
             "decision": "ALLOW",
             "reasons": [
@@ -468,7 +688,8 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     extracted_root = resolve_aimxs_extracted_root()
-    runtime = AimxsLocalFullRuntime(extracted_root)
+    local_root = resolve_local_aimxs_root()
+    runtime = AimxsLocalFullRuntime(extracted_root, local_root)
 
     class Handler(AimxsRequestHandler):
         pass

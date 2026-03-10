@@ -1979,6 +1979,7 @@ function mockSubmitRuntimeSessionToolProposalDecision(sessionId, proposalId, dec
   const now = nowISO();
   let toolActionId = "";
   let actionStatus = "";
+  let governedRun = null;
   if (normalizedDecision === "APPROVE") {
     toolActionId = `tool-proposal-mock-${Date.now()}`;
     timeline.toolActions = Array.isArray(timeline.toolActions) ? timeline.toolActions : [];
@@ -2030,6 +2031,160 @@ function mockSubmitRuntimeSessionToolProposalDecision(sessionId, proposalId, dec
       }, now);
     }
     actionStatus = "AUTHORIZED";
+    if (String(generatedPayload?.proposalType || "").trim() === "governed_action_request") {
+      const runId = `run-governed-mock-${Date.now()}`;
+      governedRun = {
+        runId,
+        requestId: `req-governed-mock-${Date.now()}`,
+        status: "COMPLETED",
+        selectedProfileProvider: "mock-profile-provider",
+        selectedPolicyProvider: "mock-policy-provider",
+        selectedEvidenceProvider: "mock-evidence-provider",
+        policyDecision: "DEFER",
+        policyBundleId: "MOCK_GOVERNED_POLICY",
+        policyBundleVersion: "v1",
+        policyGrantTokenPresent: false,
+        createdAt: now,
+        updatedAt: now,
+        requestPayload: {
+          meta: {
+            tenantId: String(timeline?.session?.tenantId || "").trim(),
+            projectId: String(timeline?.session?.projectId || "").trim()
+          },
+          task: {
+            requestLabel: String(proposalPayload?.requestLabel || "").trim(),
+            summary: String(proposalPayload?.requestSummary || "").trim(),
+            demoProfile: String(proposalPayload?.demoProfile || "").trim()
+          },
+          context: {
+            governed_action: {
+              contract_id: "epydios.governed-action.v1",
+              workflow_kind: String(proposalPayload?.workflowKind || "external_action_request").trim(),
+              request_label: String(proposalPayload?.requestLabel || "").trim(),
+              demo_profile: String(proposalPayload?.demoProfile || "").trim(),
+              request_summary: String(proposalPayload?.requestSummary || "").trim(),
+              finance_order:
+                proposalPayload?.financeOrder && typeof proposalPayload.financeOrder === "object"
+                  ? deepClone(proposalPayload.financeOrder)
+                  : undefined
+            },
+            policy_stratification: {
+              policy_bucket_id: String(proposalPayload?.policyBucketId || "mock-governed-action").trim(),
+              action_class: String(proposalPayload?.actionClass || "execute").trim(),
+              boundary_class: String(proposalPayload?.boundaryClass || "external_actuator").trim(),
+              risk_tier: String(proposalPayload?.riskTier || "high").trim(),
+              required_grants: Array.isArray(proposalPayload?.requiredGrants) ? deepClone(proposalPayload.requiredGrants) : [],
+              evidence_readiness: String(proposalPayload?.evidenceReadiness || "PARTIAL").trim(),
+              gates: {
+                "core14.adapter_present.enforce_handshake": proposalPayload?.handshakeRequired === true
+              }
+            }
+          }
+        },
+        profileResponse: {
+          profileId: "mock-governed-profile",
+          profileVersion: "v1"
+        },
+        policyResponse: {
+          decision: "DEFER",
+          source: "mock-policy-provider",
+          reasons: [
+            {
+              code: "mock_governed_review_required",
+              message: "Mock governed-action evaluation requires richer review."
+            }
+          ],
+          output: {
+            aimxs: {
+              providerId: "mock-policy-provider",
+              providerMeta: {
+                decision_path: "mock_governed_path",
+                policy_stratification: {
+                  boundary_class: String(proposalPayload?.boundaryClass || "external_actuator").trim()
+                }
+              },
+              evidence: {
+                evidence_hash: "sha256:mock-governed-evidence"
+              }
+            }
+          },
+          evidenceRefs: ["mock-evidence-ref-1"]
+        },
+        evidenceRecordResponse: {
+          evidenceId: `evidence-governed-mock-${Date.now()}`
+        },
+        evidenceBundleResponse: {
+          bundleId: `bundle-governed-mock-${Date.now()}`
+        }
+      };
+      toolAction.status = "COMPLETED";
+      toolAction.updatedAt = now;
+      toolAction.resultPayload = {
+        decision: normalizedDecision,
+        reviewedAt: now,
+        startedAt: now,
+        completedAt: now,
+        status: "COMPLETED",
+        governedRun: deepClone(governedRun)
+      };
+      appendMockSessionEvent(timeline, "tool_action.started", {
+        toolActionId,
+        workerId: String(generatedPayload?.workerId || "").trim(),
+        toolType: String(generatedPayload?.proposalType || "").trim() || "tool_proposal",
+        status: "STARTED",
+        proposalId: normalizedProposalId,
+        summary: "Approved governed action proposal started runtime policy evaluation."
+      }, now);
+      appendMockSessionEvent(timeline, "tool_action.completed", {
+        toolActionId,
+        workerId: String(generatedPayload?.workerId || "").trim(),
+        toolType: String(generatedPayload?.proposalType || "").trim() || "tool_proposal",
+        status: "COMPLETED",
+        proposalId: normalizedProposalId,
+        runId,
+        runStatus: "COMPLETED",
+        policyDecision: "DEFER",
+        selectedPolicyProvider: "mock-policy-provider",
+        summary: "Governed action request evaluated with policy decision DEFER."
+      }, now);
+      appendMockSessionEvent(timeline, "worker.progress", {
+        workerId: String(generatedPayload?.workerId || "").trim(),
+        status: "RUNNING",
+        summary: "Governed action evaluation completed with policy decision DEFER.",
+        payload: {
+          stage: "governed_action_completed",
+          percent: 100,
+          toolActionId,
+          proposalId: normalizedProposalId,
+          runId,
+          runStatus: "COMPLETED",
+          policyDecision: "DEFER",
+          selectedPolicyProvider: "mock-policy-provider"
+        }
+      }, now);
+      timeline.evidenceRecords = Array.isArray(timeline.evidenceRecords) ? timeline.evidenceRecords : [];
+      timeline.evidenceRecords.push({
+        evidenceId: `evidence-governed-run-mock-${Date.now()}`,
+        sessionId: String(sessionId || "").trim(),
+        toolActionId,
+        tenantId: String(timeline?.session?.tenantId || "").trim(),
+        projectId: String(timeline?.session?.projectId || "").trim(),
+        kind: "governed_run",
+        uri: `run://${runId}`,
+        metadata: {
+          proposalId: normalizedProposalId,
+          toolActionId,
+          runId,
+          policyDecision: "DEFER",
+          selectedPolicyProvider: "mock-policy-provider"
+        },
+        createdAt: now,
+        updatedAt: now
+      });
+      MOCK_STATE.runByID[runId] = deepClone(governedRun);
+      MOCK_STATE.runs.push(deepClone(governedRun));
+      actionStatus = toolAction.status;
+    }
     const command = String(proposalPayload?.command || "").trim();
     if (command) {
       toolAction.status = "STARTED";
@@ -2141,6 +2296,10 @@ function mockSubmitRuntimeSessionToolProposalDecision(sessionId, proposalId, dec
     reason: String(options.reason || "").trim(),
     toolActionId,
     actionStatus,
+    runId: String(governedRun?.runId || "").trim(),
+    runStatus: String(governedRun?.status || "").trim(),
+    policyDecision: String(governedRun?.policyDecision || "").trim(),
+    selectedPolicyProvider: String(governedRun?.selectedPolicyProvider || "").trim(),
     summary: normalizedDecision === "DENY"
       ? "Tool proposal denied by the operator."
       : "Tool proposal approved and promoted into a governed tool action."
@@ -2158,6 +2317,10 @@ function mockSubmitRuntimeSessionToolProposalDecision(sessionId, proposalId, dec
     workerId: String(generatedPayload?.workerId || "").trim(),
     toolType: String(generatedPayload?.proposalType || "").trim(),
     actionStatus,
+    runId: String(governedRun?.runId || "").trim(),
+    runStatus: String(governedRun?.status || "").trim(),
+    policyDecision: String(governedRun?.policyDecision || "").trim(),
+    selectedPolicyProvider: String(governedRun?.selectedPolicyProvider || "").trim(),
     reviewedAt: now
   };
 }

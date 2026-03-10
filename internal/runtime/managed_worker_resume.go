@@ -196,21 +196,31 @@ func (s *APIServer) continueManagedWorkerAfterToolAction(ctx context.Context, se
 	continuationRequestID := fmt.Sprintf("resume-%s-%d", sanitizeIDFragment(normalizeStringOrDefault(proposal.ProposalID, action.ToolActionID)), now.UnixNano())
 	continuationToolActionID := invokeSessionToolActionID(session.SessionID, "managed_agent_turn", continuationRequestID)
 	continuationRequestPayload := mustMarshalJSON(map[string]interface{}{
-		"requestId":         continuationRequestID,
-		"agentProfileId":    profile.ID,
-		"executionMode":     AgentInvokeExecutionModeManagedCodexWorker,
-		"continuation":      true,
-		"resumeAfterProposalId": normalizeStringOrDefault(proposal.ProposalID, ""),
+		"requestId":               continuationRequestID,
+		"agentProfileId":          profile.ID,
+		"executionMode":           AgentInvokeExecutionModeManagedCodexWorker,
+		"continuation":            true,
+		"resumeAfterProposalId":   normalizeStringOrDefault(proposal.ProposalID, ""),
 		"resumeAfterToolActionId": action.ToolActionID,
-		"command":           commandText,
-		"cwd":               cwd,
-		"timeoutSeconds":    timeoutSeconds,
+		"command":                 commandText,
+		"cwd":                     cwd,
+		"timeoutSeconds":          timeoutSeconds,
 		"toolExecution": map[string]interface{}{
-			"status":       action.Status,
-			"exitCode":     func() int { if execResult != nil { return execResult.ExitCode }; return -1 }(),
-			"timedOut":     execResult != nil && execResult.TimedOut,
-			"outputSha256": func() string { if execResult != nil { return execResult.OutputSHA256 }; return "" }(),
-			"error":        errorString(execErr),
+			"status": action.Status,
+			"exitCode": func() int {
+				if execResult != nil {
+					return execResult.ExitCode
+				}
+				return -1
+			}(),
+			"timedOut": execResult != nil && execResult.TimedOut,
+			"outputSha256": func() string {
+				if execResult != nil {
+					return execResult.OutputSHA256
+				}
+				return ""
+			}(),
+			"error": errorString(execErr),
 			"outputPreview": func() string {
 				if execResult == nil {
 					return ""
@@ -220,29 +230,29 @@ func (s *APIServer) continueManagedWorkerAfterToolAction(ctx context.Context, se
 		},
 	})
 	s.upsertToolActionBestEffort(ctx, &ToolActionRecord{
-		ToolActionID: continuationToolActionID,
-		SessionID:    session.SessionID,
-		WorkerID:     worker.WorkerID,
-		TenantID:     session.TenantID,
-		ProjectID:    session.ProjectID,
-		ToolType:     "managed_agent_turn",
-		Status:       ToolActionStatusRequested,
-		Source:       "v1alpha2.runtime.workers.codex_bridge.resume",
+		ToolActionID:   continuationToolActionID,
+		SessionID:      session.SessionID,
+		WorkerID:       worker.WorkerID,
+		TenantID:       session.TenantID,
+		ProjectID:      session.ProjectID,
+		ToolType:       "managed_agent_turn",
+		Status:         ToolActionStatusRequested,
+		Source:         "v1alpha2.runtime.workers.codex_bridge.resume",
 		RequestPayload: continuationRequestPayload,
-		CreatedAt:    now,
-		UpdatedAt:    now,
+		CreatedAt:      now,
+		UpdatedAt:      now,
 	})
 	s.appendSessionEventBestEffort(ctx, &SessionEventRecord{
 		SessionID: session.SessionID,
 		EventType: SessionEventType("tool_action.requested"),
 		Payload: mustMarshalJSON(map[string]interface{}{
-			"toolActionId":   continuationToolActionID,
-			"toolType":       "managed_agent_turn",
-			"workerId":       worker.WorkerID,
-			"requestId":      continuationRequestID,
-			"executionMode":  AgentInvokeExecutionModeManagedCodexWorker,
-			"proposalId":     normalizeStringOrDefault(proposal.ProposalID, ""),
-			"summary":        "Managed Codex worker resumed after governed tool execution.",
+			"toolActionId":  continuationToolActionID,
+			"toolType":      "managed_agent_turn",
+			"workerId":      worker.WorkerID,
+			"requestId":     continuationRequestID,
+			"executionMode": AgentInvokeExecutionModeManagedCodexWorker,
+			"proposalId":    normalizeStringOrDefault(proposal.ProposalID, ""),
+			"summary":       "Managed Codex worker resumed after governed tool execution.",
 		}),
 		Timestamp: now,
 	})
@@ -307,21 +317,21 @@ func (s *APIServer) continueManagedWorkerAfterToolAction(ctx context.Context, se
 	})
 
 	response, err := s.agentInvoker.ContinueManagedWorkerTurn(ctx, managedWorkerContinuationRequest{
-		Meta:               ObjectMeta{TenantID: session.TenantID, ProjectID: session.ProjectID, RequestID: continuationRequestID},
-		Profile:            profile,
-		Task:               task,
-		Session:            session,
-		Worker:             worker,
-		Proposal:           proposal,
-		ToolAction:         action,
-		CommandText:        commandText,
-		CommandCWD:         cwd,
-		TimeoutSeconds:     timeoutSeconds,
-		ExecutionResult:    execResult,
-		ExecutionError:     errorString(execErr),
-		SystemPrompt:       systemPrompt,
-		MaxOutputTokens:    maxOutputTokens,
-		PreviousOutputText: previousOutputText,
+		Meta:                ObjectMeta{TenantID: session.TenantID, ProjectID: session.ProjectID, RequestID: continuationRequestID},
+		Profile:             profile,
+		Task:                task,
+		Session:             session,
+		Worker:              worker,
+		Proposal:            proposal,
+		ToolAction:          action,
+		CommandText:         commandText,
+		CommandCWD:          cwd,
+		TimeoutSeconds:      timeoutSeconds,
+		ExecutionResult:     execResult,
+		ExecutionError:      errorString(execErr),
+		SystemPrompt:        systemPrompt,
+		MaxOutputTokens:     maxOutputTokens,
+		PreviousOutputText:  previousOutputText,
 		PreviousRawResponse: previousRawResponse,
 	})
 	if err != nil {
@@ -340,6 +350,231 @@ func (s *APIServer) continueManagedWorkerAfterToolAction(ctx context.Context, se
 			Transport:        profile.Transport,
 			Model:            profile.Model,
 			Route:            "managed_worker_process",
+		}, err, time.Now().UTC())
+		return true
+	}
+	response.TaskID = task.TaskID
+	response.SessionID = session.SessionID
+	response.SelectedWorkerID = worker.WorkerID
+	response.ExecutionMode = AgentInvokeExecutionModeManagedCodexWorker
+	response.WorkerType = worker.WorkerType
+	response.WorkerAdapterID = worker.AdapterID
+	s.markInvokeSessionResult(ctx, task, session, response, nil, time.Now().UTC())
+	return true
+}
+
+func (s *APIServer) continueManagedWorkerAfterGovernedAction(ctx context.Context, session *SessionRecord, proposal *sessionToolProposal, action *ToolActionRecord, run *RunRecord, runErr error, decidedAt time.Time) bool {
+	if s == nil || s.store == nil || s.agentInvoker == nil || session == nil || action == nil {
+		return false
+	}
+	task, err := s.store.GetTask(ctx, session.TaskID)
+	if err != nil || task == nil {
+		return false
+	}
+	worker, err := s.selectedManagedCodexWorkerForSession(ctx, session, normalizeStringOrDefault(action.WorkerID, proposal.WorkerID))
+	if err != nil || worker == nil {
+		return false
+	}
+	settings, err := s.agentInvoker.loadAgentIntegrationSettings(ctx, session.TenantID, session.ProjectID)
+	if err != nil {
+		return false
+	}
+	profileID := normalizeStringOrDefault(worker.AgentProfileID, "codex")
+	profile, err := settings.resolveProfile(profileID)
+	if err != nil {
+		return false
+	}
+
+	taskAnnotations := parseRawJSONObject(task.Annotations)
+	sessionSummary := parseRawJSONObject(session.Summary)
+	systemPrompt := normalizedInterfaceString(taskAnnotations["systemPrompt"])
+	maxOutputTokens := normalizedInterfaceInt(sessionSummary["maxOutputTokens"], 1024)
+	previousTurn, err := s.findLatestManagedTurnToolAction(ctx, session.SessionID)
+	if err != nil {
+		return false
+	}
+	previousOutputText := ""
+	var previousRawResponse json.RawMessage
+	if previousTurn != nil {
+		payload := parseRawJSONObject(previousTurn.ResultPayload)
+		previousOutputText = normalizedInterfaceString(payload["outputText"])
+		switch raw := payload["rawResponse"].(type) {
+		case json.RawMessage:
+			previousRawResponse = raw
+		case []byte:
+			previousRawResponse = json.RawMessage(raw)
+		case string:
+			previousRawResponse = json.RawMessage(raw)
+		default:
+			previousRawResponse = mustMarshalJSON(raw)
+		}
+	}
+
+	now := time.Now().UTC()
+	continuationRequestID := fmt.Sprintf("resume-%s-%d", sanitizeIDFragment(normalizeStringOrDefault(proposal.ProposalID, action.ToolActionID)), now.UnixNano())
+	continuationToolActionID := invokeSessionToolActionID(session.SessionID, "managed_agent_turn", continuationRequestID)
+	governedRunSnapshot := buildGovernedActionRunSnapshot(run)
+	continuationRequestPayload := mustMarshalJSON(map[string]interface{}{
+		"requestId":               continuationRequestID,
+		"agentProfileId":          profile.ID,
+		"executionMode":           AgentInvokeExecutionModeManagedCodexWorker,
+		"continuation":            true,
+		"resumeAfterProposalId":   normalizeStringOrDefault(proposal.ProposalID, ""),
+		"resumeAfterToolActionId": action.ToolActionID,
+		"governedAction": map[string]interface{}{
+			"status": action.Status,
+			"runId": func() string {
+				if run != nil {
+					return run.RunID
+				}
+				return ""
+			}(),
+			"runStatus": func() string {
+				if run != nil {
+					return string(run.Status)
+				}
+				return ""
+			}(),
+			"policyDecision": func() string {
+				if run != nil {
+					return run.PolicyDecision
+				}
+				return ""
+			}(),
+			"selectedPolicyProvider": func() string {
+				if run != nil {
+					return run.SelectedPolicyProvider
+				}
+				return ""
+			}(),
+			"error": errorString(runErr),
+		},
+	})
+	s.upsertToolActionBestEffort(ctx, &ToolActionRecord{
+		ToolActionID:   continuationToolActionID,
+		SessionID:      session.SessionID,
+		WorkerID:       worker.WorkerID,
+		TenantID:       session.TenantID,
+		ProjectID:      session.ProjectID,
+		ToolType:       "managed_agent_turn",
+		Status:         ToolActionStatusRequested,
+		Source:         "v1alpha2.runtime.workers.codex_bridge.resume",
+		RequestPayload: continuationRequestPayload,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	})
+	s.appendSessionEventBestEffort(ctx, &SessionEventRecord{
+		SessionID: session.SessionID,
+		EventType: SessionEventType("tool_action.requested"),
+		Payload: mustMarshalJSON(map[string]interface{}{
+			"toolActionId":  continuationToolActionID,
+			"toolType":      "managed_agent_turn",
+			"workerId":      worker.WorkerID,
+			"requestId":     continuationRequestID,
+			"executionMode": AgentInvokeExecutionModeManagedCodexWorker,
+			"proposalId":    normalizeStringOrDefault(proposal.ProposalID, ""),
+			"summary":       "Managed Codex worker resumed after governed action evaluation.",
+		}),
+		Timestamp: now,
+	})
+
+	previousSessionStatus := session.Status
+	session.Status = SessionStatusRunning
+	session.CompletedAt = nil
+	session.UpdatedAt = now
+	task.Status = TaskStatusInProgress
+	task.UpdatedAt = now
+	_ = s.store.UpsertTask(ctx, task)
+	_ = s.store.UpsertSession(ctx, session)
+	if previousSessionStatus != session.Status {
+		s.appendSessionEventBestEffort(ctx, &SessionEventRecord{
+			SessionID: session.SessionID,
+			EventType: SessionEventType("session.status.changed"),
+			Payload: mustMarshalJSON(map[string]interface{}{
+				"previousStatus": previousSessionStatus,
+				"status":         session.Status,
+				"proposalId":     normalizeStringOrDefault(proposal.ProposalID, ""),
+				"toolActionId":   continuationToolActionID,
+			}),
+			Timestamp: now,
+		})
+	}
+	s.upsertSessionWorkerBestEffort(ctx, &SessionWorkerRecord{
+		WorkerID:          worker.WorkerID,
+		SessionID:         worker.SessionID,
+		TaskID:            worker.TaskID,
+		TenantID:          worker.TenantID,
+		ProjectID:         worker.ProjectID,
+		WorkerType:        worker.WorkerType,
+		AdapterID:         worker.AdapterID,
+		Status:            WorkerStatusRunning,
+		Source:            worker.Source,
+		Capabilities:      append([]string(nil), worker.Capabilities...),
+		Routing:           worker.Routing,
+		AgentProfileID:    worker.AgentProfileID,
+		Provider:          worker.Provider,
+		Transport:         worker.Transport,
+		Model:             worker.Model,
+		TargetEnvironment: worker.TargetEnvironment,
+		Annotations:       worker.Annotations,
+		CreatedAt:         worker.CreatedAt,
+		UpdatedAt:         now,
+	})
+	s.appendSessionEventBestEffort(ctx, &SessionEventRecord{
+		SessionID: session.SessionID,
+		EventType: SessionEventType("worker.progress"),
+		Payload: mustMarshalJSON(map[string]interface{}{
+			"workerId": worker.WorkerID,
+			"status":   WorkerStatusRunning,
+			"summary":  "Managed Codex worker is resuming after governed action evaluation.",
+			"payload": map[string]interface{}{
+				"stage":        "resuming_after_governed_action",
+				"percent":      85,
+				"toolActionId": continuationToolActionID,
+				"proposalId":   normalizeStringOrDefault(proposal.ProposalID, ""),
+				"runId": func() string {
+					if run != nil {
+						return run.RunID
+					}
+					return ""
+				}(),
+			},
+		}),
+		Timestamp: now,
+	})
+
+	response, err := s.agentInvoker.ContinueManagedWorkerTurn(ctx, managedWorkerContinuationRequest{
+		Meta:                ObjectMeta{TenantID: session.TenantID, ProjectID: session.ProjectID, RequestID: continuationRequestID},
+		Profile:             profile,
+		Task:                task,
+		Session:             session,
+		Worker:              worker,
+		Proposal:            proposal,
+		ToolAction:          action,
+		GovernedRun:         run,
+		ExecutionError:      errorString(runErr),
+		SystemPrompt:        systemPrompt,
+		MaxOutputTokens:     maxOutputTokens,
+		PreviousOutputText:  previousOutputText,
+		PreviousRawResponse: previousRawResponse,
+	})
+	if err != nil {
+		s.markInvokeSessionResult(ctx, task, session, &AgentInvokeResponse{
+			RequestID:        continuationRequestID,
+			TaskID:           task.TaskID,
+			SessionID:        session.SessionID,
+			SelectedWorkerID: worker.WorkerID,
+			TenantID:         session.TenantID,
+			ProjectID:        session.ProjectID,
+			AgentProfileID:   profile.ID,
+			ExecutionMode:    AgentInvokeExecutionModeManagedCodexWorker,
+			WorkerType:       worker.WorkerType,
+			WorkerAdapterID:  worker.AdapterID,
+			Provider:         profile.Provider,
+			Transport:        profile.Transport,
+			Model:            profile.Model,
+			Route:            "managed_worker_process",
+			RawResponse:      mustMarshalJSON(governedRunSnapshot),
 		}, err, time.Now().UTC())
 		return true
 	}

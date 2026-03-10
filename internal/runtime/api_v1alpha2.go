@@ -1680,6 +1680,10 @@ func (s *APIServer) handleToolProposalDecisionV1Alpha2(w http.ResponseWriter, r 
 	status := "DENIED"
 	actionStatus := ToolActionStatus("")
 	toolActionID := ""
+	runID := ""
+	runStatus := RunStatus("")
+	policyDecision := ""
+	selectedPolicyProvider := ""
 	if decision == "APPROVE" {
 		status = "APPROVED"
 		actionStatus = ToolActionStatusAuthorized
@@ -1763,20 +1767,25 @@ func (s *APIServer) handleToolProposalDecisionV1Alpha2(w http.ResponseWriter, r 
 			Timestamp: now,
 		})
 		actionStatus = s.executeApprovedToolProposalAction(r.Context(), session, proposal, action, now)
+		runID, runStatus, policyDecision, selectedPolicyProvider = extractGovernedRunSummaryFromToolAction(action)
 	}
 
 	_ = s.store.AppendSessionEvent(r.Context(), &SessionEventRecord{
 		SessionID: session.SessionID,
 		EventType: SessionEventType("tool_proposal.decided"),
 		Payload: mustMarshalJSON(map[string]interface{}{
-			"proposalId":   proposal.ProposalID,
-			"proposalType": proposal.ProposalType,
-			"workerId":     proposal.WorkerID,
-			"decision":     decision,
-			"status":       status,
-			"reason":       reason,
-			"toolActionId": toolActionID,
-			"actionStatus": actionStatus,
+			"proposalId":             proposal.ProposalID,
+			"proposalType":           proposal.ProposalType,
+			"workerId":               proposal.WorkerID,
+			"decision":               decision,
+			"status":                 status,
+			"reason":                 reason,
+			"toolActionId":           toolActionID,
+			"actionStatus":           actionStatus,
+			"runId":                  runID,
+			"runStatus":              runStatus,
+			"policyDecision":         policyDecision,
+			"selectedPolicyProvider": selectedPolicyProvider,
 			"summary": map[string]string{
 				"APPROVE": "Tool proposal approved and promoted into a governed tool action.",
 				"DENY":    "Tool proposal denied by the operator.",
@@ -1786,17 +1795,21 @@ func (s *APIServer) handleToolProposalDecisionV1Alpha2(w http.ResponseWriter, r 
 	})
 
 	writeJSON(w, http.StatusOK, ToolProposalDecisionResponse{
-		Applied:      true,
-		SessionID:    session.SessionID,
-		ProposalID:   proposal.ProposalID,
-		Decision:     decision,
-		Status:       status,
-		Reason:       reason,
-		ToolActionID: toolActionID,
-		WorkerID:     proposal.WorkerID,
-		ToolType:     proposal.ProposalType,
-		ActionStatus: actionStatus,
-		ReviewedAt:   now.Format(time.RFC3339),
+		Applied:                true,
+		SessionID:              session.SessionID,
+		ProposalID:             proposal.ProposalID,
+		Decision:               decision,
+		Status:                 status,
+		Reason:                 reason,
+		ToolActionID:           toolActionID,
+		WorkerID:               proposal.WorkerID,
+		ToolType:               proposal.ProposalType,
+		ActionStatus:           actionStatus,
+		RunID:                  runID,
+		RunStatus:              runStatus,
+		PolicyDecision:         policyDecision,
+		SelectedPolicyProvider: selectedPolicyProvider,
+		ReviewedAt:             now.Format(time.RFC3339),
 	})
 }
 
@@ -1805,6 +1818,9 @@ func (s *APIServer) executeApprovedToolProposalAction(ctx context.Context, sessi
 		return ToolActionStatusAuthorized
 	}
 	toolType := resolveToolProposalType(proposal, action)
+	if strings.EqualFold(toolType, governedActionProposalType) {
+		return s.executeApprovedGovernedActionProposal(ctx, session, proposal, action, decidedAt)
+	}
 	if !strings.EqualFold(toolType, "terminal_command") {
 		return ToolActionStatusAuthorized
 	}
@@ -2067,6 +2083,251 @@ func (s *APIServer) executeApprovedToolProposalAction(ctx context.Context, sessi
 		Timestamp: finishedAt,
 	})
 	if !s.continueManagedWorkerAfterToolAction(ctx, session, proposal, action, commandText, cwd, timeoutSeconds, execResult, execErr, decidedAt) {
+		s.transitionSessionAfterStandaloneToolAction(ctx, session, finalStatus, finishedAt, proposal, action.ToolActionID)
+	}
+	return finalStatus
+}
+
+func (s *APIServer) executeApprovedGovernedActionProposal(ctx context.Context, session *SessionRecord, proposal *sessionToolProposal, action *ToolActionRecord, decidedAt time.Time) ToolActionStatus {
+	if s == nil || s.store == nil || session == nil || proposal == nil || action == nil {
+		return ToolActionStatusAuthorized
+	}
+	startedAt := time.Now().UTC()
+	runReq, normalizedProposal, err := buildRunCreateRequestFromGovernedActionProposal(session, proposal, startedAt)
+	if err != nil {
+		failedAt := time.Now().UTC()
+		action.Status = ToolActionStatusFailed
+		action.UpdatedAt = failedAt
+		action.ResultPayload = mustMarshalJSON(map[string]interface{}{
+			"decision":   "APPROVE",
+			"reviewedAt": decidedAt.Format(time.RFC3339),
+			"failedAt":   failedAt.Format(time.RFC3339),
+			"error":      err.Error(),
+		})
+		s.upsertToolActionBestEffort(ctx, action)
+		s.appendSessionEventBestEffort(ctx, &SessionEventRecord{
+			SessionID: session.SessionID,
+			EventType: SessionEventType("tool_action.failed"),
+			Payload: mustMarshalJSON(map[string]interface{}{
+				"toolActionId": action.ToolActionID,
+				"workerId":     proposal.WorkerID,
+				"toolType":     action.ToolType,
+				"status":       ToolActionStatusFailed,
+				"proposalId":   proposal.ProposalID,
+				"error":        err.Error(),
+				"summary":      "Approved governed action proposal could not be converted into a runtime run request.",
+			}),
+			Timestamp: failedAt,
+		})
+		if !s.continueManagedWorkerAfterGovernedAction(ctx, session, proposal, action, nil, err, decidedAt) {
+			s.transitionSessionAfterStandaloneToolAction(ctx, session, ToolActionStatusFailed, failedAt, proposal, action.ToolActionID)
+		}
+		return ToolActionStatusFailed
+	}
+
+	requestPayload := parseRawJSONObject(action.RequestPayload)
+	requestPayload["runRequest"] = runReq
+	requestPayload["proposal"] = normalizedProposal
+	action.RequestPayload = mustMarshalJSON(requestPayload)
+	action.Status = ToolActionStatusStarted
+	action.UpdatedAt = startedAt
+	action.ResultPayload = mustMarshalJSON(map[string]interface{}{
+		"decision":   "APPROVE",
+		"reviewedAt": decidedAt.Format(time.RFC3339),
+		"startedAt":  startedAt.Format(time.RFC3339),
+	})
+	s.upsertToolActionBestEffort(ctx, action)
+	s.appendSessionEventBestEffort(ctx, &SessionEventRecord{
+		SessionID: session.SessionID,
+		EventType: SessionEventType("tool_action.started"),
+		Payload: mustMarshalJSON(map[string]interface{}{
+			"toolActionId": action.ToolActionID,
+			"workerId":     proposal.WorkerID,
+			"toolType":     action.ToolType,
+			"status":       ToolActionStatusStarted,
+			"proposalId":   proposal.ProposalID,
+			"summary":      "Approved governed action proposal started runtime policy evaluation.",
+		}),
+		Timestamp: startedAt,
+	})
+	s.appendSessionEventBestEffort(ctx, &SessionEventRecord{
+		SessionID: session.SessionID,
+		EventType: SessionEventType("worker.progress"),
+		Payload: mustMarshalJSON(map[string]interface{}{
+			"workerId": proposal.WorkerID,
+			"status":   WorkerStatusRunning,
+			"summary":  "Approved governed action proposal is being evaluated through the runtime policy boundary.",
+			"payload": map[string]interface{}{
+				"stage":        "governed_action_started",
+				"percent":      70,
+				"toolActionId": action.ToolActionID,
+				"proposalId":   proposal.ProposalID,
+			},
+		}),
+		Timestamp: startedAt,
+	})
+
+	if s.orchestrator == nil {
+		err = fmt.Errorf("runtime orchestrator is not configured")
+	}
+	var run *RunRecord
+	if err == nil {
+		run, err = s.orchestrator.ExecuteRun(ctx, runReq)
+	}
+	finishedAt := time.Now().UTC()
+	if err != nil {
+		action.Status = ToolActionStatusFailed
+		action.UpdatedAt = finishedAt
+		action.ResultPayload = mustMarshalJSON(map[string]interface{}{
+			"decision":   "APPROVE",
+			"reviewedAt": decidedAt.Format(time.RFC3339),
+			"startedAt":  startedAt.Format(time.RFC3339),
+			"failedAt":   finishedAt.Format(time.RFC3339),
+			"error":      err.Error(),
+			"governedRun": func() interface{} {
+				if run == nil {
+					return nil
+				}
+				return buildGovernedActionRunSnapshot(run)
+			}(),
+		})
+		s.upsertToolActionBestEffort(ctx, action)
+		s.appendSessionEventBestEffort(ctx, &SessionEventRecord{
+			SessionID: session.SessionID,
+			EventType: SessionEventType("tool_action.failed"),
+			Payload: mustMarshalJSON(map[string]interface{}{
+				"toolActionId": action.ToolActionID,
+				"workerId":     proposal.WorkerID,
+				"toolType":     action.ToolType,
+				"status":       ToolActionStatusFailed,
+				"proposalId":   proposal.ProposalID,
+				"runId": func() string {
+					if run != nil {
+						return run.RunID
+					}
+					return ""
+				}(),
+				"error":   err.Error(),
+				"summary": "Approved governed action proposal failed during runtime evaluation.",
+			}),
+			Timestamp: finishedAt,
+		})
+		s.appendSessionEventBestEffort(ctx, &SessionEventRecord{
+			SessionID: session.SessionID,
+			EventType: SessionEventType("worker.progress"),
+			Payload: mustMarshalJSON(map[string]interface{}{
+				"workerId": proposal.WorkerID,
+				"status":   WorkerStatusRunning,
+				"summary":  "Governed action evaluation failed before a final policy result was returned.",
+				"payload": map[string]interface{}{
+					"stage":        "governed_action_failed",
+					"percent":      100,
+					"toolActionId": action.ToolActionID,
+					"proposalId":   proposal.ProposalID,
+					"runId": func() string {
+						if run != nil {
+							return run.RunID
+						}
+						return ""
+					}(),
+					"error": err.Error(),
+				},
+			}),
+			Timestamp: finishedAt,
+		})
+		if !s.continueManagedWorkerAfterGovernedAction(ctx, session, proposal, action, run, err, decidedAt) {
+			s.transitionSessionAfterStandaloneToolAction(ctx, session, ToolActionStatusFailed, finishedAt, proposal, action.ToolActionID)
+		}
+		return ToolActionStatusFailed
+	}
+
+	finalStatus := ToolActionStatusCompleted
+	action.Status = finalStatus
+	action.PolicyDecision = strings.TrimSpace(run.PolicyDecision)
+	action.UpdatedAt = finishedAt
+	governedRun := buildGovernedActionRunSnapshot(run)
+	action.ResultPayload = mustMarshalJSON(map[string]interface{}{
+		"decision":    "APPROVE",
+		"reviewedAt":  decidedAt.Format(time.RFC3339),
+		"startedAt":   startedAt.Format(time.RFC3339),
+		"completedAt": finishedAt.Format(time.RFC3339),
+		"status":      finalStatus,
+		"governedRun": governedRun,
+	})
+	s.upsertToolActionBestEffort(ctx, action)
+	evidenceID := fmt.Sprintf("%s-governed-run-evidence", action.ToolActionID)
+	s.upsertEvidenceRecordBestEffort(ctx, &EvidenceRecord{
+		EvidenceID:   evidenceID,
+		SessionID:    session.SessionID,
+		ToolActionID: action.ToolActionID,
+		TenantID:     session.TenantID,
+		ProjectID:    session.ProjectID,
+		Kind:         "governed_run",
+		URI:          "run://" + run.RunID,
+		Metadata: mustMarshalJSON(map[string]interface{}{
+			"proposalId":               proposal.ProposalID,
+			"toolActionId":             action.ToolActionID,
+			"runId":                    run.RunID,
+			"runStatus":                run.Status,
+			"policyDecision":           run.PolicyDecision,
+			"selectedProfileProvider":  run.SelectedProfileProvider,
+			"selectedPolicyProvider":   run.SelectedPolicyProvider,
+			"selectedEvidenceProvider": run.SelectedEvidenceProvider,
+			"policyGrantTokenPresent":  run.PolicyGrantTokenPresent,
+		}),
+		CreatedAt: finishedAt,
+		UpdatedAt: finishedAt,
+	})
+	s.appendSessionEventBestEffort(ctx, &SessionEventRecord{
+		SessionID: session.SessionID,
+		EventType: SessionEventType("evidence.recorded"),
+		Payload: mustMarshalJSON(map[string]interface{}{
+			"evidenceId":   evidenceID,
+			"toolActionId": action.ToolActionID,
+			"kind":         "governed_run",
+			"proposalId":   proposal.ProposalID,
+			"runId":        run.RunID,
+		}),
+		Timestamp: finishedAt,
+	})
+	s.appendSessionEventBestEffort(ctx, &SessionEventRecord{
+		SessionID: session.SessionID,
+		EventType: SessionEventType("tool_action.completed"),
+		Payload: mustMarshalJSON(map[string]interface{}{
+			"toolActionId":           action.ToolActionID,
+			"workerId":               proposal.WorkerID,
+			"toolType":               action.ToolType,
+			"status":                 finalStatus,
+			"proposalId":             proposal.ProposalID,
+			"runId":                  run.RunID,
+			"runStatus":              run.Status,
+			"policyDecision":         run.PolicyDecision,
+			"selectedPolicyProvider": run.SelectedPolicyProvider,
+			"summary":                fmt.Sprintf("Governed action request evaluated with policy decision %s.", normalizeStringOrDefault(run.PolicyDecision, "UNKNOWN")),
+		}),
+		Timestamp: finishedAt,
+	})
+	s.appendSessionEventBestEffort(ctx, &SessionEventRecord{
+		SessionID: session.SessionID,
+		EventType: SessionEventType("worker.progress"),
+		Payload: mustMarshalJSON(map[string]interface{}{
+			"workerId": proposal.WorkerID,
+			"status":   WorkerStatusRunning,
+			"summary":  fmt.Sprintf("Governed action evaluation completed with policy decision %s.", normalizeStringOrDefault(run.PolicyDecision, "UNKNOWN")),
+			"payload": map[string]interface{}{
+				"stage":                  "governed_action_completed",
+				"percent":                100,
+				"toolActionId":           action.ToolActionID,
+				"proposalId":             proposal.ProposalID,
+				"runId":                  run.RunID,
+				"runStatus":              run.Status,
+				"policyDecision":         run.PolicyDecision,
+				"selectedPolicyProvider": run.SelectedPolicyProvider,
+			},
+		}),
+		Timestamp: finishedAt,
+	})
+	if !s.continueManagedWorkerAfterGovernedAction(ctx, session, proposal, action, run, nil, decidedAt) {
 		s.transitionSessionAfterStandaloneToolAction(ctx, session, finalStatus, finishedAt, proposal, action.ToolActionID)
 	}
 	return finalStatus

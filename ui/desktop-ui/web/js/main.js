@@ -6135,6 +6135,22 @@ async function main() {
       return;
     }
 
+    if (action === "open-governed-run") {
+      const runID = String(actionNode.dataset.chatRunId || "").trim();
+      if (!runID) {
+        return;
+      }
+      await openRunDetail(runID);
+      operatorChatState = {
+        ...operatorChatState,
+        ...draft,
+        status: "success",
+        message: `Opened governed run ${runID} in History.`
+      };
+      await refresh();
+      return;
+    }
+
     if (action === "approve-tool-proposal" || action === "deny-tool-proposal") {
       const sessionId = String(actionNode.dataset.chatSessionId || "").trim();
       const proposalId = String(actionNode.dataset.chatProposalId || "").trim();
@@ -6167,12 +6183,15 @@ async function main() {
         });
         const nextThread = refreshed?.thread || operatorChatState.thread;
         const derived = deriveOperatorChatThreadState(nextThread);
+        const runSummary = result?.runId
+          ? ` Run ${String(result.runId || "").trim()} returned ${String(result.policyDecision || "UNKNOWN").trim().toUpperCase() || "UNKNOWN"} via ${String(result.selectedPolicyProvider || "-").trim() || "-"}.`
+          : "";
         operatorChatState = {
           ...operatorChatState,
           ...draft,
           status: derived.uiStatus || (result?.applied ? "success" : "warn"),
           message: result?.applied
-            ? `Tool proposal ${proposalId} ${decision === "DENY" ? "denied" : "approved"}. ${derived.message}`
+            ? `Tool proposal ${proposalId} ${decision === "DENY" ? "denied" : "approved"}.${runSummary} ${derived.message}`.trim()
             : String(result?.warning || "").trim() || `Tool proposal ${proposalId} was not changed.`,
           thread: nextThread
         };

@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -677,6 +678,184 @@ func TestRuntimeV1Alpha2ToolProposalDecisionPromotesAuthorizedToolAction(t *test
 	}
 	if !sawCompletedAction {
 		t.Fatalf("session events missing tool_action.completed: %+v", eventList.Items)
+	}
+}
+
+func TestRuntimeV1Alpha2GovernedActionProposalDecisionRoutesThroughRunOrchestrator(t *testing.T) {
+	store := newMemoryRunStore()
+	orchestrator := &Orchestrator{
+		Namespace:        "epydios-system",
+		Store:            store,
+		ProviderRegistry: &fakeGovernedActionProviderClient{},
+	}
+	server := NewAPIServer(store, orchestrator, nil)
+	handler := server.Routes()
+
+	rr := requestJSON(t, handler, http.MethodPost, "/v1alpha2/runtime/tasks", map[string]interface{}{
+		"meta": map[string]interface{}{
+			"requestId": "task-governed-proposal-1",
+			"tenantId":  "tenant-a",
+			"projectId": "project-a",
+		},
+		"source": "desktop-ui",
+		"title":  "Governed action proposal flow",
+		"intent": "Validate managed-worker governed action approvals route into the real run orchestrator.",
+	})
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("POST task status=%d body=%s", rr.Code, rr.Body.String())
+	}
+	var task TaskRecord
+	decodeResponseBody(t, rr, &task)
+
+	rr = requestJSON(t, handler, http.MethodPost, "/v1alpha2/runtime/tasks/"+task.TaskID+"/sessions", map[string]interface{}{
+		"meta": map[string]interface{}{
+			"requestId": "session-governed-proposal-1",
+			"tenantId":  "tenant-a",
+			"projectId": "project-a",
+		},
+		"sessionType": "managed_agent_turn",
+		"source":      "desktop-ui",
+	})
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("POST session status=%d body=%s", rr.Code, rr.Body.String())
+	}
+	var session SessionRecord
+	decodeResponseBody(t, rr, &session)
+
+	rr = requestJSON(t, handler, http.MethodPost, "/v1alpha2/runtime/sessions/"+session.SessionID+"/workers", map[string]interface{}{
+		"meta": map[string]interface{}{
+			"requestId": "worker-governed-proposal-1",
+			"tenantId":  "tenant-a",
+			"projectId": "project-a",
+		},
+		"workerType":        "managed_agent",
+		"adapterId":         "codex",
+		"agentProfileId":    "codex",
+		"targetEnvironment": "codex",
+		"capabilities":      []string{"agent_turn", "tool_proposal"},
+	})
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("POST worker status=%d body=%s", rr.Code, rr.Body.String())
+	}
+	var worker SessionWorkerRecord
+	decodeResponseBody(t, rr, &worker)
+
+	rr = requestJSON(t, handler, http.MethodPost, "/v1alpha2/runtime/sessions/"+session.SessionID+"/workers/"+worker.WorkerID+"/events", map[string]interface{}{
+		"meta": map[string]interface{}{
+			"requestId": "proposal-generated-governed-1",
+			"tenantId":  "tenant-a",
+			"projectId": "project-a",
+		},
+		"eventType": "tool_proposal.generated",
+		"summary":   "Managed Codex suggested a governed paper-trade request.",
+		"payload": map[string]interface{}{
+			"proposalId":   "proposal-governed-1",
+			"proposalType": governedActionProposalType,
+			"workerId":     worker.WorkerID,
+			"summary":      "BUY 25 AAPL in paper account paper-main",
+			"payload": map[string]interface{}{
+				"type":              governedActionProposalType,
+				"summary":           "BUY 25 AAPL in paper account paper-main",
+				"confidence":        "structured",
+				"requestLabel":      "Paper Trade Request: AAPL",
+				"requestSummary":    "BUY 25 AAPL in paper account paper-main",
+				"demoProfile":       governedActionDemoProfileFinancePaper,
+				"actionType":        "trade.execute",
+				"actionClass":       "execute",
+				"actionVerb":        "execute",
+				"actionTarget":      "paper-broker-order",
+				"resourceKind":      "broker-order",
+				"resourceNamespace": "epydios-system",
+				"resourceName":      "paper-order-aapl",
+				"resourceId":        "paper-order-aapl",
+				"boundaryClass":     "external_actuator",
+				"riskTier":          "high",
+				"requiredGrants":    []string{"grant.trading.supervisor"},
+				"evidenceReadiness": "PARTIAL",
+				"handshakeRequired": true,
+				"workflowKind":      governedActionWorkflowExternalRequest,
+				"financeOrder": map[string]interface{}{
+					"symbol":   "AAPL",
+					"side":     "buy",
+					"quantity": 25,
+					"account":  "paper-main",
+				},
+			},
+		},
+	})
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("POST generated governed proposal event status=%d body=%s", rr.Code, rr.Body.String())
+	}
+
+	rr = requestJSON(t, handler, http.MethodPost, "/v1alpha2/runtime/sessions/"+session.SessionID+"/tool-proposals/proposal-governed-1/decision", map[string]interface{}{
+		"meta": map[string]interface{}{
+			"requestId": "proposal-decision-governed-1",
+			"tenantId":  "tenant-a",
+			"projectId": "project-a",
+		},
+		"decision": "APPROVE",
+		"reason":   "approved for governed policy evaluation",
+	})
+	if rr.Code != http.StatusOK {
+		t.Fatalf("POST governed tool proposal decision status=%d body=%s", rr.Code, rr.Body.String())
+	}
+	var decisionResp ToolProposalDecisionResponse
+	decodeResponseBody(t, rr, &decisionResp)
+	if !decisionResp.Applied {
+		t.Fatalf("expected governed tool proposal applied=true: %#v", decisionResp)
+	}
+	if decisionResp.ToolType != governedActionProposalType {
+		t.Fatalf("toolType=%q want %q", decisionResp.ToolType, governedActionProposalType)
+	}
+	if decisionResp.RunID == "" {
+		t.Fatalf("missing runId in governed action decision response: %#v", decisionResp)
+	}
+	if decisionResp.PolicyDecision != "DEFER" {
+		t.Fatalf("policyDecision=%q want DEFER", decisionResp.PolicyDecision)
+	}
+	if decisionResp.SelectedPolicyProvider != "aimxs-full" {
+		t.Fatalf("selectedPolicyProvider=%q want aimxs-full", decisionResp.SelectedPolicyProvider)
+	}
+
+	rr = requestJSON(t, handler, http.MethodGet, "/v1alpha2/runtime/sessions/"+session.SessionID+"/tool-actions", nil)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("GET tool actions status=%d body=%s", rr.Code, rr.Body.String())
+	}
+	var toolActionList struct {
+		Count int                `json:"count"`
+		Items []ToolActionRecord `json:"items"`
+	}
+	decodeResponseBody(t, rr, &toolActionList)
+	if toolActionList.Count != 1 {
+		t.Fatalf("tool action count=%d want 1", toolActionList.Count)
+	}
+	resultPayload := parseRawJSONObject(toolActionList.Items[0].ResultPayload)
+	governedRun := extractJSONObjectValue(resultPayload["governedRun"])
+	if normalizedInterfaceString(governedRun["runId"]) != decisionResp.RunID {
+		t.Fatalf("governed runId=%q want %q", normalizedInterfaceString(governedRun["runId"]), decisionResp.RunID)
+	}
+	policyResponse := extractJSONObjectValue(governedRun["policyResponse"])
+	if normalizedInterfaceString(policyResponse["decision"]) != "DEFER" {
+		t.Fatalf("stored governed policy decision=%q want DEFER", normalizedInterfaceString(policyResponse["decision"]))
+	}
+
+	rr = requestJSON(t, handler, http.MethodGet, "/v1alpha1/runtime/runs/"+decisionResp.RunID, nil)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("GET governed run detail status=%d body=%s", rr.Code, rr.Body.String())
+	}
+	var runDetail RunRecord
+	decodeResponseBody(t, rr, &runDetail)
+	if runDetail.SelectedPolicyProvider != "aimxs-full" {
+		t.Fatalf("run selected policy provider=%q want aimxs-full", runDetail.SelectedPolicyProvider)
+	}
+	if runDetail.PolicyDecision != "DEFER" {
+		t.Fatalf("run policyDecision=%q want DEFER", runDetail.PolicyDecision)
+	}
+	requestPayload := parseRawJSONObject(runDetail.RequestPayload)
+	requestContext := extractJSONObjectValue(requestPayload["context"])
+	governedContext := extractJSONObjectValue(requestContext["governed_action"])
+	if normalizedInterfaceString(governedContext["origin_surface"]) != governedActionOriginSurfaceManagedChat {
+		t.Fatalf("origin_surface=%q want %q", normalizedInterfaceString(governedContext["origin_surface"]), governedActionOriginSurfaceManagedChat)
 	}
 }
 
@@ -2032,4 +2211,120 @@ func TestMemoryRunStoreImplementsM16Methods(t *testing.T) {
 	if items, err := store.ListEvidenceRecords(context.Background(), EvidenceRecordListQuery{SessionID: session.SessionID}); err != nil || len(items) != 1 {
 		t.Fatalf("list evidence records items=%d err=%v", len(items), err)
 	}
+}
+
+type fakeGovernedActionProviderClient struct{}
+
+func (c *fakeGovernedActionProviderClient) SelectProvider(_ context.Context, _ string, providerType, requiredCapability, targetOS string, minPriority int64) (*ProviderTarget, error) {
+	switch providerType {
+	case "ProfileResolver":
+		return &ProviderTarget{
+			Name:         "mock-profile-resolver",
+			ProviderID:   "mock-profile-resolver",
+			ProviderType: "ProfileResolver",
+			Priority:     maxInt64(minPriority, 100),
+		}, nil
+	case "PolicyProvider":
+		return &ProviderTarget{
+			Name:         "aimxs-full",
+			ProviderID:   "aimxs-full",
+			ProviderType: "PolicyProvider",
+			Priority:     maxInt64(minPriority, 100),
+		}, nil
+	case "EvidenceProvider":
+		return &ProviderTarget{
+			Name:         "mock-evidence-provider",
+			ProviderID:   "mock-evidence-provider",
+			ProviderType: "EvidenceProvider",
+			Priority:     maxInt64(minPriority, 100),
+		}, nil
+	default:
+		return nil, fmt.Errorf("no provider found (type=%s capability=%s targetOS=%s minPriority=%d)", providerType, requiredCapability, targetOS, minPriority)
+	}
+}
+
+func (c *fakeGovernedActionProviderClient) PostJSON(_ context.Context, target *ProviderTarget, path string, _ interface{}, out interface{}) error {
+	switch target.ProviderType {
+	case "ProfileResolver":
+		if path != "/v1alpha1/profile-resolver/resolve" {
+			return fmt.Errorf("unexpected profile path %q", path)
+		}
+		return assignRuntimeTestJSON(out, map[string]interface{}{
+			"profileId":      "finance-paper-trade",
+			"profileVersion": "v1",
+			"source":         "fake-governed-action-test",
+		})
+	case "PolicyProvider":
+		if path != "/v1alpha1/policy-provider/evaluate" {
+			return fmt.Errorf("unexpected policy path %q", path)
+		}
+		return assignRuntimeTestJSON(out, map[string]interface{}{
+			"decision": "DEFER",
+			"source":   "aimxs-full",
+			"policyBundle": map[string]interface{}{
+				"policyId":      "AIMXS_FINANCE_DEMO",
+				"policyVersion": "v1",
+			},
+			"reasons": []map[string]interface{}{
+				{
+					"code":    "grant_required",
+					"message": "Supervisor trading grant is still required before execution.",
+				},
+			},
+			"evidenceRefs": []string{"evidence://mock-governed-1"},
+			"output": map[string]interface{}{
+				"aimxs": map[string]interface{}{
+					"providerId": "aimxs-full",
+					"providerMeta": map[string]interface{}{
+						"baak_engaged":  true,
+						"decision_path": "finance_governed_defer",
+						"policy_stratification": map[string]interface{}{
+							"boundary_class":     "external_actuator",
+							"risk_tier":          "high",
+							"required_grants":    []string{"grant.trading.supervisor"},
+							"evidence_readiness": "PARTIAL",
+						},
+					},
+					"evidence": map[string]interface{}{
+						"evidence_hash": "sha256:governed-action-test",
+					},
+				},
+			},
+		})
+	case "EvidenceProvider":
+		switch path {
+		case "/v1alpha1/evidence-provider/record":
+			return assignRuntimeTestJSON(out, map[string]interface{}{
+				"evidenceId": "evidence-governed-action-test",
+				"checksum":   "sha256:governed-action-test",
+				"storageUri": "memory://governed-action-test/evidence-governed-action-test",
+			})
+		case "/v1alpha1/evidence-provider/finalize-bundle":
+			return assignRuntimeTestJSON(out, map[string]interface{}{
+				"bundleId":         "bundle-governed-action-test",
+				"manifestUri":      "memory://governed-action-test/bundle-governed-action-test",
+				"manifestChecksum": "sha256:governed-action-test",
+				"itemCount":        1,
+			})
+		default:
+			return fmt.Errorf("unexpected evidence path %q", path)
+		}
+	default:
+		return fmt.Errorf("unexpected provider type %q", target.ProviderType)
+	}
+}
+
+func assignRuntimeTestJSON(out interface{}, value interface{}) error {
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(encoded, out)
+}
+
+func maxInt64(a, b int64) int64 {
+	if a > b {
+		return a
+	}
+	return b
 }
