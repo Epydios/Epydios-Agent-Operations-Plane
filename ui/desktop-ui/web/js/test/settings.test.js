@@ -126,5 +126,7 @@ test("settings view persists raw response and native timeline disclosure shells"
   assert.match(ui.settingsContent.innerHTML, /Provider CA Ref/);
   assert.match(ui.settingsContent.innerHTML, /Activate AIMXS Mode/);
   assert.match(ui.settingsContent.innerHTML, /Refresh Activation Status/);
+  assert.match(ui.settingsContent.innerHTML, /AIMXS Richness Self-Check/);
+  assert.match(ui.settingsContent.innerHTML, /Evaluate Current Mode/);
   assert.match(ui.settingsContent.innerHTML, /clusterMode=aimxs-full/);
 });

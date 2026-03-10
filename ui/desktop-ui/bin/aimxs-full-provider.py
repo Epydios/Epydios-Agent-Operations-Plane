@@ -21,6 +21,7 @@ from typing import Any, Dict, Iterable, List, Tuple
 AIMXS_PROVIDER_ID = "aimxs-full"
 AIMXS_PROVIDER_VERSION = "local-v74"
 AIMXS_CONTRACT_VERSION = "v1alpha1"
+AIMXS_GOVERNED_ACTION_CONTRACT_ID = "epydios.governed-action.v1"
 AIMXS_CAPABILITIES = [
     "policy.evaluate",
     "policy.validate_bundle",
@@ -132,6 +133,43 @@ def normalize_policy_stratification(payload: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def normalize_governed_action_context(payload: Dict[str, Any]) -> Dict[str, Any]:
+    meta = payload.get("meta") if isinstance(payload.get("meta"), dict) else {}
+    context = payload.get("context") if isinstance(payload.get("context"), dict) else {}
+    raw_contract = (
+        context.get("governed_action")
+        or context.get("governedAction")
+        or meta.get("governed_action")
+        or meta.get("governedAction")
+    )
+    contract = raw_contract if isinstance(raw_contract, dict) else {}
+    return {
+        "contract_id": first_non_empty(
+            contract.get("contract_id"),
+            contract.get("contractId"),
+            AIMXS_GOVERNED_ACTION_CONTRACT_ID,
+        ),
+        "workflow_kind": first_non_empty(
+            contract.get("workflow_kind"),
+            contract.get("workflowKind"),
+            "external_action_request",
+        ),
+        "request_label": first_non_empty(
+            contract.get("request_label"),
+            contract.get("requestLabel"),
+            "Governed Action Request",
+        ),
+        "demo_profile": first_non_empty(
+            contract.get("demo_profile"),
+            contract.get("demoProfile"),
+        ),
+        "origin_surface": first_non_empty(
+            contract.get("origin_surface"),
+            contract.get("originSurface"),
+        ),
+    }
+
+
 class AimxsLocalFullRuntime:
     def __init__(self, extracted_root: Path):
         self.extracted_root = extracted_root
@@ -169,9 +207,10 @@ class AimxsLocalFullRuntime:
 
     def evaluate(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         policy = normalize_policy_stratification(payload)
-        if self._should_use_governance_path(policy, payload):
-            return self._evaluate_with_governance_provider(payload, policy)
-        return self._evaluate_allow_path(payload, policy)
+        contract = normalize_governed_action_context(payload)
+        if self._should_use_governance_path(policy):
+            return self._evaluate_with_governance_provider(payload, policy, contract)
+        return self._evaluate_allow_path(payload, policy, contract)
 
     def validate_bundle(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         bundle = payload.get("bundle") if isinstance(payload.get("bundle"), dict) else {}
@@ -207,18 +246,16 @@ class AimxsLocalFullRuntime:
         )
         return proposal_id, state_id
 
-    def _should_use_governance_path(self, policy: Dict[str, Any], payload: Dict[str, Any]) -> bool:
+    def _should_use_governance_path(self, policy: Dict[str, Any]) -> bool:
         if normalize_string_list(policy.get("required_grants")):
             return True
         if str(policy.get("evidence_readiness") or "READY").upper() != "READY":
             return True
         if isinstance(policy.get("gates"), dict) and policy["gates"]:
             return True
-        context = payload.get("context") if isinstance(payload.get("context"), dict) else {}
-        action = payload.get("action") if isinstance(payload.get("action"), dict) else {}
-        return bool(context.get("aimxsRichnessProbe") or action.get("aimxsRichnessProbe"))
+        return False
 
-    def _evaluate_with_governance_provider(self, payload: Dict[str, Any], policy: Dict[str, Any]) -> Dict[str, Any]:
+    def _evaluate_with_governance_provider(self, payload: Dict[str, Any], policy: Dict[str, Any], contract: Dict[str, Any]) -> Dict[str, Any]:
         proposal_id, state_id = self._request_ids(payload)
         requested_change = {
             "policy_stratification": {
@@ -247,6 +284,7 @@ class AimxsLocalFullRuntime:
                 "providerVersion": AIMXS_PROVIDER_VERSION,
                 "mode": "aimxs-full",
                 "providerMeta": decision_payload.get("provider_meta") or {},
+                "requestContract": contract,
                 "policyStratification": requested_change["policy_stratification"],
                 "evidence": evidence_payload,
             }
@@ -281,7 +319,7 @@ class AimxsLocalFullRuntime:
             "output": output,
         }
 
-    def _evaluate_allow_path(self, payload: Dict[str, Any], policy: Dict[str, Any]) -> Dict[str, Any]:
+    def _evaluate_allow_path(self, payload: Dict[str, Any], policy: Dict[str, Any], contract: Dict[str, Any]) -> Dict[str, Any]:
         proposal_id, state_id = self._request_ids(payload)
         request_hash = canonical_hash({"proposalId": proposal_id, "stateId": state_id, "payload": payload, "policy": policy})
         evidence = {
@@ -309,6 +347,7 @@ class AimxsLocalFullRuntime:
             "providerVersion": AIMXS_PROVIDER_VERSION,
             "baak_engaged": True,
             "decision_path": "local_allow",
+            "request_contract": contract,
             "policy_stratification": {
                 "boundary_class": policy["boundary_class"],
                 "required_grants": list(policy["required_grants"]),
@@ -346,6 +385,7 @@ class AimxsLocalFullRuntime:
                     "providerVersion": AIMXS_PROVIDER_VERSION,
                     "mode": "aimxs-full",
                     "providerMeta": provider_meta,
+                    "requestContract": contract,
                     "policyStratification": provider_meta["policy_stratification"],
                     "evidence": evidence,
                 },

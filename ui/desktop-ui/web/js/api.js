@@ -1029,7 +1029,8 @@ function mockCreateRuntimeRun(payload) {
   const runID = `run-${Date.now()}`;
   const timestamp = nowISO();
   const desktop = payload?.desktop || {};
-  const tier = Number.parseInt(String(desktop.tier || "2"), 10) || 2;
+  const desktopEnabled = desktop && typeof desktop === "object" && desktop.enabled === true;
+  const tier = desktopEnabled ? Number.parseInt(String(desktop.tier || "2"), 10) || 2 : 0;
 
   let status = "COMPLETED";
   let policyDecision = "ALLOW";
@@ -1082,7 +1083,7 @@ function mockCreateRuntimeRun(payload) {
     selectedProfileProvider: "oss-profile-static",
     selectedPolicyProvider: "oss-policy-opa",
     selectedEvidenceProvider: "oss-evidence-memory",
-    selectedDesktopProvider: tier > 1 ? "oss-desktop-openfang-linux" : "",
+    selectedDesktopProvider: desktopEnabled && tier > 1 ? "oss-desktop-openfang-linux" : "",
     policyDecision,
     policyBundleId: "bundle-default",
     policyBundleVersion: "2026.03.04",
@@ -3944,6 +3945,13 @@ export class AgentOpsApi {
 
   async applyAimxsActivation(payload = {}) {
     return this.request("", "/__agentops/aimxs/activation/apply", undefined, {
+      method: "POST",
+      body: payload
+    });
+  }
+
+  async evaluateAimxsProbe(payload = {}) {
+    return this.request("", "/__agentops/aimxs/probe/evaluate", undefined, {
       method: "POST",
       body: payload
     });

@@ -1,6 +1,7 @@
 import { escapeHTML, formatTime } from "./common.js";
 import {
   collectAimxsKnownLocalSecureRefs,
+  renderAimxsProbeMetric,
   renderAimxsSettingsMetric,
   renderAimxsStatusMetric
 } from "../aimxs/settings-view.js";
@@ -1143,6 +1144,7 @@ export function renderSettings(ui, settingsPayload, editorState = {}, viewState 
     chipClassForEditorStatus,
     selectedAttr
   });
+  const aimxsProbeMetric = renderAimxsProbeMetric(viewState?.aimxsProbe || {}, settings?.aimxs?.activation || {});
 
   ui.settingsContent.innerHTML = `
     <div class="metric settings-metric settings-metric-scope">
@@ -1174,6 +1176,7 @@ export function renderSettings(ui, settingsPayload, editorState = {}, viewState 
         <div class="meta">gatewayMtlsKeyRef=<code>${escapeHTML(integrations.gatewayMtlsKeyRef || "-")}</code></div>
       </div>
       ${aimxsSettingsMetric}
+      ${aimxsProbeMetric}
       <div class="metric settings-metric settings-metric-runtime-defaults">
         <div class="title">Runtime Defaults + Theme</div>
         <div class="meta">realtime=${escapeHTML(realtime.mode || "-")} / ${escapeHTML(String(realtime.pollIntervalMs || "-"))}ms</div>
