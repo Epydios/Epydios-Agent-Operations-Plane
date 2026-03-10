@@ -11,6 +11,7 @@ This module is intentionally outside `EPYDIOS_AI_CONTROL_PLANE` to keep backend/
 - UI does not connect directly to Postgres/CNPG.
 - Auth uses the same OIDC/JWT issuer and audience model as runtime API.
 - AIMXS remains external and is surfaced through provider status/events, not linked into UI code.
+- On the local Mac operator path, AIMXS activation is handled by the launcher helper in `bin/run-macos-local.sh`, which applies repo manifests and updates cluster secrets over the existing `ExtensionProvider` boundary instead of embedding AIMXS logic into the runtime or UI build graph.
 
 ## Initial Product Positioning
 
@@ -256,18 +257,30 @@ Notes:
 - Runtime ref resolution sources:
   - `RUNTIME_REF_VALUES_PATH=/absolute/path/to/ref-values.json`
   - `RUNTIME_REF_VALUES_JSON='{"ref://...":"..."}'`
-- The UI settings editor remains reference-only. Concrete secrets stay outside the UI and are resolved by the runtime.
+- Local secure store from `Settings -> Configuration -> Secure Local Credential Capture`
+- The project settings editor remains reference-only. Concrete values stay outside the settings draft and are resolved by the local runtime from the explicit ref-values input plus the local secure store.
+- The same local secure store is also used by `Settings -> Configuration -> AIMXS Deployment Contract` when you run `Activate AIMXS Mode` on the live launcher path.
 - A non-repo template for the ref-values JSON is kept under `EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/integration-invoke/`.
+- The local secure store uses macOS Keychain plus a non-repo ref index at `EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/local-ref-vault/index.json`.
+- The local runtime launcher merges secure-store refs after the explicit file or JSON input, so secure-store entries override duplicates on the next terminal-1 restart.
+- AIMXS activation on the live launcher path resolves stored AIMXS refs when the selected contract needs them, creates or updates `aimxs-policy-token`, `epydios-controller-mtls-client`, and `epydios-provider-ca` secrets for `aimxs-https`, and uses the local AIMXS provider shim for `aimxs-full`.
 
 Recommended operator path:
-1. Create a ref-values JSON outside the repo with your OpenAI key mapped to the `ref://.../openai.../api-key` entries.
+1. Optional but recommended: start `./bin/run-macos-local.sh --mode mock`, open `Settings -> Configuration -> Secure Local Credential Capture`, and save the concrete local values for the refs you plan to use.
 2. Start the repo runtime locally on macOS:
-   - `./bin/run-local-runtime-macos.sh --ref-values-path "/absolute/path/to/ref-values.json"`
+   - `./bin/run-local-runtime-macos.sh`
+   - or keep using an explicit seed file: `./bin/run-local-runtime-macos.sh --ref-values-path "/absolute/path/to/ref-values.json"`
 3. In a second terminal, run the browser UI against that local runtime:
    - `./bin/run-macos-local.sh --mode live --runtime-base-url "http://127.0.0.1:18080"`
 4. Open `Settings -> Configuration`.
-5. Set `modelRouting=direct_first` if no LiteLLM gateway is available.
-6. Use `Agent Invocation Test` with a low-risk prompt such as `Reply with exactly: agentops-live-ok`.
+5. Confirm the `Secure Local Credential Capture` panel shows the expected stored refs and paths.
+6. Set `modelRouting=direct_first` if no LiteLLM gateway is available.
+7. Use `Agent Invocation Test` with a low-risk prompt such as `Reply with exactly: agentops-live-ok`.
+8. If you are testing AIMXS, save the AIMXS endpoint/token/client-TLS/provider-CA refs in `Secure Local Credential Capture`, choose the desired deployment mode under `AIMXS Deployment Contract`, then run `Activate AIMXS Mode` and confirm the activation summary shows the expected cluster mode and provider capabilities.
+   - `Apply AIMXS Settings` saves the Desktop contract draft only.
+   - `Activate AIMXS Mode` switches the live desktop/runtime policy-provider path on the local launcher path.
+   - `aimxs-full` is the preferred local troubleshooting mode. It uses the live launcher AIMXS provider shim and does not require HTTPS or secure ref material.
+   - `aimxs-https` is the secure external-provider path and requires the full endpoint, bearer-token, controller-client-TLS, and provider-CA ref set.
 
 Direct defaults exist for:
 - `codex` / `openai` -> `https://api.openai.com`
@@ -293,12 +306,14 @@ Explicit endpoint refs are still required for:
 
 Minimal operator path:
 1. Start the local runtime on macOS:
-   - `./bin/run-local-runtime-macos.sh --ref-values-path "/absolute/path/to/ref-values.json" --codex-workdir "/absolute/path/to/workdir"`
+   - `./bin/run-local-runtime-macos.sh --codex-workdir "/absolute/path/to/workdir"`
+   - or seed from an explicit file and let the local secure store override duplicates on restart: `./bin/run-local-runtime-macos.sh --ref-values-path "/absolute/path/to/ref-values.json" --codex-workdir "/absolute/path/to/workdir"`
    - for local Mac testing, if the ref-values file includes only the normal OpenAI API key refs, the launcher now synthesizes:
      - `ref://gateways/litellm/openai-compatible`
      - `ref://gateways/litellm/openai`
      - `ref://projects/{projectId}/gateways/litellm/bearer-token`
      so managed Codex `process` mode can use the same local key without requiring a separate LiteLLM setup first
+   - secure local refs saved from Settings are loaded from macOS Keychain plus the non-repo ref index at `EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/local-ref-vault/index.json`
    - the launcher also bootstraps an isolated per-session `CODEX_HOME` under the non-repo session directory and runs `codex login --with-api-key` against that home, so local managed Codex testing uses API-key auth instead of inheriting the operator's desktop Codex ChatGPT session
 2. Start the browser UI against that runtime:
    - `./bin/run-macos-local.sh --mode live --runtime-base-url "http://127.0.0.1:18080"`

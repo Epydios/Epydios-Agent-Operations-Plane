@@ -137,8 +137,8 @@ cleanup_phase4_secure_fixtures_if_present() {
 }
 
 apply_customer_mode_with_local_override() {
-  echo "Applying aimxs-customer-hosted mode for entitlement verification..."
-  kubectl apply -k "${REPO_ROOT}/platform/modes/aimxs-customer-hosted" >/dev/null
+  echo "Applying aimxs-full mode for entitlement verification..."
+  kubectl apply -k "${REPO_ROOT}/platform/modes/aimxs-full" >/dev/null
   MODE_APPLIED="1"
 
   local auth_mode endpoint_url
@@ -155,7 +155,7 @@ apply_customer_mode_with_local_override() {
 
   # Local entitlement smoke override:
   # keep AIMXS contract id/selection but route endpoint to in-cluster OSS policy provider.
-  cat >"${TMPDIR_LOCAL}/aimxs-local-override.yaml" <<'YAML'
+  cat >"${TMPDIR_LOCAL}/aimxs-full-override.yaml" <<'YAML'
 apiVersion: controlplane.epydios.ai/v1alpha1
 kind: ExtensionProvider
 metadata:
@@ -178,7 +178,7 @@ spec:
     - policy.evaluate
     - policy.validate_bundle
 YAML
-  kubectl -n "${NAMESPACE}" apply -f "${TMPDIR_LOCAL}/aimxs-local-override.yaml" >/dev/null
+  kubectl -n "${NAMESPACE}" apply -f "${TMPDIR_LOCAL}/aimxs-full-override.yaml" >/dev/null
 
   wait_for_provider_ready oss-policy-opa oss-policy-opa
   wait_for_provider_ready aimxs-policy-primary

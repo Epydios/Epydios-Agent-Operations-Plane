@@ -25,17 +25,14 @@
     </header>
 
     <nav class="workspace-nav" aria-label="Workspace sections" role="tablist" aria-orientation="horizontal">
-      <button class="workspace-tab is-active" type="button" role="tab" aria-selected="true" data-workspace-tab="operations">
-        Operations
+      <button class="workspace-tab is-active" type="button" role="tab" aria-selected="true" data-workspace-tab="home">
+        Home
       </button>
-      <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="runs">
-        Runs
+      <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="agent">
+        Agent
       </button>
-      <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="chat">
-        Chat
-      </button>
-      <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="approvals">
-        Approvals
+      <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="history">
+        History
       </button>
       <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="incidents">
         Incidents
@@ -45,8 +42,8 @@
       </button>
     </nav>
 
-    <main id="workspace-layout" class="layout" data-workspace-view="operations">
-      <section class="panel panel-session" data-workspace-section="operations">
+    <main id="workspace-layout" class="layout" data-workspace-view="home">
+      <section class="panel panel-session" data-workspace-section="home">
         <h2>Session</h2>
         <div class="session-grid">
           <div>
@@ -72,7 +69,7 @@
         </div>
       </section>
 
-      <section class="panel panel-context" data-workspace-section="operations">
+      <section class="panel panel-context" data-workspace-section="home">
         <div class="panel-header">
           <h2 class="heading-inline">
             Workspace Context
@@ -109,28 +106,74 @@
         </div>
       </section>
 
-      <section class="panel panel-quickstart" data-workspace-section="operations">
+      <section class="panel panel-quickstart" data-workspace-section="home">
         <div class="panel-header">
-          <h2>Quick Start</h2>
+          <div class="panel-heading">
+            <h2>Instructions</h2>
+            <p class="panel-lead">Use Home as the living orientation surface. Keep workflow reminders, storage rules, and future doc links here so the rest of the app stays focused on active work.</p>
+          </div>
         </div>
-        <ol class="quickstart-list">
-          <li>Select project filter and agent profile.</li>
-          <li>Use Operator Chat, Run Builder, or Terminal for governed execution requests.</li>
-          <li>Track approvals, run state, and incident packages in dedicated tabs.</li>
-          <li>Use Settings for provider contracts, endpoints, storage, and retention defaults.</li>
-        </ol>
+        <div class="guide-card-grid">
+          <article class="metric workflow-guide">
+            <div class="title">Daily Operator Flow</div>
+            <div class="meta">The normal path should stay simple: do live work in Agent, move finished evidence review to History, and only use Incidents when a run needs durable downstream handoff.</div>
+            <ol class="workflow-guide-list">
+              <li>Start in Agent for the active thread, approvals, and thread state.</li>
+              <li>Use History for past runs, evidence review, JSON drill-in, and artifact folder guidance.</li>
+              <li>Use Incidents when you need a filing package, queue tracking, or handoff output.</li>
+              <li>Use Settings for routing, storage, diagnostics, and runtime configuration changes.</li>
+            </ol>
+          </article>
+          <article class="metric guide-card">
+            <div class="title">Tab Roles</div>
+            <ul class="quickstart-list">
+              <li><strong>Home</strong>: living instructions, workflow reminders, and storage rules.</li>
+              <li><strong>Agent</strong>: current chat, current approvals, and current thread state.</li>
+              <li><strong>History</strong>: past runs, evidence, exported JSON, and folder organization.</li>
+              <li><strong>Incidents</strong>: incident packages, queue state, audit-backed handoffs, and response exports.</li>
+              <li><strong>Settings</strong>: provider routes, credentials, diagnostics, retention, and integration state.</li>
+            </ul>
+          </article>
+          <article class="metric guide-card">
+            <div class="title">Storage and Evidence Rules</div>
+            <div class="meta">Keep repo-safe provenance in Git-tracked paths. Keep screenshots, manual QA, launch snapshots, and bulky evidence in non-repo storage.</div>
+            <ul class="quickstart-list">
+              <li>Repo folder stays clean for code, config, and lightweight provenance that should ship to GitHub.</li>
+              <li>Non-repo folder is the default home for screenshots, local runtime output, visual QA, and incident handoff artifacts.</li>
+              <li>Organize new evidence by date bucket first, then by run or package ID when the artifact is specific to one workflow.</li>
+            </ul>
+            <div class="guide-path-stack">
+              <div class="guide-path-line">
+                <span class="label">Repo</span>
+                <code>EPYDIOS_AGENTOPS_DESKTOP_REPO/provenance/</code>
+                <button class="btn btn-secondary btn-small" type="button" data-copy-text="EPYDIOS_AGENTOPS_DESKTOP_REPO/provenance/" data-copy-feedback-target="home-storage-feedback">Copy Path</button>
+              </div>
+              <div class="guide-path-line">
+                <span class="label">Non-repo provenance</span>
+                <code>EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/</code>
+                <button class="btn btn-secondary btn-small" type="button" data-copy-text="EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/" data-copy-feedback-target="home-storage-feedback">Copy Path</button>
+              </div>
+              <div class="guide-path-line">
+                <span class="label">Non-repo readiness</span>
+                <code>EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/</code>
+                <button class="btn btn-secondary btn-small" type="button" data-copy-text="EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/" data-copy-feedback-target="home-storage-feedback">Copy Path</button>
+              </div>
+            </div>
+            <div id="home-storage-feedback" class="meta">Use Copy Path to move these roots to the clipboard without leaving Home.</div>
+          </article>
+        </div>
       </section>
 
-      <section class="panel panel-chat" data-workspace-section="chat">
+      <section class="panel panel-chat" data-workspace-section="agent">
         <div id="chat-content" class="stack"></div>
       </section>
 
-      <section class="panel panel-execution" data-workspace-section="operations" data-advanced-section="operations">
+      <section class="panel panel-execution" data-workspace-section="home" data-advanced-section="operations">
         <h2>Execution Defaults</h2>
         <div id="execution-defaults-content" class="stack"></div>
       </section>
 
-      <section class="panel panel-triage" data-workspace-section="operations">
+      <section class="panel panel-triage" data-workspace-section="home">
         <div class="panel-header">
           <h2>Ops Triage</h2>
         </div>
@@ -171,7 +214,7 @@
         <div id="settings-content" class="stack"></div>
       </section>
 
-      <section class="panel panel-run-builder" data-workspace-section="operations">
+      <section class="panel panel-run-builder" data-workspace-section="home">
         <div class="panel-header">
           <h2 class="heading-inline">
             Run Builder
@@ -277,7 +320,7 @@
         <pre id="run-builder-payload" class="monospace"></pre>
       </section>
 
-      <section class="panel panel-terminal" data-workspace-section="operations" data-advanced-section="operations">
+      <section class="panel panel-terminal" data-workspace-section="home" data-advanced-section="operations">
         <div class="panel-header">
           <h2>Terminal Control</h2>
         </div>
@@ -329,7 +372,7 @@
         <pre id="terminal-payload" class="monospace"></pre>
       </section>
 
-      <section class="panel panel-health" data-workspace-section="operations">
+      <section class="panel panel-health" data-workspace-section="home">
         <div class="panel-header">
           <h2>Platform Health</h2>
           <button id="refresh-button" class="btn btn-secondary">Refresh</button>
@@ -345,12 +388,15 @@
         <div id="providers-content" class="stack"></div>
       </section>
 
-      <section class="panel panel-approvals" data-workspace-section="approvals">
+      <section class="panel panel-approvals" data-workspace-section="agent">
         <div class="panel-header">
           <div class="panel-heading">
-            <h2>Approval Decision Queue</h2>
-            <p class="panel-lead">Review human-gated requests, confirm decision context, and record approve or deny outcomes with evidence.</p>
+            <h2>Pending Approvals</h2>
+            <p class="panel-lead">Review approvals without leaving the current Agent workspace.</p>
           </div>
+        </div>
+        <details class="details-shell agent-approvals-filters" data-detail-key="agent.approvals.filters">
+          <summary>Scope and Filters</summary>
           <div class="filter-row filter-row-data filter-row-approvals">
             <div class="filter-group filter-group-scope">
               <span class="filter-group-label">Scope</span>
@@ -358,7 +404,7 @@
               <input id="approvals-project-filter" class="filter-input" type="text" placeholder="project filter" />
               <select id="approvals-status-filter" class="filter-input">
                 <option value="">status:any</option>
-                <option value="PENDING">status:pending</option>
+                <option value="PENDING" selected>status:pending</option>
                 <option value="APPROVED">status:approved</option>
                 <option value="DENIED">status:denied</option>
                 <option value="EXPIRED">status:expired</option>
@@ -388,10 +434,10 @@
             <div class="filter-group filter-group-page">
               <span class="filter-group-label">Pagination</span>
               <select id="approvals-page-size" class="filter-input">
-                <option value="10">page:10</option>
-                <option value="25" selected>page:25</option>
+                <option value="5">page:5</option>
+                <option value="10" selected>page:10</option>
+                <option value="25">page:25</option>
                 <option value="50">page:50</option>
-                <option value="100">page:100</option>
               </select>
               <input id="approvals-page" class="filter-input filter-input-small" type="number" min="1" value="1" />
               <input id="approvals-ttl-seconds" class="filter-input filter-input-small" type="number" min="60" max="86400" value="900" data-advanced-section="approvals" />
@@ -408,110 +454,149 @@
                   >Show advanced details</button>
                 </div>
                 <div class="action-group action-group-primary">
-                  <button id="approvals-apply-button" class="btn btn-primary">Apply</button>
+                  <button id="approvals-apply-button" class="btn btn-primary">Refresh</button>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-        <div class="metric workflow-guide">
-          <div class="title">Approvals Workflow</div>
-          <div class="meta">Use this queue when runtime policy or human gating requires an operator decision.</div>
-          <ol class="workflow-guide-list">
-            <li>Apply scope and time filters to isolate pending or expiring approvals.</li>
-            <li>Open an approval row to review run context, policy basis, and time-to-expiry.</li>
-            <li>Approve or deny only after confirming the requested action and related run evidence.</li>
-          </ol>
-        </div>
+        </details>
+        <div id="approvals-detail-content" class="stack"></div>
         <div id="approvals-feedback" class="stack" aria-live="polite"></div>
         <div id="approvals-content" class="stack"></div>
-        <div id="approvals-detail-content" class="stack"></div>
+        <dialog id="approval-review-modal" class="overlay-dialog approval-review-modal" aria-labelledby="approval-review-modal-title">
+          <div class="dialog-shell">
+            <div class="dialog-header">
+              <div>
+                <h3 id="approval-review-modal-title">Approval Review</h3>
+                <p class="dialog-subtitle">Approve or deny from this popup so the Agent workspace stays focused on active work.</p>
+              </div>
+              <button class="btn btn-secondary btn-small" type="button" data-approval-modal-close>Close</button>
+            </div>
+            <div id="approval-review-modal-content" class="stack"></div>
+          </div>
+        </dialog>
       </section>
 
-      <section class="panel panel-runs" data-workspace-section="runs">
+      <section class="panel panel-runs" data-workspace-section="history">
         <div class="panel-header">
           <div class="panel-heading">
-            <h2>Run Review Queue</h2>
-            <p class="panel-lead">Track execution state, inspect evidence, and connect each run to approval or incident handling.</p>
+            <h2>History</h2>
+            <p class="panel-lead">Review past runs, evidence, and export-ready records without cluttering the active Agent workspace.</p>
           </div>
-          <div class="filter-row filter-row-data filter-row-runs">
-            <div class="filter-group filter-group-scope">
-              <span class="filter-group-label">Scope</span>
-              <input id="runs-runid-filter" class="filter-input filter-input-wide" type="text" placeholder="runId filter" />
-              <input id="runs-tenant-filter" class="filter-input" type="text" placeholder="tenant filter" />
-              <input id="runs-project-filter" class="filter-input" type="text" placeholder="project filter" />
-              <select id="runs-status-filter" class="filter-input">
-                <option value="">status:any</option>
-                <option value="COMPLETED">status:completed</option>
-                <option value="FAILED">status:failed</option>
-                <option value="POLICY_BLOCKED">status:policy_blocked</option>
-                <option value="POLICY_EVALUATED">status:policy_evaluated</option>
-                <option value="DESKTOP_VERIFIED">status:desktop_verified</option>
-              </select>
-              <select id="runs-decision-filter" class="filter-input">
-                <option value="">decision:any</option>
-                <option value="ALLOW">decision:allow</option>
-                <option value="DENY">decision:deny</option>
-              </select>
-            </div>
-            <div class="filter-group filter-group-time">
-              <span class="filter-group-label">Time + Order</span>
-              <select id="runs-time-range" class="filter-input">
-                <option value="">time:any</option>
-                <option value="1h">time:last-1h</option>
-                <option value="24h">time:last-24h</option>
-                <option value="7d">time:last-7d</option>
-                <option value="30d">time:last-30d</option>
-                <option value="custom">time:custom</option>
-              </select>
-              <select id="runs-sort" class="filter-input">
-                <option value="updated_desc">sort:updated-newest</option>
-                <option value="updated_asc">sort:updated-oldest</option>
-                <option value="created_desc">sort:created-newest</option>
-                <option value="status">sort:status</option>
-              </select>
-              <div class="filter-custom-time-range" data-time-filter-fields="runs" hidden aria-hidden="true">
-                <input id="runs-time-from" class="filter-input" type="datetime-local" aria-label="runs from time" />
-                <input id="runs-time-to" class="filter-input" type="datetime-local" aria-label="runs to time" />
+          <details class="details-shell history-filters-card" data-detail-key="history.filters">
+            <summary>History Filters and Scope</summary>
+            <div class="filter-row filter-row-data filter-row-runs">
+              <div class="filter-group filter-group-scope">
+                <span class="filter-group-label">Scope</span>
+                <input id="runs-runid-filter" class="filter-input filter-input-wide" type="text" placeholder="runId filter" />
+                <input id="runs-tenant-filter" class="filter-input" type="text" placeholder="tenant filter" />
+                <input id="runs-project-filter" class="filter-input" type="text" placeholder="project filter" />
+                <select id="runs-status-filter" class="filter-input">
+                  <option value="">status:any</option>
+                  <option value="COMPLETED">status:completed</option>
+                  <option value="FAILED">status:failed</option>
+                  <option value="POLICY_BLOCKED">status:policy_blocked</option>
+                  <option value="POLICY_EVALUATED">status:policy_evaluated</option>
+                  <option value="DESKTOP_VERIFIED">status:desktop_verified</option>
+                </select>
+                <select id="runs-decision-filter" class="filter-input">
+                  <option value="">decision:any</option>
+                  <option value="ALLOW">decision:allow</option>
+                  <option value="DENY">decision:deny</option>
+                </select>
               </div>
-            </div>
-            <div class="filter-group filter-group-page">
-              <span class="filter-group-label">Pagination</span>
-              <input id="runs-limit-filter" class="filter-input filter-input-small" type="number" min="1" max="500" value="25" data-advanced-section="runs" />
-              <select id="runs-page-size" class="filter-input">
-                <option value="10">page:10</option>
-                <option value="25" selected>page:25</option>
-                <option value="50">page:50</option>
-                <option value="100">page:100</option>
-              </select>
-              <input id="runs-page" class="filter-input filter-input-small" type="number" min="1" value="1" />
-            </div>
-            <div class="filter-group filter-group-actions">
-              <span class="filter-group-label">Actions</span>
-              <div class="action-hierarchy">
-                <div class="action-group action-group-secondary">
-                  <button
-                    id="runs-advanced-toggle"
-                    class="btn btn-secondary btn-small"
-                    type="button"
-                    data-advanced-toggle-section="runs"
-                  >Show advanced details</button>
-                </div>
-                <div class="action-group action-group-primary">
-                  <button id="runs-apply-button" class="btn btn-primary">Apply</button>
+              <div class="filter-group filter-group-time">
+                <span class="filter-group-label">Time + Order</span>
+                <select id="runs-time-range" class="filter-input">
+                  <option value="">time:any</option>
+                  <option value="1h">time:last-1h</option>
+                  <option value="24h">time:last-24h</option>
+                  <option value="7d">time:last-7d</option>
+                  <option value="30d">time:last-30d</option>
+                  <option value="custom">time:custom</option>
+                </select>
+                <select id="runs-sort" class="filter-input">
+                  <option value="updated_desc">sort:updated-newest</option>
+                  <option value="updated_asc">sort:updated-oldest</option>
+                  <option value="created_desc">sort:created-newest</option>
+                  <option value="status">sort:status</option>
+                </select>
+                <div class="filter-custom-time-range" data-time-filter-fields="runs" hidden aria-hidden="true">
+                  <input id="runs-time-from" class="filter-input" type="datetime-local" aria-label="runs from time" />
+                  <input id="runs-time-to" class="filter-input" type="datetime-local" aria-label="runs to time" />
                 </div>
               </div>
+              <div class="filter-group filter-group-page">
+                <span class="filter-group-label">Pagination</span>
+                <input id="runs-limit-filter" class="filter-input filter-input-small" type="number" min="1" max="500" value="25" data-advanced-section="runs" />
+                <select id="runs-page-size" class="filter-input">
+                  <option value="10">page:10</option>
+                  <option value="25" selected>page:25</option>
+                  <option value="50">page:50</option>
+                  <option value="100">page:100</option>
+                </select>
+                <input id="runs-page" class="filter-input filter-input-small" type="number" min="1" value="1" />
+              </div>
+              <div class="filter-group filter-group-actions">
+                <span class="filter-group-label">Actions</span>
+                <div class="action-hierarchy">
+                  <div class="action-group action-group-secondary">
+                    <button
+                      id="runs-advanced-toggle"
+                      class="btn btn-secondary btn-small"
+                      type="button"
+                      data-advanced-toggle-section="runs"
+                    >Show advanced details</button>
+                  </div>
+                  <div class="action-group action-group-primary">
+                    <button id="runs-apply-button" class="btn btn-primary">Apply</button>
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
+          </details>
         </div>
         <div class="metric workflow-guide">
-          <div class="title">Runs Workflow</div>
-          <div class="meta">Use this queue to verify what happened, why it happened, and what operational handoff comes next.</div>
+          <div class="title">History Workflow</div>
+          <div class="meta">Use this tab for past activity, evidence drill-in, JSON review, and folder guidance. Current approvals stay in Agent.</div>
           <ol class="workflow-guide-list">
             <li>Apply scope, status, and time filters to narrow the run set.</li>
-            <li>Select a run row and review timeline first, then evidence, then approval linkage.</li>
-            <li>Escalate only after evidence review, using Approval Detail or incident export as needed.</li>
+            <li>Select a run row and review summary, evidence, and raw JSON in that order.</li>
+            <li>Use the artifact access section in run detail to copy repo and non-repo storage roots plus the current run date bucket.</li>
+            <li>Use Incidents for packaging and handoff after you finish the evidence review.</li>
           </ol>
+        </div>
+        <div class="guide-card-grid">
+          <article class="metric guide-card">
+            <div class="title">Artifact Organization</div>
+            <div class="meta">Use History to keep run evidence predictable. The working convention is date bucket first, then the specific run or incident package under that day.</div>
+            <ul class="quickstart-list">
+              <li>Put run-specific notes and screenshots under <code>history/YYYYMMDD/run-id/</code>.</li>
+              <li>Keep manual comparison captures in the readiness area when they are not specific to one runtime record.</li>
+              <li>Use the run detail Artifact Access section to copy the exact roots and suggested folders before leaving this tab.</li>
+            </ul>
+          </article>
+          <article class="metric guide-card">
+            <div class="title">Folder Convention</div>
+            <div class="guide-path-stack">
+              <div class="guide-path-line">
+                <span class="label">Run folder</span>
+                <code>EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/history/YYYYMMDD/run-id/</code>
+                <button class="btn btn-secondary btn-small" type="button" data-copy-text="EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/history/YYYYMMDD/run-id/" data-copy-feedback-target="history-folder-feedback">Copy Pattern</button>
+              </div>
+              <div class="guide-path-line">
+                <span class="label">Run screenshots</span>
+                <code>EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/history/YYYYMMDD/run-id/screenshots/</code>
+                <button class="btn btn-secondary btn-small" type="button" data-copy-text="EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/history/YYYYMMDD/run-id/screenshots/" data-copy-feedback-target="history-folder-feedback">Copy Pattern</button>
+              </div>
+              <div class="guide-path-line">
+                <span class="label">Incident package folder</span>
+                <code>EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/incidents/YYYYMMDD/run-id/</code>
+                <button class="btn btn-secondary btn-small" type="button" data-copy-text="EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/incidents/YYYYMMDD/run-id/" data-copy-feedback-target="history-folder-feedback">Copy Pattern</button>
+              </div>
+            </div>
+            <div id="history-folder-feedback" class="meta">Copy a pattern here when you need a quick folder template before selecting a specific run.</div>
+          </article>
         </div>
         <div id="runs-content" class="stack"></div>
         <div id="run-detail-content" class="stack"></div>
@@ -545,6 +630,24 @@
             <li>Use Audit Events to validate source records and produce audit exports for response teams.</li>
           </ol>
         </div>
+        <div class="guide-card-grid">
+          <article class="metric guide-card">
+            <div class="title">Queue Discipline</div>
+            <ul class="quickstart-list">
+              <li><strong>Drafted</strong>: package is prepared locally and still needs downstream handoff.</li>
+              <li><strong>Filed</strong>: package has been handed off and is waiting on follow-through or closure.</li>
+              <li><strong>Closed</strong>: queue tracking is complete unless new follow-up forces a reopen.</li>
+            </ul>
+          </article>
+          <article class="metric guide-card">
+            <div class="title">Audit Events Role</div>
+            <ul class="quickstart-list">
+              <li>Use Audit Events when you need source-of-truth records, exportable audit evidence, or a fresh incident package.</li>
+              <li>Use the queue when a package already exists and you are tracking filing state, handoff, or closure.</li>
+              <li>Keep the handoff preview in view before copying or exporting anything downstream.</li>
+            </ul>
+          </article>
+        </div>
         <section class="incident-subpanel is-active" data-incident-subpanel="queue">
           <div class="panel-header">
             <div class="panel-heading">
@@ -552,77 +655,80 @@
               <p class="panel-lead">Triage run-linked incident packages, manage filing state, and prepare handoff bundles.</p>
             </div>
             <div class="incident-toolbar">
-              <div class="filter-row filter-row-data filter-row-incidents incident-filter-row">
-                <div class="filter-group filter-group-scope">
-                  <span class="filter-group-label">Scope</span>
-                  <select id="incident-history-status-filter" class="filter-input" aria-label="incident status filter">
-                    <option value="">status:any</option>
-                    <option value="drafted">status:drafted</option>
-                    <option value="filed">status:filed</option>
-                    <option value="closed">status:closed</option>
-                  </select>
-                  <select id="incident-history-sort" class="filter-input" aria-label="incident sort">
-                    <option value="newest">sort:newest</option>
-                    <option value="oldest">sort:oldest</option>
-                    <option value="status">sort:status</option>
-                  </select>
-                  <input id="incident-history-search-input" class="filter-input" type="text" placeholder="search runId/packageId" aria-label="incident search" />
-                  <button id="incident-history-search-clear-button" class="btn btn-secondary" type="button">Clear Search</button>
-                </div>
-                <div class="filter-group filter-group-time">
-                  <span class="filter-group-label">Time</span>
-                  <select id="incident-history-time-range" class="filter-input">
-                    <option value="">time:any</option>
-                    <option value="1h">time:last-1h</option>
-                    <option value="24h">time:last-24h</option>
-                    <option value="7d">time:last-7d</option>
-                    <option value="30d">time:last-30d</option>
-                    <option value="custom">time:custom</option>
-                  </select>
-                  <div class="filter-custom-time-range" data-time-filter-fields="incidents" hidden aria-hidden="true">
-                    <input id="incident-history-time-from" class="filter-input" type="datetime-local" aria-label="incident from time" />
-                    <input id="incident-history-time-to" class="filter-input" type="datetime-local" aria-label="incident to time" />
+              <details class="details-shell incidents-filters-card" data-detail-key="incidents.queue.filters">
+                <summary>Queue Filters and Bulk Actions</summary>
+                <div class="filter-row filter-row-data filter-row-incidents incident-filter-row">
+                  <div class="filter-group filter-group-scope">
+                    <span class="filter-group-label">Scope</span>
+                    <select id="incident-history-status-filter" class="filter-input" aria-label="incident status filter">
+                      <option value="">status:any</option>
+                      <option value="drafted">status:drafted</option>
+                      <option value="filed">status:filed</option>
+                      <option value="closed">status:closed</option>
+                    </select>
+                    <select id="incident-history-sort" class="filter-input" aria-label="incident sort">
+                      <option value="newest">sort:newest</option>
+                      <option value="oldest">sort:oldest</option>
+                      <option value="status">sort:status</option>
+                    </select>
+                    <input id="incident-history-search-input" class="filter-input" type="text" placeholder="search runId/packageId" aria-label="incident search" />
+                    <button id="incident-history-search-clear-button" class="btn btn-secondary" type="button">Clear Search</button>
+                  </div>
+                  <div class="filter-group filter-group-time">
+                    <span class="filter-group-label">Time</span>
+                    <select id="incident-history-time-range" class="filter-input">
+                      <option value="">time:any</option>
+                      <option value="1h">time:last-1h</option>
+                      <option value="24h">time:last-24h</option>
+                      <option value="7d">time:last-7d</option>
+                      <option value="30d">time:last-30d</option>
+                      <option value="custom">time:custom</option>
+                    </select>
+                    <div class="filter-custom-time-range" data-time-filter-fields="incidents" hidden aria-hidden="true">
+                      <input id="incident-history-time-from" class="filter-input" type="datetime-local" aria-label="incident from time" />
+                      <input id="incident-history-time-to" class="filter-input" type="datetime-local" aria-label="incident to time" />
+                    </div>
+                  </div>
+                  <div class="filter-group filter-group-page">
+                    <span class="filter-group-label">Pagination</span>
+                    <select id="incident-history-page-size" class="filter-input">
+                      <option value="10">page:10</option>
+                      <option value="25" selected>page:25</option>
+                      <option value="50">page:50</option>
+                      <option value="100">page:100</option>
+                    </select>
+                    <input id="incident-history-page" class="filter-input filter-input-small" type="number" min="1" value="1" />
+                  </div>
+                  <div class="filter-group filter-group-actions">
+                    <span class="filter-group-label">Quick Views</span>
+                    <div class="action-hierarchy">
+                      <div class="action-group action-group-primary">
+                        <button id="incident-history-quick-all-button" class="btn btn-primary" type="button">Show All</button>
+                      </div>
+                      <div class="action-group action-group-secondary">
+                        <button id="incident-history-quick-filed-button" class="btn btn-secondary" type="button">Show Filed</button>
+                        <button id="incident-history-quick-needs-closure-button" class="btn btn-secondary" type="button">Needs Closure</button>
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <div class="filter-group filter-group-page">
-                  <span class="filter-group-label">Pagination</span>
-                  <select id="incident-history-page-size" class="filter-input">
-                    <option value="10">page:10</option>
-                    <option value="25" selected>page:25</option>
-                    <option value="50">page:50</option>
-                    <option value="100">page:100</option>
-                  </select>
-                  <input id="incident-history-page" class="filter-input filter-input-small" type="number" min="1" value="1" />
-                </div>
-                <div class="filter-group filter-group-actions">
-                  <span class="filter-group-label">Quick Views</span>
+                <div class="filter-row incident-action-row" data-advanced-section="incidents">
                   <div class="action-hierarchy">
                     <div class="action-group action-group-primary">
-                      <button id="incident-history-quick-all-button" class="btn btn-primary" type="button">Show All</button>
+                      <button id="incident-history-bulk-filed-button" class="btn btn-primary" type="button">Mark Selected Filed</button>
                     </div>
                     <div class="action-group action-group-secondary">
-                      <button id="incident-history-quick-filed-button" class="btn btn-secondary" type="button">Show Filed</button>
-                      <button id="incident-history-quick-needs-closure-button" class="btn btn-secondary" type="button">Needs Closure</button>
+                      <button id="incident-history-bulk-closed-button" class="btn btn-secondary" type="button">Mark Selected Closed</button>
+                      <button id="incident-history-export-selected-button" class="btn btn-secondary" type="button">Export Selected Bundle JSON</button>
+                      <button id="incident-history-clear-selection-button" class="btn btn-secondary" type="button">Clear Selection</button>
+                      <button id="incident-history-copy-latest-button" class="btn btn-secondary" type="button">Copy Latest Handoff Summary</button>
+                    </div>
+                    <div class="action-group action-group-destructive">
+                      <button id="incident-history-clear-button" class="btn btn-danger" type="button">Clear Queue</button>
                     </div>
                   </div>
                 </div>
-              </div>
-              <div class="filter-row incident-action-row" data-advanced-section="incidents">
-                <div class="action-hierarchy">
-                  <div class="action-group action-group-primary">
-                    <button id="incident-history-bulk-filed-button" class="btn btn-primary" type="button">Mark Selected Filed</button>
-                  </div>
-                  <div class="action-group action-group-secondary">
-                    <button id="incident-history-bulk-closed-button" class="btn btn-secondary" type="button">Mark Selected Closed</button>
-                    <button id="incident-history-export-selected-button" class="btn btn-secondary" type="button">Export Selected Bundle JSON</button>
-                    <button id="incident-history-clear-selection-button" class="btn btn-secondary" type="button">Clear Selection</button>
-                    <button id="incident-history-copy-latest-button" class="btn btn-secondary" type="button">Copy Latest Handoff Summary</button>
-                  </div>
-                  <div class="action-group action-group-destructive">
-                    <button id="incident-history-clear-button" class="btn btn-danger" type="button">Clear Queue</button>
-                  </div>
-                </div>
-              </div>
+              </details>
             </div>
           </div>
           <div id="incident-history-summary" class="stack" aria-live="polite"></div>
@@ -634,59 +740,62 @@
               <h2>Audit Events</h2>
               <p class="panel-lead">Filter source-of-truth event records, export audit evidence, and build run-specific incident packages from active scope.</p>
             </div>
-            <div class="filter-row filter-row-data filter-row-audit">
-              <div class="filter-group filter-group-scope">
-                <span class="filter-group-label">Scope</span>
-                <input id="audit-tenant-filter" class="filter-input" type="text" placeholder="tenant filter" />
-                <input id="audit-project-filter" class="filter-input" type="text" placeholder="project filter" />
-                <input id="audit-provider-filter" class="filter-input" type="text" placeholder="provider filter" />
-                <input id="audit-event-filter" class="filter-input" type="text" placeholder="event filter" />
-                <select id="audit-decision-filter" class="filter-input">
-                  <option value="">decision:any</option>
-                  <option value="ALLOW">decision:allow</option>
-                  <option value="DENY">decision:deny</option>
-                </select>
-              </div>
-              <div class="filter-group filter-group-time">
-                <span class="filter-group-label">Time</span>
-                <select id="audit-time-range" class="filter-input">
-                  <option value="">time:any</option>
-                  <option value="1h">time:last-1h</option>
-                  <option value="24h">time:last-24h</option>
-                  <option value="7d">time:last-7d</option>
-                  <option value="30d">time:last-30d</option>
-                  <option value="custom">time:custom</option>
-                </select>
-                <div class="filter-custom-time-range" data-time-filter-fields="audit" hidden aria-hidden="true">
-                  <input id="audit-time-from" class="filter-input" type="datetime-local" aria-label="audit from time" />
-                  <input id="audit-time-to" class="filter-input" type="datetime-local" aria-label="audit to time" />
+            <details class="details-shell incidents-filters-card" data-detail-key="incidents.audit.filters">
+              <summary>Audit Filters and Exports</summary>
+              <div class="filter-row filter-row-data filter-row-audit">
+                <div class="filter-group filter-group-scope">
+                  <span class="filter-group-label">Scope</span>
+                  <input id="audit-tenant-filter" class="filter-input" type="text" placeholder="tenant filter" />
+                  <input id="audit-project-filter" class="filter-input" type="text" placeholder="project filter" />
+                  <input id="audit-provider-filter" class="filter-input" type="text" placeholder="provider filter" />
+                  <input id="audit-event-filter" class="filter-input" type="text" placeholder="event filter" />
+                  <select id="audit-decision-filter" class="filter-input">
+                    <option value="">decision:any</option>
+                    <option value="ALLOW">decision:allow</option>
+                    <option value="DENY">decision:deny</option>
+                  </select>
                 </div>
-              </div>
-              <div class="filter-group filter-group-page">
-                <span class="filter-group-label">Pagination</span>
-                <select id="audit-page-size" class="filter-input">
-                  <option value="10">page:10</option>
-                  <option value="25" selected>page:25</option>
-                  <option value="50">page:50</option>
-                  <option value="100">page:100</option>
-                </select>
-                <input id="audit-page" class="filter-input filter-input-small" type="number" min="1" value="1" />
-              </div>
-              <div class="filter-group filter-group-actions">
-                <span class="filter-group-label">Actions</span>
-                <div class="action-hierarchy">
-                  <div class="action-group action-group-primary">
-                    <button id="audit-apply-button" class="btn btn-primary">Apply</button>
-                  </div>
-                  <div class="action-group action-group-secondary">
-                    <button id="audit-export-json-button" class="btn btn-secondary" type="button">Export Audit JSON</button>
-                    <button id="audit-export-csv-button" class="btn btn-secondary" type="button">Export Audit CSV</button>
-                    <button id="audit-copy-handoff-button" class="btn btn-secondary" type="button" data-advanced-section="incidents">Copy Audit Handoff</button>
-                    <button id="audit-export-incident-button" class="btn btn-secondary" type="button" data-advanced-section="incidents">Export Incident Package JSON</button>
+                <div class="filter-group filter-group-time">
+                  <span class="filter-group-label">Time</span>
+                  <select id="audit-time-range" class="filter-input">
+                    <option value="">time:any</option>
+                    <option value="1h">time:last-1h</option>
+                    <option value="24h">time:last-24h</option>
+                    <option value="7d">time:last-7d</option>
+                    <option value="30d">time:last-30d</option>
+                    <option value="custom">time:custom</option>
+                  </select>
+                  <div class="filter-custom-time-range" data-time-filter-fields="audit" hidden aria-hidden="true">
+                    <input id="audit-time-from" class="filter-input" type="datetime-local" aria-label="audit from time" />
+                    <input id="audit-time-to" class="filter-input" type="datetime-local" aria-label="audit to time" />
                   </div>
                 </div>
+                <div class="filter-group filter-group-page">
+                  <span class="filter-group-label">Pagination</span>
+                  <select id="audit-page-size" class="filter-input">
+                    <option value="10">page:10</option>
+                    <option value="25" selected>page:25</option>
+                    <option value="50">page:50</option>
+                    <option value="100">page:100</option>
+                  </select>
+                  <input id="audit-page" class="filter-input filter-input-small" type="number" min="1" value="1" />
+                </div>
+                <div class="filter-group filter-group-actions">
+                  <span class="filter-group-label">Actions</span>
+                  <div class="action-hierarchy">
+                    <div class="action-group action-group-primary">
+                      <button id="audit-apply-button" class="btn btn-primary">Apply</button>
+                    </div>
+                    <div class="action-group action-group-secondary">
+                      <button id="audit-export-json-button" class="btn btn-secondary" type="button">Export Audit JSON</button>
+                      <button id="audit-export-csv-button" class="btn btn-secondary" type="button">Export Audit CSV</button>
+                      <button id="audit-copy-handoff-button" class="btn btn-secondary" type="button" data-advanced-section="incidents">Copy Audit Handoff</button>
+                      <button id="audit-export-incident-button" class="btn btn-secondary" type="button" data-advanced-section="incidents">Export Incident Package JSON</button>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
+            </details>
             <div class="meta">Export and copy actions use the current audit filters and selected run context.</div>
           </div>
           <div id="audit-feedback" class="stack" aria-live="polite"></div>

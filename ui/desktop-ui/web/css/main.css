@@ -257,12 +257,11 @@ body::before {
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--surface) 94%, transparent);
   color: var(--ink);
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-sm);
   font-weight: 700;
-  letter-spacing: 0.035em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
   min-height: var(--control-height-sm);
-  padding: 0.38rem 0.92rem;
+  padding: 0.42rem 1rem;
   cursor: pointer;
   transition:
     transform var(--motion-fast) ease,
@@ -414,9 +413,9 @@ body::before {
   grid-column: span 12;
 }
 
-.layout[data-workspace-view="operations"] [data-workspace-section]:not([data-workspace-section="operations"]),
-.layout[data-workspace-view="runs"] [data-workspace-section]:not([data-workspace-section="runs"]),
-.layout[data-workspace-view="approvals"] [data-workspace-section]:not([data-workspace-section="approvals"]),
+.layout[data-workspace-view="home"] [data-workspace-section]:not([data-workspace-section="home"]),
+.layout[data-workspace-view="agent"] [data-workspace-section]:not([data-workspace-section="agent"]),
+.layout[data-workspace-view="history"] [data-workspace-section]:not([data-workspace-section="history"]),
 .layout[data-workspace-view="incidents"] [data-workspace-section]:not([data-workspace-section="incidents"]),
 .layout[data-workspace-view="settings"] [data-workspace-section]:not([data-workspace-section="settings"]) {
   display: none;
@@ -427,35 +426,47 @@ body::before {
     --layout-gap: var(--space-5);
   }
 
-  .layout[data-workspace-view="operations"] .panel-session {
+  .layout[data-workspace-view="home"] .panel-session {
     grid-column: span 12;
   }
 
-  .layout[data-workspace-view="operations"] .panel-context {
+  .layout[data-workspace-view="home"] .panel-context {
     grid-column: span 7;
   }
 
-  .layout[data-workspace-view="operations"] .panel-quickstart {
+  .layout[data-workspace-view="home"] .panel-quickstart {
     grid-column: span 5;
   }
 
-  .layout[data-workspace-view="operations"] .panel-triage {
+  .layout[data-workspace-view="home"] .panel-triage {
     grid-column: span 7;
   }
 
-  .layout[data-workspace-view="operations"] .panel-execution {
+  .layout[data-workspace-view="home"] .panel-execution {
     grid-column: span 5;
   }
 
-  .layout[data-workspace-view="operations"] .panel-run-builder {
+  .layout[data-workspace-view="home"] .panel-run-builder {
     grid-column: span 7;
   }
 
-  .layout[data-workspace-view="operations"] .panel-terminal {
+  .layout[data-workspace-view="home"] .panel-terminal {
     grid-column: span 5;
   }
 
-  .layout[data-workspace-view="operations"] .panel-health {
+  .layout[data-workspace-view="home"] .panel-health {
+    grid-column: span 12;
+  }
+
+  .workspace-panel[data-workspace-panel="agent"] .panel-chat {
+    grid-column: span 7;
+  }
+
+  .workspace-panel[data-workspace-panel="agent"] .panel-approvals {
+    grid-column: span 5;
+  }
+
+  .workspace-panel[data-workspace-panel="history"] .panel-runs {
     grid-column: span 12;
   }
 
@@ -478,36 +489,49 @@ body::before {
     --layout-gap: var(--space-4);
   }
 
-  .layout[data-workspace-view="operations"] .panel-session {
+  .layout[data-workspace-view="home"] .panel-session {
     grid-column: span 12;
   }
 
-  .layout[data-workspace-view="operations"] .panel-context {
+  .layout[data-workspace-view="home"] .panel-context {
     grid-column: span 8;
   }
 
-  .layout[data-workspace-view="operations"] .panel-quickstart {
+  .layout[data-workspace-view="home"] .panel-quickstart {
     grid-column: span 4;
   }
 
-  .layout[data-workspace-view="operations"] .panel-triage {
+  .layout[data-workspace-view="home"] .panel-triage {
     grid-column: span 8;
   }
 
-  .layout[data-workspace-view="operations"] .panel-execution {
+  .layout[data-workspace-view="home"] .panel-execution {
     grid-column: span 4;
   }
 
-  .layout[data-workspace-view="operations"] .panel-run-builder {
+  .layout[data-workspace-view="home"] .panel-run-builder {
     grid-column: span 7;
   }
 
-  .layout[data-workspace-view="operations"] .panel-terminal {
+  .layout[data-workspace-view="home"] .panel-terminal {
     grid-column: span 5;
   }
 
-  .layout[data-workspace-view="operations"] .panel-health {
+  .layout[data-workspace-view="home"] .panel-health {
     grid-column: span 12;
+  }
+
+  .workspace-panel[data-workspace-panel="agent"] .panel-chat {
+    grid-column: span 8;
+  }
+
+  .workspace-panel[data-workspace-panel="agent"] .panel-approvals {
+    grid-column: span 4;
+    position: sticky;
+    top: 6.8rem;
+    align-self: start;
+    max-height: calc(100vh - 7.5rem);
+    overflow: auto;
   }
 
   .layout[data-workspace-view="settings"] .panel-settings {
@@ -823,8 +847,172 @@ select.filter-input:disabled {
   grid-column: 1 / -1;
 }
 
-.chat-surface {
+.chat-surface,
+.agent-chat-shell {
   gap: var(--space-4);
+}
+
+.agent-panel-heading {
+  margin-bottom: 0;
+}
+
+.agent-chat-top {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.agent-chat-composer,
+.agent-thread-state-card {
+  align-content: start;
+}
+
+.agent-chat-composer .settings-agent-test-textarea {
+  min-height: 7.5rem;
+}
+
+#chat-system-prompt.settings-agent-test-textarea {
+  min-height: 6rem;
+}
+
+#chat-prompt.settings-agent-test-textarea {
+  min-height: 12rem;
+}
+
+.agent-composer-actions {
+  margin-top: var(--space-2);
+}
+
+.agent-advanced-block > summary,
+.agent-approvals-filters > summary,
+.agent-thread-history-card > summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.agent-thread-history-card {
+  background: color-mix(in srgb, var(--surface) 86%, var(--panel));
+}
+
+.agent-thread-history-body {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.agent-thread-history-body .chat-thread-list {
+  max-height: 22rem;
+  overflow: auto;
+  padding-right: var(--space-1);
+}
+
+.agent-approvals-filters .filter-row {
+  margin-top: var(--space-3);
+}
+
+.agent-approval-summary-row {
+  margin-bottom: var(--space-2);
+}
+
+.agent-approval-list {
+  display: grid;
+  gap: var(--space-2);
+  max-height: 20rem;
+  overflow: auto;
+  padding-right: var(--space-1);
+}
+
+.agent-approval-card {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+  border-radius: var(--radius-2);
+  background: color-mix(in srgb, var(--surface) 90%, var(--panel));
+  box-shadow: var(--shadow-1), var(--shadow-inset);
+}
+
+.agent-approval-card.is-selected {
+  border-color: color-mix(in srgb, var(--primary) 48%, var(--line));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--primary) 10%, transparent), transparent 85%),
+    color-mix(in srgb, var(--surface) 92%, var(--panel));
+}
+
+.approval-review-selection {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--primary) 10%, transparent), transparent 80%),
+    var(--surface-raised);
+}
+
+.panel-approvals #approvals-detail-content {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.panel-approvals .approval-review-selection {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  box-shadow: var(--shadow-1);
+}
+
+.overlay-dialog {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  max-width: min(880px, calc(100vw - 2rem));
+  width: min(880px, calc(100vw - 2rem));
+}
+
+.overlay-dialog::backdrop {
+  background: color-mix(in srgb, var(--ink) 26%, transparent);
+  backdrop-filter: blur(4px);
+}
+
+.overlay-dialog[open] {
+  display: grid;
+  position: fixed;
+  inset: 1rem;
+  margin: auto;
+  z-index: 40;
+}
+
+.dialog-shell {
+  display: grid;
+  gap: var(--space-3);
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+  padding: var(--space-4);
+  border: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
+  border-radius: calc(var(--radius-2) + 0.2rem);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface) 94%, transparent), color-mix(in srgb, var(--panel) 84%, transparent)),
+    var(--surface-raised);
+  box-shadow: 0 24px 60px color-mix(in srgb, var(--ink) 24%, transparent);
+}
+
+.dialog-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.dialog-header h3 {
+  margin: 0;
+  font-size: var(--font-size-lg);
+}
+
+.dialog-subtitle {
+  margin: var(--space-1) 0 0;
+  color: var(--ink-soft);
+}
+
+@media (min-width: 960px) {
+  .agent-chat-top {
+    grid-template-columns: minmax(0, 1.7fr) minmax(260px, 1fr);
+  }
 }
 
 .chat-composer-grid {
@@ -899,6 +1087,34 @@ select.filter-input:disabled {
     var(--surface-raised);
   box-shadow: var(--shadow-1), var(--shadow-inset);
   padding: var(--space-4);
+}
+
+.chat-review-inbox {
+  display: grid;
+  gap: var(--space-3);
+  margin: var(--space-4) 0;
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--danger) 26%, var(--line));
+  border-radius: var(--radius-2);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--danger) 8%, transparent), transparent 85%),
+    color-mix(in srgb, var(--surface) 92%, var(--panel));
+  box-shadow: var(--shadow-1), var(--shadow-inset);
+}
+
+.chat-review-inbox-grid {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.chat-review-inbox-card {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+  border-radius: var(--radius-2);
+  background: color-mix(in srgb, var(--surface) 92%, var(--panel));
+  box-shadow: var(--shadow-1), var(--shadow-inset);
 }
 
 .chat-empty-state-list {
@@ -1199,6 +1415,11 @@ select.filter-input:disabled {
   resize: vertical;
 }
 
+.settings-secret-textarea {
+  min-height: 7rem;
+  resize: vertical;
+}
+
 .settings-agent-test-output {
   display: grid;
   gap: var(--space-2);
@@ -1250,6 +1471,10 @@ select.filter-input:disabled {
   }
 
   .settings-subpanel-configuration > .settings-metric-editor {
+    grid-column: span 7;
+  }
+
+  .settings-subpanel-configuration > .settings-metric-local-secure-refs {
     grid-column: span 7;
   }
 
@@ -1402,13 +1627,14 @@ select.filter-input:disabled {
   gap: var(--space-1);
   min-height: var(--control-height);
   border-radius: var(--radius-control);
-  border: 1px solid transparent;
+  border: 1px solid color-mix(in srgb, var(--line-strong) 72%, transparent);
   padding: 0.38rem 0.9rem;
   font-size: var(--font-size-sm);
   line-height: var(--line-height-tight);
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.01em;
   cursor: pointer;
+  box-shadow: var(--shadow-inset);
   transition:
     transform var(--motion-fast) ease,
     background-color var(--motion-fast) ease,
@@ -1420,6 +1646,7 @@ select.filter-input:disabled {
 .btn-primary {
   color: #fff;
   background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 92%, white 8%), var(--primary-strong));
+  border-color: color-mix(in srgb, var(--primary-strong) 82%, black 18%);
   box-shadow: 0 10px 20px color-mix(in srgb, var(--primary) 18%, transparent);
 }
 
@@ -1430,26 +1657,33 @@ select.filter-input:disabled {
 
 .btn-secondary {
   color: var(--ink);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 92%, transparent), var(--secondary-bg));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 96%, transparent), color-mix(in srgb, var(--secondary-bg) 92%, transparent));
   border-color: color-mix(in srgb, var(--line) 90%, transparent);
   box-shadow: var(--shadow-inset);
 }
 
 .btn-secondary:hover {
-  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
   border-color: var(--line-strong);
 }
 
 .btn-ok {
   color: #fff;
   background: linear-gradient(135deg, color-mix(in srgb, var(--ok) 92%, white 8%), color-mix(in srgb, var(--ok) 72%, black 28%));
+  border-color: color-mix(in srgb, var(--ok) 72%, black 28%);
   box-shadow: 0 10px 20px color-mix(in srgb, var(--ok) 20%, transparent);
 }
 
 .btn-danger {
   color: #fff;
   background: linear-gradient(135deg, color-mix(in srgb, var(--danger) 92%, white 8%), color-mix(in srgb, var(--danger) 72%, black 28%));
+  border-color: color-mix(in srgb, var(--danger) 72%, black 28%);
   box-shadow: 0 10px 20px color-mix(in srgb, var(--danger) 20%, transparent);
+}
+
+.btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-1), var(--shadow-inset);
 }
 
 .btn-ok:hover,
@@ -1687,6 +1921,61 @@ select.filter-input:disabled {
   line-height: var(--line-height-base);
 }
 
+.guide-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-3);
+}
+
+.guide-card {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.guide-path-stack {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.guide-path-line {
+  display: grid;
+  gap: 0.2rem;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+  border-radius: var(--radius-2);
+  background: color-mix(in srgb, var(--surface) 92%, var(--panel));
+}
+
+.guide-path-line code {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+  color: var(--ink);
+  word-break: break-word;
+}
+
+.guide-path-line .btn {
+  justify-self: start;
+  margin-top: var(--space-1);
+}
+
+.history-filters-card,
+.incidents-filters-card {
+  width: 100%;
+}
+
+.history-filters-card > summary,
+.incidents-filters-card > summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.history-filters-card[open] .filter-row,
+.incidents-filters-card[open] .filter-row {
+  margin-top: var(--space-3);
+}
+
 .triage-card {
   display: grid;
   gap: var(--space-2);
@@ -1876,6 +2165,42 @@ select.filter-input:disabled {
 
 .artifact-panel[open] summary {
   margin-bottom: var(--space-2);
+}
+
+.artifact-path-grid {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.artifact-path-card {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+  border-radius: var(--radius-2);
+  background: color-mix(in srgb, var(--surface) 90%, var(--panel));
+  box-shadow: var(--shadow-1), var(--shadow-inset);
+}
+
+.artifact-path-value {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-2);
+  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+  background: color-mix(in srgb, var(--surface) 92%, var(--panel));
+  color: var(--ink);
+  font-size: var(--font-size-xs);
+  font-family: var(--font-family-mono);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.history-summary-card,
+.approval-state-card,
+.agent-focus-card {
+  display: grid;
+  gap: var(--space-2);
 }
 
 .footer {

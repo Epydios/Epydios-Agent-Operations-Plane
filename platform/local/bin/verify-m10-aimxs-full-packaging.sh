@@ -107,16 +107,16 @@ validate_sha256() {
 
 load_inputs() {
   if [ -z "${INPUT_FILE}" ]; then
-    if [ -f "${NON_GITHUB_ROOT}/provenance/aimxs/customer-hosted-release-inputs.vars" ]; then
-      INPUT_FILE="${NON_GITHUB_ROOT}/provenance/aimxs/customer-hosted-release-inputs.vars"
+    if [ -f "${NON_GITHUB_ROOT}/provenance/aimxs/aimxs-full-release-inputs.vars" ]; then
+      INPUT_FILE="${NON_GITHUB_ROOT}/provenance/aimxs/aimxs-full-release-inputs.vars"
     else
-      INPUT_FILE="${REPO_ROOT}/provenance/aimxs/customer-hosted-release-inputs.vars"
+      INPUT_FILE="${REPO_ROOT}/provenance/aimxs/aimxs-full-release-inputs.vars"
     fi
   fi
 
   if [ ! -f "${INPUT_FILE}" ]; then
-    echo "Missing customer-hosted packaging inputs file: ${INPUT_FILE}" >&2
-    echo "Create ../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/customer-hosted-release-inputs.vars" >&2
+    echo "Missing aimxs-full packaging inputs file: ${INPUT_FILE}" >&2
+    echo "Create ../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/aimxs-full-release-inputs.vars" >&2
     exit 1
   fi
 
@@ -134,7 +134,7 @@ find_staging_log() {
       [ -n "${candidate}" ] || continue
       if grep -Fq "CI gate passed (full mode)" "${candidate}" \
         && grep -Fq "Running M10.4 gate (three deployment modes on a single provider contract)..." "${candidate}" \
-        && grep -Fq "Running M10.5 gate (customer-hosted local AIMXS no-egress proof)..." "${candidate}" \
+        && grep -Fq "Running M10.5 gate (aimxs-full local AIMXS no-egress proof)..." "${candidate}" \
         && grep -Fq "Running M10.6 gate (AIMXS entitlement deny path + licensed ALLOW assertions)..." "${candidate}"; then
         STAGING_GATE_LOG_PATH="${candidate}"
         break
@@ -191,14 +191,14 @@ main() {
   mkdir -p "${OUTPUT_DIR}"
 
   local airgap_doc support_doc
-  airgap_doc="${REPO_ROOT}/docs/runbooks/aimxs-customer-hosted-airgap.md"
-  support_doc="${REPO_ROOT}/docs/runbooks/aimxs-customer-hosted-support-boundary.md"
+  airgap_doc="${REPO_ROOT}/docs/runbooks/aimxs-full-airgap.md"
+  support_doc="${REPO_ROOT}/docs/runbooks/aimxs-full-support-boundary.md"
 
   assert_runbook_content "${airgap_doc}" "airgap" "air-?gapped" "no external egress" "update flow" "rollback"
   assert_runbook_content "${support_doc}" "support-boundary" "support boundary" "sla" "incident" "shared responsibility"
 
   assert_log_contains "Running M10.4 gate (three deployment modes on a single provider contract)..."
-  assert_log_contains "Running M10.5 gate (customer-hosted local AIMXS no-egress proof)..."
+  assert_log_contains "Running M10.5 gate (aimxs-full local AIMXS no-egress proof)..."
   assert_log_contains "Running M10.6 gate (AIMXS entitlement deny path + licensed ALLOW assertions)..."
   assert_log_contains "CI gate passed (full mode)"
 
@@ -244,8 +244,8 @@ main() {
 
   local timestamp out_json out_sha latest_json latest_sha staging_log_sha
   timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
-  out_json="${OUTPUT_DIR}/m10-7-customer-hosted-packaging-evidence-${timestamp}.json"
-  latest_json="${OUTPUT_DIR}/m10-7-customer-hosted-packaging-evidence-latest.json"
+  out_json="${OUTPUT_DIR}/m10-7-aimxs-full-packaging-evidence-${timestamp}.json"
+  latest_json="${OUTPUT_DIR}/m10-7-aimxs-full-packaging-evidence-latest.json"
   staging_log_sha="$(sha256_file "${STAGING_GATE_LOG_PATH}")"
 
   jq -n \
@@ -270,7 +270,7 @@ main() {
     '{
       schema_version: 1,
       milestone: "M10.7",
-      title: "AIMXS customer-hosted packaging evidence",
+      title: "AIMXS aimxs-full packaging evidence",
       generated_at_utc: $generated_at,
       source_inputs: { file: $input_file },
       release: {
@@ -298,7 +298,7 @@ main() {
         log_sha256: $staging_log_sha,
         required_markers: [
           "Running M10.4 gate (three deployment modes on a single provider contract)...",
-          "Running M10.5 gate (customer-hosted local AIMXS no-egress proof)...",
+          "Running M10.5 gate (aimxs-full local AIMXS no-egress proof)...",
           "Running M10.6 gate (AIMXS entitlement deny path + licensed ALLOW assertions)...",
           "CI gate passed (full mode)"
         ]
@@ -311,7 +311,7 @@ main() {
   cp "${out_json}" "${latest_json}"
   cp "${out_json}.sha256" "${latest_json}.sha256"
 
-  echo "M10.7 customer-hosted packaging evidence verification passed."
+  echo "M10.7 aimxs-full packaging evidence verification passed."
   echo "  evidence=${out_json}"
   echo "  evidence_sha256=sha256:${out_sha}"
   echo "  staging_log=${STAGING_GATE_LOG_PATH}"

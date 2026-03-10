@@ -195,7 +195,7 @@ find_staging_log() {
   else
     M10_4_LOG_IN_STAGING="0"
   fi
-  if grep -Fq "Running M10.5 gate (customer-hosted local AIMXS no-egress proof)..." "${STAGING_GATE_LOG_PATH}" 2>/dev/null; then
+  if grep -Fq "Running M10.5 gate (aimxs-full local AIMXS no-egress proof)..." "${STAGING_GATE_LOG_PATH}" 2>/dev/null; then
     M10_5_LOG_IN_STAGING="1"
   else
     M10_5_LOG_IN_STAGING="0"
@@ -300,7 +300,7 @@ main() {
 
   line_m105=""
   if [ "${M10_5_LOG_IN_STAGING}" = "1" ]; then
-    line_m105="$(assert_log_contains "Running M10.5 gate (customer-hosted local AIMXS no-egress proof)..." "m10_5_gate")"
+    line_m105="$(assert_log_contains "Running M10.5 gate (aimxs-full local AIMXS no-egress proof)..." "m10_5_gate")"
   elif [ "${M10_5_GATE_EXECUTED}" != "1" ]; then
     echo "Staging log ${STAGING_GATE_LOG_PATH} does not include M10.5 marker and current run did not declare M10.5 execution." >&2
     echo "Run PROFILE=staging-full gate once after M10.5 wiring or pass M10_5_GATE_EXECUTED=1 when invoking from CI gate." >&2
@@ -350,7 +350,7 @@ main() {
           },
           {
             name: "m10_5_gate_invoked",
-            contains: "Running M10.5 gate (customer-hosted local AIMXS no-egress proof)...",
+            contains: "Running M10.5 gate (aimxs-full local AIMXS no-egress proof)...",
             line: ($line_m105 | tonumber)
           },
           {
@@ -398,7 +398,7 @@ main() {
           },
           {
             name: "m10_5_gate_invoked",
-            contains: (if ($line_m105 | length) > 0 then "Running M10.5 gate (customer-hosted local AIMXS no-egress proof)..." else "M10_5_GATE_EXECUTED=1 (current gate execution)" end),
+            contains: (if ($line_m105 | length) > 0 then "Running M10.5 gate (aimxs-full local AIMXS no-egress proof)..." else "M10_5_GATE_EXECUTED=1 (current gate execution)" end),
             line: (if ($line_m105 | length) > 0 then ($line_m105 | tonumber) else null end)
           },
           {

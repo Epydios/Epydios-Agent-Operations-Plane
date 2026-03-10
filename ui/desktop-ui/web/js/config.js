@@ -1,3 +1,5 @@
+import { buildDefaultAimxsSettings } from "./aimxs/state.js";
+
 const DEFAULT_CONFIG = {
   appName: "Epydios AgentOps Desktop",
   environment: "local",
@@ -113,14 +115,7 @@ const DEFAULT_CONFIG = {
         }
       ]
     },
-    aimxs: {
-      paymentEntitled: false,
-      mode: "disabled",
-      endpointRef: "ref://projects/{projectId}/providers/aimxs/https-endpoint",
-      bearerTokenRef: "ref://projects/{projectId}/providers/aimxs/bearer-token",
-      mtlsCertRef: "ref://projects/{projectId}/providers/aimxs/mtls-cert",
-      mtlsKeyRef: "ref://projects/{projectId}/providers/aimxs/mtls-key"
-    }
+    aimxs: buildDefaultAimxsSettings()
   },
   auth: {
     enabled: true,

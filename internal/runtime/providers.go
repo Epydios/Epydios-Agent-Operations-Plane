@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -56,14 +57,36 @@ type ProviderClient interface {
 }
 
 type ProviderRegistry struct {
-	k8s client.Client
+	k8s               client.Client
+	localOverridePath string
 }
 
-func NewProviderRegistry(k8s client.Client) *ProviderRegistry {
-	return &ProviderRegistry{k8s: k8s}
+type localProviderOverride struct {
+	Active         bool     `json:"active"`
+	ProviderType   string   `json:"providerType"`
+	ProviderID     string   `json:"providerId"`
+	ProviderName   string   `json:"providerName"`
+	EndpointURL    string   `json:"endpointUrl"`
+	TimeoutSeconds int64    `json:"timeoutSeconds"`
+	AuthMode       string   `json:"authMode"`
+	Capabilities   []string `json:"capabilities"`
+}
+
+func NewProviderRegistry(k8s client.Client, localOverridePath string) *ProviderRegistry {
+	return &ProviderRegistry{k8s: k8s, localOverridePath: strings.TrimSpace(localOverridePath)}
 }
 
 func (r *ProviderRegistry) SelectProvider(ctx context.Context, namespace, providerType, requiredCapability, targetOS string, minPriority int64) (*ProviderTarget, error) {
+	if override, ok := r.selectLocalOverride(providerType, requiredCapability, targetOS, minPriority); ok {
+		return override, nil
+	}
+	if r.k8s == nil {
+		if providerType == "DesktopProvider" && normalizeProviderTargetOS(targetOS) != "" {
+			return nil, fmt.Errorf("no provider found (type=%s capability=%s targetOS=%s minPriority=%d)", providerType, requiredCapability, normalizeProviderTargetOS(targetOS), minPriority)
+		}
+		return nil, fmt.Errorf("no provider found (type=%s capability=%s minPriority=%d)", providerType, requiredCapability, minPriority)
+	}
+
 	list := &unstructured.UnstructuredList{}
 	list.SetGroupVersionKind(extensionProviderListGVK)
 	if err := r.k8s.List(ctx, list, client.InNamespace(namespace)); err != nil {
@@ -171,6 +194,55 @@ func (r *ProviderRegistry) SelectProvider(ctx context.Context, namespace, provid
 
 	chosen := candidates[0]
 	return &chosen, nil
+}
+
+func (r *ProviderRegistry) selectLocalOverride(providerType, requiredCapability, targetOS string, minPriority int64) (*ProviderTarget, bool) {
+	override, ok := r.readLocalOverride()
+	if !ok {
+		return nil, false
+	}
+	if !strings.EqualFold(strings.TrimSpace(override.ProviderType), providerType) {
+		return nil, false
+	}
+	if requiredCapability != "" && !containsString(override.Capabilities, requiredCapability) {
+		return nil, false
+	}
+	if providerType == "DesktopProvider" && normalizeProviderTargetOS(targetOS) != "" {
+		return nil, false
+	}
+	if minPriority > 0 && 1000 < minPriority {
+		return nil, false
+	}
+	name := firstNonEmpty(override.ProviderName, override.ProviderID, "local-provider-override")
+	return &ProviderTarget{
+		Name:           name,
+		Namespace:      "",
+		ProviderType:   strings.TrimSpace(override.ProviderType),
+		ProviderID:     firstNonEmpty(override.ProviderID, name),
+		EndpointURL:    strings.TrimSpace(override.EndpointURL),
+		TimeoutSeconds: defaultInt64(override.TimeoutSeconds, 10),
+		Priority:       1000,
+		TargetOS:       "",
+		AuthMode:       firstNonEmpty(override.AuthMode, "None"),
+	}, true
+}
+
+func (r *ProviderRegistry) readLocalOverride() (*localProviderOverride, bool) {
+	if strings.TrimSpace(r.localOverridePath) == "" {
+		return nil, false
+	}
+	raw, err := os.ReadFile(r.localOverridePath)
+	if err != nil {
+		return nil, false
+	}
+	var payload localProviderOverride
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return nil, false
+	}
+	if !payload.Active || strings.TrimSpace(payload.EndpointURL) == "" || strings.TrimSpace(payload.ProviderType) == "" {
+		return nil, false
+	}
+	return &payload, true
 }
 
 func (r *ProviderRegistry) PostJSON(ctx context.Context, target *ProviderTarget, path string, reqBody interface{}, out interface{}) error {
@@ -398,6 +470,13 @@ func containsString(items []string, target string) bool {
 		}
 	}
 	return false
+}
+
+func defaultInt64(value, fallback int64) int64 {
+	if value > 0 {
+		return value
+	}
+	return fallback
 }
 
 func firstNonEmpty(values ...string) string {

@@ -1,3 +1,8 @@
+import {
+  normalizeAimxsActivationSnapshot,
+  summarizeAimxsStatus
+} from "./aimxs/state.js";
+
 function deepClone(value) {
   return JSON.parse(JSON.stringify(value));
 }
@@ -2543,37 +2548,6 @@ export class AgentOpsApi {
     return deepClone(this.endpointStatus);
   }
 
-  summarizeAimxsStatus(providerPayload) {
-    const providers = Array.isArray(providerPayload?.items) ? providerPayload.items : [];
-    const aimxsProviders = providers.filter((item) =>
-      String(item?.providerId || "").toLowerCase().includes("aimxs")
-    );
-
-    if (aimxsProviders.length === 0) {
-      return {
-        state: "not_configured",
-        detail: "No AIMXS provider is currently discovered in registry state.",
-        providerIds: []
-      };
-    }
-
-    const ready = aimxsProviders.filter((item) => Boolean(item?.ready) && Boolean(item?.probed));
-    const providerIds = aimxsProviders.map((item) => String(item?.providerId || "").trim()).filter(Boolean);
-    if (ready.length === aimxsProviders.length) {
-      return {
-        state: "ready",
-        detail: `${ready.length}/${aimxsProviders.length} AIMXS providers are ready.`,
-        providerIds
-      };
-    }
-
-    return {
-      state: "degraded",
-      detail: `${ready.length}/${aimxsProviders.length} AIMXS providers are ready.`,
-      providerIds
-    };
-  }
-
   getSettingsSnapshot(context = {}) {
     const choices = context.choices || {};
     const endpointSnapshot = this.getEndpointStatusSnapshot();
@@ -2732,14 +2706,35 @@ export class AgentOpsApi {
         mode: themeMode || "system"
       },
       aimxs: {
-        ...this.summarizeAimxsStatus(context.providers || {}),
+        ...summarizeAimxsStatus(context.providers || {}),
         paymentEntitled: Boolean(choices?.aimxs?.paymentEntitled),
-        mode: String(choices?.aimxs?.mode || "disabled").trim().toLowerCase(),
+        mode: String(choices?.aimxs?.mode || "oss-only").trim().toLowerCase(),
         endpointRef: String(choices?.aimxs?.endpointRef || "-"),
         bearerTokenRef: String(choices?.aimxs?.bearerTokenRef || "-"),
-        mtlsCertRef: String(choices?.aimxs?.mtlsCertRef || "-"),
-        mtlsKeyRef: String(choices?.aimxs?.mtlsKeyRef || "-")
-      }
+        clientTlsCertRef: String(
+          choices?.aimxs?.clientTlsCertRef || choices?.aimxs?.mtlsCertRef || "-"
+        ),
+        clientTlsKeyRef: String(
+          choices?.aimxs?.clientTlsKeyRef || choices?.aimxs?.mtlsKeyRef || "-"
+        ),
+        caCertRef: String(
+          choices?.aimxs?.caCertRef || choices?.aimxs?.caBundleRef || "-"
+        ),
+        activation: normalizeAimxsActivationSnapshot(context.aimxsActivation || {})
+      },
+      localSecureRefs: deepClone(
+        context.localSecureRefs || {
+          available: false,
+          platform: "unknown",
+          service: "",
+          indexPath: "",
+          exportPath: "",
+          storedCount: 0,
+          entries: [],
+          lastExportedAt: "",
+          message: ""
+        }
+      )
     };
   }
 
@@ -3843,6 +3838,115 @@ export class AgentOpsApi {
       );
       throw error;
     }
+  }
+
+  async getLocalSecureRefs() {
+    try {
+      return await this.request("", "/__agentops/secure-refs");
+    } catch (error) {
+      if (error.status === 404 || error.status === 405 || error.status === 501 || error.status === 503) {
+        return {
+          available: false,
+          source: "helper-unavailable",
+          entries: [],
+          storedCount: 0,
+          service: "",
+          indexPath: "",
+          exportPath: "",
+          lastExportedAt: "",
+          message: "Local secure credential capture is unavailable on this launcher."
+        };
+      }
+      throw error;
+    }
+  }
+
+  async upsertLocalSecureRef(payload = {}) {
+    return this.request("", "/__agentops/secure-refs/upsert", undefined, {
+      method: "POST",
+      body: payload
+    });
+  }
+
+  async deleteLocalSecureRef(payload = {}) {
+    return this.request("", "/__agentops/secure-refs/delete", undefined, {
+      method: "POST",
+      body: payload
+    });
+  }
+
+  async exportLocalSecureRefs() {
+    return this.request("", "/__agentops/secure-refs/export", undefined, {
+      method: "POST",
+      body: {}
+    });
+  }
+
+  async getAimxsActivation() {
+    if (this.config.mockMode) {
+      return normalizeAimxsActivationSnapshot({
+        available: true,
+        source: "mock",
+        state: "active",
+        message: "Mock AIMXS activation reports aimxs-https as active.",
+        namespace: "epydios-system",
+        activeMode: "aimxs-https",
+        selectedProviderId: "aimxs-policy-primary",
+        selectedProviderName: "aimxs-policy-primary",
+        selectedProviderReady: true,
+        selectedProviderProbed: true,
+        capabilities: [
+          "policy.evaluate",
+          "policy.validate_bundle",
+          "governance.handshake_validation",
+          "evidence.policy_decision_refs"
+        ],
+        enabledProviders: [
+          {
+            name: "aimxs-policy-primary",
+            providerId: "aimxs-policy-primary",
+            mode: "aimxs-https",
+            enabled: true,
+            ready: true,
+            probed: true,
+            priority: 900,
+            authMode: "MTLSAndBearerTokenSecret",
+            capabilities: [
+              "policy.evaluate",
+              "policy.validate_bundle",
+              "governance.handshake_validation",
+              "evidence.policy_decision_refs"
+            ]
+          }
+        ],
+        secrets: {
+          bearerTokenSecret: { name: "aimxs-policy-token", present: true },
+          clientTlsSecret: { name: "epydios-controller-mtls-client", present: true },
+          caSecret: { name: "epydios-provider-ca", present: true }
+        }
+      });
+    }
+
+    try {
+      return await this.request("", "/__agentops/aimxs/activation");
+    } catch (error) {
+      if (error.status === 404 || error.status === 405 || error.status === 501 || error.status === 503) {
+        return normalizeAimxsActivationSnapshot({
+          available: false,
+          source: "helper-unavailable",
+          state: "unavailable",
+          message: "AIMXS activation helper is unavailable on this launcher."
+        });
+      }
+      throw error;
+    }
+  }
+
+  async applyAimxsActivation(payload = {}) {
+    return this.request("", "/__agentops/aimxs/activation/apply", undefined, {
+      method: "POST",
+      body: payload
+    });
   }
 
   async invokeIntegrationAgent(payload = {}) {

@@ -3,6 +3,21 @@ import { bootstrapAuth, beginLogin, logout, getSession } from "./oidc.js";
 import { AgentOpsApi } from "./api.js";
 import { createAppStore } from "./state/store.js";
 import { resolveRuntimeChoices } from "./runtime/choices.js";
+import {
+  AIMXS_OVERRIDE_KEY,
+  applyAimxsOverrideToChoices,
+  buildDefaultAimxsActivationSnapshot,
+  describeAimxsAppliedMessage,
+  describeAimxsEntitlementMessage,
+  describeAimxsSyncedMessage,
+  normalizeAimxsActivationSnapshot,
+  normalizeAimxsOverride,
+  validateAimxsOverride
+} from "./aimxs/state.js";
+import {
+  readAimxsEditorInput as readAimxsEditorDraft,
+  renderAimxsEditorFeedback
+} from "./aimxs/editor.js";
 import { setAuthDisplay } from "./views/session.js";
 import { renderHealth, renderError } from "./views/health.js";
 import { renderProviders } from "./views/providers.js";
@@ -27,6 +42,7 @@ import {
   readApprovalFilters,
   renderApprovals,
   renderApprovalsDetail,
+  renderApprovalReviewModal,
   renderApprovalFeedback
 } from "./views/approvals.js";
 import {
@@ -51,6 +67,7 @@ import {
   followOperatorChatThread,
   invokeOperatorChatTurn,
   launchManagedCodexWorker,
+  listNativeToolProposals,
   loadNativeSessionView,
   listOperatorChatThreads,
   loadOperatorChatThread,
@@ -108,6 +125,8 @@ const ui = {
   approvalsFeedback: document.getElementById("approvals-feedback"),
   approvalsContent: document.getElementById("approvals-content"),
   approvalsDetailContent: document.getElementById("approvals-detail-content"),
+  approvalReviewModal: document.getElementById("approval-review-modal"),
+  approvalReviewModalContent: document.getElementById("approval-review-modal-content"),
   runsContent: document.getElementById("runs-content"),
   runDetailContent: document.getElementById("run-detail-content"),
   auditContent: document.getElementById("audit-content"),
@@ -234,13 +253,13 @@ const SETTINGS_SUBVIEW_PREF_KEY = "epydios.agentops.desktop.settings.subview";
 const LIST_FILTER_STATE_KEY = "epydios.agentops.desktop.list.filters.v1";
 const ADVANCED_SECTION_STATE_KEY = "epydios.agentops.desktop.advanced.sections.v1";
 const DETAILS_OPEN_STATE_KEY = "epydios.agentops.desktop.details.open.v1";
-const AIMXS_OVERRIDE_KEY = "epydios.agentops.desktop.aimxs.override.v1";
 const INTEGRATION_OVERRIDES_KEY = "epydios.agentops.desktop.integrations.project_overrides.v1";
 const INCIDENT_HISTORY_KEY = "epydios.agentops.desktop.incident.history.v1";
 const CONFIG_CHANGE_HISTORY_KEY = "epydios.agentops.desktop.settings.change.history.v1";
 const OPERATOR_CHAT_ARCHIVE_KEY = "epydios.agentops.desktop.chat.archive.v1";
+const APPROVAL_SELECTION_NONE = "__approval_selection_none__";
 const PROJECT_ANY_SCOPE_KEY = "__project_any__";
-const WORKSPACE_VIEW_IDS = new Set(["operations", "chat", "runs", "approvals", "incidents", "settings"]);
+const WORKSPACE_VIEW_IDS = new Set(["home", "agent", "history", "incidents", "settings"]);
 const INCIDENT_SUBVIEW_IDS = new Set(["queue", "audit"]);
 const SETTINGS_SUBVIEW_IDS = new Set(["configuration", "diagnostics"]);
 const ADVANCED_SECTION_IDS = new Set(["operations", "runs", "approvals", "incidents", "settings"]);
@@ -277,6 +296,25 @@ let listFilterStateDigest = "";
 let advancedSectionState = {};
 let detailsOpenState = {};
 let aimxsEditorState = {
+  status: "clean",
+  message: ""
+};
+let aimxsActivationSnapshot = buildDefaultAimxsActivationSnapshot();
+let localSecureRefSnapshot = {
+  available: false,
+  platform: "unknown",
+  service: "",
+  indexPath: "",
+  exportPath: "",
+  storedCount: 0,
+  entries: [],
+  lastExportedAt: "",
+  message: "Local secure credential capture is unavailable until the local Mac launcher exposes the helper path."
+};
+let localSecureRefEditorState = {
+  selectedRef: "",
+  customRef: "",
+  secretValue: "",
   status: "clean",
   message: ""
 };
@@ -389,6 +427,15 @@ function normalizeOperatorChatArchiveState(value) {
   return next;
 }
 
+function readPinnedApprovalSelectionId() {
+  const value = String(ui.approvalsDetailContent?.dataset?.selectedRunId || "").trim();
+  return value === APPROVAL_SELECTION_NONE ? "" : value;
+}
+
+function isApprovalSelectionDismissed() {
+  return String(ui.approvalsDetailContent?.dataset?.selectedRunId || "").trim() === APPROVAL_SELECTION_NONE;
+}
+
 function operatorChatScopeKey(scope = {}) {
   const tenantId = String(scope?.tenantId || "").trim();
   const projectId = String(scope?.projectId || "").trim();
@@ -425,7 +472,7 @@ function setOperatorChatArchivedTask(scope = {}, taskId, archived) {
 }
 
 function activeWorkspaceView() {
-  return normalizeWorkspaceView(ui.workspaceLayout?.dataset?.workspaceView, "operations");
+  return normalizeWorkspaceView(ui.workspaceLayout?.dataset?.workspaceView, "home");
 }
 
 function clearOperatorChatFollowLoop() {
@@ -482,7 +529,7 @@ function scheduleOperatorChatFollow(delayMs, token) {
 
 function shouldOperatorChatFollow() {
   const derived = deriveOperatorChatThreadState(operatorChatState.thread);
-  return activeWorkspaceView() === "chat" && document.visibilityState !== "hidden" && derived.shouldFollow;
+  return activeWorkspaceView() === "agent" && document.visibilityState !== "hidden" && derived.shouldFollow;
 }
 
 async function runOperatorChatFollowLoop(token) {
@@ -525,7 +572,7 @@ async function runOperatorChatFollowLoop(token) {
 
 function reconcileOperatorChatFollowLoop() {
   const derived = deriveOperatorChatThreadState(operatorChatState.thread);
-  if (activeWorkspaceView() !== "chat" || document.visibilityState === "hidden" || !derived.shouldFollow) {
+  if (activeWorkspaceView() !== "agent" || document.visibilityState === "hidden" || !derived.shouldFollow) {
     if (operatorChatFollowState.timerId || operatorChatFollowState.sessionId) {
       clearOperatorChatFollowLoop();
     }
@@ -620,8 +667,40 @@ function validateReference(errors, label, value) {
   }
 }
 
+function resolveLocalSecureRefTargetRef(input = {}) {
+  const customRef = String(input.customRef || "").trim();
+  if (customRef) {
+    return customRef;
+  }
+  return String(input.selectedRef || "").trim();
+}
+
 function normalizeBoolean(value) {
   return value === true || value === "true" || value === "1" || value === 1;
+}
+
+function normalizeLocalSecureRefSnapshot(input = {}) {
+  const source = input && typeof input === "object" ? input : {};
+  const entries = Array.isArray(source.entries)
+    ? source.entries
+        .map((item) => ({
+          ref: String(item?.ref || "").trim(),
+          present: Boolean(item?.present),
+          updatedAt: String(item?.updatedAt || "").trim()
+        }))
+        .filter((item) => item.ref)
+    : [];
+  return {
+    available: Boolean(source.available),
+    platform: String(source.platform || "unknown").trim() || "unknown",
+    service: String(source.service || "").trim(),
+    indexPath: String(source.indexPath || "").trim(),
+    exportPath: String(source.exportPath || "").trim(),
+    storedCount: Number.isFinite(Number(source.storedCount)) ? Number(source.storedCount) : entries.filter((item) => item.present).length,
+    entries,
+    lastExportedAt: String(source.lastExportedAt || "").trim(),
+    message: String(source.message || "").trim()
+  };
 }
 
 function normalizeIntegrationEditorDraft(input = {}) {
@@ -748,57 +827,6 @@ function resolveChoicesForProject(baseChoices, projectID, overrides) {
   return applyIntegrationOverrideToChoices(baseChoices, entry.override);
 }
 
-function normalizeAimxsMode(value, fallback = "disabled") {
-  const requested = String(value || "").trim().toLowerCase();
-  if (requested === "disabled" || requested === "https_external" || requested === "in_stack_reserved") {
-    return requested;
-  }
-  const nextFallback = String(fallback || "").trim().toLowerCase();
-  if (nextFallback === "disabled" || nextFallback === "https_external" || nextFallback === "in_stack_reserved") {
-    return nextFallback;
-  }
-  return "disabled";
-}
-
-function normalizeAimxsOverride(input = {}, fallback = {}) {
-  const source = input && typeof input === "object" ? input : {};
-  const base = fallback && typeof fallback === "object" ? fallback : {};
-  return {
-    paymentEntitled: Boolean(base.paymentEntitled),
-    mode: normalizeAimxsMode(source.mode, normalizeAimxsMode(base.mode, "disabled")),
-    endpointRef:
-      String(
-        source.endpointRef ||
-          base.endpointRef ||
-          "ref://projects/{projectId}/providers/aimxs/https-endpoint"
-      ).trim() || "-",
-    bearerTokenRef:
-      String(
-        source.bearerTokenRef ||
-          base.bearerTokenRef ||
-          "ref://projects/{projectId}/providers/aimxs/bearer-token"
-      ).trim() || "-",
-    mtlsCertRef:
-      String(
-        source.mtlsCertRef ||
-          base.mtlsCertRef ||
-          "ref://projects/{projectId}/providers/aimxs/mtls-cert"
-      ).trim() || "-",
-    mtlsKeyRef:
-      String(
-        source.mtlsKeyRef ||
-          base.mtlsKeyRef ||
-          "ref://projects/{projectId}/providers/aimxs/mtls-key"
-      ).trim() || "-"
-  };
-}
-
-function applyAimxsOverrideToChoices(baseChoices, override) {
-  const next = deepClone(baseChoices || {});
-  next.aimxs = normalizeAimxsOverride(override || {}, baseChoices?.aimxs || {});
-  return next;
-}
-
 function buildEditorDraftFromChoices(choices, selectedAgentProfileId) {
   const integrations = choices?.integrations || {};
   const profiles = Array.isArray(integrations.agentProfiles) ? integrations.agentProfiles : [];
@@ -885,33 +913,29 @@ function readIntegrationEditorInput() {
 }
 
 function readAimxsEditorInput() {
+  return readAimxsEditorDraft(ui.settingsContent);
+}
+
+function readLocalSecureRefInput() {
   const root = ui.settingsContent;
   if (!root) {
     return null;
   }
   const read = (selector) => root.querySelector(selector);
-  const mode = read("#settings-aimxs-mode");
-  const endpointRef = read("#settings-aimxs-endpoint-ref");
-  const bearerTokenRef = read("#settings-aimxs-bearer-token-ref");
-  const mtlsCertRef = read("#settings-aimxs-mtls-cert-ref");
-  const mtlsKeyRef = read("#settings-aimxs-mtls-key-ref");
-
+  const selectedRef = read("#settings-local-ref-select");
+  const customRef = read("#settings-local-ref-custom");
+  const secretValue = read("#settings-local-ref-value");
   if (
-    !(mode instanceof HTMLSelectElement) ||
-    !(endpointRef instanceof HTMLInputElement) ||
-    !(bearerTokenRef instanceof HTMLInputElement) ||
-    !(mtlsCertRef instanceof HTMLInputElement) ||
-    !(mtlsKeyRef instanceof HTMLInputElement)
+    !(selectedRef instanceof HTMLSelectElement) ||
+    !(customRef instanceof HTMLInputElement) ||
+    !(secretValue instanceof HTMLTextAreaElement)
   ) {
     return null;
   }
-
   return {
-    mode: normalizeAimxsMode(mode.value, "disabled"),
-    endpointRef: String(endpointRef.value || "").trim(),
-    bearerTokenRef: String(bearerTokenRef.value || "").trim(),
-    mtlsCertRef: String(mtlsCertRef.value || "").trim(),
-    mtlsKeyRef: String(mtlsKeyRef.value || "").trim()
+    selectedRef: String(selectedRef.value || "").trim(),
+    customRef: String(customRef.value || "").trim(),
+    secretValue: String(secretValue.value || "")
   };
 }
 
@@ -1203,35 +1227,6 @@ function buildOperatorChatGovernanceReportExport(thread = {}, sessionId, catalog
   return buildChatTurnGovernanceReport(turn, catalogs, exportSelection);
 }
 
-function validateAimxsOverride(override, fallback) {
-  const errors = [];
-  const warnings = [];
-  const draft = normalizeAimxsOverride(override || {}, fallback || {});
-  if (draft.mode === "disabled") {
-    return { valid: true, errors, warnings, draft };
-  }
-
-  if (!draft.paymentEntitled) {
-    errors.push("AIMXS mode is locked until payment entitlement is active.");
-  }
-
-  if (draft.mode === "https_external") {
-    validateReference(errors, "AIMXS endpoint ref", draft.endpointRef);
-    validateReference(errors, "AIMXS bearer token ref", draft.bearerTokenRef);
-    validateReference(errors, "AIMXS mTLS cert ref", draft.mtlsCertRef);
-    validateReference(errors, "AIMXS mTLS key ref", draft.mtlsKeyRef);
-  } else if (draft.mode === "in_stack_reserved") {
-    warnings.push("in_stack_reserved is a placeholder in this build; external HTTPS mode is currently active path.");
-  }
-
-  return {
-    valid: errors.length === 0,
-    errors,
-    warnings,
-    draft
-  };
-}
-
 function readSavedValue(key) {
   try {
     return String(window.localStorage.getItem(key) || "").trim();
@@ -1248,16 +1243,22 @@ function saveValue(key, value) {
   }
 }
 
-function normalizeWorkspaceView(value, fallback = "operations") {
-  const requested = String(value || "").trim().toLowerCase();
+function normalizeWorkspaceView(value, fallback = "home") {
+  const aliases = {
+    operations: "home",
+    chat: "agent",
+    approvals: "agent",
+    runs: "history"
+  };
+  const requested = aliases[String(value || "").trim().toLowerCase()] || String(value || "").trim().toLowerCase();
   if (WORKSPACE_VIEW_IDS.has(requested)) {
     return requested;
   }
-  const fallbackView = String(fallback || "").trim().toLowerCase();
+  const fallbackView = aliases[String(fallback || "").trim().toLowerCase()] || String(fallback || "").trim().toLowerCase();
   if (WORKSPACE_VIEW_IDS.has(fallbackView)) {
     return fallbackView;
   }
-  return "operations";
+  return "home";
 }
 
 function initializeWorkspacePanels() {
@@ -1373,7 +1374,7 @@ function focusElement(node, options = {}) {
 }
 
 function applyWorkspaceView(view) {
-  const selectedView = normalizeWorkspaceView(view, "operations");
+  const selectedView = normalizeWorkspaceView(view, "home");
   if (ui.workspaceLayout) {
     ui.workspaceLayout.setAttribute("data-workspace-view", selectedView);
   }
@@ -2327,7 +2328,7 @@ function settingsEditorChipClass(value) {
   if (status === "applied" || status === "saved") {
     return "chip chip-ok";
   }
-  if (status === "dirty" || status === "pending_apply") {
+  if (status === "dirty" || status === "pending_apply" || status === "warn") {
     return "chip chip-warn";
   }
   if (status === "invalid" || status === "error") {
@@ -2435,36 +2436,40 @@ function renderSettingsEditorFeedbackInline(state) {
 }
 
 function renderAimxsEditorFeedbackInline(state) {
+  renderAimxsEditorFeedback(ui.settingsContent, state, {
+    settingsEditorChipClass,
+    settingsEditorStatusLabel
+  });
+}
+
+function renderLocalSecureRefFeedbackInline(state) {
   if (!ui.settingsContent) {
     return;
   }
-  const chip = ui.settingsContent.querySelector("#settings-aimxs-status-chip");
+  const chip = ui.settingsContent.querySelector("#settings-local-ref-status-chip");
   if (chip instanceof HTMLElement) {
     chip.className = settingsEditorChipClass(state?.status);
     chip.textContent = settingsEditorStatusLabel(state?.status);
   }
 
-  const feedback = ui.settingsContent.querySelector("#settings-aimxs-feedback");
+  const feedback = ui.settingsContent.querySelector("#settings-local-ref-feedback");
   if (!(feedback instanceof HTMLElement)) {
     return;
   }
 
-  const errors = Array.isArray(state?.errors) ? state.errors : [];
-  const warnings = Array.isArray(state?.warnings) ? state.warnings : [];
-  const message = String(state?.message || "").trim();
   const parts = [];
+  const message = String(state?.message || "").trim();
   if (message) {
     parts.push(`<div class="meta">${escapeHTML(message)}</div>`);
   }
-  for (const item of errors) {
-    parts.push(`<div class="meta settings-editor-error">Blocked: ${escapeHTML(item)}</div>`);
-  }
-  for (const item of warnings) {
-    parts.push(`<div class="meta settings-editor-warn">Review before apply: ${escapeHTML(item)}</div>`);
-  }
   parts.push(
-    "<div class=\"meta\">Next step: confirm entitlement and valid ref:// credential references, then rerun Apply AIMXS Settings.</div>"
+    `<div class="meta">storedCount=${escapeHTML(String(localSecureRefSnapshot.storedCount || 0))}; keychainService=${escapeHTML(localSecureRefSnapshot.service || "-")}</div>`
   );
+  parts.push(`<div class="meta">indexPath=<code>${escapeHTML(localSecureRefSnapshot.indexPath || "-")}</code></div>`);
+  parts.push(`<div class="meta">exportPath=<code>${escapeHTML(localSecureRefSnapshot.exportPath || "-")}</code></div>`);
+  if (localSecureRefSnapshot.lastExportedAt) {
+    parts.push(`<div class="meta">lastExportedAt=${escapeHTML(String(localSecureRefSnapshot.lastExportedAt))}</div>`);
+  }
   feedback.innerHTML = parts.join("");
 }
 
@@ -2925,8 +2930,8 @@ function clearDataPanels() {
   if (ui.chatContent) {
     ui.chatContent.innerHTML = renderPanelStateMetric(
       "info",
-      "Operator Chat",
-      "Chat becomes available after workspace scope and runtime choices load."
+      "Agent Workspace",
+      "Agent workspace becomes available after scope and runtime choices load."
     );
   }
   ui.settingsContent.innerHTML = renderPanelStateMetric(
@@ -2938,18 +2943,19 @@ function clearDataPanels() {
   ui.approvalsFeedback.innerHTML = "";
   ui.approvalsContent.innerHTML = renderPanelStateMetric(
     "empty",
-    "Approvals Queue",
+    "Pending Approvals",
     "No approval data loaded.",
     "Refresh the workspace, then verify approval endpoint health and active scope."
   );
   if (ui.approvalsDetailContent) {
     ui.approvalsDetailContent.innerHTML = renderPanelStateMetric(
       "info",
-      "Approval Detail",
-      "Select an approval row to review detail."
+      "Approval Review",
+      "Select an approval card to pin its context, then use the popup review surface for approve or deny."
     );
     delete ui.approvalsDetailContent.dataset.selectedRunId;
   }
+  renderApprovalReviewModal(ui, null);
   ui.terminalFeedback.innerHTML = "";
   ui.terminalHistory.innerHTML = renderPanelStateMetric(
     "empty",
@@ -2961,8 +2967,8 @@ function clearDataPanels() {
   ui.terminalPolicyHints.innerHTML = "";
   ui.runsContent.innerHTML = renderPanelStateMetric(
     "empty",
-    "Runs",
-    "No run data loaded.",
+    "History",
+    "No run history loaded.",
     "Refresh the workspace, then verify runtime availability and current scope."
   );
   ui.runDetailContent.innerHTML = renderPanelStateMetric(
@@ -3011,10 +3017,10 @@ function renderPanelLoadingStates() {
     );
   }
   if (ui.runsContent) {
-    ui.runsContent.innerHTML = renderPanelStateMetric("loading", "Runs", "Loading run history...");
+    ui.runsContent.innerHTML = renderPanelStateMetric("loading", "History", "Loading run history...");
   }
   if (ui.approvalsContent) {
-    ui.approvalsContent.innerHTML = renderPanelStateMetric("loading", "Approvals Queue", "Loading approvals...");
+    ui.approvalsContent.innerHTML = renderPanelStateMetric("loading", "Pending Approvals", "Loading approvals...");
   }
   if (ui.auditContent) {
     ui.auditContent.innerHTML = renderPanelStateMetric("loading", "Audit Events", "Loading audit events...");
@@ -3543,8 +3549,37 @@ function renderIncidentHistorySummary(totalCount, visibleCount, selectedCount, v
   const totalStatusCounts = countIncidentStatuses(allItems);
   const visibleStatusCounts = countIncidentStatuses(visibleItems);
   const latestVisible = Array.isArray(visibleItems) && visibleItems.length > 0 ? visibleItems[0] : null;
+  const visibleSelectedCount = Array.isArray(visibleItems)
+    ? visibleItems.filter((item) => incidentHistorySelection.has(String(item?.id || "").trim())).length
+    : 0;
+  const hiddenSelectedCount = Math.max(0, selectedCount - visibleSelectedCount);
   const timeLabel =
     normalizeIncidentHistoryTimeRange(view?.timeRange) || (view?.timeFrom || view?.timeTo ? "custom" : "any");
+  let nextAction = "Use Audit Events to seed a new package when a run needs durable incident handoff.";
+  if (selectedCount > 0) {
+    nextAction = "Selection is active. Run bulk status updates or export the selected bundle before changing filters.";
+  } else if (visibleStatusCounts.drafted > 0) {
+    nextAction = "Review drafted packages first and mark them filed only after downstream handoff has actually started.";
+  } else if (visibleStatusCounts.filed > 0) {
+    nextAction = "Filed packages are waiting on closure. Use Needs Closure and mark them closed when response tracking is complete.";
+  } else if (visibleStatusCounts.closed > 0) {
+    nextAction = "Closed packages are archival. Open the linked run or clear filters if active queue work needs to resume.";
+  }
+  const summaryActions = `
+    <div class="incident-history-actions">
+      <div class="action-hierarchy">
+        <div class="action-group action-group-primary">
+          <button class="btn btn-primary btn-small" type="button" data-incident-summary-action="copy-latest" ${latestVisible?.handoffText ? "" : "disabled"}>Copy Latest Handoff</button>
+        </div>
+        <div class="action-group action-group-secondary">
+          <button class="btn btn-secondary btn-small" type="button" data-incident-summary-action="open-audit">Open Audit Events</button>
+          <button class="btn btn-secondary btn-small" type="button" data-incident-summary-action="show-needs-closure">Needs Closure</button>
+          <button class="btn btn-secondary btn-small" type="button" data-incident-summary-action="show-all">Show All</button>
+          <button class="btn btn-secondary btn-small" type="button" data-incident-summary-action="clear-selection" ${selectedCount > 0 ? "" : "disabled"}>Clear Selection</button>
+        </div>
+      </div>
+    </div>
+  `;
   ui.incidentHistorySummary.innerHTML = `
     <div class="metric">
       <div class="metric-title-row">
@@ -3559,11 +3594,15 @@ function renderIncidentHistorySummary(totalCount, visibleCount, selectedCount, v
         <span class="chip chip-neutral chip-compact">closed=${escapeHTML(String(visibleStatusCounts.closed))}/${escapeHTML(String(totalStatusCounts.closed))}</span>
         <span class="chip chip-neutral chip-compact">latestScope=${escapeHTML(String(latestVisible?.scope || "-"))}</span>
         <span class="chip chip-neutral chip-compact">latestSource=${escapeHTML(String(latestVisible?.auditSource || "-"))}</span>
+        <span class="chip chip-neutral chip-compact">selectedVisible=${escapeHTML(String(visibleSelectedCount))}</span>
       </div>
+      <div class="meta incident-history-note">${escapeHTML(nextAction)}</div>
+      ${hiddenSelectedCount > 0 ? `<div class="meta incident-history-note">selectionHiddenByFilters=${escapeHTML(String(hiddenSelectedCount))}; clear selection or widen filters before bulk actions if you need to review every selected row first.</div>` : ""}
       <div class="meta incident-history-note">Transition semantics: drafted=prepared locally, filed=handed off downstream, closed=queue tracking complete.</div>
       <div class="meta incident-history-note">Bulk actions touch selected rows only. Rows that cannot move to the requested next status are skipped and reported in feedback.</div>
       <div class="meta">latestPackage=${escapeHTML(String(latestVisible?.packageId || "-"))}; latestGeneratedAt=${escapeHTML(String(latestVisible?.generatedAt || latestVisible?.createdAt || "-"))}</div>
       <div class="meta">filter=${escapeHTML(String(view?.status || "any"))}; sort=${escapeHTML(String(view?.sort || "newest"))}; time=${escapeHTML(timeLabel)}; search=${escapeHTML(searchLabel)}; page=${escapeHTML(pageLabel)}; pageSize=${escapeHTML(String(view?.pageSize || 25))}</div>
+      ${summaryActions}
     </div>
   `;
 }
@@ -3953,6 +3992,27 @@ async function main() {
     if (!(target instanceof HTMLElement)) {
       return;
     }
+    const copyNode = target.closest("[data-copy-text]");
+    if (copyNode instanceof HTMLElement) {
+      const payload = String(copyNode.dataset.copyText || "").trim();
+      const feedbackTargetId = String(copyNode.dataset.copyFeedbackTarget || "").trim();
+      const feedbackNode = feedbackTargetId ? document.getElementById(feedbackTargetId) : null;
+      if (!payload) {
+        return;
+      }
+      copyTextToClipboard(payload)
+        .then(() => {
+          if (feedbackNode instanceof HTMLElement) {
+            feedbackNode.textContent = "Path copied to the clipboard.";
+          }
+        })
+        .catch((error) => {
+          if (feedbackNode instanceof HTMLElement) {
+            feedbackNode.textContent = `Copy failed: ${error.message}`;
+          }
+        });
+      return;
+    }
     const toggleNode = target.closest("[data-advanced-toggle-section]");
     if (!(toggleNode instanceof HTMLElement)) {
       return;
@@ -4009,9 +4069,7 @@ async function main() {
   let initialChoices = resolveProjectChoices(initialProjectScope);
   aimxsEditorState = {
     status: "clean",
-    message: initialChoices?.aimxs?.paymentEntitled
-      ? "Entitlement is active; AIMXS HTTPS mode can be enabled with valid refs."
-      : "Entitlement is locked; AIMXS HTTPS mode remains disabled."
+    message: describeAimxsEntitlementMessage(initialChoices?.aimxs || {})
   };
   const initialThemeMode = resolveThemeMode(initialChoices?.theme?.mode || "system");
   if (ui.settingsThemeMode) {
@@ -4128,7 +4186,9 @@ async function main() {
     ...api.getSettingsSnapshot({
       choices: getRuntimeChoices(),
       themeMode: initialThemeMode,
-      selectedAgentProfileId: initialAgentID
+      selectedAgentProfileId: initialAgentID,
+      aimxsActivation: aimxsActivationSnapshot,
+      localSecureRefs: localSecureRefSnapshot
     }),
     configChanges: buildSettingsConfigChanges(configChangeHistory, { items: [] })
   };
@@ -4208,12 +4268,16 @@ async function main() {
         const approvalScope = readApprovalFilters(ui);
         persistListFilterStateFromUI();
 
-        const [health, pipeline, providers, runs] = await Promise.all([
+        const [health, pipeline, providers, runs, localSecureRefs, aimxsActivation] = await Promise.all([
           api.getHealth(),
           api.getPipelineStatus(),
           api.getProviders(),
-          api.getRuntimeRuns(runScope.limit)
+          api.getRuntimeRuns(runScope.limit),
+          api.getLocalSecureRefs(),
+          api.getAimxsActivation()
         ]);
+        localSecureRefSnapshot = normalizeLocalSecureRefSnapshot(localSecureRefs);
+        aimxsActivationSnapshot = normalizeAimxsActivationSnapshot(aimxsActivation);
 
         const [audit, approvals] = await Promise.all([
           api.getAuditEvents(auditScope, runs.items || []),
@@ -4259,7 +4323,9 @@ async function main() {
           approvals,
           audit,
           themeMode: selectedThemeMode,
-          selectedAgentProfileId
+          selectedAgentProfileId,
+          aimxsActivation: aimxsActivationSnapshot,
+          localSecureRefs: localSecureRefSnapshot
         });
         const settingsWithConfigChanges = {
           ...settings,
@@ -4298,10 +4364,26 @@ async function main() {
           integrationOverrides,
           runtimeIntegrationSyncStateByProject
         );
-        const selectedApprovalRunId = String(ui.approvalsDetailContent?.dataset?.selectedRunId || "").trim();
+        const nativeApprovalRailItems = buildNativeApprovalRailItems(operatorChatState.thread || {});
+        let selectedApprovalRunId = readPinnedApprovalSelectionId();
+        let selectedApproval = resolveApprovalSelection(selectedApprovalRunId);
+        if (!selectedApproval && !isApprovalSelectionDismissed()) {
+          const fallbackSelectionId = String(nativeApprovalRailItems[0]?.selectionId || "").trim();
+          if (fallbackSelectionId) {
+            selectedApprovalRunId = fallbackSelectionId;
+            selectedApproval = resolveApprovalSelection(selectedApprovalRunId);
+            if (ui.approvalsDetailContent) {
+              ui.approvalsDetailContent.dataset.selectedRunId = selectedApprovalRunId;
+            }
+          } else if (ui.approvalsDetailContent && selectedApprovalRunId) {
+            delete ui.approvalsDetailContent.dataset.selectedRunId;
+            selectedApprovalRunId = "";
+          }
+        }
         renderSettings(ui, settingsWithConfigChanges, editorState, {
           subview: settingsSubviewState,
           aimxsEditor: aimxsEditorState,
+          localSecureRefEditor: localSecureRefEditorState,
           agentTest: {
             ...agentInvokeState,
             agentProfileId:
@@ -4316,8 +4398,15 @@ async function main() {
           }
         });
         setSettingsSubview(settingsSubviewState);
-        renderApprovals(ui, store, approvals, approvalScope, selectedApprovalRunId);
-        renderApprovalsDetail(ui, store.getApprovalByRunID(selectedApprovalRunId));
+        renderApprovals(ui, store, approvals, approvalScope, selectedApprovalRunId, nativeApprovalRailItems);
+        renderApprovalsDetail(ui, selectedApproval);
+        if (approvalReviewModalIsOpen()) {
+          if (selectedApproval && !String(selectedApproval?.selectionId || "").trim().startsWith("native:")) {
+            renderApprovalReviewModal(ui, selectedApproval);
+          } else {
+            closeApprovalReviewModal();
+          }
+        }
         renderRuns(ui, store, runs, runScope);
         renderAudit(ui, audit, auditScope, {
           actor: String(
@@ -4412,12 +4501,91 @@ async function main() {
     };
   }
 
+  function buildNativeApprovalRailItems(thread = {}) {
+    const turns = Array.isArray(thread?.turns) ? thread.turns : [];
+    const taskId = String(thread?.taskId || "").trim();
+    const tenantId = String(thread?.tenantId || "").trim();
+    const projectId = String(thread?.projectId || "").trim();
+    return turns
+      .flatMap((turn) => {
+        const sessionView = turn?.sessionView || {};
+        const timeline = sessionView?.timeline && typeof sessionView.timeline === "object" ? sessionView.timeline : {};
+        const sessionId = String(timeline?.session?.sessionId || turn?.response?.sessionId || "").trim();
+        const approvals = Array.isArray(timeline?.approvalCheckpoints) ? timeline.approvalCheckpoints : [];
+        const proposals = listNativeToolProposals(sessionView);
+        const approvalItems = approvals
+          .filter((item) => String(item?.status || "").trim().toUpperCase() === "PENDING")
+          .map((item) => {
+            const checkpointId = String(item?.checkpointId || "").trim();
+            return {
+              selectionId: `native:checkpoint:${sessionId}:${checkpointId}`,
+              decisionType: "checkpoint",
+              source: "native-session-checkpoint",
+              taskId,
+              tenantId,
+              projectId,
+              sessionId,
+              checkpointId,
+              createdAt: String(item?.createdAt || item?.updatedAt || turn?.createdAt || "").trim(),
+              status: "PENDING",
+              reason: String(item?.reason || "").trim(),
+              summary: String(item?.reason || "").trim(),
+              scope: String(item?.scope || "").trim()
+            };
+          });
+        const proposalItems = proposals
+          .filter((item) => String(item?.status || "PENDING").trim().toUpperCase() === "PENDING")
+          .map((item) => {
+            const proposalId = String(item?.proposalId || "").trim();
+            return {
+              selectionId: `native:proposal:${sessionId}:${proposalId}`,
+              decisionType: "proposal",
+              source: "native-tool-proposal",
+              taskId,
+              tenantId,
+              projectId,
+              sessionId,
+              proposalId,
+              createdAt: String(item?.generatedAt || turn?.createdAt || "").trim(),
+              status: "PENDING",
+              summary: String(item?.summary || item?.command || "").trim(),
+              reason: String(item?.reason || "").trim(),
+              proposalType: String(item?.proposalType || "").trim(),
+              command: String(item?.command || "").trim()
+            };
+          });
+        return [...approvalItems, ...proposalItems];
+      })
+      .sort((a, b) => parseTimeMs(b?.createdAt) - parseTimeMs(a?.createdAt));
+  }
+
+  function getNativeApprovalRailItemBySelectionId(selectionId) {
+    const id = String(selectionId || "").trim();
+    if (!id.startsWith("native:")) {
+      return null;
+    }
+    return buildNativeApprovalRailItems(operatorChatState.thread || {}).find(
+      (item) => String(item?.selectionId || "").trim() === id
+    ) || null;
+  }
+
+  function resolveApprovalSelection(selectionId) {
+    const id = String(selectionId || "").trim();
+    if (!id) {
+      return null;
+    }
+    if (id.startsWith("native:")) {
+      return getNativeApprovalRailItemBySelectionId(id);
+    }
+    return store.getApprovalByRunID(id) || null;
+  }
+
   async function openRunDetail(runID, options = {}) {
     const nextRunID = String(runID || "").trim();
     if (!nextRunID) {
       return;
     }
-    setWorkspaceView("runs", true);
+    setWorkspaceView("history", true);
     ui.runDetailContent.dataset.selectedRunId = nextRunID;
     if (ui.terminalRunId) {
       ui.terminalRunId.value = nextRunID;
@@ -4483,17 +4651,203 @@ async function main() {
     if (!nextRunID || !ui.approvalsDetailContent) {
       return "noop";
     }
-    const selectedRunID = String(ui.approvalsDetailContent.dataset.selectedRunId || "").trim();
+    const selectedRunID = readPinnedApprovalSelectionId();
     if (selectedRunID && selectedRunID === nextRunID) {
-      delete ui.approvalsDetailContent.dataset.selectedRunId;
+      ui.approvalsDetailContent.dataset.selectedRunId = APPROVAL_SELECTION_NONE;
       renderApprovalsDetail(ui, null);
+      closeApprovalReviewModal();
       return "collapsed";
     }
     ui.approvalsDetailContent.dataset.selectedRunId = nextRunID;
-    const approval = store.getApprovalByRunID(nextRunID);
+    const approval = resolveApprovalSelection(nextRunID);
     renderApprovalsDetail(ui, approval);
     focusRenderedRegion(ui.approvalsDetailContent);
     return "opened";
+  }
+
+  function approvalReviewModalIsOpen() {
+    if (typeof HTMLDialogElement !== "undefined" && ui.approvalReviewModal instanceof HTMLDialogElement) {
+      return ui.approvalReviewModal.open;
+    }
+    return ui.approvalReviewModal instanceof HTMLElement && ui.approvalReviewModal.hasAttribute("open");
+  }
+
+  function closeApprovalReviewModal() {
+    if (typeof HTMLDialogElement !== "undefined" && ui.approvalReviewModal instanceof HTMLDialogElement) {
+      if (ui.approvalReviewModal.open) {
+        ui.approvalReviewModal.close();
+      }
+      return;
+    }
+    if (ui.approvalReviewModal instanceof HTMLElement) {
+      ui.approvalReviewModal.removeAttribute("open");
+    }
+  }
+
+  function openApprovalReviewModal(runID, options = {}) {
+    const nextRunID = String(runID || "").trim();
+    if (!nextRunID || !ui.approvalReviewModalContent) {
+      return false;
+    }
+    const approval = store.getApprovalByRunID(nextRunID);
+    if (!approval || String(nextRunID || "").trim().startsWith("native:")) {
+      closeApprovalReviewModal();
+      return false;
+    }
+    renderApprovalReviewModal(ui, approval);
+    if (typeof HTMLDialogElement !== "undefined" && ui.approvalReviewModal instanceof HTMLDialogElement) {
+      if (!ui.approvalReviewModal.open) {
+        ui.approvalReviewModal.showModal();
+      }
+    } else if (ui.approvalReviewModal instanceof HTMLElement) {
+      ui.approvalReviewModal.setAttribute("open", "open");
+    }
+    if (options.focus !== false) {
+      focusRenderedRegion(ui.approvalReviewModalContent, { scroll: false });
+    }
+    return true;
+  }
+
+  async function submitApprovalDecisionFromContainer(container, decisionNode) {
+    const runID =
+      decisionNode instanceof HTMLElement
+        ? String(decisionNode.dataset.approvalDetailRunId || "").trim()
+        : "";
+    const decision =
+      decisionNode instanceof HTMLElement
+        ? String(decisionNode.dataset.approvalDetailDecision || "").trim().toUpperCase()
+        : "";
+    if (!runID || !decision) {
+      return false;
+    }
+    const reasonInput =
+      container instanceof HTMLElement ? container.querySelector("[data-approval-decision-reason]") : null;
+    const reason =
+      reasonInput instanceof HTMLInputElement ? String(reasonInput.value || "").trim() : "";
+    if (!reason) {
+      renderApprovalFeedback(ui, "warn", "Decision reason is required before approve/deny.");
+      return true;
+    }
+
+    const approvalScope = readApprovalFilters(ui);
+    const approvalRecord = store.getApprovalByRunID(runID) || {};
+    const decisionScope = formatScopeLabel(approvalRecord?.tenantId, approvalRecord?.projectId);
+    const submittedAt = new Date().toISOString();
+    try {
+      const result = await api.submitApprovalDecision(runID, decision, {
+        ttlSeconds: approvalScope.ttlSeconds,
+        reason
+      });
+      if (result?.applied === false) {
+        renderApprovalFeedback(
+          ui,
+          "warn",
+          `${result.warning || "No approval endpoint available."} scope=${decisionScope}; source=approval-queue; submittedAt=${submittedAt}`
+        );
+      } else {
+        renderApprovalFeedback(
+          ui,
+          "ok",
+          `runId=${runID}; decision=${decision}; status=${result.status || "updated"}; scope=${decisionScope}; source=approval-queue; submittedAt=${submittedAt}`
+        );
+        closeApprovalReviewModal();
+      }
+      if (ui.approvalsDetailContent) {
+        ui.approvalsDetailContent.dataset.selectedRunId = runID;
+      }
+      await refresh();
+    } catch (error) {
+      renderApprovalFeedback(ui, "error", error.message);
+    }
+    return true;
+  }
+
+  async function submitNativeApprovalRailDecision(selectionId, decision, reason) {
+    const item = getNativeApprovalRailItemBySelectionId(selectionId);
+    if (!item || !operatorChatState.thread) {
+      return false;
+    }
+    const normalizedDecision = String(decision || "").trim().toUpperCase();
+    const decisionVerb = normalizedDecision === "DENY" ? "denied" : "approved";
+    const submittedReason =
+      String(reason || "").trim() ||
+      (item?.decisionType === "proposal"
+        ? `Pinned Agent review ${decisionVerb} tool proposal.`
+        : `Pinned Agent review ${decisionVerb} approval checkpoint.`);
+    const sessionId = String(item?.sessionId || "").trim();
+    if (!sessionId || !normalizedDecision) {
+      return false;
+    }
+    const currentSession = getSession();
+    const decisionScope = {
+      tenantId: String(item?.tenantId || activeTenantScope(currentSession) || "").trim(),
+      projectId: String(item?.projectId || activeProjectScope(currentSession) || "").trim()
+    };
+    operatorChatState = {
+      ...operatorChatState,
+      status: "running",
+      message:
+        item?.decisionType === "proposal"
+          ? `Submitting ${normalizedDecision} for tool proposal ${item.proposalId} on session ${sessionId}...`
+          : `Submitting ${normalizedDecision} for checkpoint ${item.checkpointId} on session ${sessionId}...`
+    };
+    await refresh();
+    try {
+      let result = null;
+      if (item?.decisionType === "proposal") {
+        result = await api.submitRuntimeSessionToolProposalDecision(sessionId, item.proposalId, normalizedDecision, {
+          meta: {
+            tenantId: decisionScope.tenantId,
+            projectId: decisionScope.projectId,
+            requestId: `chat-tool-proposal-${Date.now()}`
+          },
+          reason: submittedReason
+        });
+      } else {
+        result = await api.submitRuntimeSessionApprovalDecision(sessionId, item.checkpointId, normalizedDecision, {
+          meta: {
+            tenantId: decisionScope.tenantId,
+            projectId: decisionScope.projectId,
+            requestId: `chat-approval-${Date.now()}`
+          },
+          reason: submittedReason
+        });
+      }
+      const refreshed = await refreshOperatorChatThreadSession(api, operatorChatState.thread, sessionId, {
+        tailCount: 8,
+        waitSeconds: 1
+      });
+      const nextThread = refreshed?.thread || operatorChatState.thread;
+      const derived = deriveOperatorChatThreadState(nextThread);
+      operatorChatState = {
+        ...operatorChatState,
+        status: derived.uiStatus || (result?.applied ? "success" : "warn"),
+        message: result?.applied
+          ? item?.decisionType === "proposal"
+            ? `Tool proposal ${item.proposalId} ${normalizedDecision === "DENY" ? "denied" : "approved"}. ${derived.message}`
+            : `Checkpoint ${item.checkpointId} ${normalizedDecision === "DENY" ? "denied" : "approved"}. ${derived.message}`
+          : String(result?.warning || "").trim() || "Native decision was not changed.",
+        thread: nextThread
+      };
+      await refreshOperatorChatHistory(session);
+      renderApprovalFeedback(
+        ui,
+        result?.applied ? "ok" : "warn",
+        operatorChatState.message
+      );
+    } catch (error) {
+      operatorChatState = {
+        ...operatorChatState,
+        status: "error",
+        message: item?.decisionType === "proposal"
+          ? `Tool proposal decision failed: ${error.message}`
+          : `Approval decision failed: ${error.message}`,
+        thread: operatorChatState.thread
+      };
+      renderApprovalFeedback(ui, "error", operatorChatState.message);
+    }
+    await refresh();
+    return true;
   }
 
   ui.loginButton.addEventListener("click", async () => {
@@ -5721,7 +6075,24 @@ async function main() {
     const integrationFieldNode = target.closest("[data-settings-int-field]");
     const aimxsFieldNode = target.closest("[data-settings-aimxs-field]");
     const agentTestFieldNode = target.closest("[data-settings-agent-test-field]");
-    if (!integrationFieldNode && !aimxsFieldNode && !agentTestFieldNode) {
+    const localSecureRefFieldNode = target.closest("[data-settings-local-ref-field]");
+    if (!integrationFieldNode && !aimxsFieldNode && !agentTestFieldNode && !localSecureRefFieldNode) {
+      return;
+    }
+    if (localSecureRefFieldNode) {
+      const draft = readLocalSecureRefInput();
+      if (!draft) {
+        return;
+      }
+      localSecureRefEditorState = {
+        ...localSecureRefEditorState,
+        ...draft,
+        status: localSecureRefSnapshot.available ? "dirty" : "warn",
+        message: localSecureRefSnapshot.available
+          ? "Local secure ref draft changed. Save Secure Value to store it outside the repo, then restart terminal 1 when you need the runtime to pick it up."
+          : "Local secure credential capture is unavailable on this launcher."
+      };
+      renderLocalSecureRefFeedbackInline(localSecureRefEditorState);
       return;
     }
     if (agentTestFieldNode) {
@@ -5747,7 +6118,11 @@ async function main() {
       if (!draft) {
         return;
       }
-      const validation = validateAimxsOverride(draft, getRuntimeChoices()?.aimxs || {});
+      const validation = validateAimxsOverride(
+        draft,
+        getRuntimeChoices()?.aimxs || {},
+        validateReference
+      );
       aimxsEditorState = validation.valid
         ? {
             status: "dirty",
@@ -5823,6 +6198,161 @@ async function main() {
       focusRenderedRegion(ui.auditContent);
       return;
     }
+    const localSecureRefActionNode = target.closest("[data-settings-local-ref-action]");
+    if (localSecureRefActionNode instanceof HTMLElement) {
+      const action = String(localSecureRefActionNode.dataset.settingsLocalRefAction || "")
+        .trim()
+        .toLowerCase();
+      if (!action) {
+        return;
+      }
+      if (action === "refresh") {
+        localSecureRefSnapshot = normalizeLocalSecureRefSnapshot(await api.getLocalSecureRefs());
+        localSecureRefEditorState = {
+          ...localSecureRefEditorState,
+          status: localSecureRefSnapshot.available ? "clean" : "warn",
+          message: localSecureRefSnapshot.message || "Secure local ref status refreshed."
+        };
+        await refresh();
+        return;
+      }
+
+      const draft = readLocalSecureRefInput() || localSecureRefEditorState;
+      const targetRef = resolveLocalSecureRefTargetRef(draft);
+      const validationErrors = [];
+      validateReference(validationErrors, "Local ref", targetRef);
+
+      if (!localSecureRefSnapshot.available) {
+        localSecureRefEditorState = {
+          ...localSecureRefEditorState,
+          ...draft,
+          status: "warn",
+          message: "Local secure credential capture is unavailable on this launcher."
+        };
+        renderLocalSecureRefFeedbackInline(localSecureRefEditorState);
+        return;
+      }
+
+      if (validationErrors.length > 0) {
+        localSecureRefEditorState = {
+          ...localSecureRefEditorState,
+          ...draft,
+          status: "invalid",
+          message: validationErrors.join(" ")
+        };
+        renderLocalSecureRefFeedbackInline(localSecureRefEditorState);
+        return;
+      }
+
+      if (action === "save") {
+        if (!String(draft?.secretValue || "").trim()) {
+          localSecureRefEditorState = {
+            ...localSecureRefEditorState,
+            ...draft,
+            status: "invalid",
+            message: "Concrete local value is required before saving."
+          };
+          renderLocalSecureRefFeedbackInline(localSecureRefEditorState);
+          return;
+        }
+        try {
+          const result = await api.upsertLocalSecureRef({
+            ref: targetRef,
+            value: String(draft.secretValue || "")
+          });
+          localSecureRefSnapshot = normalizeLocalSecureRefSnapshot(result);
+          localSecureRefEditorState = {
+            selectedRef: draft.selectedRef,
+            customRef: draft.customRef,
+            secretValue: "",
+            status: "saved",
+            message: String(result?.message || "Secure local ref value saved.").trim()
+          };
+          recordConfigChange({
+            action: "settings.local_secure_ref.save",
+            status: "saved",
+            source: "local-keychain",
+            event: "settings.local_secure_ref.save",
+            providerId: "local-secure-ref-helper"
+          });
+          await refresh();
+        } catch (error) {
+          localSecureRefEditorState = {
+            ...localSecureRefEditorState,
+            ...draft,
+            status: "error",
+            message: `Secure local save failed: ${error.message}`
+          };
+          renderLocalSecureRefFeedbackInline(localSecureRefEditorState);
+        }
+        return;
+      }
+
+      if (action === "delete") {
+        try {
+          const result = await api.deleteLocalSecureRef({
+            ref: targetRef
+          });
+          localSecureRefSnapshot = normalizeLocalSecureRefSnapshot(result);
+          localSecureRefEditorState = {
+            selectedRef: draft.selectedRef,
+            customRef: draft.customRef,
+            secretValue: "",
+            status: "applied",
+            message: String(result?.message || "Secure local ref value removed.").trim()
+          };
+          recordConfigChange({
+            action: "settings.local_secure_ref.delete",
+            status: "applied",
+            source: "local-keychain",
+            event: "settings.local_secure_ref.delete",
+            providerId: "local-secure-ref-helper"
+          });
+          await refresh();
+        } catch (error) {
+          localSecureRefEditorState = {
+            ...localSecureRefEditorState,
+            ...draft,
+            status: "error",
+            message: `Secure local delete failed: ${error.message}`
+          };
+          renderLocalSecureRefFeedbackInline(localSecureRefEditorState);
+        }
+        return;
+      }
+
+      if (action === "export") {
+        try {
+          const result = await api.exportLocalSecureRefs();
+          localSecureRefSnapshot = normalizeLocalSecureRefSnapshot(result);
+          localSecureRefEditorState = {
+            ...localSecureRefEditorState,
+            ...draft,
+            secretValue: "",
+            status: "applied",
+            message: String(result?.message || "Runtime ref-values export refreshed.").trim()
+          };
+          recordConfigChange({
+            action: "settings.local_secure_ref.export",
+            status: "applied",
+            source: "local-keychain",
+            event: "settings.local_secure_ref.export",
+            providerId: "local-secure-ref-helper"
+          });
+          await refresh();
+        } catch (error) {
+          localSecureRefEditorState = {
+            ...localSecureRefEditorState,
+            ...draft,
+            status: "error",
+            message: `Runtime ref export failed: ${error.message}`
+          };
+          renderLocalSecureRefFeedbackInline(localSecureRefEditorState);
+        }
+        return;
+      }
+      return;
+    }
     const aimxsActionNode = target.closest("[data-settings-aimxs-action]");
     if (aimxsActionNode instanceof HTMLElement) {
       const action = String(aimxsActionNode.dataset.settingsAimxsAction || "")
@@ -5832,24 +6362,55 @@ async function main() {
         return;
       }
 
-      if (action === "apply") {
-        const draft = readAimxsEditorInput();
-        if (!draft) {
+      const draft = readAimxsEditorInput();
+      if ((action === "apply" || action === "activate") && !draft) {
+        aimxsEditorState = {
+          status: "invalid",
+          message: "AIMXS controls are unavailable in this view. Reopen Settings and retry the action.",
+          errors: [],
+          warnings: []
+        };
+        renderAimxsEditorFeedbackInline(aimxsEditorState);
+        return;
+      }
+
+      if (action === "refresh-activation") {
+        try {
+          aimxsActivationSnapshot = normalizeAimxsActivationSnapshot(await api.getAimxsActivation());
           aimxsEditorState = {
-            status: "invalid",
-            message: "AIMXS controls are unavailable in this view. Reopen Settings and retry the action.",
+            status: "clean",
+            message: String(
+              aimxsActivationSnapshot.message ||
+                "AIMXS activation status refreshed from the local launcher helper."
+            ).trim(),
+            errors: [],
+            warnings: aimxsActivationSnapshot.warnings || [],
+            nextStep:
+              "Next step: if the active cluster mode is wrong, adjust the contract and run Activate AIMXS Mode."
+          };
+        } catch (error) {
+          aimxsEditorState = {
+            status: "error",
+            message: `AIMXS activation status refresh failed: ${error.message}`,
             errors: [],
             warnings: []
           };
-          renderAimxsEditorFeedbackInline(aimxsEditorState);
-          return;
         }
+        renderAimxsEditorFeedbackInline(aimxsEditorState);
+        await refresh();
+        return;
+      }
 
-        const validation = validateAimxsOverride(draft, getRuntimeChoices()?.aimxs || {});
+      if (action === "apply" || action === "activate") {
+        const validation = validateAimxsOverride(
+          draft,
+          getRuntimeChoices()?.aimxs || {},
+          validateReference
+        );
         if (!validation.valid) {
           aimxsEditorState = {
             status: "invalid",
-            message: "AIMXS apply is blocked. Fix the fields below, then run Apply AIMXS Settings again.",
+            message: `AIMXS ${action} is blocked. Fix the fields below, then retry.`,
             errors: validation.errors,
             warnings: validation.warnings
           };
@@ -5868,27 +6429,74 @@ async function main() {
         renderConfigSummary(nextChoices);
         refreshRunBuilderPreview(getSession());
         refreshTerminalPreview(getSession(), nextChoices);
-        const mode = String(aimxsOverride.mode || "disabled").trim().toLowerCase();
-        const message =
-          mode === "https_external"
-            ? "AIMXS HTTPS mode is active with external provider references."
-            : mode === "in_stack_reserved"
-              ? "AIMXS mode is set to in_stack_reserved placeholder; HTTPS external remains the active path in this build."
-              : "AIMXS mode is disabled.";
-        aimxsEditorState = {
-          status: "applied",
-          message,
-          errors: [],
-          warnings: validation.warnings
-        };
+
+        if (action === "apply") {
+          aimxsEditorState = {
+            status: "applied",
+            message: describeAimxsAppliedMessage(aimxsOverride),
+            errors: [],
+            warnings: validation.warnings,
+            nextStep:
+              "Next step: run Activate AIMXS Mode when you want the live policy-provider selection to switch to this contract."
+          };
+          renderAimxsEditorFeedbackInline(aimxsEditorState);
+          recordConfigChange({
+            action: "settings.aimxs.apply",
+            status: "applied",
+            source: "local-ui",
+            event: "settings.aimxs.apply",
+            providerId: "aimxs-settings"
+          });
+          await refresh();
+          return;
+        }
+
+        try {
+          const activationResult = await api.applyAimxsActivation(validation.draft);
+          aimxsActivationSnapshot = normalizeAimxsActivationSnapshot(activationResult);
+          aimxsEditorState = {
+            status:
+              aimxsActivationSnapshot.state === "active" || aimxsActivationSnapshot.state === "ready"
+                ? "applied"
+                : "dirty",
+            message: String(
+              activationResult?.message ||
+                aimxsActivationSnapshot.message ||
+                "AIMXS activation request completed."
+            ).trim(),
+            errors: [],
+            warnings: [
+              ...validation.warnings,
+              ...(Array.isArray(aimxsActivationSnapshot.warnings) ? aimxsActivationSnapshot.warnings : [])
+            ],
+            nextStep:
+              "Next step: confirm provider readiness and capabilities in Settings, then run the live operator loop on the selected AIMXS mode."
+          };
+          recordConfigChange({
+            action: "settings.aimxs.activate",
+            status:
+              aimxsActivationSnapshot.state === "active" || aimxsActivationSnapshot.state === "ready"
+                ? "applied"
+                : "pending",
+            source: "local-launcher",
+            event: "settings.aimxs.activate",
+            providerId: String(
+              aimxsActivationSnapshot.selectedProviderId || validation.draft.mode || "aimxs-settings"
+            ).trim()
+          });
+        } catch (error) {
+          aimxsEditorState = {
+            status: "error",
+            message: `AIMXS activation failed: ${error.message}`,
+            errors: [],
+            warnings: validation.warnings,
+            nextStep:
+              validation.draft.mode === "aimxs-full"
+                ? "Next step: confirm terminal 2 is still running the live launcher AIMXS shim, then retry Activate AIMXS Mode."
+                : "Next step: verify the AIMXS refs exist in Secure Local Credential Capture, then retry Activate AIMXS Mode."
+          };
+        }
         renderAimxsEditorFeedbackInline(aimxsEditorState);
-        recordConfigChange({
-          action: "settings.aimxs.apply",
-          status: "applied",
-          source: "local-ui",
-          event: "settings.aimxs.apply",
-          providerId: "aimxs-settings"
-        });
         await refresh();
         return;
       }
@@ -6424,9 +7032,13 @@ async function main() {
         ? String(selectRunNode.dataset.approvalSelectRunId || "").trim()
         : "";
     if (selectRunID) {
-      openApprovalDetail(selectRunID);
+      const state = openApprovalDetail(selectRunID);
+      if (state === "collapsed") {
+        await refresh();
+        return;
+      }
       await refresh();
-      focusRenderedRegion(ui.approvalsDetailContent, { scroll: false });
+      openApprovalReviewModal(selectRunID);
       return;
     }
     const openRunNode = target.closest("[data-approval-open-run-id]");
@@ -6444,6 +7056,24 @@ async function main() {
     if (!(target instanceof HTMLElement)) {
       return;
     }
+    const nativeDecisionNode = target.closest("[data-native-decision-action]");
+    if (nativeDecisionNode instanceof HTMLElement) {
+      const selectionId = String(nativeDecisionNode.dataset.nativeDecisionKey || "").trim();
+      const decision = String(nativeDecisionNode.dataset.nativeDecisionAction || "").trim().toUpperCase();
+      const reasonInput = ui.approvalsDetailContent.querySelector("[data-native-decision-reason]");
+      const reason = reasonInput instanceof HTMLInputElement ? String(reasonInput.value || "").trim() : "";
+      await submitNativeApprovalRailDecision(selectionId, decision, reason);
+      return;
+    }
+    const openModalNode = target.closest("[data-approval-open-modal-run-id]");
+    const openModalRunID =
+      openModalNode instanceof HTMLElement
+        ? String(openModalNode.dataset.approvalOpenModalRunId || "").trim()
+        : "";
+    if (openModalRunID) {
+      openApprovalReviewModal(openModalRunID);
+      return;
+    }
     const openRunNode = target.closest("[data-approval-open-run-id]");
     const openRunID =
       openRunNode instanceof HTMLElement
@@ -6454,54 +7084,49 @@ async function main() {
       return;
     }
     const decisionNode = target.closest("[data-approval-detail-run-id]");
-    const runID =
-      decisionNode instanceof HTMLElement
-        ? String(decisionNode.dataset.approvalDetailRunId || "").trim()
-        : "";
-    const decision =
-      decisionNode instanceof HTMLElement
-        ? String(decisionNode.dataset.approvalDetailDecision || "").trim().toUpperCase()
-        : "";
-    if (!runID || !decision) {
+    if (!(decisionNode instanceof HTMLElement)) {
       return;
     }
-    const reasonInput = ui.approvalsDetailContent.querySelector("#approval-detail-reason");
-    const reason =
-      reasonInput instanceof HTMLInputElement ? String(reasonInput.value || "").trim() : "";
-    if (!reason) {
-      renderApprovalFeedback(ui, "warn", "Decision reason is required before approve/deny.");
+    await submitApprovalDecisionFromContainer(ui.approvalsDetailContent, decisionNode);
+  });
+  ui.approvalReviewModal?.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
       return;
     }
-
-    const approvalScope = readApprovalFilters(ui);
-    const approvalRecord = store.getApprovalByRunID(runID) || {};
-    const decisionScope = formatScopeLabel(approvalRecord?.tenantId, approvalRecord?.projectId);
-    const submittedAt = new Date().toISOString();
-    try {
-      const result = await api.submitApprovalDecision(runID, decision, {
-        ttlSeconds: approvalScope.ttlSeconds,
-        reason
-      });
-      if (result?.applied === false) {
-        renderApprovalFeedback(
-          ui,
-          "warn",
-          `${result.warning || "No approval endpoint available."} scope=${decisionScope}; source=approval-queue; submittedAt=${submittedAt}`
-        );
-      } else {
-        renderApprovalFeedback(
-          ui,
-          "ok",
-          `runId=${runID}; decision=${decision}; status=${result.status || "updated"}; scope=${decisionScope}; source=approval-queue; submittedAt=${submittedAt}`
-        );
-      }
-      if (ui.approvalsDetailContent) {
-        ui.approvalsDetailContent.dataset.selectedRunId = runID;
-      }
-      await refresh();
-    } catch (error) {
-      renderApprovalFeedback(ui, "error", error.message);
+    if (target === ui.approvalReviewModal) {
+      closeApprovalReviewModal();
+      return;
     }
+    const closeNode = target.closest("[data-approval-modal-close]");
+    if (closeNode instanceof HTMLElement) {
+      closeApprovalReviewModal();
+    }
+  });
+  ui.approvalReviewModal?.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    closeApprovalReviewModal();
+  });
+  ui.approvalReviewModalContent?.addEventListener("click", async (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    const openRunNode = target.closest("[data-approval-open-run-id]");
+    const openRunID =
+      openRunNode instanceof HTMLElement
+        ? String(openRunNode.dataset.approvalOpenRunId || "").trim()
+        : "";
+    if (openRunID) {
+      closeApprovalReviewModal();
+      await openRunDetail(openRunID, { fromApproval: true });
+      return;
+    }
+    const decisionNode = target.closest("[data-approval-detail-run-id]");
+    if (!(decisionNode instanceof HTMLElement)) {
+      return;
+    }
+    await submitApprovalDecisionFromContainer(ui.approvalReviewModalContent, decisionNode);
   });
   ui.triageContent?.addEventListener("click", async (event) => {
     const target = event.target;
@@ -6526,7 +7151,7 @@ async function main() {
         ui.approvalsPage.value = "1";
       }
       await refresh();
-      setWorkspaceView("approvals", true);
+      setWorkspaceView("agent", true);
       ui.approvalsContent?.scrollIntoView({ behavior: "smooth", block: "start" });
       focusRenderedRegion(ui.approvalsContent, { scroll: false });
       return;
@@ -6541,7 +7166,7 @@ async function main() {
         ui.runsPage.value = "1";
       }
       await refresh();
-      setWorkspaceView("runs", true);
+      setWorkspaceView("history", true);
       if (runID) {
         await openRunDetail(runID);
       } else {
@@ -6568,7 +7193,7 @@ async function main() {
         ui.terminalHistoryStatusFilter.value = "POLICY_BLOCKED";
       }
       renderTerminalHistoryPanel();
-      setWorkspaceView("operations", true);
+      setWorkspaceView("home", true);
       ui.terminalHistory?.scrollIntoView({ behavior: "smooth", block: "start" });
       focusRenderedRegion(ui.terminalHistory, { scroll: false });
     }
@@ -7036,6 +7661,38 @@ async function main() {
       await openRunDetail(openRunId);
     }
   });
+  ui.incidentHistorySummary?.addEventListener("click", async (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    const action = String(target.dataset.incidentSummaryAction || "").trim();
+    if (!action) {
+      return;
+    }
+    if (action === "copy-latest") {
+      ui.incidentHistoryCopyLatestButton?.click();
+      return;
+    }
+    if (action === "open-audit") {
+      setWorkspaceView("incidents", true);
+      setIncidentSubview("audit", true);
+      focusRenderedRegion(ui.auditContent, { scroll: false });
+      return;
+    }
+    if (action === "show-needs-closure") {
+      applyIncidentQuickView("filed", "newest", { resetSearch: false });
+      return;
+    }
+    if (action === "show-all") {
+      applyIncidentQuickView("", "newest", { resetSearch: false });
+      return;
+    }
+    if (action === "clear-selection") {
+      clearIncidentHistorySelection();
+      renderAuditFilingFeedback("info", "Incident selection cleared from the queue summary.");
+    }
+  });
   window.addEventListener("storage", (event) => {
     if (!event) {
       return;
@@ -7086,12 +7743,7 @@ async function main() {
       );
       aimxsEditorState = {
         status: "clean",
-        message:
-          aimxsOverride.mode === "https_external"
-            ? "AIMXS settings synced from another tab; HTTPS mode is active."
-            : aimxsOverride.paymentEntitled
-              ? "AIMXS settings synced from another tab."
-              : "Entitlement is locked; AIMXS HTTPS mode remains disabled."
+        message: describeAimxsSyncedMessage(aimxsOverride)
       };
       refresh().catch(() => {});
       return;
@@ -7147,6 +7799,23 @@ async function main() {
     if (!(target instanceof HTMLElement)) {
       return;
     }
+    const copyPath = String(target.dataset.runCopyPath || "").trim();
+    if (copyPath) {
+      const label = String(target.dataset.runCopyPathLabel || "Path").trim();
+      try {
+        await copyTextToClipboard(copyPath);
+        const feedback = ui.runDetailContent.querySelector("[data-run-path-feedback]");
+        if (feedback instanceof HTMLElement) {
+          feedback.textContent = `${label} copied to the clipboard.`;
+        }
+      } catch (error) {
+        const feedback = ui.runDetailContent.querySelector("[data-run-path-feedback]");
+        if (feedback instanceof HTMLElement) {
+          feedback.textContent = `Copy failed: ${error.message}`;
+        }
+      }
+      return;
+    }
     const openApprovalRunID = String(target.dataset.openApprovalRunId || "").trim();
     if (!openApprovalRunID) {
       return;
@@ -7169,8 +7838,9 @@ async function main() {
     }
 
     await refresh();
-    setWorkspaceView("approvals", true);
+    setWorkspaceView("agent", true);
     openApprovalDetail(openApprovalRunID);
+    openApprovalReviewModal(openApprovalRunID);
   });
 
   const stopRefreshLoop = startRealtimeRefreshLoop(getRuntimeChoices(), refresh);

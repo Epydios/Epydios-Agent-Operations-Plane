@@ -36,6 +36,34 @@ m21_local_runtime_session_root() {
   printf "%s/sessions\n" "$(m21_local_runtime_root)"
 }
 
+m21_local_aimxs_root() {
+  printf "%s/aimxs-full\n" "$(m21_local_runtime_root)"
+}
+
+m21_local_aimxs_provider_override_path() {
+  printf "%s/provider-override.json\n" "$(m21_local_aimxs_root)"
+}
+
+m21_local_aimxs_provider_state_path() {
+  printf "%s/provider-state.json\n" "$(m21_local_aimxs_root)"
+}
+
+m21_local_ref_vault_root() {
+  printf "%s/internal-readiness/local-ref-vault\n" "${M21_NON_GITHUB_ROOT}"
+}
+
+m21_local_ref_vault_index_path() {
+  printf "%s/index.json\n" "$(m21_local_ref_vault_root)"
+}
+
+m21_local_ref_vault_export_path() {
+  printf "%s/runtime-ref-values.generated.json\n" "$(m21_local_ref_vault_root)"
+}
+
+m21_local_ref_vault_service_name() {
+  printf "%s\n" "${EPYDIOS_M21_LOCAL_REF_VAULT_SERVICE:-epydios.agentops.desktop.local-ref.v1}"
+}
+
 m21_go_cache_root() {
   printf "%s/go-build-cache\n" "${M21_CACHE_ROOT}"
 }

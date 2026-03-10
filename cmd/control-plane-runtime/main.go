@@ -71,6 +71,7 @@ type Config struct {
 	RetentionPolicyJSON               string
 	RefValuesPath                     string
 	RefValuesJSON                     string
+	PolicyProviderOverridePath        string
 	IntegrationInvokeTimeout          time.Duration
 	ManagedCodexMode                  string
 	CodexCLIPath                      string
@@ -132,6 +133,7 @@ func parseFlags() Config {
 		RetentionPolicyJSON:               envOrDefault("RETENTION_POLICY_JSON", ""),
 		RefValuesPath:                     envOrDefault("RUNTIME_REF_VALUES_PATH", ""),
 		RefValuesJSON:                     envOrDefault("RUNTIME_REF_VALUES_JSON", ""),
+		PolicyProviderOverridePath:        envOrDefault("RUNTIME_POLICY_PROVIDER_OVERRIDE_PATH", ""),
 		IntegrationInvokeTimeout:          envDurationOrDefault("RUNTIME_INTEGRATION_INVOKE_TIMEOUT", 45*time.Second),
 		ManagedCodexMode:                  envOrDefault("RUNTIME_MANAGED_CODEX_MODE", "legacy"),
 		CodexCLIPath:                      envOrDefault("RUNTIME_CODEX_CLI_PATH", ""),
@@ -186,6 +188,7 @@ func parseFlags() Config {
 	flag.StringVar(&cfg.RetentionPolicyJSON, "retention-policy-json", cfg.RetentionPolicyJSON, "JSON map of retentionClass to duration (for example {\"standard\":\"168h\",\"short\":\"24h\"})")
 	flag.StringVar(&cfg.RefValuesPath, "runtime-ref-values-path", cfg.RefValuesPath, "Path to JSON file mapping ref:// values to concrete endpoint or credential values")
 	flag.StringVar(&cfg.RefValuesJSON, "runtime-ref-values-json", cfg.RefValuesJSON, "Inline JSON object mapping ref:// values to concrete endpoint or credential values")
+	flag.StringVar(&cfg.PolicyProviderOverridePath, "runtime-policy-provider-override-path", cfg.PolicyProviderOverridePath, "Path to a local PolicyProvider override JSON file for desktop/local AIMXS full mode")
 	flag.DurationVar(&cfg.IntegrationInvokeTimeout, "integration-invoke-timeout", cfg.IntegrationInvokeTimeout, "Timeout for runtime integration invoke HTTP requests")
 	flag.StringVar(&cfg.ManagedCodexMode, "runtime-managed-codex-mode", cfg.ManagedCodexMode, "Managed Codex mode: legacy or process")
 	flag.StringVar(&cfg.CodexCLIPath, "runtime-codex-cli-path", cfg.CodexCLIPath, "Path to the local Codex CLI binary")
@@ -237,7 +240,7 @@ func run(cfg Config) error {
 	orchestrator := &cpruntime.Orchestrator{
 		Namespace:            cfg.Namespace,
 		Store:                store,
-		ProviderRegistry:     cpruntime.NewProviderRegistry(k8sClient),
+		ProviderRegistry:     cpruntime.NewProviderRegistry(k8sClient, cfg.PolicyProviderOverridePath),
 		ProfileMinPriority:   cfg.ProfileMinPriority,
 		PolicyMinPriority:    cfg.PolicyMinPriority,
 		EvidenceMinPriority:  cfg.EvidenceMinPriority,

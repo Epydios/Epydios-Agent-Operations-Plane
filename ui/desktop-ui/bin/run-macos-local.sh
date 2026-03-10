@@ -3,6 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MODULE_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+REPO_ROOT="$(cd "${MODULE_ROOT}/../.." && pwd)"
 # shellcheck source=./lib-m21-paths.sh
 source "${SCRIPT_DIR}/lib-m21-paths.sh"
 
@@ -13,6 +14,9 @@ RUNTIME_LOCAL_PORT="${RUNTIME_LOCAL_PORT:-8080}"
 REGISTRY_LOCAL_PORT="${REGISTRY_LOCAL_PORT:-8081}"
 RUNTIME_BASE_URL_OVERRIDE="${RUNTIME_BASE_URL_OVERRIDE:-}"
 AUTO_OPEN="${AUTO_OPEN:-1}"
+NAMESPACE="${NAMESPACE:-epydios-system}"
+AIMXS_LOCAL_FULL_HOST="${AIMXS_LOCAL_FULL_HOST:-127.0.0.1}"
+AIMXS_LOCAL_FULL_PORT="${AIMXS_LOCAL_FULL_PORT:-4271}"
 
 usage() {
   cat <<'EOF'
@@ -28,6 +32,8 @@ Options:
   --runtime-base-url URL      Use an already-running runtime instead of starting
                               a kubectl port-forward (for example http://127.0.0.1:18080)
   --registry-port PORT        Reserved for future dedicated provider discovery (default: 8081)
+  --namespace NAME            Kubernetes namespace for AIMXS activation helpers
+                              (default: epydios-system)
   --no-open                   Do not auto-open browser
   -h, --help                  Show usage
 
@@ -46,6 +52,36 @@ require_cmd() {
     echo "Missing required command: ${cmd}" >&2
     exit 1
   }
+}
+
+prune_run_root_sessions() {
+  local run_root="$1"
+  local keep_dir="$2"
+  local keep_latest="${3:-2}"
+  local -a sessions=()
+  local -A keep_map=()
+  local start=0
+  local i=0
+
+  [[ -d "${run_root}" ]] || return 0
+  mapfile -t sessions < <(find "${run_root}" -mindepth 1 -maxdepth 1 -type d -print | LC_ALL=C sort)
+  if [[ "${#sessions[@]}" -eq 0 ]]; then
+    return 0
+  fi
+
+  keep_map["${keep_dir}"]=1
+  start=$(( ${#sessions[@]} - keep_latest ))
+  if (( start < 0 )); then
+    start=0
+  fi
+  for (( i = start; i < ${#sessions[@]}; i++ )); do
+    keep_map["${sessions[$i]}"]=1
+  done
+
+  for session in "${sessions[@]}"; do
+    [[ -n "${keep_map["${session}"]:-}" ]] && continue
+    rm -rf "${session}"
+  done
 }
 
 while [[ $# -gt 0 ]]; do
@@ -72,6 +108,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --registry-port)
       REGISTRY_LOCAL_PORT="${2:-}"
+      shift 2
+      ;;
+    --namespace)
+      NAMESPACE="${2:-}"
       shift 2
       ;;
     --no-open)
@@ -112,6 +152,7 @@ SESSION_DIR="${RUN_ROOT}/${STAMP}"
 WEB_ROOT="${MODULE_ROOT}/web"
 CONFIG_PATH=""
 mkdir -p "${SESSION_DIR}"
+prune_run_root_sessions "${RUN_ROOT}" "${SESSION_DIR}" 2
 
 if [[ "${MODE}" == "live" ]]; then
   WEB_ROOT="${SESSION_DIR}/web"
@@ -133,8 +174,20 @@ fi
 
 UI_LOG="${SESSION_DIR}/ui-server.log"
 PF_LOG="${SESSION_DIR}/runtime-port-forward.log"
+LOCAL_AIMXS_LOG="${SESSION_DIR}/aimxs-full.log"
 UI_PID=""
 PF_PID=""
+LOCAL_AIMXS_PID=""
+LOCAL_REF_VAULT_ROOT="$(m21_local_ref_vault_root)"
+LOCAL_REF_VAULT_INDEX_PATH="$(m21_local_ref_vault_index_path)"
+LOCAL_REF_VAULT_EXPORT_PATH="$(m21_local_ref_vault_export_path)"
+LOCAL_REF_VAULT_SERVICE="$(m21_local_ref_vault_service_name)"
+LOCAL_AIMXS_OVERRIDE_PATH="$(m21_local_aimxs_provider_override_path)"
+LOCAL_AIMXS_STATE_PATH="$(m21_local_aimxs_provider_state_path)"
+LOCAL_AIMXS_ENDPOINT_URL="http://${AIMXS_LOCAL_FULL_HOST}:${AIMXS_LOCAL_FULL_PORT}"
+
+mkdir -p "${LOCAL_REF_VAULT_ROOT}"
+mkdir -p "$(m21_local_aimxs_root)"
 
 check_port_available() {
   local port="$1"
@@ -240,6 +293,9 @@ cleanup() {
   if [[ -n "${PF_PID}" ]] && kill -0 "${PF_PID}" >/dev/null 2>&1; then
     kill "${PF_PID}" >/dev/null 2>&1 || true
   fi
+  if [[ -n "${LOCAL_AIMXS_PID}" ]] && kill -0 "${LOCAL_AIMXS_PID}" >/dev/null 2>&1; then
+    kill "${LOCAL_AIMXS_PID}" >/dev/null 2>&1 || true
+  fi
 }
 trap cleanup EXIT INT TERM
 
@@ -247,8 +303,16 @@ check_port_available "${UI_PORT}" "UI"
 if [[ "${MODE}" == "live" && -z "${RUNTIME_BASE_URL_OVERRIDE}" ]]; then
   check_port_available "${RUNTIME_LOCAL_PORT}" "Runtime"
 fi
+if [[ "${MODE}" == "live" ]]; then
+  check_port_available "${AIMXS_LOCAL_FULL_PORT}" "AIMXS full local provider"
+fi
 
 if [[ "${MODE}" == "live" ]]; then
+  python3 "${SCRIPT_DIR}/aimxs-full-provider.py" \
+    --host "${AIMXS_LOCAL_FULL_HOST}" \
+    --port "${AIMXS_LOCAL_FULL_PORT}" > "${LOCAL_AIMXS_LOG}" 2>&1 &
+  LOCAL_AIMXS_PID="$!"
+  wait_for_http_ok "${LOCAL_AIMXS_ENDPOINT_URL}/healthz" "AIMXS full local provider" "${LOCAL_AIMXS_LOG}"
   if [[ -n "${RUNTIME_BASE_URL_OVERRIDE}" ]]; then
     wait_for_http_ok "${runtime_proxy_base}/healthz" "Runtime endpoint" ""
     verify_live_contract "${runtime_proxy_base}"
@@ -261,24 +325,934 @@ if [[ "${MODE}" == "live" ]]; then
   fi
 fi
 
-python3 - "${UI_HOST}" "${UI_PORT}" "${WEB_ROOT}" "${MODE}" "${runtime_proxy_base:-http://${UI_HOST}:${RUNTIME_LOCAL_PORT}}" > "${UI_LOG}" 2>&1 <<'PY' &
+python3 - "${UI_HOST}" "${UI_PORT}" "${WEB_ROOT}" "${MODE}" "${runtime_proxy_base:-http://${UI_HOST}:${RUNTIME_LOCAL_PORT}}" "${LOCAL_REF_VAULT_SERVICE}" "${LOCAL_REF_VAULT_INDEX_PATH}" "${LOCAL_REF_VAULT_EXPORT_PATH}" "${NAMESPACE}" "${REPO_ROOT}" "${LOCAL_AIMXS_OVERRIDE_PATH}" "${LOCAL_AIMXS_STATE_PATH}" "${LOCAL_AIMXS_ENDPOINT_URL}" "${AIMXS_LOCAL_FULL_HOST}" "${AIMXS_LOCAL_FULL_PORT}" > "${UI_LOG}" 2>&1 <<'PY' &
 import http.server
 import json
+import os
+import shutil
 import socketserver
+import subprocess
 import sys
+import tempfile
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from datetime import datetime
 
 host = sys.argv[1]
 port = int(sys.argv[2])
 directory = sys.argv[3]
 mode = sys.argv[4]
 runtime_proxy_base = sys.argv[5]
+secure_ref_service = sys.argv[6]
+secure_ref_index_path = sys.argv[7]
+secure_ref_export_path = sys.argv[8]
+namespace = sys.argv[9]
+repo_root = sys.argv[10]
+aimxs_override_path = sys.argv[11]
+aimxs_state_path = sys.argv[12]
+aimxs_local_endpoint_url = sys.argv[13]
+aimxs_local_host = sys.argv[14]
+aimxs_local_port = int(sys.argv[15])
+secure_ref_prefix = "/__agentops/secure-refs"
+aimxs_activation_prefix = "/__agentops/aimxs/activation"
+secure_ref_index_version = 1
+aimxs_primary_provider_name = "aimxs-policy-primary"
+aimxs_full_provider_name = "aimxs-full"
+oss_policy_provider_name = "oss-policy-opa"
+aimxs_bearer_secret_name = "aimxs-policy-token"
+aimxs_client_tls_secret_name = "epydios-controller-mtls-client"
+aimxs_ca_secret_name = "epydios-provider-ca"
+
+
+def json_response(handler, status_code, payload):
+    body = json.dumps(payload).encode("utf-8")
+    handler.send_response(status_code)
+    handler.send_header("Content-Type", "application/json")
+    handler.send_header("Content-Length", str(len(body)))
+    handler.end_headers()
+    if body:
+        handler.wfile.write(body)
+
+
+def ensure_parent_dir(path):
+    parent = os.path.dirname(path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+
+
+def read_json_file(path, fallback):
+    if not path or not os.path.exists(path):
+        return fallback
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+        if isinstance(payload, dict):
+            return payload
+    except Exception:
+        return fallback
+    return fallback
+
+
+def write_json_file(path, payload):
+    ensure_parent_dir(path)
+    with open(path, "w", encoding="utf-8") as handle:
+        json.dump(payload, handle, indent=2, sort_keys=True)
+        handle.write("\n")
+
+
+def remove_file(path):
+    try:
+        os.remove(path)
+    except FileNotFoundError:
+        return
+
+
+def http_json(url, *, method="GET", payload=None, timeout=3):
+    request = urllib.request.Request(url, method=method)
+    if payload is not None:
+        body = json.dumps(payload).encode("utf-8")
+        request.add_header("Content-Type", "application/json")
+        request.data = body
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def normalize_ref_entries(items):
+    normalized = []
+    seen = set()
+    for item in items or []:
+        if isinstance(item, dict):
+            ref_value = item.get("ref")
+            updated_at = item.get("updatedAt")
+        else:
+            ref_value = item
+            updated_at = ""
+        ref = str(ref_value or "").strip()
+        if not ref or ref in seen:
+            continue
+        seen.add(ref)
+        normalized.append(
+            {
+                "ref": ref,
+                "updatedAt": str(updated_at or "").strip(),
+            }
+        )
+    return normalized
+
+
+def read_secure_ref_index():
+    payload = {
+        "version": secure_ref_index_version,
+        "service": secure_ref_service,
+        "entries": [],
+        "lastExportedAt": "",
+    }
+    if not os.path.exists(secure_ref_index_path):
+        return payload
+    try:
+        with open(secure_ref_index_path, "r", encoding="utf-8") as handle:
+            raw = json.load(handle)
+    except Exception:
+        return payload
+    payload["version"] = secure_ref_index_version
+    payload["service"] = secure_ref_service
+    payload["entries"] = normalize_ref_entries(raw.get("entries") if isinstance(raw, dict) else [])
+    payload["lastExportedAt"] = str(
+        raw.get("lastExportedAt") if isinstance(raw, dict) else ""
+    ).strip()
+    return payload
+
+
+def write_secure_ref_index(payload):
+    ensure_parent_dir(secure_ref_index_path)
+    normalized = {
+        "version": secure_ref_index_version,
+        "service": secure_ref_service,
+        "entries": normalize_ref_entries(payload.get("entries")),
+        "lastExportedAt": str(payload.get("lastExportedAt") or "").strip(),
+    }
+    fd, tmp_path = tempfile.mkstemp(
+        prefix="agentops-local-ref-index-",
+        suffix=".json",
+        dir=os.path.dirname(secure_ref_index_path) or None,
+        text=True,
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump(normalized, handle, indent=2)
+            handle.write("\n")
+        os.chmod(tmp_path, 0o600)
+        os.replace(tmp_path, secure_ref_index_path)
+        os.chmod(secure_ref_index_path, 0o600)
+    finally:
+        if os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+
+
+def has_security_cli():
+    return sys.platform == "darwin" and shutil.which("security") is not None
+
+
+def secure_ref_lookup(ref):
+    if not has_security_cli():
+        return ""
+    result = subprocess.run(
+        ["security", "find-generic-password", "-a", ref, "-s", secure_ref_service, "-w"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return ""
+    return result.stdout
+
+
+def secure_ref_upsert(ref, value):
+    process = subprocess.run(
+        ["security", "add-generic-password", "-a", ref, "-s", secure_ref_service, "-U", "-w"],
+        input=f"{value}\n",
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if process.returncode != 0:
+        raise RuntimeError((process.stderr or process.stdout or "security add failed").strip())
+
+
+def secure_ref_delete(ref):
+    process = subprocess.run(
+        ["security", "delete-generic-password", "-a", ref, "-s", secure_ref_service],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if process.returncode != 0:
+        stderr = (process.stderr or process.stdout or "").strip().lower()
+        if "could not be found" in stderr or "specified item could not be found" in stderr:
+            return False
+        raise RuntimeError((process.stderr or process.stdout or "security delete failed").strip())
+    return True
+
+
+def build_secure_ref_status():
+    index_payload = read_secure_ref_index()
+    entries = []
+    stored_count = 0
+    available = has_security_cli()
+    for item in index_payload["entries"]:
+        ref = item["ref"]
+        present = available and bool(secure_ref_lookup(ref))
+        if present:
+            stored_count += 1
+        entries.append(
+            {
+                "ref": ref,
+                "present": present,
+                "updatedAt": item["updatedAt"],
+            }
+        )
+    message = (
+        "Concrete local ref values are stored in macOS Keychain and indexed outside the repo."
+        if available
+        else "macOS Keychain support is unavailable on this launcher."
+    )
+    return {
+        "available": available,
+        "platform": sys.platform,
+        "service": secure_ref_service,
+        "indexPath": secure_ref_index_path,
+        "exportPath": secure_ref_export_path,
+        "storedCount": stored_count,
+        "entries": entries,
+        "lastExportedAt": index_payload["lastExportedAt"],
+        "message": message,
+    }
+
+
+def export_secure_refs():
+    index_payload = read_secure_ref_index()
+    exported = {}
+    exported_count = 0
+    for item in index_payload["entries"]:
+        ref = item["ref"]
+        value = secure_ref_lookup(ref)
+        if not value:
+            continue
+        exported[ref] = value
+        exported_count += 1
+    ensure_parent_dir(secure_ref_export_path)
+    fd, tmp_path = tempfile.mkstemp(
+        prefix="agentops-runtime-ref-values-",
+        suffix=".json",
+        dir=os.path.dirname(secure_ref_export_path) or None,
+        text=True,
+    )
+    now = datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump(exported, handle, indent=2)
+            handle.write("\n")
+        os.chmod(tmp_path, 0o600)
+        os.replace(tmp_path, secure_ref_export_path)
+        os.chmod(secure_ref_export_path, 0o600)
+    finally:
+        if os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+    index_payload["lastExportedAt"] = now
+    write_secure_ref_index(index_payload)
+    status = build_secure_ref_status()
+    status.update(
+        {
+            "applied": True,
+            "exportedCount": exported_count,
+            "lastExportedAt": now,
+            "message": "Exported a non-repo runtime ref-values snapshot from the local secure store.",
+        }
+    )
+    return status
+
+
+def read_json_body(handler):
+    length = int(handler.headers.get("Content-Length") or 0)
+    raw = handler.rfile.read(length) if length > 0 else b"{}"
+    if not raw:
+        return {}
+    try:
+        payload = json.loads(raw.decode("utf-8"))
+    except Exception:
+        raise ValueError("Request body must be valid JSON.")
+    if not isinstance(payload, dict):
+        raise ValueError("Request body must be a JSON object.")
+    return payload
+
+
+def normalize_ref(value):
+    ref = str(value or "").strip()
+    if not ref:
+        raise ValueError("ref is required.")
+    if not ref.startswith("ref://"):
+        raise ValueError("ref must use ref:// format.")
+    return ref
+
+
+def normalize_secret_value(value):
+    secret = str(value or "")
+    if not secret.strip():
+        raise ValueError("value is required.")
+    return secret
+
+
+def has_kubectl():
+    return shutil.which("kubectl") is not None
+
+
+def first_non_empty(*values):
+    for value in values:
+        text = str(value or "").strip()
+        if text:
+            return text
+    return ""
+
+
+def kubectl_run(args, input_text=None, check=True):
+    process = subprocess.run(
+        ["kubectl", *args],
+        input=input_text,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if check and process.returncode != 0:
+        raise RuntimeError((process.stderr or process.stdout or "kubectl command failed").strip())
+    return process
+
+
+def kubectl_apply_kustomize(path):
+    kubectl_run(["apply", "-k", path])
+
+
+def kubectl_apply_file(path):
+    kubectl_run(["apply", "-f", path])
+
+
+def kubectl_apply_manifest(manifest):
+    kubectl_run(["apply", "-f", "-"], input_text=json.dumps(manifest))
+
+
+def kubectl_patch_provider(name, patch, ignore_missing=False):
+    process = kubectl_run(
+        ["-n", namespace, "patch", "extensionprovider", name, "--type=merge", "-p", json.dumps(patch)],
+        check=False,
+    )
+    if process.returncode == 0:
+        return True
+    stderr = (process.stderr or process.stdout or "").strip().lower()
+    if ignore_missing and ("not found" in stderr or "no matches for kind" in stderr):
+        return False
+    raise RuntimeError((process.stderr or process.stdout or f"failed to patch extensionprovider {name}").strip())
+
+
+def kubectl_secret_present(name):
+    if not name:
+        return False
+    process = kubectl_run(["-n", namespace, "get", "secret", name, "-o", "name"], check=False)
+    return process.returncode == 0
+
+
+def load_kubectl_json(args):
+    process = kubectl_run(args)
+    try:
+        return json.loads(process.stdout or "{}")
+    except Exception as error:
+        raise RuntimeError(f"Failed to decode kubectl JSON output: {error}") from error
+
+
+def provider_condition_true(status, cond_type):
+    for item in status.get("conditions", []) or []:
+        if str(item.get("type") or "").strip() != cond_type:
+            continue
+        if str(item.get("status") or "").strip().lower() == "true":
+            return True
+    return False
+
+
+def provider_capabilities(item):
+    status = item.get("status") or {}
+    resolved = status.get("resolved") or {}
+    capabilities = resolved.get("capabilities")
+    if isinstance(capabilities, list) and capabilities:
+        return [str(value or "").strip() for value in capabilities if str(value or "").strip()]
+    advertised = (item.get("spec") or {}).get("advertisedCapabilities")
+    if isinstance(advertised, list):
+        return [str(value or "").strip() for value in advertised if str(value or "").strip()]
+    return []
+
+
+def resolve_provider_mode(item):
+    metadata = item.get("metadata") or {}
+    spec = item.get("spec") or {}
+    status = item.get("status") or {}
+    labels = metadata.get("labels") or {}
+    explicit = first_non_empty(
+        labels.get("epydios.ai/deployment-mode"),
+        status.get("resolved", {}).get("deploymentMode"),
+    ).lower()
+    if explicit in ("oss-only", "aimxs-full", "aimxs-https"):
+        return explicit
+    provider_name = str(metadata.get("name") or "").strip().lower()
+    provider_id = first_non_empty(
+        status.get("resolved", {}).get("providerId"),
+        spec.get("providerId"),
+        provider_name,
+    ).lower()
+    if provider_name == aimxs_full_provider_name or provider_id == aimxs_full_provider_name:
+        return "aimxs-full"
+    if provider_name == oss_policy_provider_name or provider_id == oss_policy_provider_name:
+        return "oss-only"
+    if provider_name == aimxs_primary_provider_name or provider_id == aimxs_primary_provider_name:
+        return "aimxs-https"
+    return "unknown"
+
+
+def normalize_policy_provider(item):
+    metadata = item.get("metadata") or {}
+    spec = item.get("spec") or {}
+    status = item.get("status") or {}
+    selection = spec.get("selection") or {}
+    endpoint = spec.get("endpoint") or {}
+    resolved = status.get("resolved") or {}
+    name = str(metadata.get("name") or "").strip()
+    provider_id = first_non_empty(resolved.get("providerId"), spec.get("providerId"), name)
+    enabled = selection.get("enabled")
+    if enabled is None:
+        enabled = True
+    priority = selection.get("priority")
+    try:
+        priority = int(priority)
+    except Exception:
+        priority = 100
+    return {
+        "name": name,
+        "providerId": provider_id,
+        "mode": resolve_provider_mode(item),
+        "enabled": bool(enabled),
+        "ready": provider_condition_true(status, "Ready"),
+        "probed": provider_condition_true(status, "Probed"),
+        "priority": priority,
+        "authMode": first_non_empty((spec.get("auth") or {}).get("mode"), "None"),
+        "capabilities": provider_capabilities(item),
+        "endpoint": str(endpoint.get("url") or "").strip(),
+    }
+
+
+def sort_selectable_providers(items):
+    return sorted(items, key=lambda item: (-int(item.get("priority") or 0), item.get("name") or ""))
+
+
+def resolve_secure_ref_value(ref):
+    value = secure_ref_lookup(ref)
+    if value:
+        return value.strip()
+    if os.path.exists(secure_ref_export_path):
+        try:
+            with open(secure_ref_export_path, "r", encoding="utf-8") as handle:
+                payload = json.load(handle)
+            exported = str((payload or {}).get(ref) or "").strip()
+            if exported:
+                return exported
+        except Exception:
+            return ""
+    return ""
+
+
+def resolve_required_secure_ref(ref_value, label):
+    ref = normalize_ref(ref_value)
+    value = resolve_secure_ref_value(ref)
+    if not value:
+        raise RuntimeError(
+            f"{label} could not be resolved from Secure Local Credential Capture. Save {ref} first, then retry AIMXS activation."
+    )
+    return ref, value
+
+
+def resolve_optional_secure_ref(ref_value):
+    ref = str(ref_value or "").strip()
+    if not ref:
+        return "", ""
+    normalized_ref = normalize_ref(ref)
+    value = resolve_secure_ref_value(normalized_ref)
+    if not value:
+        return normalized_ref, ""
+    return normalized_ref, value
+
+
+def validate_endpoint_url(raw_value, require_https):
+    parsed = urllib.parse.urlparse(str(raw_value or "").strip())
+    scheme = str(parsed.scheme or "").strip().lower()
+    if require_https and scheme != "https":
+        raise RuntimeError("AIMXS secure deployment modes require an https endpoint URL.")
+    if not require_https and scheme not in ("http", "https"):
+        raise RuntimeError("AIMXS full mode requires an http or https endpoint URL.")
+    if not str(parsed.netloc or "").strip():
+        raise RuntimeError("AIMXS endpoint URL must include a host.")
+    return parsed.geturl()
+
+
+def build_secret_manifest(name, secret_type, string_data):
+    return {
+        "apiVersion": "v1",
+        "kind": "Secret",
+        "metadata": {
+            "name": name,
+            "namespace": namespace,
+        },
+        "type": secret_type,
+        "stringData": string_data,
+    }
+
+
+def build_aimxs_full_override(endpoint_url=""):
+    target_url = str(endpoint_url or aimxs_local_endpoint_url).strip() or aimxs_local_endpoint_url
+    return {
+        "active": True,
+        "providerType": "PolicyProvider",
+        "providerId": aimxs_full_provider_name,
+        "providerName": aimxs_full_provider_name,
+        "endpointUrl": target_url,
+        "timeoutSeconds": 10,
+        "authMode": "None",
+        "capabilities": [
+            "policy.evaluate",
+            "policy.validate_bundle",
+            "governance.handshake_validation",
+            "evidence.policy_decision_refs",
+            "policy.defer",
+            "policy.grant_tokens",
+        ],
+        "mode": "aimxs-full",
+        "updatedAt": datetime.utcnow().replace(microsecond=0).isoformat() + "Z",
+    }
+
+
+def read_aimxs_override():
+    return read_json_file(aimxs_override_path, {})
+
+
+def write_aimxs_override(payload):
+    write_json_file(aimxs_override_path, payload)
+
+
+def clear_aimxs_override():
+    remove_file(aimxs_override_path)
+
+
+def collect_aimxs_full_local_status():
+    override = read_aimxs_override()
+    active = bool(override.get("active")) and str(override.get("mode") or "").strip().lower() == "aimxs-full"
+    status = {
+        "active": active,
+        "mode": "aimxs-full" if active else "unknown",
+        "endpointUrl": str(override.get("endpointUrl") or aimxs_local_endpoint_url).strip() or aimxs_local_endpoint_url,
+        "providerId": str(override.get("providerId") or aimxs_full_provider_name).strip() or aimxs_full_provider_name,
+        "providerName": str(override.get("providerName") or aimxs_full_provider_name).strip() or aimxs_full_provider_name,
+        "ready": False,
+        "probed": False,
+        "capabilities": [],
+        "warnings": [],
+    }
+    if not active:
+        return status
+    try:
+        health = http_json(f"{status['endpointUrl']}/healthz", timeout=3)
+        capabilities = http_json(f"{status['endpointUrl']}/v1alpha1/capabilities", timeout=3)
+        status["ready"] = str(health.get("status") or "").strip().lower() == "ok"
+        status["probed"] = status["ready"]
+        status["capabilities"] = [
+            str(item or "").strip()
+            for item in (capabilities.get("capabilities") or [])
+            if str(item or "").strip()
+        ]
+    except Exception as error:
+        status["warnings"].append(f"Local AIMXS full provider probe failed: {error}")
+    return status
+
+
+def load_extensionproviders():
+    payload = load_kubectl_json(["-n", namespace, "get", "extensionprovider", "-o", "json"])
+    return payload.get("items") or []
+
+
+def collect_aimxs_activation_status(message="", applied=False, requested_mode=""):
+    if mode != "live":
+        return {
+            "available": False,
+            "source": "launcher-mode",
+            "state": "unavailable",
+            "message": "AIMXS activation is only available from the live local launcher.",
+            "namespace": namespace,
+            "activeMode": "unknown",
+            "requestedMode": requested_mode,
+            "selectedProviderId": "",
+            "selectedProviderName": "",
+            "selectedProviderReady": False,
+            "selectedProviderProbed": False,
+            "capabilities": [],
+            "enabledProviders": [],
+            "warnings": [],
+            "applied": applied,
+            "lastAppliedAt": "",
+            "secrets": {
+                "bearerTokenSecret": {"name": aimxs_bearer_secret_name, "present": False},
+                "clientTlsSecret": {"name": aimxs_client_tls_secret_name, "present": False},
+                "caSecret": {"name": aimxs_ca_secret_name, "present": False},
+            },
+        }
+    local_full_status = collect_aimxs_full_local_status()
+    if local_full_status["active"]:
+        payload = {
+            "available": True,
+            "source": "launcher-helper",
+            "state": "active" if local_full_status["ready"] and local_full_status["probed"] else "pending",
+            "message": str(
+                message
+                or (
+                    f"Policy selection currently routes through {local_full_status['providerId']} (aimxs-full)."
+                    if local_full_status["ready"] and local_full_status["probed"]
+                    else "AIMXS full activation is applied, but the local provider shim is still pending readiness."
+                )
+            ).strip(),
+            "namespace": namespace,
+            "activeMode": "aimxs-full",
+            "requestedMode": requested_mode,
+            "selectedProviderId": local_full_status["providerId"],
+            "selectedProviderName": local_full_status["providerName"],
+            "selectedProviderReady": local_full_status["ready"],
+            "selectedProviderProbed": local_full_status["probed"],
+            "capabilities": list(local_full_status["capabilities"]),
+            "enabledProviders": [
+                {
+                    "name": local_full_status["providerName"],
+                    "providerId": local_full_status["providerId"],
+                    "mode": "aimxs-full",
+                    "enabled": True,
+                    "ready": local_full_status["ready"],
+                    "probed": local_full_status["probed"],
+                    "priority": 1000,
+                    "authMode": "None",
+                    "capabilities": list(local_full_status["capabilities"]),
+                }
+            ],
+            "warnings": list(local_full_status["warnings"]),
+            "applied": applied,
+            "lastAppliedAt": "",
+            "secrets": {
+                "bearerTokenSecret": {"name": aimxs_bearer_secret_name, "present": False},
+                "clientTlsSecret": {"name": aimxs_client_tls_secret_name, "present": False},
+                "caSecret": {"name": aimxs_ca_secret_name, "present": False},
+            },
+        }
+        write_json_file(aimxs_state_path, payload)
+        return payload
+
+    if not has_kubectl():
+        return {
+            "available": False,
+            "source": "kubectl-missing",
+            "state": "unavailable",
+            "message": "kubectl is required for AIMXS activation on the local launcher path.",
+            "namespace": namespace,
+            "activeMode": "unknown",
+            "requestedMode": requested_mode,
+            "selectedProviderId": "",
+            "selectedProviderName": "",
+            "selectedProviderReady": False,
+            "selectedProviderProbed": False,
+            "capabilities": [],
+            "enabledProviders": [],
+            "warnings": [],
+            "applied": applied,
+            "lastAppliedAt": "",
+            "secrets": {
+                "bearerTokenSecret": {"name": aimxs_bearer_secret_name, "present": False},
+                "clientTlsSecret": {"name": aimxs_client_tls_secret_name, "present": False},
+                "caSecret": {"name": aimxs_ca_secret_name, "present": False},
+            },
+        }
+
+    items = load_extensionproviders()
+    providers = []
+    for item in items:
+        spec = item.get("spec") or {}
+        if str(spec.get("providerType") or "").strip() != "PolicyProvider":
+            continue
+        provider = normalize_policy_provider(item)
+        if provider["name"] not in (
+            aimxs_primary_provider_name,
+            oss_policy_provider_name,
+        ):
+            continue
+        providers.append(provider)
+
+    enabled = [item for item in providers if item["enabled"]]
+    selectable = sort_selectable_providers(
+        [item for item in enabled if item["ready"] and item["probed"]]
+    )
+    selected = selectable[0] if selectable else None
+    warnings = []
+    enabled_aimxs = [item for item in enabled if item["mode"].startswith("aimxs-")]
+    if len(enabled_aimxs) > 1:
+        warnings.append("Multiple AIMXS policy providers are enabled simultaneously; selection may drift until only one remains enabled.")
+    if enabled and not selectable:
+        warnings.append("A policy provider is enabled but has not reached Ready and Probed yet.")
+
+    if selected:
+        state = "active"
+        active_mode = selected["mode"]
+        default_message = (
+            f"Policy selection currently routes through {selected['providerId']} ({selected['mode']})."
+        )
+    elif enabled:
+        state = "pending"
+        active_mode = first_non_empty(*(item["mode"] for item in enabled), "unknown")
+        default_message = "AIMXS activation has been applied, but the selected policy provider is still pending readiness."
+    else:
+        state = "degraded"
+        active_mode = "unknown"
+        default_message = "No enabled policy provider was found in ExtensionProvider state."
+
+    payload = {
+        "available": True,
+        "source": "launcher-helper",
+        "state": state,
+        "message": str(message or default_message).strip(),
+        "namespace": namespace,
+        "activeMode": active_mode,
+        "requestedMode": requested_mode,
+        "selectedProviderId": selected["providerId"] if selected else "",
+        "selectedProviderName": selected["name"] if selected else "",
+        "selectedProviderReady": bool(selected and selected["ready"]),
+        "selectedProviderProbed": bool(selected and selected["probed"]),
+        "capabilities": list(selected["capabilities"]) if selected else [],
+        "enabledProviders": providers,
+        "warnings": warnings,
+        "applied": applied,
+        "lastAppliedAt": "",
+        "secrets": {
+            "bearerTokenSecret": {
+                "name": aimxs_bearer_secret_name,
+                "present": kubectl_secret_present(aimxs_bearer_secret_name),
+            },
+            "clientTlsSecret": {
+                "name": aimxs_client_tls_secret_name,
+                "present": kubectl_secret_present(aimxs_client_tls_secret_name),
+            },
+            "caSecret": {
+                "name": aimxs_ca_secret_name,
+                "present": kubectl_secret_present(aimxs_ca_secret_name),
+            },
+        },
+    }
+    write_json_file(aimxs_state_path, payload)
+    return payload
+
+
+def wait_for_aimxs_mode(target_mode, timeout_seconds=25):
+    deadline = time.time() + timeout_seconds
+    last = collect_aimxs_activation_status(requested_mode=target_mode)
+    while time.time() < deadline:
+        last = collect_aimxs_activation_status(requested_mode=target_mode)
+        if (
+            last.get("activeMode") == target_mode
+            and last.get("selectedProviderReady")
+            and last.get("selectedProviderProbed")
+        ):
+            return last
+        time.sleep(1)
+    warnings = list(last.get("warnings") or [])
+    warnings.append(f"Requested mode {target_mode} did not reach Ready and Probed before timeout.")
+    last["warnings"] = warnings
+    if last.get("state") == "active" and last.get("activeMode") != target_mode:
+        last["state"] = "pending"
+    return last
+
+
+def apply_oss_only_mode():
+    clear_aimxs_override()
+    kubectl_apply_kustomize(os.path.join(repo_root, "platform", "modes", "oss-only"))
+    kubectl_patch_provider(
+        oss_policy_provider_name,
+        {"spec": {"selection": {"enabled": True, "priority": 90}}},
+        ignore_missing=False,
+    )
+    kubectl_patch_provider(
+        aimxs_primary_provider_name,
+        {"spec": {"selection": {"enabled": False, "priority": 900}}},
+        ignore_missing=True,
+    )
+
+
+def apply_full_mode(endpoint_url=""):
+    apply_oss_only_mode()
+    override = build_aimxs_full_override(endpoint_url)
+    write_aimxs_override(override)
+
+
+def apply_secure_mode(requested_mode, endpoint_url, bearer_token, client_tls_cert, client_tls_key, ca_cert):
+    clear_aimxs_override()
+    kubectl_apply_manifest(
+        build_secret_manifest(
+            aimxs_bearer_secret_name,
+            "Opaque",
+            {"token": bearer_token},
+        )
+    )
+    kubectl_apply_manifest(
+        build_secret_manifest(
+            aimxs_client_tls_secret_name,
+            "kubernetes.io/tls",
+            {"tls.crt": client_tls_cert, "tls.key": client_tls_key},
+        )
+    )
+    kubectl_apply_manifest(
+        build_secret_manifest(
+            aimxs_ca_secret_name,
+            "Opaque",
+            {"ca.crt": ca_cert},
+        )
+    )
+    kubectl_apply_kustomize(os.path.join(repo_root, "platform", "modes", requested_mode))
+    kubectl_patch_provider(
+        aimxs_primary_provider_name,
+        {
+            "spec": {
+                "endpoint": {
+                    "url": endpoint_url,
+                    "healthPath": "/healthz",
+                    "capabilitiesPath": "/v1alpha1/capabilities",
+                    "timeoutSeconds": 10,
+                },
+                "auth": {
+                    "mode": "MTLSAndBearerTokenSecret",
+                    "bearerTokenSecretRef": {"name": aimxs_bearer_secret_name, "key": "token"},
+                    "clientTLSSecretRef": {"name": aimxs_client_tls_secret_name},
+                    "caSecretRef": {"name": aimxs_ca_secret_name},
+                },
+                "selection": {"enabled": True, "priority": 900},
+            }
+        },
+        ignore_missing=False,
+    )
+    kubectl_patch_provider(
+        oss_policy_provider_name,
+        {"spec": {"selection": {"enabled": False, "priority": 90}}},
+        ignore_missing=False,
+    )
+
+
+def apply_aimxs_activation(payload):
+    if mode != "live":
+        raise RuntimeError("AIMXS activation is only available from the live local launcher.")
+    if not has_kubectl():
+        raise RuntimeError("kubectl is required to activate AIMXS on the local launcher path.")
+
+    requested_mode = str(payload.get("mode") or "").strip().lower()
+    if requested_mode not in ("oss-only", "aimxs-full", "aimxs-https"):
+        raise RuntimeError("AIMXS activation requires a valid deployment mode.")
+
+    now = datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+    endpoint_url = ""
+    if requested_mode == "oss-only":
+        apply_oss_only_mode()
+    elif requested_mode == "aimxs-full":
+        endpoint_url = aimxs_local_endpoint_url
+        apply_full_mode(endpoint_url)
+    else:
+        _, endpoint_value = resolve_required_secure_ref(payload.get("endpointRef"), "AIMXS endpoint ref")
+        _, bearer_token = resolve_required_secure_ref(payload.get("bearerTokenRef"), "AIMXS bearer token ref")
+        _, client_tls_cert = resolve_required_secure_ref(payload.get("clientTlsCertRef"), "AIMXS controller client TLS cert ref")
+        _, client_tls_key = resolve_required_secure_ref(payload.get("clientTlsKeyRef"), "AIMXS controller client TLS key ref")
+        _, ca_cert = resolve_required_secure_ref(payload.get("caCertRef"), "AIMXS provider CA ref")
+        endpoint_url = validate_endpoint_url(endpoint_value, require_https=True)
+        apply_secure_mode(
+            requested_mode,
+            endpoint_url,
+            bearer_token,
+            client_tls_cert,
+            client_tls_key,
+            ca_cert,
+        )
+
+    snapshot = wait_for_aimxs_mode(requested_mode)
+    snapshot["applied"] = True
+    snapshot["requestedMode"] = requested_mode
+    snapshot["lastAppliedAt"] = now
+    if snapshot.get("activeMode") == requested_mode and snapshot.get("selectedProviderReady"):
+        if requested_mode == "aimxs-full":
+            snapshot["message"] = "AIMXS activation switched the live policy-provider path to aimxs-full using the local AIMXS provider shim."
+        else:
+            snapshot["message"] = f"AIMXS activation switched the live policy-provider path to {requested_mode}."
+    else:
+        snapshot["message"] = f"AIMXS activation applied the {requested_mode} contract, but the live provider is still converging."
+    return snapshot
+
 
 class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=directory, **kwargs)
+
+    def _is_secure_ref_route(self):
+        return self.path == secure_ref_prefix or self.path.startswith(f"{secure_ref_prefix}/")
+
+    def _is_aimxs_route(self):
+        return self.path == aimxs_activation_prefix or self.path.startswith(f"{aimxs_activation_prefix}/")
 
     def _should_proxy(self):
         return mode == "live" and runtime_proxy_base and (
@@ -286,6 +1260,97 @@ class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
             or self.path.startswith("/v1alpha1/")
             or self.path.startswith("/v1alpha2/")
         )
+
+    def _handle_secure_ref_route(self):
+        if not has_security_cli():
+            json_response(
+                self,
+                503,
+                {
+                    "available": False,
+                    "message": "macOS Keychain support is unavailable on this launcher.",
+                    "service": secure_ref_service,
+                    "indexPath": secure_ref_index_path,
+                    "exportPath": secure_ref_export_path,
+                    "entries": [],
+                },
+            )
+            return
+
+        try:
+            parsed = urllib.parse.urlparse(self.path)
+            route = parsed.path
+            if self.command == "GET" and route == secure_ref_prefix:
+                json_response(self, 200, build_secure_ref_status())
+                return
+            if self.command == "POST" and route == f"{secure_ref_prefix}/upsert":
+                payload = read_json_body(self)
+                ref = normalize_ref(payload.get("ref"))
+                value = normalize_secret_value(payload.get("value"))
+                secure_ref_upsert(ref, value)
+                index_payload = read_secure_ref_index()
+                entries = [item for item in index_payload["entries"] if item["ref"] != ref]
+                entries.append(
+                    {
+                        "ref": ref,
+                        "updatedAt": datetime.utcnow().replace(microsecond=0).isoformat() + "Z",
+                    }
+                )
+                index_payload["entries"] = entries
+                write_secure_ref_index(index_payload)
+                response = build_secure_ref_status()
+                response.update(
+                    {
+                        "applied": True,
+                        "ref": ref,
+                        "message": "Secure local ref value saved. Restart terminal 1 before expecting runtime-side ref resolution to pick it up.",
+                    }
+                )
+                json_response(self, 200, response)
+                return
+            if self.command == "POST" and route == f"{secure_ref_prefix}/delete":
+                payload = read_json_body(self)
+                ref = normalize_ref(payload.get("ref"))
+                removed = secure_ref_delete(ref)
+                index_payload = read_secure_ref_index()
+                index_payload["entries"] = [item for item in index_payload["entries"] if item["ref"] != ref]
+                write_secure_ref_index(index_payload)
+                response = build_secure_ref_status()
+                response.update(
+                    {
+                        "applied": True,
+                        "removed": removed,
+                        "ref": ref,
+                        "message": "Secure local ref value removed from the launcher store.",
+                    }
+                )
+                json_response(self, 200, response)
+                return
+            if self.command == "POST" and route == f"{secure_ref_prefix}/export":
+                json_response(self, 200, export_secure_refs())
+                return
+            json_response(self, 404, {"message": "Unknown secure-ref route."})
+        except ValueError as error:
+            json_response(self, 400, {"message": str(error)})
+        except RuntimeError as error:
+            json_response(self, 500, {"message": str(error)})
+
+    def _handle_aimxs_route(self):
+        try:
+            parsed = urllib.parse.urlparse(self.path)
+            route = parsed.path
+            if self.command == "GET" and route == aimxs_activation_prefix:
+                json_response(self, 200, collect_aimxs_activation_status())
+                return
+            if self.command == "POST" and route == f"{aimxs_activation_prefix}/apply":
+                payload = read_json_body(self)
+                json_response(self, 200, apply_aimxs_activation(payload))
+                return
+            json_response(self, 404, {"message": "Unknown AIMXS activation route."})
+        except ValueError as error:
+            json_response(self, 400, {"message": str(error)})
+        except RuntimeError as error:
+            json_response(self, 500, {"message": str(error)})
 
     def _proxy_request(self):
         url = urllib.parse.urljoin(runtime_proxy_base, self.path)
@@ -330,12 +1395,24 @@ class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
             self.wfile.write(payload)
 
     def do_GET(self):
+        if self._is_secure_ref_route():
+            self._handle_secure_ref_route()
+            return
+        if self._is_aimxs_route():
+            self._handle_aimxs_route()
+            return
         if self._should_proxy():
             self._proxy_request()
             return
         super().do_GET()
 
     def do_POST(self):
+        if self._is_secure_ref_route():
+            self._handle_secure_ref_route()
+            return
+        if self._is_aimxs_route():
+            self._handle_aimxs_route()
+            return
         if self._should_proxy():
             self._proxy_request()
             return
