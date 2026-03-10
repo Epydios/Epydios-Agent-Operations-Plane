@@ -15,6 +15,12 @@ import {
   validateAimxsOverride
 } from "./aimxs/state.js";
 import {
+  AIMXS_PROBE_STATE_KEY,
+  buildAimxsProbeRequest,
+  normalizeAimxsProbeState,
+  readAimxsProbeInput
+} from "./aimxs/probe.js";
+import {
   readAimxsEditorInput as readAimxsEditorDraft,
   renderAimxsEditorFeedback
 } from "./aimxs/editor.js";
@@ -38,6 +44,15 @@ import {
   renderRunBuilderPolicyHints,
   renderRunBuilderFeedback
 } from "./views/run-builder.js";
+import {
+  ensureGovernedActionDefaults,
+  readGovernedActionInput,
+  evaluateGovernedActionIssues,
+  buildGovernedActionRunPayload,
+  renderGovernedActionPayload,
+  renderGovernedActionPolicyHints,
+  renderGovernedActionFeedback
+} from "./views/governed-action.js";
 import {
   readApprovalFilters,
   renderApprovals,
@@ -211,6 +226,36 @@ const ui = {
   runBuilderPolicyHints: document.getElementById("run-builder-policy-hints"),
   runBuilderFeedback: document.getElementById("run-builder-feedback"),
   runBuilderPayload: document.getElementById("run-builder-payload"),
+  governedActionForm: document.getElementById("governed-action-form"),
+  governedActionPolicyHints: document.getElementById("governed-action-policy-hints"),
+  governedActionFeedback: document.getElementById("governed-action-feedback"),
+  governedActionPayload: document.getElementById("governed-action-payload"),
+  gaRequestId: document.getElementById("ga-request-id"),
+  gaTenantId: document.getElementById("ga-tenant-id"),
+  gaProjectId: document.getElementById("ga-project-id"),
+  gaEnvironment: document.getElementById("ga-environment"),
+  gaDemoProfile: document.getElementById("ga-demo-profile"),
+  gaRequestLabel: document.getElementById("ga-request-label"),
+  gaRequestSummary: document.getElementById("ga-request-summary"),
+  gaFinanceSymbol: document.getElementById("ga-finance-symbol"),
+  gaFinanceSide: document.getElementById("ga-finance-side"),
+  gaFinanceQuantity: document.getElementById("ga-finance-quantity"),
+  gaFinanceAccount: document.getElementById("ga-finance-account"),
+  gaRequiredGrants: document.getElementById("ga-required-grants"),
+  gaEvidenceReadiness: document.getElementById("ga-evidence-readiness"),
+  gaRiskTier: document.getElementById("ga-risk-tier"),
+  gaBoundaryClass: document.getElementById("ga-boundary-class"),
+  gaSubjectId: document.getElementById("ga-subject-id"),
+  gaActionType: document.getElementById("ga-action-type"),
+  gaActionVerb: document.getElementById("ga-action-verb"),
+  gaActionTarget: document.getElementById("ga-action-target"),
+  gaResourceKind: document.getElementById("ga-resource-kind"),
+  gaResourceNamespace: document.getElementById("ga-resource-namespace"),
+  gaResourceName: document.getElementById("ga-resource-name"),
+  gaResourceId: document.getElementById("ga-resource-id"),
+  gaHandshakeRequired: document.getElementById("ga-handshake-required"),
+  gaApprovedForProd: document.getElementById("ga-approved-for-prod"),
+  gaDryRun: document.getElementById("ga-dry-run"),
   rbRequestId: document.getElementById("rb-request-id"),
   rbTenantId: document.getElementById("rb-tenant-id"),
   rbProjectId: document.getElementById("rb-project-id"),
@@ -300,6 +345,7 @@ let aimxsEditorState = {
   message: ""
 };
 let aimxsActivationSnapshot = buildDefaultAimxsActivationSnapshot();
+let aimxsProbeState = normalizeAimxsProbeState();
 let localSecureRefSnapshot = {
   available: false,
   platform: "unknown",
@@ -2442,6 +2488,46 @@ function renderAimxsEditorFeedbackInline(state) {
   });
 }
 
+function renderAimxsProbeFeedbackInline(state) {
+  if (!ui.settingsContent) {
+    return;
+  }
+  const chip = ui.settingsContent.querySelector("#settings-aimxs-probe-status-chip");
+  if (chip instanceof HTMLElement) {
+    chip.className = settingsEditorChipClass(state?.status);
+    chip.textContent = settingsEditorStatusLabel(state?.status);
+  }
+
+  const feedback = ui.settingsContent.querySelector("#settings-aimxs-probe-feedback");
+  if (feedback instanceof HTMLElement) {
+    const parts = [];
+    const message = String(state?.message || "").trim();
+    if (message) {
+      parts.push(`<div class="meta">${escapeHTML(message)}</div>`);
+    }
+    parts.push(
+      `<div class="meta">This panel is provider-level inside the Desktop product. It is not the managed-agent chat path.</div>`
+    );
+    const activeMode = String(aimxsActivationSnapshot?.activeMode || "").trim().toLowerCase();
+    if (activeMode !== "oss-only" && activeMode !== "aimxs-full") {
+      parts.push(
+        '<div class="meta settings-editor-warn">Switch AIMXS Deployment Contract to <code>oss-only</code> or <code>aimxs-full</code> before running this self-check.</div>'
+      );
+    }
+    parts.push(
+      `<div class="meta">storedModes=${escapeHTML(
+        Object.keys(aimxsProbeState?.resultsByMode || {}).join(", ") || "-"
+      )}; activeMode=${escapeHTML(activeMode || "unknown")}</div>`
+    );
+    feedback.innerHTML = parts.join("");
+  }
+
+  const payload = ui.settingsContent.querySelector("#settings-aimxs-probe-payload");
+  if (payload instanceof HTMLElement) {
+    payload.textContent = JSON.stringify(buildAimxsProbeRequest(state?.draft || {}), null, 2);
+  }
+}
+
 function renderLocalSecureRefFeedbackInline(state) {
   if (!ui.settingsContent) {
     return;
@@ -3088,6 +3174,16 @@ function refreshRunBuilderPreview(session) {
   const payload = buildRunCreatePayload(input, session);
   renderRunBuilderPolicyHints(ui, input, issues);
   renderRunBuilderPayload(ui, payload);
+  return { input, issues, payload };
+}
+
+function refreshGovernedActionPreview(session) {
+  ensureGovernedActionDefaults(ui, session);
+  const input = readGovernedActionInput(ui);
+  const issues = evaluateGovernedActionIssues(input);
+  const payload = buildGovernedActionRunPayload(input, session);
+  renderGovernedActionPolicyHints(ui, input, issues);
+  renderGovernedActionPayload(ui, payload);
   return { input, issues, payload };
 }
 
@@ -3832,6 +3928,7 @@ async function main() {
     readSavedJSON(AIMXS_OVERRIDE_KEY),
     baselineChoices?.aimxs || {}
   );
+  aimxsProbeState = normalizeAimxsProbeState(readSavedJSON(AIMXS_PROBE_STATE_KEY));
   let integrationOverrides = readSavedJSON(INTEGRATION_OVERRIDES_KEY);
   let configChangeHistory = parseConfigChangeHistoryStoragePayload(
     readSavedValue(CONFIG_CHANGE_HISTORY_KEY)
@@ -3848,6 +3945,9 @@ async function main() {
   };
   const persistAimxsOverride = () => {
     saveJSON(AIMXS_OVERRIDE_KEY, aimxsOverride);
+  };
+  const persistAimxsProbeState = () => {
+    saveJSON(AIMXS_PROBE_STATE_KEY, aimxsProbeState);
   };
   const persistConfigChangeHistory = () => {
     try {
@@ -4096,6 +4196,7 @@ async function main() {
   store.setIncidentPackageHistory(incidentHistorySeedItems);
   applyIncidentHistoryViewControls();
 
+  refreshGovernedActionPreview(session);
   refreshRunBuilderPreview(session);
   refreshTerminalPreview(session, initialChoices);
   renderTerminalHistoryPanel();
@@ -4171,6 +4272,7 @@ async function main() {
   initialChoices = resolveProjectChoices(initialProjectScope);
   renderExecutionDefaults(ui, initialChoices);
   renderConfigSummary(initialChoices);
+  refreshGovernedActionPreview(session);
   refreshRunBuilderPreview(session);
   refreshTerminalPreview(session, initialChoices);
 
@@ -4241,6 +4343,7 @@ async function main() {
     await syncProjectIntegrationSettings(projectID, session);
     let currentChoices = resolveProjectChoices(projectID);
     renderExecutionDefaults(ui, currentChoices);
+    refreshGovernedActionPreview(session);
     refreshRunBuilderPreview(session);
     refreshTerminalPreview(session, currentChoices);
 
@@ -4292,6 +4395,7 @@ async function main() {
           currentChoices = resolveProjectChoices(projectID);
           renderExecutionDefaults(ui, currentChoices);
           renderConfigSummary(currentChoices);
+          refreshGovernedActionPreview(session);
           refreshRunBuilderPreview(session);
           refreshTerminalPreview(session, currentChoices);
           continue;
@@ -4364,6 +4468,11 @@ async function main() {
           integrationOverrides,
           runtimeIntegrationSyncStateByProject
         );
+        aimxsProbeState = normalizeAimxsProbeState(aimxsProbeState, {
+          tenantId: settingsWithConfigChanges?.summary?.tenantId || session?.claims?.tenant_id || "",
+          projectId: settingsWithConfigChanges?.summary?.projectId || session?.claims?.project_id || "",
+          environment: settingsWithConfigChanges?.summary?.environment || "dev"
+        });
         const nativeApprovalRailItems = buildNativeApprovalRailItems(operatorChatState.thread || {});
         let selectedApprovalRunId = readPinnedApprovalSelectionId();
         let selectedApproval = resolveApprovalSelection(selectedApprovalRunId);
@@ -4383,6 +4492,7 @@ async function main() {
         renderSettings(ui, settingsWithConfigChanges, editorState, {
           subview: settingsSubviewState,
           aimxsEditor: aimxsEditorState,
+          aimxsProbe: aimxsProbeState,
           localSecureRefEditor: localSecureRefEditorState,
           agentTest: {
             ...agentInvokeState,
@@ -4876,6 +4986,7 @@ async function main() {
       const currentChoices = resolveProjectChoices(activeProject);
       renderExecutionDefaults(ui, currentChoices);
       renderConfigSummary(currentChoices);
+      refreshGovernedActionPreview(session);
       refreshRunBuilderPreview(session);
       refreshTerminalPreview(session, currentChoices);
       await refresh();
@@ -4914,6 +5025,69 @@ async function main() {
       renderRunBuilderFeedback(ui, "error", error.message);
     }
   });
+
+  ui.governedActionForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const { issues, payload } = refreshGovernedActionPreview(getSession());
+    const blocking = issues.filter((issue) => issue.severity === "error");
+    if (blocking.length) {
+      renderGovernedActionFeedback(ui, "error", blocking.map((issue) => issue.message).join(" "));
+      return;
+    }
+
+    try {
+      const result = await api.createRuntimeRun(payload);
+      const resultRunID = result?.runId || payload?.meta?.requestId || "";
+      const resultStatus = result?.status || "submitted";
+      renderGovernedActionFeedback(ui, "ok", `runId=${resultRunID || "(unknown)"}; status=${resultStatus}. Opening History for review.`);
+      await refresh();
+      if (resultRunID) {
+        await openRunDetail(resultRunID);
+      }
+    } catch (error) {
+      renderGovernedActionFeedback(ui, "error", error.message);
+    }
+  });
+
+  const governedActionWatchTargets = [
+    ui.gaRequestId,
+    ui.gaTenantId,
+    ui.gaProjectId,
+    ui.gaEnvironment,
+    ui.gaDemoProfile,
+    ui.gaRequestLabel,
+    ui.gaRequestSummary,
+    ui.gaFinanceSymbol,
+    ui.gaFinanceSide,
+    ui.gaFinanceQuantity,
+    ui.gaFinanceAccount,
+    ui.gaRequiredGrants,
+    ui.gaEvidenceReadiness,
+    ui.gaRiskTier,
+    ui.gaBoundaryClass,
+    ui.gaSubjectId,
+    ui.gaActionType,
+    ui.gaActionVerb,
+    ui.gaActionTarget,
+    ui.gaResourceKind,
+    ui.gaResourceNamespace,
+    ui.gaResourceName,
+    ui.gaResourceId,
+    ui.gaHandshakeRequired,
+    ui.gaApprovedForProd,
+    ui.gaDryRun
+  ].filter(Boolean);
+
+  for (const target of governedActionWatchTargets) {
+    target.addEventListener("change", () => {
+      refreshGovernedActionPreview(getSession());
+    });
+    if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") {
+      target.addEventListener("keyup", () => {
+        refreshGovernedActionPreview(getSession());
+      });
+    }
+  }
 
   const runBuilderWatchTargets = [
     ui.rbRequestId,
@@ -5033,6 +5207,7 @@ async function main() {
     const nextChoices = resolveProjectChoices(selectedProject);
     renderExecutionDefaults(ui, nextChoices);
     renderConfigSummary(nextChoices);
+    refreshGovernedActionPreview(getSession());
     refreshRunBuilderPreview(getSession());
     refreshTerminalPreview(getSession(), nextChoices);
     await refresh();
@@ -6074,9 +6249,10 @@ async function main() {
     }
     const integrationFieldNode = target.closest("[data-settings-int-field]");
     const aimxsFieldNode = target.closest("[data-settings-aimxs-field]");
+    const aimxsProbeFieldNode = target.closest("[data-settings-aimxs-probe-field]");
     const agentTestFieldNode = target.closest("[data-settings-agent-test-field]");
     const localSecureRefFieldNode = target.closest("[data-settings-local-ref-field]");
-    if (!integrationFieldNode && !aimxsFieldNode && !agentTestFieldNode && !localSecureRefFieldNode) {
+    if (!integrationFieldNode && !aimxsFieldNode && !aimxsProbeFieldNode && !agentTestFieldNode && !localSecureRefFieldNode) {
       return;
     }
     if (localSecureRefFieldNode) {
@@ -6138,6 +6314,22 @@ async function main() {
             warnings: validation.warnings
           };
       renderAimxsEditorFeedbackInline(aimxsEditorState);
+      return;
+    }
+    if (aimxsProbeFieldNode) {
+      const draft = readAimxsProbeInput(ui.settingsContent);
+      if (!draft) {
+        return;
+      }
+      aimxsProbeState = normalizeAimxsProbeState({
+        ...aimxsProbeState,
+        draft,
+        status: "dirty",
+        message:
+          "Probe fields changed. Review the generated payload below, then click Evaluate Current Mode when you are ready to capture this mode."
+      });
+      persistAimxsProbeState();
+      renderAimxsProbeFeedbackInline(aimxsProbeState);
       return;
     }
     const projectID = activeProjectScope(getSession());
@@ -6427,6 +6619,7 @@ async function main() {
         const nextChoices = resolveProjectChoices(projectID, selectedAgentProfileId);
         renderExecutionDefaults(ui, nextChoices);
         renderConfigSummary(nextChoices);
+        refreshGovernedActionPreview(getSession());
         refreshRunBuilderPreview(getSession());
         refreshTerminalPreview(getSession(), nextChoices);
 
@@ -6499,6 +6692,103 @@ async function main() {
         renderAimxsEditorFeedbackInline(aimxsEditorState);
         await refresh();
         return;
+      }
+      return;
+    }
+    const aimxsProbeActionNode = target.closest("[data-settings-aimxs-probe-action]");
+    if (aimxsProbeActionNode instanceof HTMLElement) {
+      const action = String(aimxsProbeActionNode.dataset.settingsAimxsProbeAction || "")
+        .trim()
+        .toLowerCase();
+      if (!action) {
+        return;
+      }
+      const draft = readAimxsProbeInput(ui.settingsContent);
+      if ((action === "evaluate" || action === "clear-results") && !draft) {
+        aimxsProbeState = normalizeAimxsProbeState({
+          ...aimxsProbeState,
+          status: "invalid",
+          message: "AIMXS probe controls are unavailable in this view. Reopen Settings and retry."
+        });
+        persistAimxsProbeState();
+        renderAimxsProbeFeedbackInline(aimxsProbeState);
+        return;
+      }
+      if (action === "clear-results") {
+        aimxsProbeState = normalizeAimxsProbeState({
+          ...aimxsProbeState,
+          draft,
+          resultsByMode: {},
+          lastResult: null,
+          status: "clean",
+          message: "Stored oss-only and aimxs-full probe results were cleared."
+        });
+        persistAimxsProbeState();
+        await refresh();
+        return;
+      }
+      if (action !== "evaluate") {
+        return;
+      }
+      const activeMode = String(aimxsActivationSnapshot?.activeMode || "").trim().toLowerCase();
+      if (activeMode !== "oss-only" && activeMode !== "aimxs-full") {
+        aimxsProbeState = normalizeAimxsProbeState({
+          ...aimxsProbeState,
+          draft,
+          status: "invalid",
+          message: "Switch AIMXS Deployment Contract to oss-only or aimxs-full before running this self-check."
+        });
+        persistAimxsProbeState();
+        renderAimxsProbeFeedbackInline(aimxsProbeState);
+        return;
+      }
+      aimxsProbeState = normalizeAimxsProbeState({
+        ...aimxsProbeState,
+        draft,
+        status: "pending",
+        message: `Evaluating ${activeMode} with the current probe fields...`
+      });
+      persistAimxsProbeState();
+      renderAimxsProbeFeedbackInline(aimxsProbeState);
+      try {
+        const payload = buildAimxsProbeRequest(draft);
+        const result = await api.evaluateAimxsProbe(payload);
+        const mode = String(result?.mode || activeMode).trim().toLowerCase();
+        const nextResults = {
+          ...(aimxsProbeState.resultsByMode || {})
+        };
+        if (mode === "oss-only" || mode === "aimxs-full") {
+          nextResults[mode] = result;
+        }
+        aimxsProbeState = normalizeAimxsProbeState({
+          ...aimxsProbeState,
+          draft,
+          resultsByMode: nextResults,
+          lastResult: result,
+          status: "applied",
+          message: String(
+            result?.summary ||
+              `Captured ${mode || activeMode} differential result from the current live policy mode.`
+          ).trim()
+        });
+        persistAimxsProbeState();
+        recordConfigChange({
+          action: "settings.aimxs.probe.evaluate",
+          status: "applied",
+          source: "local-launcher",
+          event: "settings.aimxs.probe.evaluate",
+          providerId: String(result?.providerId || mode || activeMode || "aimxs-probe").trim()
+        });
+        await refresh();
+      } catch (error) {
+        aimxsProbeState = normalizeAimxsProbeState({
+          ...aimxsProbeState,
+          draft,
+          status: "error",
+          message: `AIMXS self-check failed: ${error.message}`
+        });
+        persistAimxsProbeState();
+        renderAimxsProbeFeedbackInline(aimxsProbeState);
       }
       return;
     }
@@ -6765,6 +7055,7 @@ async function main() {
       if (nextChoices?.integrations?.selectedAgentProfileId) {
         saveValue(AGENT_PREF_KEY, nextChoices.integrations.selectedAgentProfileId);
       }
+      refreshGovernedActionPreview(getSession());
       refreshRunBuilderPreview(getSession());
       refreshTerminalPreview(getSession(), nextChoices);
       setEditorDraftForProject(projectID, savedDraft);
@@ -6881,6 +7172,7 @@ async function main() {
       const nextChoices = resolveProjectChoices(projectID);
       renderExecutionDefaults(ui, nextChoices);
       renderConfigSummary(nextChoices);
+      refreshGovernedActionPreview(getSession());
       refreshRunBuilderPreview(getSession());
       refreshTerminalPreview(getSession(), nextChoices);
       recordConfigChange({
@@ -7745,6 +8037,11 @@ async function main() {
         status: "clean",
         message: describeAimxsSyncedMessage(aimxsOverride)
       };
+      refresh().catch(() => {});
+      return;
+    }
+    if (event.key === AIMXS_PROBE_STATE_KEY) {
+      aimxsProbeState = normalizeAimxsProbeState(readSavedJSON(AIMXS_PROBE_STATE_KEY));
       refresh().catch(() => {});
       return;
     }

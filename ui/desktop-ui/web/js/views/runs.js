@@ -136,6 +136,78 @@ function buildArtifactAccessEntries(run, evidenceStages = []) {
   return { entries: [...entries, ...screenshotURIs], dateBucket };
 }
 
+function readObject(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+function readStringArray(value) {
+  return Array.isArray(value)
+    ? value
+        .map((item) => String(item || "").trim())
+        .filter(Boolean)
+    : [];
+}
+
+function derivePolicyRichness(run) {
+  const requestPayload = readObject(run?.requestPayload);
+  const requestContext = readObject(requestPayload.context);
+  const requestGoverned = readObject(requestContext.governed_action);
+  const requestPolicy = readObject(requestContext.policy_stratification);
+  const requestTask = readObject(requestPayload.task);
+  const policyResponse = readObject(run?.policyResponse);
+  const policyOutput = readObject(policyResponse.output);
+  const aimxsOutput = readObject(policyOutput.aimxs);
+  const providerMeta = readObject(aimxsOutput.providerMeta);
+  const providerPolicy = readObject(providerMeta.policy_stratification);
+  const requestContract = readObject(providerMeta.request_contract);
+  const outputContract = readObject(aimxsOutput.requestContract);
+  const evidence = readObject(aimxsOutput.evidence);
+  const financeOrder = readObject(requestGoverned.finance_order);
+  const reasons = Array.isArray(policyResponse.reasons) ? policyResponse.reasons : [];
+  const firstReason = readObject(reasons[0]);
+  const requiredGrants = readStringArray(requestPolicy.required_grants);
+  const evidenceRefs = readStringArray(policyResponse.evidenceRefs);
+  const contractId = String(requestGoverned.contract_id || requestContract.contract_id || outputContract.contract_id || "").trim();
+  const providerId = String(
+    aimxsOutput.providerId ||
+      providerMeta.providerId ||
+      policyResponse.source ||
+      run?.selectedPolicyProvider ||
+      ""
+  ).trim();
+  const decision = String(policyResponse.decision || run?.policyDecision || "").trim().toUpperCase();
+  const decisionPath = String(providerMeta.decision_path || "").trim();
+  const evidenceHash = String(evidence.evidence_hash || evidence.evidenceHash || "").trim();
+  const policyStratificationPresent = Object.keys(providerPolicy).length > 0 || Object.keys(readObject(aimxsOutput.policyStratification)).length > 0;
+  const requestContractEchoPresent = Object.keys(requestContract).length > 0 || Object.keys(outputContract).length > 0;
+
+  return {
+    isGovernedAction: Object.keys(requestGoverned).length > 0 || contractId.length > 0,
+    contractId,
+    workflowKind: String(requestGoverned.workflow_kind || outputContract.workflow_kind || "").trim(),
+    requestLabel: String(requestGoverned.request_label || requestTask.requestLabel || "").trim(),
+    demoProfile: String(requestGoverned.demo_profile || requestTask.demoProfile || "").trim(),
+    requestSummary: String(requestGoverned.request_summary || requestTask.summary || requestTask.intent || "").trim(),
+    boundaryClass: String(requestPolicy.boundary_class || providerPolicy.boundary_class || "").trim(),
+    riskTier: String(requestPolicy.risk_tier || providerPolicy.risk_tier || "").trim(),
+    requiredGrants,
+    evidenceReadiness: String(requestPolicy.evidence_readiness || providerPolicy.evidence_readiness || "").trim(),
+    handshakeRequired: requestPolicy?.gates?.["core14.adapter_present.enforce_handshake"] === true,
+    decision,
+    providerId,
+    decisionPath,
+    baakEngaged: providerMeta.baak_engaged === true,
+    grantTokenPresent: run?.policyGrantTokenPresent === true || policyResponse.grantTokenPresent === true,
+    policyStratificationPresent,
+    requestContractEchoPresent,
+    evidenceHash,
+    evidenceRefCount: evidenceRefs.length,
+    evidenceRefs,
+    firstReason: String(firstReason.message || firstReason.code || "").trim(),
+    financeOrder
+  };
+}
+
 export function readRunFilters(ui) {
   const parsedLimit = parsePositiveInt(ui.runsLimitFilter?.value, 25, 1, 500);
   const pageSize = parsePositiveInt(ui.runsPageSize?.value, 25, 1, 500);
@@ -387,6 +459,7 @@ export function renderRunDetail(ui, run, options = {}) {
   ].filter(Boolean);
   const artifactEntries = buildArtifactEntries(run);
   const artifactAccess = buildArtifactAccessEntries(run, evidenceStages);
+  const policyRichness = derivePolicyRichness(run);
   const runStatus = String(run?.status || "").toUpperCase();
   const runDecision = String(run?.policyDecision || "").toUpperCase();
   const runStatusChipClass = runStatus ? chipClassForStatus(runStatus) : "chip chip-neutral";
@@ -495,7 +568,56 @@ export function renderRunDetail(ui, run, options = {}) {
       </details>
     </div>
     <div class="metric">
-      <div class="title">2. Evidence Review</div>
+      <div class="title">2. Policy Richness</div>
+      <div class="meta metric-note">This section is sourced from the actual stored governed-action request and provider response. It is the structured comparison surface for <code>oss-only</code> versus <code>aimxs-full</code>.</div>
+      ${
+        !policyRichness.isGovernedAction
+          ? `
+            <div class="meta">This run did not use the governed-action request contract.</div>
+          `
+          : `
+            <div class="run-detail-chips">
+              <span class="chip chip-neutral chip-compact">decision=${escapeHTML(policyRichness.decision || "UNSET")}</span>
+              <span class="chip chip-neutral chip-compact">provider=${escapeHTML(policyRichness.providerId || "-")}</span>
+              <span class="chip chip-neutral chip-compact">workflow=${escapeHTML(policyRichness.workflowKind || "-")}</span>
+              <span class="chip chip-neutral chip-compact">profile=${escapeHTML(policyRichness.demoProfile || "-")}</span>
+              <span class="chip chip-neutral chip-compact">boundary=${escapeHTML(policyRichness.boundaryClass || "-")}</span>
+              <span class="chip chip-neutral chip-compact">risk=${escapeHTML(policyRichness.riskTier || "-")}</span>
+              <span class="chip chip-neutral chip-compact">grants=${escapeHTML(String(policyRichness.requiredGrants.length))}</span>
+              <span class="chip chip-neutral chip-compact">evidenceRefs=${escapeHTML(String(policyRichness.evidenceRefCount))}</span>
+            </div>
+            <details class="artifact-panel" data-detail-key="runs.policy_richness" open>
+              <summary>Show governed request and provider richness</summary>
+              <table class="data-table runs-table">
+                <thead>
+                  <tr>
+                    <th>Signal</th>
+                    <th>Value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>${tableCell("Signal", "Request Label")}${tableCell("Value", escapeHTML(policyRichness.requestLabel || "-"))}</tr>
+                  <tr>${tableCell("Signal", "Request Summary")}${tableCell("Value", escapeHTML(policyRichness.requestSummary || "-"))}</tr>
+                  <tr>${tableCell("Signal", "Contract ID")}${tableCell("Value", escapeHTML(policyRichness.contractId || "-"))}</tr>
+                  <tr>${tableCell("Signal", "Required Grants")}${tableCell("Value", escapeHTML(policyRichness.requiredGrants.join(", ") || "-"))}</tr>
+                  <tr>${tableCell("Signal", "Evidence Readiness")}${tableCell("Value", escapeHTML(policyRichness.evidenceReadiness || "-"))}</tr>
+                  <tr>${tableCell("Signal", "Handshake Required")}${tableCell("Value", escapeHTML(policyRichness.handshakeRequired ? "true" : "false"))}</tr>
+                  <tr>${tableCell("Signal", "Decision Path")}${tableCell("Value", escapeHTML(policyRichness.decisionPath || "-"))}</tr>
+                  <tr>${tableCell("Signal", "BAAK Engaged")}${tableCell("Value", escapeHTML(policyRichness.baakEngaged ? "true" : "false"))}</tr>
+                  <tr>${tableCell("Signal", "Policy Stratification Present")}${tableCell("Value", escapeHTML(policyRichness.policyStratificationPresent ? "true" : "false"))}</tr>
+                  <tr>${tableCell("Signal", "Request Contract Echo Present")}${tableCell("Value", escapeHTML(policyRichness.requestContractEchoPresent ? "true" : "false"))}</tr>
+                  <tr>${tableCell("Signal", "Grant Token Present")}${tableCell("Value", escapeHTML(policyRichness.grantTokenPresent ? "true" : "false"))}</tr>
+                  <tr>${tableCell("Signal", "Evidence Hash")}${tableCell("Value", escapeHTML(policyRichness.evidenceHash || "-"))}</tr>
+                  <tr>${tableCell("Signal", "Primary Reason")}${tableCell("Value", escapeHTML(policyRichness.firstReason || "-"))}</tr>
+                  <tr>${tableCell("Signal", "Finance Order")}${tableCell("Value", escapeHTML(Object.keys(policyRichness.financeOrder).length ? JSON.stringify(policyRichness.financeOrder) : "-"))}</tr>
+                </tbody>
+              </table>
+            </details>
+          `
+      }
+    </div>
+    <div class="metric">
+      <div class="title">3. Evidence Review</div>
       <div class="meta metric-note">Confirm verifier outputs, reason codes, and screenshot linkage before handing off this run.</div>
       <div class="meta">desktopEvidenceStages=${escapeHTML(String(evidenceStages.length))}</div>
       <details class="artifact-panel" data-detail-key="runs.evidence_summary" open>
@@ -518,7 +640,7 @@ export function renderRunDetail(ui, run, options = {}) {
       </details>
     </div>
     <div class="metric">
-      <div class="title">3. Approval Linkage</div>
+      <div class="title">4. Approval Linkage</div>
       <div class="meta metric-note">Check for a related approval record before escalating, exporting, or closing the workflow.</div>
       ${approvalSummary}
       <div class="approval-actions action-hierarchy">
@@ -532,7 +654,7 @@ export function renderRunDetail(ui, run, options = {}) {
       </div>
     </div>
     <div class="metric">
-      <div class="title">4. Artifact Access</div>
+      <div class="title">5. Artifact Access</div>
       <div class="meta metric-note">Copy the workspace roots you need before leaving History. Repo provenance stays Git-safe; screenshots, run notes, and incident handoff artifacts belong in non-repo folders organized by date bucket and run ID.</div>
       <div class="meta" data-run-path-feedback>Copy a path to send it to the clipboard.</div>
       <div class="run-detail-chips">
@@ -545,7 +667,7 @@ export function renderRunDetail(ui, run, options = {}) {
       </div>
     </div>
     <div class="metric" data-advanced-section="runs">
-      <div class="title">5. Payload Drill-In</div>
+      <div class="title">6. Payload Drill-In</div>
       <div class="meta metric-note">Use payload drill-in only when the structured timeline and evidence summaries are not sufficient.</div>
       <div class="meta">artifactPayloads=${escapeHTML(String(artifactEntries.length))}</div>
       <div class="stack">
@@ -553,7 +675,7 @@ export function renderRunDetail(ui, run, options = {}) {
       </div>
     </div>
     <div class="metric" data-advanced-section="runs">
-      <div class="title">6. Raw Run Record</div>
+      <div class="title">7. Raw Run Record</div>
       <div class="meta metric-note">Raw record is intentionally last. Review it only after the structured sections above.</div>
       <details class="artifact-panel" data-detail-key="runs.raw_record">
         <summary>Show raw run record</summary>

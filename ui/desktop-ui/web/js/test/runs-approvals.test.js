@@ -150,3 +150,89 @@ test("run detail surfaces artifact roots and recommended date bucket", () => {
   assert.match(ui.runDetailContent.innerHTML, /EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB\/internal-readiness\/incidents\/20260228\/run-20260228-001\//);
   assert.match(ui.runDetailContent.innerHTML, /Copy Path/);
 });
+
+test("run detail surfaces governed-action policy richness from the stored provider response", () => {
+  const ui = { runDetailContent: { innerHTML: "", dataset: {} } };
+  renderRunDetail(
+    ui,
+    {
+      runId: "run-governed-001",
+      tenantId: "tenant-demo",
+      projectId: "project-trading",
+      status: "POLICY_EVALUATED",
+      policyDecision: "DEFER",
+      policyGrantTokenPresent: true,
+      createdAt: "2026-03-10T08:00:00Z",
+      updatedAt: "2026-03-10T08:00:05Z",
+      requestPayload: {
+        context: {
+          governed_action: {
+            contract_id: "epydios.governed-action.v1",
+            workflow_kind: "external_action_request",
+            request_label: "Paper Trade Request: AAPL",
+            demo_profile: "finance_paper_trade",
+            request_summary: "BUY 25 AAPL in paper account paper-main",
+            finance_order: {
+              symbol: "AAPL",
+              side: "buy",
+              quantity: 25,
+              account: "paper-main"
+            }
+          },
+          policy_stratification: {
+            boundary_class: "external_actuator",
+            risk_tier: "high",
+            required_grants: ["grant.trading.supervisor"],
+            evidence_readiness: "PARTIAL",
+            gates: {
+              "core14.adapter_present.enforce_handshake": true
+            }
+          }
+        },
+        task: {
+          summary: "BUY 25 AAPL in paper account paper-main"
+        }
+      },
+      policyResponse: {
+        decision: "DEFER",
+        grantTokenPresent: true,
+        evidenceRefs: ["EVIDENCE_DEMO_001", "sha256:abc123"],
+        reasons: [
+          {
+            code: "AIMXS_LOCAL_FULL_GOVERNANCE",
+            message: "Deferred pending grants and evidence readiness."
+          }
+        ],
+        output: {
+          aimxs: {
+            providerId: "aimxs-full",
+            requestContract: {
+              contract_id: "epydios.governed-action.v1"
+            },
+            providerMeta: {
+              baak_engaged: true,
+              decision_path: "governance_provider",
+              policy_stratification: {
+                boundary_class: "external_actuator"
+              }
+            },
+            evidence: {
+              evidence_hash: "sha256-demo-evidence"
+            }
+          }
+        }
+      }
+    },
+    {
+      selectedRunId: "run-governed-001"
+    }
+  );
+
+  assert.match(ui.runDetailContent.innerHTML, /2\. Policy Richness/);
+  assert.match(ui.runDetailContent.innerHTML, /Paper Trade Request: AAPL/);
+  assert.match(ui.runDetailContent.innerHTML, /finance_paper_trade/);
+  assert.match(ui.runDetailContent.innerHTML, /governance_provider/);
+  assert.match(ui.runDetailContent.innerHTML, /Policy Stratification Present/);
+  assert.match(ui.runDetailContent.innerHTML, /Request Contract Echo Present/);
+  assert.match(ui.runDetailContent.innerHTML, /sha256-demo-evidence/);
+});

@@ -216,6 +216,151 @@
 
       <section class="panel panel-run-builder" data-workspace-section="home">
         <div class="panel-header">
+          <div class="panel-heading">
+            <h2>Governed Action Request</h2>
+            <p class="panel-lead">Use the same request here under <code>oss-only</code> and <code>aimxs-full</code> to compare the real policy response on an actual runtime run. This is the product demo path, not a side probe.</p>
+          </div>
+        </div>
+        <form id="governed-action-form" class="run-builder-grid">
+          <label class="field">
+            <span class="label">Request ID</span>
+            <input id="ga-request-id" class="filter-input" type="text" placeholder="auto if empty" />
+          </label>
+          <label class="field">
+            <span class="label">Tenant</span>
+            <input id="ga-tenant-id" class="filter-input" type="text" placeholder="tenant id" />
+          </label>
+          <label class="field">
+            <span class="label">Project</span>
+            <input id="ga-project-id" class="filter-input" type="text" placeholder="project id" />
+          </label>
+          <label class="field">
+            <span class="label">Environment</span>
+            <input id="ga-environment" class="filter-input" type="text" value="dev" />
+          </label>
+          <label class="field">
+            <span class="label">Demo Profile</span>
+            <select id="ga-demo-profile" class="filter-input">
+              <option value="finance_paper_trade" selected>Finance Paper Trade</option>
+              <option value="external_action_request">Generic External Action</option>
+            </select>
+          </label>
+          <label class="field field-wide">
+            <span class="label">Request Label</span>
+            <input id="ga-request-label" class="filter-input" type="text" placeholder="Paper Trade Request: AAPL" />
+            <span class="field-help">Use a stable label across both modes so the demo is clearly the same request.</span>
+          </label>
+          <label class="field field-wide">
+            <span class="label">Operator Request Summary</span>
+            <textarea id="ga-request-summary" class="filter-input" rows="3" placeholder="BUY 25 AAPL in paper account paper-main"></textarea>
+          </label>
+          <label class="field">
+            <span class="label">Symbol</span>
+            <input id="ga-finance-symbol" class="filter-input" type="text" value="AAPL" />
+          </label>
+          <label class="field">
+            <span class="label">Side</span>
+            <select id="ga-finance-side" class="filter-input">
+              <option value="buy" selected>buy</option>
+              <option value="sell">sell</option>
+            </select>
+          </label>
+          <label class="field">
+            <span class="label">Quantity</span>
+            <input id="ga-finance-quantity" class="filter-input" type="number" min="1" step="1" value="25" />
+          </label>
+          <label class="field">
+            <span class="label">Account</span>
+            <input id="ga-finance-account" class="filter-input" type="text" value="paper-main" />
+          </label>
+          <label class="field field-wide">
+            <span class="label">Required Grants (comma-separated)</span>
+            <input id="ga-required-grants" class="filter-input" type="text" value="grant.trading.supervisor" />
+          </label>
+          <label class="field">
+            <span class="label">Evidence Readiness</span>
+            <select id="ga-evidence-readiness" class="filter-input">
+              <option value="MISSING">MISSING</option>
+              <option value="PARTIAL" selected>PARTIAL</option>
+              <option value="READY">READY</option>
+            </select>
+          </label>
+          <label class="field">
+            <span class="label">Risk Tier</span>
+            <select id="ga-risk-tier" class="filter-input">
+              <option value="high" selected>high</option>
+              <option value="medium">medium</option>
+              <option value="low">low</option>
+            </select>
+          </label>
+          <label class="field">
+            <span class="label">Boundary Class</span>
+            <select id="ga-boundary-class" class="filter-input">
+              <option value="external_actuator" selected>external_actuator</option>
+              <option value="desktop_action">desktop_action</option>
+              <option value="model_gateway">model_gateway</option>
+            </select>
+          </label>
+          <label class="field">
+            <span class="label">Subject ID</span>
+            <input id="ga-subject-id" class="filter-input" type="text" value="operator-governed-action" />
+          </label>
+          <details class="artifact-panel field-wide" data-detail-key="home.governed_action_advanced">
+            <summary>Advanced request fields</summary>
+            <div class="run-builder-grid">
+              <label class="field">
+                <span class="label">Action Type</span>
+                <input id="ga-action-type" class="filter-input" type="text" value="trade.execute" />
+              </label>
+              <label class="field">
+                <span class="label">Action Verb</span>
+                <input id="ga-action-verb" class="filter-input" type="text" value="execute" />
+              </label>
+              <label class="field">
+                <span class="label">Action Target</span>
+                <input id="ga-action-target" class="filter-input" type="text" value="paper-broker-order" />
+              </label>
+              <label class="field">
+                <span class="label">Resource Kind</span>
+                <input id="ga-resource-kind" class="filter-input" type="text" value="broker-order" />
+              </label>
+              <label class="field">
+                <span class="label">Resource Namespace</span>
+                <input id="ga-resource-namespace" class="filter-input" type="text" value="epydios-system" />
+              </label>
+              <label class="field">
+                <span class="label">Resource Name</span>
+                <input id="ga-resource-name" class="filter-input" type="text" placeholder="paper-order-aapl" />
+              </label>
+              <label class="field">
+                <span class="label">Resource ID</span>
+                <input id="ga-resource-id" class="filter-input" type="text" placeholder="paper-order-aapl" />
+              </label>
+            </div>
+          </details>
+          <label class="field field-checkbox">
+            <input id="ga-handshake-required" type="checkbox" checked />
+            <span>Require handshake enforcement</span>
+          </label>
+          <label class="field field-checkbox">
+            <input id="ga-approved-for-prod" type="checkbox" />
+            <span>Approved for production execution</span>
+          </label>
+          <label class="field field-checkbox">
+            <input id="ga-dry-run" type="checkbox" />
+            <span>Dry run</span>
+          </label>
+          <div class="field field-actions">
+            <button id="governed-action-submit-button" class="btn btn-primary" type="submit">Submit Governed Action</button>
+          </div>
+        </form>
+        <div id="governed-action-policy-hints" class="stack"></div>
+        <div id="governed-action-feedback" class="stack" aria-live="polite"></div>
+        <pre id="governed-action-payload" class="monospace"></pre>
+      </section>
+
+      <section class="panel panel-run-builder" data-workspace-section="home">
+        <div class="panel-header">
           <h2 class="heading-inline">
             Run Builder
             <button

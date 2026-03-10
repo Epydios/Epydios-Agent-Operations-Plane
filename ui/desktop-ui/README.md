@@ -280,7 +280,21 @@ Recommended operator path:
    - `Apply AIMXS Settings` saves the Desktop contract draft only.
    - `Activate AIMXS Mode` switches the live desktop/runtime policy-provider path on the local launcher path.
    - `aimxs-full` is the preferred local troubleshooting mode. It uses the live launcher AIMXS provider shim and does not require HTTPS or secure ref material.
+9. To prove the OSS-vs-AIMXS decision difference on the current local stack, run `./bin/verify-m21-aimxs-richness.sh`.
+   - The script compares provider capabilities directly, submits the same high-risk external-actuator probe to both providers, expects `aimxs-full` to `DEFER` with AIMXS evidence metadata, expects OSS to return baseline OPA output without `DEFER`, and runs the AIMXS-only handshake sample against the extracted pack adapter seam.
+   - Preconditions: terminal 2 is running so `aimxs-full` is live on `http://127.0.0.1:4271`, and the cluster is reachable so the script can port-forward `svc/epydios-oss-policy-provider`.
    - `aimxs-https` is the secure external-provider path and requires the full endpoint, bearer-token, controller-client-TLS, and provider-CA ref set.
+10. For a manual provider-level side-by-side between `oss-only` and `aimxs-full`, use [aimxs-oss-manual-side-by-side.md](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/docs/runbooks/aimxs-oss-manual-side-by-side.md).
+   - Use this when you want the lowest-level provider comparison.
+   - It intentionally omits `aimxs-https`.
+11. For a field-driven in-product self-check, stay inside `Settings -> Configuration -> AIMXS Richness Self-Check`.
+   - Fill or adjust the probe fields, click `Evaluate Current Mode`, then switch `AIMXS Deployment Contract` between `oss-only` and `aimxs-full` and repeat.
+   - The panel stores the captured `oss-only` and `aimxs-full` results side by side and renders the differential summary directly in the product.
+   - This is a truthful Desktop self-check, but it is still provider-level inside the product, not the managed-agent chat path.
+12. For the real recordable product demo path, use [aimxs-governed-action-demo.md](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/docs/runbooks/aimxs-governed-action-demo.md).
+   - This path stays inside the actual product after startup.
+   - It uses `Home -> Governed Action Request`, then reviews the real stored result in `History -> 2. Policy Richness`.
+   - It is the current source of truth for a recordable `oss-only` versus `aimxs-full` operator demo.
 
 Direct defaults exist for:
 - `codex` / `openai` -> `https://api.openai.com`
