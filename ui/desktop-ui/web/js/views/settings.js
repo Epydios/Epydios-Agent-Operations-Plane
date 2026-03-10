@@ -1,4 +1,9 @@
 import { escapeHTML, formatTime } from "./common.js";
+import {
+  collectAimxsKnownLocalSecureRefs,
+  renderAimxsSettingsMetric,
+  renderAimxsStatusMetric
+} from "../aimxs/settings-view.js";
 
 function tableCell(label, content, attrs = "") {
   return `<td data-label="${escapeHTML(label)}"${attrs}>${content}</td>`;
@@ -100,22 +105,6 @@ function renderAgentProfileSummary(settings) {
     label: activeProfile?.label || selected || "-",
     provider: activeProfile?.provider || "-"
   };
-}
-
-function renderAimxsStatus(settings) {
-  const aimxs = settings?.aimxs || {};
-  const state = String(aimxs.state || "unknown").trim().toLowerCase();
-  const providerIDs = Array.isArray(aimxs.providerIds) ? aimxs.providerIds : [];
-  return `
-    <div class="metric settings-metric settings-metric-aimxs-provider">
-      <div class="title">AIMXS Provider Status</div>
-      <div class="meta">
-        <span class="${chipClassForEndpointState(state)}">${escapeHTML(state)}</span>
-      </div>
-      <div class="meta">${escapeHTML(aimxs.detail || "-")}</div>
-      <div class="meta">providerIds=${escapeHTML(providerIDs.length > 0 ? providerIDs.join(", ") : "-")}</div>
-    </div>
-  `;
 }
 
 function chipClassForNativeSessionStatus(value) {
@@ -587,7 +576,7 @@ function chipClassForEditorStatus(value) {
   if (status === "applied" || status === "saved") {
     return "chip chip-ok";
   }
-  if (status === "dirty" || status === "pending_apply") {
+  if (status === "dirty" || status === "pending_apply" || status === "warn") {
     return "chip chip-warn";
   }
   if (status === "invalid" || status === "error") {
@@ -964,6 +953,159 @@ function renderIntegrationInvokePanel(settings, invokeState = {}) {
   `;
 }
 
+function collectKnownLocalSecureRefs(settings) {
+  const items = [];
+  const seen = new Set();
+  const pushItem = (ref, label, kind) => {
+    const normalizedRef = String(ref || "").trim();
+    if (!normalizedRef || seen.has(normalizedRef)) {
+      return;
+    }
+    seen.add(normalizedRef);
+    items.push({
+      ref: normalizedRef,
+      label: String(label || "Stored ref").trim() || "Stored ref",
+      kind: String(kind || "value").trim() || "value"
+    });
+  };
+
+  const integrations = settings?.integrations || {};
+  pushItem(integrations.gatewayTokenRef, "Gateway bearer token", "credential");
+  pushItem(integrations.gatewayMtlsCertRef, "Gateway mTLS cert", "credential");
+  pushItem(integrations.gatewayMtlsKeyRef, "Gateway mTLS key", "credential");
+
+  const profiles = Array.isArray(integrations.agentProfiles) ? integrations.agentProfiles : [];
+  profiles.forEach((profile) => {
+    const label = String(profile?.label || profile?.id || "Profile").trim() || "Profile";
+    pushItem(profile?.endpointRef, `${label} endpoint`, "endpoint");
+    pushItem(profile?.credentialRef, `${label} credential`, "credential");
+  });
+
+  collectAimxsKnownLocalSecureRefs(settings).forEach((item) => {
+    pushItem(item.ref, item.label, item.kind);
+  });
+  return items;
+}
+
+function renderLocalSecureRefPanel(settings, editorState = {}) {
+  const vault = settings?.localSecureRefs || {};
+  const storedEntries = Array.isArray(vault.entries) ? vault.entries : [];
+  const storedByRef = new Map(
+    storedEntries.map((item) => [String(item?.ref || "").trim(), item]).filter(([ref]) => Boolean(ref))
+  );
+  const knownItems = collectKnownLocalSecureRefs(settings);
+  const knownRefs = new Set(knownItems.map((item) => item.ref));
+  const combinedItems = [
+    ...knownItems.map((item) => ({
+      ...item,
+      present: Boolean(storedByRef.get(item.ref)?.present),
+      updatedAt: String(storedByRef.get(item.ref)?.updatedAt || "").trim()
+    })),
+    ...storedEntries
+      .filter((item) => !knownRefs.has(String(item?.ref || "").trim()))
+      .map((item) => ({
+        ref: String(item?.ref || "").trim(),
+        label: "Stored extra ref",
+        kind: "value",
+        present: Boolean(item?.present),
+        updatedAt: String(item?.updatedAt || "").trim()
+      }))
+  ];
+  const selectedRef = String(editorState?.selectedRef || "").trim();
+  const customRef = String(editorState?.customRef || "").trim();
+  const secretValue = String(editorState?.secretValue || "");
+  const status = String(editorState?.status || (vault.available ? "clean" : "warn")).trim().toLowerCase() || "clean";
+  const statusChipClass = chipClassForEditorStatus(status);
+  const statusMessage = String(editorState?.message || vault.message || "").trim() || "Store concrete local values here; project settings continue to save only ref:// pointers.";
+  const helperDisabled = vault.available ? "" : "disabled";
+  const optionRows = knownItems
+    .map(
+      (item) =>
+        `<option value="${escapeHTML(item.ref)}" ${selectedAttr(selectedRef, item.ref)}>${escapeHTML(item.label)}</option>`
+    )
+    .join("");
+  const tableRows =
+    combinedItems.length > 0
+      ? combinedItems
+          .map((item) => {
+            const updatedAt = item.updatedAt ? new Date(item.updatedAt).toISOString() : "-";
+            return `
+              <tr>
+                ${tableCell("Purpose", escapeHTML(item.label))}
+                ${tableCell("Type", escapeHTML(item.kind))}
+                ${tableCell("Ref", `<code>${escapeHTML(item.ref)}</code>`)}
+                ${tableCell(
+                  "Stored",
+                  `<span class="${item.present ? "chip chip-ok chip-compact" : "chip chip-warn chip-compact"}">${escapeHTML(item.present ? "stored" : "missing")}</span>`
+                )}
+                ${tableCell("Updated", escapeHTML(updatedAt))}
+              </tr>
+            `;
+          })
+          .join("")
+      : `<tr>${tableCell("Status", "No local ref bindings are recorded yet. Save one below to seed the local secure store.", ' colspan="5"')}</tr>`;
+
+  return `
+    <div class="metric settings-metric settings-metric-local-secure-refs">
+      <div class="title">Secure Local Credential Capture</div>
+      <div class="meta">Concrete values stay outside the repo and outside the project settings draft. Use this only for the local Mac operator path.</div>
+      <div class="meta">Restart terminal 1 after changes if you need the local runtime to pick up updated ref resolution.</div>
+      <div class="settings-editor-grid">
+        <label class="field">
+          <span class="label">Known Ref</span>
+          <select id="settings-local-ref-select" class="filter-input" data-settings-local-ref-field="selectedRef">
+            <option value="">Select a known ref</option>
+            ${optionRows}
+          </select>
+        </label>
+        <label class="field field-wide">
+          <span class="label">Custom Ref Override</span>
+          <span class="meta">Optional. Use this when you need to bind a ref that is not already listed above.</span>
+          <input id="settings-local-ref-custom" class="filter-input" type="text" value="${escapeHTML(customRef)}" data-settings-local-ref-field="customRef" placeholder="ref://projects/{projectId}/providers/example/api-key" />
+        </label>
+        <label class="field field-wide">
+          <span class="label">Concrete Local Value</span>
+          <span class="meta">Saved into the local secure store. The UI never writes this raw value into the ref:// settings draft.</span>
+          <textarea id="settings-local-ref-value" class="filter-input settings-secret-textarea" rows="5" data-settings-local-ref-field="secretValue" ${vault.available ? "" : "disabled"}>${escapeHTML(secretValue)}</textarea>
+        </label>
+      </div>
+      <div class="filter-row settings-editor-actions">
+        <div class="action-hierarchy">
+          <div class="action-group action-group-primary">
+            <button class="btn btn-primary" type="button" data-settings-local-ref-action="save" ${helperDisabled}>Save Secure Value</button>
+          </div>
+          <div class="action-group action-group-secondary">
+            <button class="btn btn-secondary" type="button" data-settings-local-ref-action="delete" ${helperDisabled}>Remove Stored Value</button>
+            <button class="btn btn-secondary" type="button" data-settings-local-ref-action="export" ${helperDisabled}>Export Runtime JSON</button>
+            <button class="btn btn-secondary" type="button" data-settings-local-ref-action="refresh">Refresh Status</button>
+          </div>
+        </div>
+        <span id="settings-local-ref-status-chip" class="${statusChipClass}">${escapeHTML(status)}</span>
+      </div>
+      <div id="settings-local-ref-feedback" class="stack" role="status" aria-live="polite" aria-atomic="true">
+        <div class="meta">${escapeHTML(statusMessage)}</div>
+        <div class="meta">storedCount=${escapeHTML(String(vault.storedCount || 0))}; keychainService=${escapeHTML(vault.service || "-")}</div>
+        <div class="meta">indexPath=<code>${escapeHTML(vault.indexPath || "-")}</code></div>
+        <div class="meta">exportPath=<code>${escapeHTML(vault.exportPath || "-")}</code></div>
+        ${vault.lastExportedAt ? `<div class="meta">lastExportedAt=${escapeHTML(String(vault.lastExportedAt))}</div>` : ""}
+      </div>
+      <table class="data-table settings-table">
+        <caption class="sr-only">Known and stored local secure ref bindings for the current settings contract.</caption>
+        <thead>
+          <tr>
+            <th scope="col">Purpose</th>
+            <th scope="col">Type</th>
+            <th scope="col">Ref</th>
+            <th scope="col">Stored</th>
+            <th scope="col">Updated</th>
+          </tr>
+        </thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
 export function renderSettings(ui, settingsPayload, editorState = {}, viewState = {}) {
   if (!ui.settingsContent) {
     return;
@@ -979,7 +1121,6 @@ export function renderSettings(ui, settingsPayload, editorState = {}, viewState 
   const realtime = settings.realtime || {};
   const terminal = settings.terminal || {};
   const theme = settings.theme || {};
-  const aimxs = settings.aimxs || {};
   const agent = renderAgentProfileSummary(settings);
   const runtimePlatform = detectLocalPlatform();
   const localPaths = resolveLocalStoragePaths(runtimePlatform);
@@ -989,6 +1130,7 @@ export function renderSettings(ui, settingsPayload, editorState = {}, viewState 
   const endpointRows = renderEndpointMatrixRows(endpoints);
   const providerContractRows = renderProviderContractRows(providerContracts);
   const integrationEditor = renderIntegrationEditor(settings, editorState);
+  const localSecureRefPanel = renderLocalSecureRefPanel(settings, viewState?.localSecureRefEditor || {});
   const integrationInvokePanel = renderIntegrationInvokePanel(settings, viewState?.agentTest || {});
   const integrationSyncStatus = renderIntegrationSyncStatus(settings, editorState);
   const configChangeRows = renderConfigChangeRows(configChanges);
@@ -996,20 +1138,11 @@ export function renderSettings(ui, settingsPayload, editorState = {}, viewState 
   const selectedSubview = requestedSubview === "diagnostics" ? "diagnostics" : "configuration";
   const configurationClass = selectedSubview === "configuration" ? "is-active" : "";
   const diagnosticsClass = selectedSubview === "diagnostics" ? "is-active" : "";
-  const aimxsMode = String(aimxs.mode || "disabled").trim().toLowerCase();
-  const aimxsProviderState = String(aimxs.state || "unknown").trim().toLowerCase();
-  const aimxsPaymentEntitled = Boolean(aimxs.paymentEntitled);
-  const aimxsProviderIds = Array.isArray(aimxs.providerIds) ? aimxs.providerIds : [];
-  const aimxsEditor = viewState?.aimxsEditor || {};
-  const aimxsEditorStatus = String(aimxsEditor.status || "clean").trim().toLowerCase();
-  const aimxsEditorMessage = String(aimxsEditor.message || "").trim();
-  const aimxsStatusChipClass = chipClassForEditorStatus(aimxsEditorStatus);
-  const aimxsStatusMessage = aimxsEditorMessage
-    ? aimxsEditorMessage
-    : aimxsPaymentEntitled
-      ? "Entitlement is active; HTTPS mode can be applied with valid ref:// credentials."
-      : "Entitlement is locked; AIMXS HTTPS mode cannot be enabled yet.";
   const settingsWorkflowPanel = renderSettingsWorkflowPanel(settings, editorState, selectedSubview);
+  const aimxsSettingsMetric = renderAimxsSettingsMetric(settings, viewState, {
+    chipClassForEditorStatus,
+    selectedAttr
+  });
 
   ui.settingsContent.innerHTML = `
     <div class="metric settings-metric settings-metric-scope">
@@ -1032,6 +1165,7 @@ export function renderSettings(ui, settingsPayload, editorState = {}, viewState 
         <div class="meta">profileProviderContract=${escapeHTML(agent.provider)}</div>
       </div>
       ${integrationEditor}
+      ${localSecureRefPanel}
       ${integrationInvokePanel}
       <div class="metric settings-metric settings-metric-gateway">
         <div class="title">Gateway Security References</div>
@@ -1039,48 +1173,7 @@ export function renderSettings(ui, settingsPayload, editorState = {}, viewState 
         <div class="meta">gatewayMtlsCertRef=<code>${escapeHTML(integrations.gatewayMtlsCertRef || "-")}</code></div>
         <div class="meta">gatewayMtlsKeyRef=<code>${escapeHTML(integrations.gatewayMtlsKeyRef || "-")}</code></div>
       </div>
-      <div class="metric settings-metric settings-metric-aimxs-config">
-        <div class="title">AIMXS HTTPS Mode</div>
-        <div class="meta">entitlement=${escapeHTML(aimxsPaymentEntitled ? "active" : "locked")}; providerState=${escapeHTML(aimxsProviderState)}; providers=${escapeHTML(aimxsProviderIds.length > 0 ? aimxsProviderIds.join(", ") : "-")}</div>
-        <div class="settings-editor-grid">
-          <label class="field">
-            <span class="label">AIMXS Mode</span>
-            <select id="settings-aimxs-mode" class="filter-input" data-settings-aimxs-field="mode">
-              <option value="disabled" ${selectedAttr(aimxsMode, "disabled")}>disabled</option>
-              <option value="https_external" ${selectedAttr(aimxsMode, "https_external")}>https_external</option>
-              <option value="in_stack_reserved" ${selectedAttr(aimxsMode, "in_stack_reserved")}>in_stack_reserved</option>
-            </select>
-          </label>
-          <label class="field">
-            <span class="label">AIMXS Endpoint Ref</span>
-            <input id="settings-aimxs-endpoint-ref" class="filter-input" type="text" data-settings-aimxs-field="endpointRef" value="${escapeHTML(String(aimxs.endpointRef || "-"))}" />
-          </label>
-          <label class="field">
-            <span class="label">AIMXS Bearer Token Ref</span>
-            <input id="settings-aimxs-bearer-token-ref" class="filter-input" type="text" data-settings-aimxs-field="bearerTokenRef" value="${escapeHTML(String(aimxs.bearerTokenRef || "-"))}" />
-          </label>
-          <label class="field">
-            <span class="label">AIMXS mTLS Cert Ref</span>
-            <input id="settings-aimxs-mtls-cert-ref" class="filter-input" type="text" data-settings-aimxs-field="mtlsCertRef" value="${escapeHTML(String(aimxs.mtlsCertRef || "-"))}" />
-          </label>
-          <label class="field">
-            <span class="label">AIMXS mTLS Key Ref</span>
-            <input id="settings-aimxs-mtls-key-ref" class="filter-input" type="text" data-settings-aimxs-field="mtlsKeyRef" value="${escapeHTML(String(aimxs.mtlsKeyRef || "-"))}" />
-          </label>
-        </div>
-        <div class="filter-row settings-editor-actions">
-          <div class="action-hierarchy">
-            <div class="action-group action-group-primary">
-              <button class="btn btn-primary" type="button" data-settings-aimxs-action="apply">Apply AIMXS Settings</button>
-            </div>
-          </div>
-          <span id="settings-aimxs-status-chip" class="${aimxsStatusChipClass}">${escapeHTML(aimxsEditorStatus || "clean")}</span>
-        </div>
-        <div id="settings-aimxs-feedback" class="stack" role="status" aria-live="polite" aria-atomic="true">
-          <div class="meta">${escapeHTML(aimxsStatusMessage)}</div>
-          <div class="meta">HTTPS mode requires payment entitlement and valid ref:// credential references.</div>
-        </div>
-      </div>
+      ${aimxsSettingsMetric}
       <div class="metric settings-metric settings-metric-runtime-defaults">
         <div class="title">Runtime Defaults + Theme</div>
         <div class="meta">realtime=${escapeHTML(realtime.mode || "-")} / ${escapeHTML(String(realtime.pollIntervalMs || "-"))}ms</div>
@@ -1165,7 +1258,7 @@ export function renderSettings(ui, settingsPayload, editorState = {}, viewState 
           <tbody>${providerContractRows || `<tr>${tableCell("Status", "No provider contracts are populated for the current scope. Select an agent profile or apply integration settings, then reopen Diagnostics.", ' colspan="8"')}</tr>`}</tbody>
         </table>
       </div>
-      ${renderAimxsStatus(settings)}
+      ${renderAimxsStatusMetric(settings, chipClassForEndpointState)}
       <div class="metric settings-metric settings-metric-endpoints">
         <div class="title">Endpoint Contract Matrix</div>
         <table class="data-table settings-table">

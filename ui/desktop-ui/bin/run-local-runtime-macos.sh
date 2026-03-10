@@ -17,12 +17,17 @@ REF_VALUES_PATH="${RUNTIME_REF_VALUES_PATH:-}"
 REF_VALUES_JSON="${RUNTIME_REF_VALUES_JSON:-}"
 EFFECTIVE_REF_VALUES_PATH=""
 SYNTHESIZED_REF_KEYS=()
+SECURE_REF_STORE_JSON="{}"
 CODEX_HOME_DIR=""
 MANAGED_CODEX_MODE="${RUNTIME_MANAGED_CODEX_MODE:-process}"
 CODEX_CLI_PATH="${RUNTIME_CODEX_CLI_PATH:-/Applications/Codex.app/Contents/Resources/codex}"
 CODEX_WORKDIR="${RUNTIME_CODEX_WORKDIR:-$(cd "${MODULE_ROOT}/../.." && pwd)}"
 CODEX_SANDBOX_MODE="${RUNTIME_CODEX_SANDBOX_MODE:-read-only}"
 CODEX_EXEC_TIMEOUT="${RUNTIME_CODEX_EXEC_TIMEOUT:-45s}"
+LOCAL_REF_VAULT_SERVICE="$(m21_local_ref_vault_service_name)"
+LOCAL_REF_VAULT_INDEX_PATH="$(m21_local_ref_vault_index_path)"
+LOCAL_REF_VAULT_EXPORT_PATH="$(m21_local_ref_vault_export_path)"
+LOCAL_AIMXS_PROVIDER_OVERRIDE_PATH="$(m21_local_aimxs_provider_override_path)"
 
 usage() {
   cat <<'EOF'
@@ -151,12 +156,38 @@ load_ref_values_json() {
   printf "{}"
 }
 
+load_secure_ref_values_json() {
+  local payload="{}"
+  local value=""
+  local ref=""
+  if [[ ! -f "${LOCAL_REF_VAULT_INDEX_PATH}" ]]; then
+    printf "{}"
+    return
+  fi
+  if ! command -v security >/dev/null 2>&1; then
+    printf "{}"
+    return
+  fi
+  while IFS= read -r ref; do
+    [[ -n "${ref}" ]] || continue
+    value="$(security find-generic-password -a "${ref}" -s "${LOCAL_REF_VAULT_SERVICE}" -w 2>/dev/null || true)"
+    if [[ -z "${value}" ]]; then
+      continue
+    fi
+    payload="$(printf "%s" "${payload}" | jq -c --arg ref "${ref}" --arg value "${value}" '. + {($ref): $value}')"
+  done < <(jq -r '.entries[]?.ref // empty' "${LOCAL_REF_VAULT_INDEX_PATH}" 2>/dev/null)
+  printf "%s" "${payload}"
+}
+
 prepare_effective_ref_values() {
   local source_json=""
+  local secure_json=""
   local merged_json=""
   local openai_api_key=""
   source_json="$(load_ref_values_json)"
-  merged_json="${source_json}"
+  secure_json="$(load_secure_ref_values_json)"
+  SECURE_REF_STORE_JSON="${secure_json}"
+  merged_json="$(jq -cn --argjson source "${source_json}" --argjson secure "${secure_json}" '$source * $secure')"
   SYNTHESIZED_REF_KEYS=()
 
   if [[ "${MANAGED_CODEX_MODE}" == "process" ]]; then
@@ -302,6 +333,8 @@ SESSION_ROOT="$(m21_local_runtime_session_root)"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 SESSION_DIR="${SESSION_ROOT}/${STAMP}"
 mkdir -p "${SESSION_DIR}" "$(m21_go_cache_root)" "$(m21_go_mod_cache_root)" "$(m21_local_runtime_bin_root)"
+mkdir -p "$(m21_local_ref_vault_root)"
+mkdir -p "$(m21_local_aimxs_root)"
 
 POSTGRES_PORT_FORWARD_LOG="${SESSION_DIR}/postgres-port-forward.log"
 RUNTIME_LOG="${SESSION_DIR}/runtime.log"
@@ -352,6 +385,9 @@ echo "  runtime_log=${RUNTIME_LOG}"
 echo "  postgres_port_forward_log=${POSTGRES_PORT_FORWARD_LOG}"
 echo "  session_dir=${SESSION_DIR}"
 echo "  effective_ref_values=${EFFECTIVE_REF_VALUES_PATH}"
+echo "  secure_ref_vault_index=${LOCAL_REF_VAULT_INDEX_PATH}"
+echo "  secure_ref_vault_export=${LOCAL_REF_VAULT_EXPORT_PATH}"
+echo "  local_policy_provider_override=${LOCAL_AIMXS_PROVIDER_OVERRIDE_PATH}"
 echo "  codex_mode=${MANAGED_CODEX_MODE}"
 echo "  codex_cli_path=${CODEX_CLI_PATH}"
 if [[ -n "${CODEX_HOME_DIR}" ]]; then
@@ -372,6 +408,7 @@ fi
   export POSTGRES_SSLMODE="disable"
   export RUNTIME_REF_VALUES_PATH="${EFFECTIVE_REF_VALUES_PATH}"
   export RUNTIME_REF_VALUES_JSON=""
+  export RUNTIME_POLICY_PROVIDER_OVERRIDE_PATH="${LOCAL_AIMXS_PROVIDER_OVERRIDE_PATH}"
   export RUNTIME_MANAGED_CODEX_MODE="${MANAGED_CODEX_MODE}"
   export RUNTIME_CODEX_CLI_PATH="${CODEX_CLI_PATH}"
   export RUNTIME_CODEX_HOME="${CODEX_HOME_DIR}"
@@ -386,7 +423,8 @@ fi
     --postgres-db="${POSTGRES_DB}" \
     --postgres-user="${POSTGRES_USER}" \
     --postgres-password="${POSTGRES_PASSWORD}" \
-    --postgres-sslmode="disable"
+    --postgres-sslmode="disable" \
+    --runtime-policy-provider-override-path="${LOCAL_AIMXS_PROVIDER_OVERRIDE_PATH}"
 ) > "${RUNTIME_LOG}" 2>&1 &
 RUNTIME_PID="$!"
 

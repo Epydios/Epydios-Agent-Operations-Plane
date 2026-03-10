@@ -64,6 +64,78 @@ function buildArtifactEntries(run) {
   return entries.filter((entry) => hasValue(entry.value));
 }
 
+const WORKSPACE_ARTIFACT_ROOTS = {
+  repoProvenance: "EPYDIOS_AGENTOPS_DESKTOP_REPO/provenance/",
+  nonRepoProvenance: "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/",
+  nonRepoReadiness: "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/"
+};
+
+function safePathSegment(value, fallback = "item") {
+  const normalized = String(value || "").trim().replace(/[^a-zA-Z0-9._-]+/g, "-");
+  return normalized || fallback;
+}
+
+function deriveRunDateBucket(run) {
+  const timestamp = String(run?.updatedAt || run?.createdAt || "").trim();
+  const parsed = new Date(timestamp);
+  if (!Number.isFinite(parsed.getTime())) {
+    return "";
+  }
+  return parsed.toISOString().slice(0, 10).replaceAll("-", "");
+}
+
+function buildArtifactAccessEntries(run, evidenceStages = []) {
+  const dateBucket = deriveRunDateBucket(run);
+  const runFolderToken = safePathSegment(run?.runId, "run-id");
+  const screenshotURIs = evidenceStages
+    .map((stage) => ({
+      label: `${stage.label} screenshot URI`,
+      path: String(stage?.screenshotUri || "").trim(),
+      note: "Captured by the runtime and persisted in the evidence metadata."
+    }))
+    .filter((entry) => entry.path);
+  const entries = [
+    {
+      label: "Repo provenance root",
+      path: WORKSPACE_ARTIFACT_ROOTS.repoProvenance,
+      note: "Git-tracked provenance and repo-safe artifacts."
+    },
+    {
+      label: "Non-repo provenance root",
+      path: WORKSPACE_ARTIFACT_ROOTS.nonRepoProvenance,
+      note: "Large governed evidence bundles and host-visible proof artifacts."
+    },
+    {
+      label: "Non-repo readiness root",
+      path: WORKSPACE_ARTIFACT_ROOTS.nonRepoReadiness,
+      note: "Screenshots, manual QA, smoke evidence, and local operator artifacts."
+    }
+  ];
+  if (dateBucket) {
+    entries.push({
+      label: "Suggested date bucket",
+      path: `${WORKSPACE_ARTIFACT_ROOTS.nonRepoReadiness}history/${dateBucket}/`,
+      note: "Recommended next folder for any new run-specific screenshots or operator notes."
+    });
+    entries.push({
+      label: "Suggested run folder",
+      path: `${WORKSPACE_ARTIFACT_ROOTS.nonRepoReadiness}history/${dateBucket}/${runFolderToken}/`,
+      note: "Recommended home for run-specific notes, JSON exports, and operator evidence."
+    });
+    entries.push({
+      label: "Suggested screenshots folder",
+      path: `${WORKSPACE_ARTIFACT_ROOTS.nonRepoReadiness}history/${dateBucket}/${runFolderToken}/screenshots/`,
+      note: "Keep per-run screenshots and visual comparisons under the same date bucket."
+    });
+    entries.push({
+      label: "Suggested incidents folder",
+      path: `${WORKSPACE_ARTIFACT_ROOTS.nonRepoReadiness}incidents/${dateBucket}/${runFolderToken}/`,
+      note: "Use this when the run graduates into durable incident packaging and handoff artifacts."
+    });
+  }
+  return { entries: [...entries, ...screenshotURIs], dateBucket };
+}
+
 export function readRunFilters(ui) {
   const parsedLimit = parsePositiveInt(ui.runsLimitFilter?.value, 25, 1, 500);
   const pageSize = parsePositiveInt(ui.runsPageSize?.value, 25, 1, 500);
@@ -153,15 +225,38 @@ export function renderRuns(ui, store, runPayload, filters) {
   if (filteredItems.length === 0) {
     ui.runsContent.innerHTML = renderPanelStateMetric(
       "empty",
-      "Runs",
+      "History",
       "No runtime runs match current filters.",
-      "Adjust scope, decision, or time filters, then click Apply."
+      "Adjust scope, decision, or time filters, then refresh History."
     );
     if (!hasSelectedRun) {
       ui.runDetailContent.innerHTML = "";
     }
     return;
   }
+
+  const completedCount = filteredItems.filter((item) => String(item?.status || "").trim().toUpperCase() === "COMPLETED").length;
+  const failedCount = filteredItems.filter((item) => {
+    const status = String(item?.status || "").trim().toUpperCase();
+    return status === "FAILED" || status === "POLICY_BLOCKED";
+  }).length;
+  const deniedCount = filteredItems.filter((item) => String(item?.policyDecision || "").trim().toUpperCase() === "DENY").length;
+  const historySummary = `
+    <div class="metric history-summary-card">
+      <div class="metric-title-row">
+        <div class="title">History Summary</div>
+        <span class="chip chip-neutral chip-compact">matches=${escapeHTML(String(pageState.totalItems))}</span>
+      </div>
+      <div class="meta">History is for finished or prior work. Review the selected run below before exporting, filing, or copying folder paths.</div>
+      <div class="run-detail-chips">
+        <span class="chip chip-neutral chip-compact">completed=${escapeHTML(String(completedCount))}</span>
+        <span class="chip chip-neutral chip-compact">needsAttention=${escapeHTML(String(failedCount))}</span>
+        <span class="chip chip-neutral chip-compact">decisionDeny=${escapeHTML(String(deniedCount))}</span>
+        <span class="chip chip-neutral chip-compact">selected=${escapeHTML(selectedRunID || "-")}</span>
+      </div>
+      <div class="meta">Use the Artifact Access section in run detail to map the selected run into repo-safe provenance or non-repo date-bucket storage.</div>
+    </div>
+  `;
 
   const rows = items
     .map((item) => {
@@ -192,6 +287,7 @@ export function renderRuns(ui, store, runPayload, filters) {
     .join("");
 
   ui.runsContent.innerHTML = `
+    ${historySummary}
     <div class="table-meta-row">
       <span class="chip chip-neutral chip-compact">matches=${escapeHTML(String(pageState.totalItems))}</span>
       <span class="chip chip-neutral chip-compact">page=${escapeHTML(String(pageState.page))}/${escapeHTML(String(pageState.totalPages))}</span>
@@ -290,6 +386,7 @@ export function renderRunDetail(ui, run, options = {}) {
     desktopEvidenceStage(run, "desktopVerifyResponse", "Verify")
   ].filter(Boolean);
   const artifactEntries = buildArtifactEntries(run);
+  const artifactAccess = buildArtifactAccessEntries(run, evidenceStages);
   const runStatus = String(run?.status || "").toUpperCase();
   const runDecision = String(run?.policyDecision || "").toUpperCase();
   const runStatusChipClass = runStatus ? chipClassForStatus(runStatus) : "chip chip-neutral";
@@ -328,6 +425,35 @@ export function renderRunDetail(ui, run, options = {}) {
           <summary>${escapeHTML(entry.label)}</summary>
           <pre class="monospace">${escapeHTML(valueText)}</pre>
         </details>
+      `;
+    })
+    .join("");
+
+  const artifactAccessCards = artifactAccess.entries
+    .map((entry) => {
+      return `
+        <article class="artifact-path-card">
+          <div class="metric-title-row">
+            <div class="title">${escapeHTML(entry.label)}</div>
+            ${
+              entry.label === "Suggested date bucket"
+                ? '<span class="chip chip-warn chip-compact">recommended</span>'
+                : ""
+            }
+          </div>
+          <pre class="artifact-path-value">${escapeHTML(entry.path)}</pre>
+          <div class="meta">${escapeHTML(entry.note)}</div>
+          <div class="approval-actions action-hierarchy">
+            <div class="action-group action-group-secondary">
+              <button
+                class="btn btn-secondary btn-small"
+                type="button"
+                data-run-copy-path="${escapeHTML(entry.path)}"
+                data-run-copy-path-label="${escapeHTML(entry.label)}"
+              >Copy Path</button>
+            </div>
+          </div>
+        </article>
       `;
     })
     .join("");
@@ -405,8 +531,21 @@ export function renderRunDetail(ui, run, options = {}) {
         </div>
       </div>
     </div>
+    <div class="metric">
+      <div class="title">4. Artifact Access</div>
+      <div class="meta metric-note">Copy the workspace roots you need before leaving History. Repo provenance stays Git-safe; screenshots, run notes, and incident handoff artifacts belong in non-repo folders organized by date bucket and run ID.</div>
+      <div class="meta" data-run-path-feedback>Copy a path to send it to the clipboard.</div>
+      <div class="run-detail-chips">
+        <span class="chip chip-neutral chip-compact">dateBucket=${escapeHTML(artifactAccess.dateBucket || "-")}</span>
+        <span class="chip chip-neutral chip-compact">pathHints=${escapeHTML(String(artifactAccess.entries.length))}</span>
+        <span class="chip chip-neutral chip-compact">runFolder=${escapeHTML(safePathSegment(run?.runId, "run-id"))}</span>
+      </div>
+      <div class="artifact-path-grid">
+        ${artifactAccessCards}
+      </div>
+    </div>
     <div class="metric" data-advanced-section="runs">
-      <div class="title">4. Payload Drill-In</div>
+      <div class="title">5. Payload Drill-In</div>
       <div class="meta metric-note">Use payload drill-in only when the structured timeline and evidence summaries are not sufficient.</div>
       <div class="meta">artifactPayloads=${escapeHTML(String(artifactEntries.length))}</div>
       <div class="stack">
@@ -414,7 +553,7 @@ export function renderRunDetail(ui, run, options = {}) {
       </div>
     </div>
     <div class="metric" data-advanced-section="runs">
-      <div class="title">5. Raw Run Record</div>
+      <div class="title">6. Raw Run Record</div>
       <div class="meta metric-note">Raw record is intentionally last. Review it only after the structured sections above.</div>
       <details class="artifact-panel" data-detail-key="runs.raw_record">
         <summary>Show raw run record</summary>

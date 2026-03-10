@@ -657,7 +657,7 @@ RUN_M5_BASELINE=0 ./platform/local/bin/verify-m10-policy-grant-enforcement.sh
 
 Runs runtime AIMXS entitlement boundary checks on the policy-provider path:
 - optionally runs M5 baseline first
-- applies `aimxs-customer-hosted` mode and local AIMXS contract override for OSS smoke
+- applies `aimxs-full` mode and local AIMXS contract override for OSS smoke
 - enables runtime entitlement enforcement
 - asserts:
   - missing entitlement token => `DENY`
@@ -675,28 +675,28 @@ Fast path when runtime baseline is already healthy:
 RUN_M5_BASELINE=0 ./platform/local/bin/verify-m10-entitlement-deny.sh
 ```
 
-### M10.7 AIMXS customer-hosted packaging evidence verification
+### M10.7 AIMXS aimxs-full packaging evidence verification
 
-Validates release-grade packaging evidence for customer-hosted AIMXS mode:
-- consumes private metadata inputs from `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/customer-hosted-release-inputs.vars` by default
+Validates release-grade packaging evidence for aimxs-full AIMXS mode:
+- consumes private metadata inputs from `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/aimxs-full-release-inputs.vars` by default
 - requires strict staging log markers for M10.4/M10.5/M10.6 and full-gate pass
 - asserts signed packaging references, SBOM/signature references, air-gapped install/update bundle refs, and support/SLA references
 - verifies required runbooks:
-  - `docs/runbooks/aimxs-customer-hosted-airgap.md`
-  - `docs/runbooks/aimxs-customer-hosted-support-boundary.md`
+  - `docs/runbooks/aimxs-full-airgap.md`
+  - `docs/runbooks/aimxs-full-support-boundary.md`
 - writes evidence to:
-  - `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/m10-7-customer-hosted-packaging-evidence-<timestamp>.json`
+  - `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/m10-7-aimxs-full-packaging-evidence-<timestamp>.json`
 
 ```bash
-./platform/local/bin/verify-m10-customer-hosted-packaging.sh
+./platform/local/bin/verify-m10-aimxs-full-packaging.sh
 ```
 
 Override input/evidence paths explicitly:
 
 ```bash
-INPUT_FILE=../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/customer-hosted-release-inputs.vars \
+INPUT_FILE=../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/aimxs-full-release-inputs.vars \
 OUTPUT_DIR=../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs \
-./platform/local/bin/verify-m10-customer-hosted-packaging.sh
+./platform/local/bin/verify-m10-aimxs-full-packaging.sh
 ```
 
 ### M7.1 integration verification (M0->M5 critical path)
@@ -875,25 +875,23 @@ Validates AIMXS plug-in boundary constraints:
 ./platform/local/bin/verify-aimxs-boundary.sh
 ```
 
-### AIMXS local dev loopback profile (pre-private endpoint)
+### AIMXS full local mode
 
-Registers a dev-only AIMXS placeholder provider against the OSS local policy service, so you can validate contract/routing behavior before private AIMXS is reachable:
+Starts the real local AIMXS full shim on the Desktop/runtime path so you can test AIMXS without HTTPS or secure ref material:
 
 ```bash
-kubectl apply -f examples/aimxs/extensionprovider-policy-local-dev.yaml
-kubectl -n epydios-system patch extensionprovider oss-policy-opa --type=merge -p '{"spec":{"selection":{"enabled":false,"priority":90}}}'
-kubectl -n epydios-system patch extensionprovider aimxs-policy-local-dev --type=merge -p '{"spec":{"selection":{"enabled":true,"priority":850}}}'
+cd ui/desktop-ui
+./bin/run-macos-local.sh --mode live --runtime-base-url "http://127.0.0.1:18080"
 ```
 
-Switch back to secure/private AIMXS registration:
+Switch to the secure HTTPS registration when you want the external provider path:
 
 ```bash
-kubectl apply -f examples/aimxs/extensionprovider-policy-mtls-bearer.yaml
-kubectl -n epydios-system patch extensionprovider aimxs-policy-local-dev --type=merge -p '{"spec":{"selection":{"enabled":false,"priority":850}}}'
+kubectl apply -f examples/aimxs/extensionprovider-policy-https.yaml
 kubectl -n epydios-system patch extensionprovider aimxs-policy-primary --type=merge -p '{"spec":{"selection":{"enabled":true,"priority":900}}}'
 ```
 
-The local loopback profile is local-only and must not be promoted to staging/prod.
+The full local shim is for local Desktop/runtime testing only and must not be promoted to staging/prod.
 
 ### AIMXS deployment mode packs
 
@@ -901,8 +899,8 @@ Apply policy-routing mode manifests directly:
 
 ```bash
 kubectl apply -k platform/modes/oss-only
-kubectl apply -k platform/modes/aimxs-hosted
-kubectl apply -k platform/modes/aimxs-customer-hosted
+kubectl apply -k platform/modes/aimxs-https
+kubectl apply -k platform/modes/aimxs-full
 ```
 
 ### PR CI gate parity (kind, ephemeral)
@@ -1053,10 +1051,10 @@ WITH_SYSTEM_SMOKETEST=1 ./platform/local/bin/bootstrap-k3d.sh
 - `platform/local/bin/verify-phase-05-kuberay.sh` installs and verifies optional phase 05 KubeRay components
 - `platform/local/bin/verify-m10-provider-conformance.sh` validates provider contract/auth-mode conformance across ProfileResolver/PolicyProvider/EvidenceProvider
 - `platform/local/bin/verify-m10-policy-grant-enforcement.sh` validates required grant-token enforcement (`no token => no execution` for non-DENY decisions)
-- `platform/local/bin/verify-m10-deployment-modes.sh` validates three deployment-mode routing transitions (`oss-only`, `aimxs-hosted`, `aimxs-customer-hosted`) under one provider contract
-- `platform/local/bin/verify-m10-no-egress-local-aimxs.sh` validates customer-hosted local AIMXS mode under scoped no-egress network policy constraints
+- `platform/local/bin/verify-m10-deployment-modes.sh` validates three deployment-mode routing transitions (`oss-only`, `aimxs-https`, `aimxs-full`) under one provider contract
+- `platform/local/bin/verify-m10-no-egress-local-aimxs.sh` validates aimxs-full local AIMXS mode under scoped no-egress network policy constraints
 - `platform/local/bin/verify-m10-entitlement-deny.sh` validates runtime entitlement deny-path assertions and licensed ALLOW behavior on AIMXS policy routing
-- `platform/local/bin/verify-m10-customer-hosted-packaging.sh` validates customer-hosted AIMXS packaging evidence requirements (signed package refs, SBOM/signature refs, air-gapped install/update bundles, and support/SLA references)
+- `platform/local/bin/verify-m10-aimxs-full-packaging.sh` validates aimxs-full AIMXS packaging evidence requirements (signed package refs, SBOM/signature refs, air-gapped install/update bundles, and support/SLA references)
 - `platform/local/bin/verify-m13-openfang-adapter.sh` validates Openfang adapter guardrails (Linux-first + sandbox profile + restricted-host blocked default + secure template posture)
 - `platform/local/bin/verify-m13-openfang-runtime-integration.sh` validates runtime observe->actuate->verify and runtime->adapter->upstream contract flow + restricted-host deny assertion
 - `platform/local/bin/verify-m13-runtime-approvals.sh` validates runtime approval queue/decision API semantics (`PENDING|APPROVED|DENIED|EXPIRED`, approve/deny transitions, expired request rejection)

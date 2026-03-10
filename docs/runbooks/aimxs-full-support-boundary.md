@@ -4,7 +4,7 @@ Last updated: 2026-03-02
 
 ## Purpose
 
-Define ownership boundaries, escalation path, and SLA commitments for customer-hosted AIMXS deployments.
+Define ownership boundaries, escalation path, and SLA commitments for aimxs-full AIMXS deployments.
 
 ## Support Boundary
 
@@ -13,7 +13,7 @@ Define ownership boundaries, escalation path, and SLA commitments for customer-h
 1. Provider contract compatibility (`ExtensionProvider` + runtime integration boundary).
 2. Packaging metadata contract (digest/signature/SBOM evidence requirements).
 3. Guidance for secure auth modes (`MTLS`, `MTLSAndBearerTokenSecret`).
-4. Compatibility and upgrade notes for AIMXS/customer-hosted mode.
+4. Compatibility and upgrade notes for AIMXS/aimxs-full mode.
 
 ### Customer-Owned
 
@@ -31,7 +31,7 @@ Define ownership boundaries, escalation path, and SLA commitments for customer-h
 ## SLA Baseline (Template)
 
 1. Availability target:
-   - Customer-hosted AIMXS policy endpoint: 99.9% monthly target (or customer contract override).
+   - Customer-AIMXS HTTPS policy endpoint: 99.9% monthly target (or customer contract override).
 2. Incident response:
    - P1 security/service-down: initial response <= 1 hour.
    - P2 degraded service: initial response <= 4 hours.
@@ -50,7 +50,7 @@ Define ownership boundaries, escalation path, and SLA commitments for customer-h
 
 ## Required Inputs for Packaging Evidence
 
-The customer-hosted packaging verifier requires explicit references for:
+The aimxs-full packaging verifier requires explicit references for:
 
 1. Primary release identifier.
 2. Signed package reference (image digest or artifact digest path).
@@ -61,9 +61,9 @@ The customer-hosted packaging verifier requires explicit references for:
 
 These values are supplied in:
 
-- `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/customer-hosted-release-inputs.vars`
+- `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/aimxs-full-release-inputs.vars`
 
 ## Verification Hook
 
-- `platform/local/bin/verify-m10-customer-hosted-packaging.sh`
+- `platform/local/bin/verify-m10-aimxs-full-packaging.sh`
 - Required in strict profiles through CI gate wiring.

@@ -115,11 +115,12 @@
     },
     "aimxs": {
       "paymentEntitled": false,
-      "mode": "disabled",
+      "mode": "oss-only",
       "endpointRef": "ref://projects/{projectId}/providers/aimxs/https-endpoint",
       "bearerTokenRef": "ref://projects/{projectId}/providers/aimxs/bearer-token",
-      "mtlsCertRef": "ref://projects/{projectId}/providers/aimxs/mtls-cert",
-      "mtlsKeyRef": "ref://projects/{projectId}/providers/aimxs/mtls-key"
+      "clientTlsCertRef": "ref://projects/{projectId}/providers/aimxs/client-tls-cert",
+      "clientTlsKeyRef": "ref://projects/{projectId}/providers/aimxs/client-tls-key",
+      "caCertRef": "ref://projects/{projectId}/providers/aimxs/provider-ca"
     }
   },
   "auth": {

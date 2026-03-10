@@ -144,7 +144,7 @@ function renderApprovalCheckpoints(items = []) {
             />
             <div class="action-group action-group-secondary">
               <button
-                class="btn btn-secondary btn-small"
+                class="btn btn-ok btn-small"
                 type="button"
                 data-chat-action="approve-checkpoint"
                 data-chat-session-id="${escapeHTML(sessionId)}"
@@ -308,7 +308,7 @@ function renderToolProposals(items = []) {
                       />
                       <div class="action-group action-group-secondary">
                         <button
-                          class="btn btn-secondary btn-small"
+                          class="btn btn-ok btn-small"
                           type="button"
                           data-chat-action="approve-tool-proposal"
                           data-chat-session-id="${escapeHTML(sessionId)}"
@@ -330,6 +330,111 @@ function renderToolProposals(items = []) {
           `;
         })
         .join("")}
+    </div>
+  `;
+}
+
+function renderTurnActionInbox(approvalItems = [], proposalItems = []) {
+  const pendingApprovals = (Array.isArray(approvalItems) ? approvalItems : []).filter(
+    (item) => String(item?.status || "-").trim().toUpperCase() === "PENDING"
+  );
+  const pendingProposals = (Array.isArray(proposalItems) ? proposalItems : []).filter(
+    (item) => String(item?.status || "PENDING").trim().toUpperCase() === "PENDING"
+  );
+  if (pendingApprovals.length === 0 && pendingProposals.length === 0) {
+    return "";
+  }
+  const approvalCards = pendingApprovals
+    .map((item) => {
+      const sessionId = String(item?.sessionId || "").trim();
+      const checkpointId = String(item?.checkpointId || "").trim();
+      return `
+        <article class="chat-review-inbox-card" data-chat-approval-row data-chat-session-id="${escapeHTML(sessionId)}" data-chat-checkpoint-id="${escapeHTML(checkpointId)}">
+          <div class="metric-title-row">
+            <div class="title">Approval Checkpoint</div>
+            <span class="${chipClassForSessionStatus(item?.status)}">${escapeHTML(String(item?.status || "PENDING").trim().toUpperCase())}</span>
+          </div>
+          <div class="meta">checkpoint=${escapeHTML(checkpointId || "-")}; scope=${escapeHTML(String(item?.scope || "-"))}</div>
+          <div class="meta">${escapeHTML(String(item?.reason || "No checkpoint reason captured."))}</div>
+          <div class="chat-approval-action-group">
+            <input
+              class="filter-input chat-approval-reason-input"
+              type="text"
+              placeholder="decision reason"
+              data-chat-approval-reason
+            />
+            <div class="action-group action-group-secondary">
+              <button
+                class="btn btn-ok"
+                type="button"
+                data-chat-action="approve-checkpoint"
+                data-chat-session-id="${escapeHTML(sessionId)}"
+                data-chat-checkpoint-id="${escapeHTML(checkpointId)}"
+              >Approve</button>
+              <button
+                class="btn btn-danger"
+                type="button"
+                data-chat-action="deny-checkpoint"
+                data-chat-session-id="${escapeHTML(sessionId)}"
+                data-chat-checkpoint-id="${escapeHTML(checkpointId)}"
+              >Deny</button>
+            </div>
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+  const proposalCards = pendingProposals
+    .map((item) => {
+      const sessionId = String(item?.sessionId || "").trim();
+      const proposalId = String(item?.proposalId || "").trim();
+      return `
+        <article class="chat-review-inbox-card" data-chat-tool-proposal-row data-chat-session-id="${escapeHTML(sessionId)}" data-chat-proposal-id="${escapeHTML(proposalId)}">
+          <div class="metric-title-row">
+            <div class="title">Tool Proposal</div>
+            <span class="${chipClassForSessionStatus(item?.status || "PENDING")}">${escapeHTML(String(item?.status || "PENDING").trim().toUpperCase())}</span>
+          </div>
+          <div class="meta">proposal=${escapeHTML(proposalId || "-")}; type=${escapeHTML(String(item?.proposalType || "-"))}</div>
+          <div class="meta">${escapeHTML(String(item?.summary || "No proposal summary captured."))}</div>
+          <div class="chat-approval-action-group">
+            <input
+              class="filter-input chat-approval-reason-input"
+              type="text"
+              placeholder="decision reason"
+              data-chat-proposal-reason
+            />
+            <div class="action-group action-group-secondary">
+              <button
+                class="btn btn-ok"
+                type="button"
+                data-chat-action="approve-tool-proposal"
+                data-chat-session-id="${escapeHTML(sessionId)}"
+                data-chat-proposal-id="${escapeHTML(proposalId)}"
+              >Approve Proposal</button>
+              <button
+                class="btn btn-danger"
+                type="button"
+                data-chat-action="deny-tool-proposal"
+                data-chat-session-id="${escapeHTML(sessionId)}"
+                data-chat-proposal-id="${escapeHTML(proposalId)}"
+              >Deny Proposal</button>
+            </div>
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+  return `
+    <div class="chat-review-inbox">
+      <div class="metric-title-row">
+        <div class="title">Pending Decisions</div>
+        <span class="chip chip-danger chip-compact">items=${escapeHTML(String(pendingApprovals.length + pendingProposals.length))}</span>
+      </div>
+      <div class="meta">Pending approvals and proposals are surfaced here so you do not have to dig into the detailed review sections first.</div>
+      <div class="chat-review-inbox-grid">
+        ${approvalCards}
+        ${proposalCards}
+      </div>
     </div>
   `;
 }
@@ -540,7 +645,7 @@ function renderGovernanceReport(envelope = {}, sessionId = "") {
   const reportDetailKey = detailKey("chat", "governance_report", sessionId || "unknown");
   const renderedReportDetailKey = detailKey(reportDetailKey, "rendered");
   return `
-    <details class="details-shell chat-review-details chat-governance-report" data-detail-key="${escapeHTML(reportDetailKey)}" open>
+    <details class="details-shell chat-review-details chat-governance-report" data-detail-key="${escapeHTML(reportDetailKey)}">
       <summary>Enterprise Governance Report</summary>
       <div class="run-detail-chips">
         <span class="chip chip-neutral chip-compact">export=${escapeHTML(String(envelope.exportProfile || "-"))}</span>
@@ -640,6 +745,80 @@ function renderThreadResolutionPanel(threadState, activitySummary, hasTask) {
   `;
 }
 
+function buildAgentFocusSummary({
+  taskId = "",
+  threadState = {},
+  latestActivity = {},
+  latestTurn = null,
+  turnCount = 0,
+  historyCount = 0,
+  managedExecution = false
+} = {}) {
+  const pendingApprovalCount = Math.max(0, Number(threadState?.openApprovalCount ?? 0) || 0);
+  const pendingProposalCount = listNativeToolProposals(latestTurn?.sessionView || {}).filter(
+    (item) => String(item?.status || "PENDING").trim().toUpperCase() === "PENDING"
+  ).length;
+  const pendingDecisionCount = pendingApprovalCount + pendingProposalCount;
+  if (!taskId) {
+    return {
+      tone: "chip chip-neutral chip-compact",
+      label: "setup",
+      title: "Start the first governed thread",
+      detail: "Set the thread title and prompt, then start the thread and send the first message from Agent.",
+      pendingApprovalCount,
+      pendingProposalCount,
+      turnCount,
+      historyCount
+    };
+  }
+  if (threadState?.isResolvedThread) {
+    return {
+      tone: "chip chip-ok chip-compact",
+      label: "resolved",
+      title: "Current thread is resolved",
+      detail: "Use New Follow-up Thread for successor work or reopen this thread intentionally only when the same task must continue.",
+      pendingApprovalCount,
+      pendingProposalCount,
+      turnCount,
+      historyCount
+    };
+  }
+  if (pendingDecisionCount > 0) {
+    return {
+      tone: "chip chip-danger chip-compact",
+      label: "review now",
+      title: "Resolve pending decisions first",
+      detail: "Use the approval rail and current-turn decision inbox before asking the worker to continue mutating work.",
+      pendingApprovalCount,
+      pendingProposalCount,
+      turnCount,
+      historyCount
+    };
+  }
+  if (managedExecution && String(latestActivity?.latestWorkerStatus || "").trim()) {
+    return {
+      tone: "chip chip-warn chip-compact",
+      label: "worker active",
+      title: "Managed worker is active",
+      detail: "Watch worker progress, refresh if output stalls, and intervene only when approvals, proposals, or follow-up instructions are needed.",
+      pendingApprovalCount,
+      pendingProposalCount,
+      turnCount,
+      historyCount
+    };
+  }
+  return {
+    tone: "chip chip-ok chip-compact",
+    label: "ready",
+    title: "Continue the current thread",
+    detail: "Send the next message, or refresh the latest reply if the current turn needs another read from native session state.",
+    pendingApprovalCount,
+    pendingProposalCount,
+    turnCount,
+    historyCount
+  };
+}
+
 function renderTurnCards(turns = [], catalogs = {}, exportSelection = {}) {
   if (!Array.isArray(turns) || turns.length === 0) {
     return `
@@ -706,6 +885,7 @@ function renderTurnCards(turns = [], catalogs = {}, exportSelection = {}) {
             <div class="meta">completed=${escapeHTML(formatTime(response?.completedAt || session?.completedAt || turn?.createdAt))}</div>
             <div class="meta">source=${escapeHTML(String(sessionView?.source || "not-loaded"))}; finishReason=${escapeHTML(String(response?.finishReason || "-"))}; endpointRef=${escapeHTML(String(response?.endpointRef || "-"))}</div>
           </div>
+          ${renderTurnActionInbox(approvals, toolProposals)}
           <div class="chat-activity-panel">
             <div class="metric-title-row">
               <div class="title">Worker Review</div>
@@ -716,20 +896,20 @@ function renderTurnCards(turns = [], catalogs = {}, exportSelection = {}) {
             ${activity?.latestOutputText ? `<pre class="code-block chat-output-preview">${escapeHTML(String(activity.latestOutputText))}</pre>` : ""}
             ${renderProgressItems(activity?.progressItems)}
           </div>
-          ${transcript ? `<details class="details-shell" data-detail-key="${escapeHTML(transcriptDetailKey)}" open><summary>Raw Worker Transcript (${escapeHTML(String(transcript.eventCount || 0))} events)</summary><div class="meta">managedTurn=${escapeHTML(String(transcript.toolActionId || "-"))}</div><pre class="code-block">${escapeHTML(String(transcript.pretty || ""))}</pre></details>` : ""}
-          <details class="details-shell" data-detail-key="${escapeHTML(approvalsDetailKey)}" open>
+          ${transcript ? `<details class="details-shell" data-detail-key="${escapeHTML(transcriptDetailKey)}"><summary>Raw Worker Transcript (${escapeHTML(String(transcript.eventCount || 0))} events)</summary><div class="meta">managedTurn=${escapeHTML(String(transcript.toolActionId || "-"))}</div><pre class="code-block">${escapeHTML(String(transcript.pretty || ""))}</pre></details>` : ""}
+          <details class="details-shell" data-detail-key="${escapeHTML(approvalsDetailKey)}">
             <summary>Approval checkpoints (${approvals.length})</summary>
             ${renderApprovalCheckpoints(approvals)}
           </details>
-          <details class="details-shell" data-detail-key="${escapeHTML(proposalsDetailKey)}" open>
+          <details class="details-shell" data-detail-key="${escapeHTML(proposalsDetailKey)}">
             <summary>Tool proposals (${toolProposals.length})</summary>
             ${renderToolProposals(toolProposals)}
           </details>
-          <details class="details-shell" data-detail-key="${escapeHTML(actionsDetailKey)}" open>
+          <details class="details-shell" data-detail-key="${escapeHTML(actionsDetailKey)}">
             <summary>Tool actions (${toolActions.length})</summary>
             ${renderToolActions(toolActions)}
           </details>
-          <details class="details-shell" data-detail-key="${escapeHTML(evidenceDetailKey)}" open>
+          <details class="details-shell" data-detail-key="${escapeHTML(evidenceDetailKey)}">
             <summary>Evidence records (${evidence.length})</summary>
             ${renderEvidenceRecords(evidence)}
           </details>
@@ -779,8 +959,8 @@ export function renderChat(ui, settingsPayload = {}, chatState = {}) {
     (item) => String(item?.taskId || "").trim() === taskId
   );
   const startAction = taskId && threadState?.isResolvedThread ? "start-followup-thread" : "start-thread";
-  const startLabel = taskId && threadState?.isResolvedThread ? "Start Follow-up Thread" : "Start Thread";
-  const sendLabel = taskId && threadState?.isResolvedThread ? "Reopen Thread With Turn" : "Send Turn";
+  const startLabel = taskId && threadState?.isResolvedThread ? "New Follow-up Thread" : "Start Thread";
+  const sendLabel = taskId && threadState?.isResolvedThread ? "Reopen and Send" : "Send Message";
   const executionMode = String(chatState.executionMode || thread?.executionMode || "raw_model_invoke").trim().toLowerCase();
   const selectedWorker = latestTurn?.sessionView?.timeline?.selectedWorker || {};
   const catalogState = chatState?.catalogs && typeof chatState.catalogs === "object" ? chatState.catalogs : {};
@@ -793,63 +973,153 @@ export function renderChat(ui, settingsPayload = {}, chatState = {}) {
   const canReattachManagedWorker = managedExecution && Boolean(taskId) && Boolean(managedSessionId) && !threadState?.isResolvedThread;
   const canRecoverManagedWorker = managedExecution && Boolean(taskId);
   const canCloseManagedWorker = managedExecution && Boolean(managedSessionId) && !threadState?.isResolvedThread;
+  const historyCount = Number(history?.count ?? 0) || 0;
+  const archivedCount = Number(history?.archivedCount ?? 0) || 0;
+  const historySummary = String(history?.message || "Use Thread History to reopen or archive prior work without burying the current chat.").trim();
+  const focusSummary = buildAgentFocusSummary({
+    taskId,
+    threadState,
+    latestActivity,
+    latestTurn,
+    turnCount: turns.length,
+    historyCount,
+    managedExecution
+  });
 
   ui.chatContent.innerHTML = `
-    <div class="stack chat-surface">
-      <div class="panel-heading">
-        <h2>Operator Chat</h2>
-        <p class="panel-lead">Bootstrap governed chat on top of the M16 task and session contract. This surface creates a task once, sends turns against that task, and reads native timeline or event-stream state for each turn.</p>
+    <div class="stack chat-surface agent-chat-shell">
+      <div class="panel-heading agent-panel-heading">
+        <h2>Agent Workspace</h2>
+        <p class="panel-lead">Keep current work in one place: write the next message here, review thread state beside it, and use the approval rail without leaving the tab.</p>
       </div>
-      <div class="metric workflow-guide">
-        <div class="title">Chat Workflow</div>
-        <div class="meta">Start a thread for the current tenant and project scope, send operator prompts, then inspect the native M16 session record attached to each turn.</div>
-        <ol class="workflow-guide-list">
-          <li>Confirm tenant and project scope before starting a chat thread.</li>
-          <li>Use one agent profile consistently within the thread unless you intentionally want route changes.</li>
-          <li>Inspect each turn’s native session timeline before treating the response as authoritative.</li>
-        </ol>
-      </div>
-      <div class="metric settings-metric settings-metric-chat-thread">
+      <div class="metric agent-focus-card">
         <div class="metric-title-row">
-          <div class="title">Thread State</div>
-          <span class="${chipClassForSessionStatus(status)}">${escapeHTML(status.toUpperCase())}</span>
+          <div class="title">Current Focus</div>
+          <span class="${focusSummary.tone}">${escapeHTML(focusSummary.label)}</span>
         </div>
-        <div class="meta">task=${escapeHTML(taskId || "-")}; tenant=${escapeHTML(tenantId || "-")}; project=${escapeHTML(projectId || "-")}</div>
+        <div class="meta">${escapeHTML(focusSummary.title)}</div>
+        <div class="meta">${escapeHTML(focusSummary.detail)}</div>
         <div class="run-detail-chips">
+          <span class="chip chip-neutral chip-compact">task=${escapeHTML(taskId || "-")}</span>
+          <span class="chip chip-neutral chip-compact">turns=${escapeHTML(String(focusSummary.turnCount))}</span>
+          <span class="chip chip-neutral chip-compact">approvals=${escapeHTML(String(focusSummary.pendingApprovalCount))}</span>
+          <span class="chip chip-neutral chip-compact">proposals=${escapeHTML(String(focusSummary.pendingProposalCount))}</span>
+          <span class="chip chip-neutral chip-compact">history=${escapeHTML(String(focusSummary.historyCount))}</span>
           <span class="chip chip-neutral chip-compact">execution=${escapeHTML(executionModeLabel(executionMode))}</span>
-          <span class="chip chip-neutral chip-compact">taskStatus=${escapeHTML(String(threadState?.taskStatus || activeHistoryItem?.status || "-"))}</span>
-          <span class="chip chip-neutral chip-compact">sessionStatus=${escapeHTML(String(threadState?.sessionStatus || "-"))}</span>
-          <span class="chip chip-neutral chip-compact">workerStatus=${escapeHTML(String(threadState?.latestWorkerStatus || "-"))}</span>
-          <span class="chip chip-neutral chip-compact">approvals=${escapeHTML(String(threadState?.openApprovalCount ?? 0))}</span>
         </div>
-        <div class="run-detail-chips">
-          <span class="chip chip-neutral chip-compact">workerType=${escapeHTML(String(latestActivity?.selectedWorkerType || selectedWorker?.workerType || "-"))}</span>
-          <span class="chip chip-neutral chip-compact">workerAdapter=${escapeHTML(String(latestActivity?.selectedWorkerAdapterId || selectedWorker?.adapterId || "-"))}</span>
-          <span class="chip chip-neutral chip-compact">workerTarget=${escapeHTML(String(latestActivity?.selectedWorkerTargetEnvironment || selectedWorker?.targetEnvironment || "-"))}</span>
-        </div>
-        <div class="meta">${escapeHTML(message || "Use Start Thread to create an M16 task, then Send Turn to invoke the selected agent profile against that task.")}</div>
-        ${latestActivity?.latestWorkerSummary ? `<div class="meta">${escapeHTML(String(latestActivity.latestWorkerSummary))}</div>` : ""}
-        ${
-          managedExecution
-            ? `<div class="meta">${escapeHTML(managedWorkerReady
-              ? "Managed Codex worker controls are active on the latest native session. Reattach if the bridge must bind again, Recover to mint a fresh managed session, or Close to cancel the active managed session cleanly."
-              : "Managed Codex worker path selected. Launch to attach the bridge, or Recover to create a fresh managed session if the latest managed thread is already resolved.")}</div>`
-            : ""
-        }
-        ${catalogState?.message ? `<div class="meta">governanceCatalogs=${escapeHTML(String(catalogState.source || "-"))}; ${escapeHTML(String(catalogState.message || ""))}</div>` : ""}
       </div>
-      ${renderGovernedExportControls(governedExportSelection)}
-      ${renderThreadResolutionPanel(threadState, latestActivity, Boolean(taskId))}
-      <div class="chat-history-layout">
-        <div class="metric settings-metric settings-metric-chat-history">
+      <div class="agent-chat-top">
+        <div class="metric agent-chat-composer">
           <div class="metric-title-row">
-            <div class="title">Native Thread History</div>
-            <span class="chip chip-neutral chip-compact">${escapeHTML(String(history?.count ?? 0))} threads</span>
+            <div class="title">Current Chat</div>
+            <span class="${chipClassForSessionStatus(status)}">${escapeHTML(status.toUpperCase())}</span>
           </div>
-          <div class="meta">${escapeHTML(String(history?.message || "Resume a prior chat thread directly from native M16 task/session records."))}</div>
+          <div class="meta">${escapeHTML(message || "Start a thread, send the next message, and keep the current conversation visible while approvals and thread state stay nearby.")}</div>
+          <div class="settings-editor-grid chat-composer-grid">
+            <label class="field field-wide">
+              <span class="label">Thread Title</span>
+              <input id="chat-thread-title" class="filter-input" type="text" value="${escapeHTML(String(chatState.title || ""))}" data-chat-field="title" />
+            </label>
+            <label class="field">
+              <span class="label">Agent Profile</span>
+              <select id="chat-agent-profile" class="filter-input" data-chat-field="agentProfileId">${profileOptions}</select>
+            </label>
+            <label class="field">
+              <span class="label">Execution Path</span>
+              <select id="chat-execution-mode" class="filter-input" data-chat-field="executionMode">
+                <option value="raw_model_invoke" ${selectedAttr(executionMode, "raw_model_invoke")}>Raw Model Invoke</option>
+                <option value="managed_codex_worker" ${selectedAttr(executionMode, "managed_codex_worker")}>Managed Codex Worker</option>
+              </select>
+            </label>
+            <label class="field field-wide">
+              <span class="label">Thread Intent</span>
+              <input id="chat-thread-intent" class="filter-input" type="text" value="${escapeHTML(String(chatState.intent || ""))}" data-chat-field="intent" />
+            </label>
+            <label class="field field-wide">
+              <span class="label">System Instructions</span>
+              <span class="meta">Use this for durable guidance that should stay in effect across the whole thread.</span>
+              <textarea id="chat-system-prompt" class="filter-input settings-agent-test-textarea" rows="4" data-chat-field="systemPrompt">${escapeHTML(String(chatState.systemPrompt || ""))}</textarea>
+            </label>
+            <label class="field field-wide">
+              <span class="label">Turn Prompt</span>
+              <span class="meta">Use this for the specific request or message you want to send right now.</span>
+              <textarea id="chat-prompt" class="filter-input settings-agent-test-textarea" rows="8" data-chat-field="prompt">${escapeHTML(String(chatState.prompt || ""))}</textarea>
+            </label>
+          </div>
+          <div class="filter-row settings-editor-actions agent-composer-actions">
+            <div class="action-hierarchy">
+              <div class="action-group action-group-primary">
+                <button class="btn btn-primary" type="button" data-chat-action="${startAction}">${startLabel}</button>
+                <button class="btn btn-primary" type="button" data-chat-action="send-turn" ${taskId ? "" : "disabled"}>${sendLabel}</button>
+              </div>
+              ${
+                managedExecution
+                  ? `
+                    <div class="action-group action-group-secondary">
+                      <button class="btn btn-secondary" type="button" data-chat-action="launch-managed-worker" ${canLaunchManagedWorker ? "" : "disabled"}>Launch Worker</button>
+                      <button class="btn btn-secondary" type="button" data-chat-action="reattach-managed-worker" ${canReattachManagedWorker ? "" : "disabled"}>Reattach</button>
+                      <button class="btn btn-secondary" type="button" data-chat-action="emit-worker-heartbeat" ${managedWorkerReady ? "" : "disabled"}>Heartbeat</button>
+                      <button class="btn btn-secondary" type="button" data-chat-action="recover-managed-worker" ${canRecoverManagedWorker ? "" : "disabled"}>Recover</button>
+                      <button class="btn btn-danger" type="button" data-chat-action="close-managed-worker" ${canCloseManagedWorker ? "" : "disabled"}>Close Worker</button>
+                    </div>
+                  `
+                  : ""
+              }
+              <div class="action-group action-group-secondary">
+                <button class="btn btn-secondary" type="button" data-chat-action="refresh-last-turn" ${latestTurn?.response?.sessionId ? "" : "disabled"}>Refresh Reply</button>
+              </div>
+              <div class="action-group action-group-destructive">
+                <button class="btn btn-danger" type="button" data-chat-action="reset-thread" ${taskId ? "" : "disabled"}>Clear Current Thread</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="metric settings-metric settings-metric-chat-thread agent-thread-state-card">
+          <div class="metric-title-row">
+            <div class="title">Thread State</div>
+            <span class="${chipClassForSessionStatus(status)}">${escapeHTML(status.toUpperCase())}</span>
+          </div>
+          <div class="meta">task=${escapeHTML(taskId || "-")}; tenant=${escapeHTML(tenantId || "-")}; project=${escapeHTML(projectId || "-")}</div>
           <div class="run-detail-chips">
-            <span class="chip chip-neutral chip-compact">visible=${escapeHTML(String(history?.count ?? 0))}</span>
-            <span class="chip chip-neutral chip-compact">archived=${escapeHTML(String(history?.archivedCount ?? 0))}</span>
+            <span class="chip chip-neutral chip-compact">execution=${escapeHTML(executionModeLabel(executionMode))}</span>
+            <span class="chip chip-neutral chip-compact">taskStatus=${escapeHTML(String(threadState?.taskStatus || activeHistoryItem?.status || "-"))}</span>
+            <span class="chip chip-neutral chip-compact">sessionStatus=${escapeHTML(String(threadState?.sessionStatus || "-"))}</span>
+            <span class="chip chip-neutral chip-compact">workerStatus=${escapeHTML(String(threadState?.latestWorkerStatus || "-"))}</span>
+            <span class="chip chip-neutral chip-compact">approvals=${escapeHTML(String(threadState?.openApprovalCount ?? 0))}</span>
+          </div>
+          <div class="run-detail-chips">
+            <span class="chip chip-neutral chip-compact">workerType=${escapeHTML(String(latestActivity?.selectedWorkerType || selectedWorker?.workerType || "-"))}</span>
+            <span class="chip chip-neutral chip-compact">workerAdapter=${escapeHTML(String(latestActivity?.selectedWorkerAdapterId || selectedWorker?.adapterId || "-"))}</span>
+            <span class="chip chip-neutral chip-compact">workerTarget=${escapeHTML(String(latestActivity?.selectedWorkerTargetEnvironment || selectedWorker?.targetEnvironment || "-"))}</span>
+          </div>
+          ${latestActivity?.latestWorkerSummary ? `<div class="meta">${escapeHTML(String(latestActivity.latestWorkerSummary))}</div>` : ""}
+          ${
+            managedExecution
+              ? `<div class="meta">${escapeHTML(
+                managedWorkerReady
+                  ? "Managed worker controls are live on the latest session."
+                  : "Managed worker mode is selected. Launch or recover when you need a live bridge."
+              )}</div>`
+              : ""
+          }
+          ${catalogState?.message ? `<div class="meta">governanceCatalogs=${escapeHTML(String(catalogState.source || "-"))}; ${escapeHTML(String(catalogState.message || ""))}</div>` : ""}
+        </div>
+      </div>
+      <details class="details-shell agent-advanced-block" data-detail-key="agent.export_and_governance">
+        <summary>Export and governance settings</summary>
+        ${renderGovernedExportControls(governedExportSelection)}
+      </details>
+      ${renderThreadResolutionPanel(threadState, latestActivity, Boolean(taskId))}
+      <div class="chat-turns-stack">
+        ${renderTurnCards(turns, catalogState, governedExportSelection)}
+      </div>
+      <details class="details-shell agent-thread-history-card" data-detail-key="agent.thread_history">
+        <summary>Thread History (${escapeHTML(String(historyCount))} visible${archivedCount ? `, ${escapeHTML(String(archivedCount))} archived` : ""})</summary>
+        <div class="agent-thread-history-body">
+          <div class="meta">${escapeHTML(historySummary)}</div>
+          <div class="run-detail-chips">
+            <span class="chip chip-neutral chip-compact">visible=${escapeHTML(String(historyCount))}</span>
+            <span class="chip chip-neutral chip-compact">archived=${escapeHTML(String(archivedCount))}</span>
           </div>
           <div class="filter-row settings-editor-actions">
             <div class="action-hierarchy">
@@ -868,68 +1138,7 @@ export function renderChat(ui, settingsPayload = {}, chatState = {}) {
             })}
           </div>
         </div>
-      </div>
-      <div class="settings-editor-grid chat-composer-grid">
-        <label class="field">
-          <span class="label">Thread Title</span>
-          <input id="chat-thread-title" class="filter-input" type="text" value="${escapeHTML(String(chatState.title || ""))}" data-chat-field="title" />
-        </label>
-        <label class="field">
-          <span class="label">Agent Profile</span>
-          <select id="chat-agent-profile" class="filter-input" data-chat-field="agentProfileId">${profileOptions}</select>
-        </label>
-        <label class="field">
-          <span class="label">Execution Path</span>
-          <select id="chat-execution-mode" class="filter-input" data-chat-field="executionMode">
-            <option value="raw_model_invoke" ${selectedAttr(executionMode, "raw_model_invoke")}>Raw Model Invoke</option>
-            <option value="managed_codex_worker" ${selectedAttr(executionMode, "managed_codex_worker")}>Managed Codex Worker</option>
-          </select>
-        </label>
-        <label class="field field-wide">
-          <span class="label">Thread Intent</span>
-          <input id="chat-thread-intent" class="filter-input" type="text" value="${escapeHTML(String(chatState.intent || ""))}" data-chat-field="intent" />
-        </label>
-        <label class="field field-wide">
-          <span class="label">System Instructions</span>
-          <span class="meta">Use this for durable guidance that should stay in effect for the whole governed thread.</span>
-          <textarea id="chat-system-prompt" class="filter-input settings-agent-test-textarea" rows="3" data-chat-field="systemPrompt">${escapeHTML(String(chatState.systemPrompt || ""))}</textarea>
-        </label>
-        <label class="field field-wide">
-          <span class="label">Turn Prompt</span>
-          <span class="meta">Use this for the specific request you want the worker or model to perform in this turn.</span>
-          <textarea id="chat-prompt" class="filter-input settings-agent-test-textarea" rows="5" data-chat-field="prompt">${escapeHTML(String(chatState.prompt || ""))}</textarea>
-        </label>
-      </div>
-      <div class="filter-row settings-editor-actions">
-        <div class="action-hierarchy">
-          <div class="action-group action-group-primary">
-            <button class="btn btn-primary" type="button" data-chat-action="${startAction}">${startLabel}</button>
-            <button class="btn btn-primary" type="button" data-chat-action="send-turn" ${taskId ? "" : "disabled"}>${sendLabel}</button>
-          </div>
-          ${
-            managedExecution
-              ? `
-                <div class="action-group action-group-secondary">
-                  <button class="btn btn-secondary" type="button" data-chat-action="launch-managed-worker" ${canLaunchManagedWorker ? "" : "disabled"}>Launch Managed Worker</button>
-                  <button class="btn btn-secondary" type="button" data-chat-action="reattach-managed-worker" ${canReattachManagedWorker ? "" : "disabled"}>Reattach Worker</button>
-                  <button class="btn btn-secondary" type="button" data-chat-action="emit-worker-heartbeat" ${managedWorkerReady ? "" : "disabled"}>Emit Heartbeat</button>
-                  <button class="btn btn-secondary" type="button" data-chat-action="recover-managed-worker" ${canRecoverManagedWorker ? "" : "disabled"}>Recover Worker</button>
-                  <button class="btn btn-danger" type="button" data-chat-action="close-managed-worker" ${canCloseManagedWorker ? "" : "disabled"}>Close Worker Session</button>
-                </div>
-              `
-              : ""
-          }
-          <div class="action-group action-group-secondary">
-            <button class="btn btn-secondary" type="button" data-chat-action="refresh-last-turn" ${latestTurn?.response?.sessionId ? "" : "disabled"}>Refresh Last Turn</button>
-          </div>
-          <div class="action-group action-group-destructive">
-            <button class="btn btn-danger" type="button" data-chat-action="reset-thread" ${taskId ? "" : "disabled"}>Reset Thread</button>
-          </div>
-        </div>
-      </div>
-      <div class="chat-turns-stack">
-        ${renderTurnCards(turns, catalogState, governedExportSelection)}
-      </div>
+      </details>
     </div>
   `;
 }

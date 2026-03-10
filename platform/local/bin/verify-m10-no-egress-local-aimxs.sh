@@ -244,8 +244,8 @@ assert_runtime_selected_policy_provider() {
 }
 
 apply_customer_mode_and_override() {
-  echo "Applying customer-hosted mode profile..."
-  kubectl apply -k "${REPO_ROOT}/platform/modes/aimxs-customer-hosted" >/dev/null
+  echo "Applying aimxs-full mode profile..."
+  kubectl apply -k "${REPO_ROOT}/platform/modes/aimxs-full" >/dev/null
 
   local auth_mode endpoint_url
   auth_mode="$(kubectl -n "${NAMESPACE}" get extensionprovider aimxs-policy-primary -o jsonpath='{.spec.auth.mode}' 2>/dev/null || true)"
@@ -262,7 +262,7 @@ apply_customer_mode_and_override() {
   # Local no-egress proof override:
   # use in-cluster OSS provider endpoint as AIMXS stand-in to validate that policy flow does not
   # require external network egress when AIMXS runs customer-local.
-  cat >"${TMPDIR_LOCAL}/aimxs-local-override.yaml" <<'YAML'
+  cat >"${TMPDIR_LOCAL}/aimxs-full-override.yaml" <<'YAML'
 apiVersion: controlplane.epydios.ai/v1alpha1
 kind: ExtensionProvider
 metadata:
@@ -285,7 +285,7 @@ spec:
     - policy.evaluate
     - policy.validate_bundle
 YAML
-  kubectl -n "${NAMESPACE}" apply -f "${TMPDIR_LOCAL}/aimxs-local-override.yaml" >/dev/null
+  kubectl -n "${NAMESPACE}" apply -f "${TMPDIR_LOCAL}/aimxs-full-override.yaml" >/dev/null
 
   wait_for_provider_ready oss-policy-opa oss-policy-opa
   # Local smoke override points AIMXS contract to OSS policy endpoint, so resolved.providerId

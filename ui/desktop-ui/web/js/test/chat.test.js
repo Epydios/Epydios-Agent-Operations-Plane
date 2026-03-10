@@ -70,12 +70,16 @@ test("chat view renders parity fixture state from the native contract", async ()
     }
   );
 
-  assert.match(ui.chatContent.innerHTML, /Operator Chat/);
+  assert.match(ui.chatContent.innerHTML, /Agent Workspace/);
   assert.match(ui.chatContent.innerHTML, /Managed Codex Worker/);
   assert.match(ui.chatContent.innerHTML, /Investigate checkout timeouts/);
   assert.match(ui.chatContent.innerHTML, /Tool proposal generated for shell execution\./);
   assert.match(ui.chatContent.innerHTML, /approval-1/);
   assert.match(ui.chatContent.innerHTML, /proposal-1/);
+  assert.match(ui.chatContent.innerHTML, /Pending Decisions/);
+  assert.match(ui.chatContent.innerHTML, /Approve Proposal/);
+  assert.match(ui.chatContent.innerHTML, /Current Focus/);
+  assert.match(ui.chatContent.innerHTML, /Resolve pending decisions first/);
   assert.match(ui.chatContent.innerHTML, /Enterprise Governance Report/);
   assert.match(ui.chatContent.innerHTML, /Copy Report/);
   assert.match(ui.chatContent.innerHTML, /enterprise-default: Enterprise Default/);

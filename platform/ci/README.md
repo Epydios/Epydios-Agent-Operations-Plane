@@ -75,14 +75,14 @@ This directory contains CI entrypoint scripts invoked by GitHub Actions.
     - runs `platform/local/bin/verify-m10-deployment-modes.sh`
     - validates policy-provider routing transitions across:
       - `platform/modes/oss-only`
-      - `platform/modes/aimxs-hosted`
-      - `platform/modes/aimxs-customer-hosted`
+      - `platform/modes/aimxs-https`
+      - `platform/modes/aimxs-full`
     - confirms all three modes stay on one `ExtensionProvider` contract surface
-  - M10.5 customer-hosted no-egress verification:
+  - M10.5 aimxs-full no-egress verification:
     - `RUN_M10_NO_EGRESS_LOCAL_AIMXS=1` in full mode (required)
     - `RUN_M10_NO_EGRESS_LOCAL_AIMXS=0` default in fast mode
     - runs `platform/local/bin/verify-m10-no-egress-local-aimxs.sh`
-    - validates local/customer-hosted policy path succeeds while external egress is blocked by a scoped runtime NetworkPolicy
+    - validates local/aimxs-full policy path succeeds while external egress is blocked by a scoped runtime NetworkPolicy
   - M10.6 AIMXS entitlement deny-path verification:
     - `RUN_M10_ENTITLEMENT_DENY=1` in full mode (required)
     - `RUN_M10_ENTITLEMENT_DENY=0` default in fast mode
@@ -98,12 +98,12 @@ This directory contains CI entrypoint scripts invoked by GitHub Actions.
     - runs `platform/local/bin/verify-m10-aimxs-private-release.sh`
     - validates first private AIMXS SDK/provider release evidence and staging strict-proof assertions
     - reads `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/private-release-inputs.vars` by default for private release metadata (falls back to repo-local path only if present)
-  - M10.7 AIMXS customer-hosted packaging evidence verification:
+  - M10.7 AIMXS aimxs-full packaging evidence verification:
     - `RUN_M10_CUSTOMER_HOSTED_PACKAGING=1` in full mode (required)
     - `RUN_M10_CUSTOMER_HOSTED_PACKAGING=0` default in fast mode
-    - runs `platform/local/bin/verify-m10-customer-hosted-packaging.sh`
-    - validates customer-hosted packaging references (signed image/artifact + SBOM + air-gapped install/update bundles + support/SLA docs)
-    - reads `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/customer-hosted-release-inputs.vars` by default for private customer-hosted release metadata (falls back to repo-local path only if present)
+    - runs `platform/local/bin/verify-m10-aimxs-full-packaging.sh`
+    - validates aimxs-full packaging references (signed image/artifact + SBOM + air-gapped install/update bundles + support/SLA docs)
+    - reads `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/aimxs-full-release-inputs.vars` by default for private aimxs-full release metadata (falls back to repo-local path only if present)
   - M13 desktop execution-plane contract + deny-path verifier:
     - `RUN_M13_DESKTOP_PROVIDER=1` in full mode (required)
     - `RUN_M13_DESKTOP_PROVIDER=0` default in fast mode

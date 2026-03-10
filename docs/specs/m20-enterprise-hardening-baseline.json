@@ -416,9 +416,9 @@
     {
       "id": "M22",
       "name": "local_aimxs_decision_provider_boundary",
-      "goal": "evaluate and then implement local or customer-hosted AIMXS decision-provider operation on the existing policy boundary after M21 stabilization is complete",
+      "goal": "evaluate and then implement aimxs-full AIMXS decision-provider operation on the existing policy boundary after M21 stabilization is complete",
       "deliverables": [
-        "local or customer-hosted AIMXS provider mode decision record",
+        "aimxs-full AIMXS provider mode decision record",
         "AIMXS local test harness on the existing PolicyProvider boundary",
         "no-egress or local-boundary verification for AIMXS local mode",
         "runtime and operator documentation for local AIMXS testing"

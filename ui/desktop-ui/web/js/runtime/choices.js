@@ -1,3 +1,5 @@
+import { normalizeAimxsOverride } from "../aimxs/state.js";
+
 function normalizeChoice(value, allowed, fallback) {
   const normalized = String(value || "").trim().toLowerCase();
   if (allowed.includes(normalized)) {
@@ -187,29 +189,8 @@ export function resolveRuntimeChoices(config) {
         ? selectedAgentProfileID
         : (agentProfiles[0]?.id || "codex")
     },
-    aimxs: {
-      paymentEntitled: Boolean(aimxs.paymentEntitled),
-      mode: normalizeChoice(aimxs.mode, ["disabled", "https_external", "in_stack_reserved"], "disabled"),
-      endpointRef:
-        String(
-          aimxs.endpointRef ||
-            "ref://projects/{projectId}/providers/aimxs/https-endpoint"
-        ).trim() || "-",
-      bearerTokenRef:
-        String(
-          aimxs.bearerTokenRef ||
-            "ref://projects/{projectId}/providers/aimxs/bearer-token"
-        ).trim() || "-",
-      mtlsCertRef:
-        String(
-          aimxs.mtlsCertRef ||
-            "ref://projects/{projectId}/providers/aimxs/mtls-cert"
-        ).trim() || "-",
-      mtlsKeyRef:
-        String(
-          aimxs.mtlsKeyRef ||
-            "ref://projects/{projectId}/providers/aimxs/mtls-key"
-        ).trim() || "-"
-    }
+    aimxs: normalizeAimxsOverride(aimxs, {
+      paymentEntitled: Boolean(aimxs.paymentEntitled)
+    })
   };
 }

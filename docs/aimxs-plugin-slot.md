@@ -5,12 +5,12 @@ This document codifies the boundary: AIMXS remains private and external to the O
 ## Design Rule
 
 - OSS control plane exposes versioned provider contracts and `ExtensionProvider` registration.
-- AIMXS runs as separate image(s)/repo(s), reachable via HTTPS endpoints.
-- OSS must not import AIMXS code directly.
+- AIMXS runs behind the public provider boundary, either as an HTTPS provider or as the Desktop/runtime local full shim.
+- OSS must not vendor AIMXS code directly into the build graph.
 - Deployment modes stay on one contract surface:
   - OSS-only (`platform/modes/oss-only`)
-  - AIMXS hosted HTTPS (`platform/modes/aimxs-hosted`)
-  - AIMXS customer-hosted local/on-prem (`platform/modes/aimxs-customer-hosted`)
+  - AIMXS HTTPS (`platform/modes/aimxs-https`)
+  - AIMXS full local Desktop/runtime shim (`ui/desktop-ui/bin/aimxs-full-provider.py`)
 
 ## Slot Interface
 
@@ -26,24 +26,22 @@ This package defines:
 
 ## Endpoint Security Expectations
 
-- Prefer `MTLS` or `MTLSAndBearerTokenSecret` for AIMXS providers.
+- Prefer `MTLS` or `MTLSAndBearerTokenSecret` for AIMXS HTTPS providers.
 - Use HTTPS endpoint URLs for all mTLS modes.
 - Keep AIMXS credentials/material in Kubernetes secrets referenced by `ExtensionProvider` auth fields.
 
-## Local Development Mode (Non-Production)
+## Full Local Mode
 
-- A local bootstrap path is allowed before private AIMXS is deployed:
-  - `examples/aimxs/extensionprovider-policy-local-dev.yaml`
-- This dev profile is intentionally `auth.mode=None` and `selection.enabled=false` by default.
-- Use it only to validate contract compatibility and routing behavior in local clusters.
-- Staging/prod must switch to HTTPS with `MTLS` or `MTLSAndBearerTokenSecret`.
+- `aimxs-full` is the local Desktop/runtime AIMXS shim started by `ui/desktop-ui/bin/run-macos-local.sh`.
+- It dynamically loads the external AIMXS pack at runtime and exposes the public `PolicyProvider` contract locally.
+- It does not reuse the OSS placeholder policy provider and it does not require HTTPS, mTLS, or bearer-token refs.
 
 ## Deployment Mode Profiles
 
 - Mode manifests are under `platform/modes/`.
 - `oss-only` routes to OSS providers and keeps AIMXS out of the execution path.
-- `aimxs-hosted` routes to hosted AIMXS endpoint over secure auth.
-- `aimxs-customer-hosted` routes to customer-local AIMXS endpoint over secure auth, so policy execution does not require external data egress.
+- `aimxs-https` routes to AIMXS HTTPS endpoint over secure auth.
+- `aimxs-full` routes local Desktop/runtime policy evaluation through the AIMXS full shim with no silent OSS fallback.
 
 ## Operational Contract
 

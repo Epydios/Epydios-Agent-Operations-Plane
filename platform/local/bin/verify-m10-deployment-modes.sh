@@ -208,7 +208,7 @@ apply_aimxs_local_smoke_override() {
   # Local mode-switch verification override:
   # route aimxs-policy-primary to in-cluster OSS policy endpoint so switching can be validated
   # without requiring private AIMXS runtime in this OSS workspace.
-  cat >"${TMPDIR_LOCAL}/aimxs-local-override.yaml" <<'YAML'
+  cat >"${TMPDIR_LOCAL}/aimxs-full-override.yaml" <<'YAML'
 apiVersion: controlplane.epydios.ai/v1alpha1
 kind: ExtensionProvider
 metadata:
@@ -231,7 +231,7 @@ spec:
     - policy.evaluate
     - policy.validate_bundle
 YAML
-  kubectl -n "${NAMESPACE}" apply -f "${TMPDIR_LOCAL}/aimxs-local-override.yaml" >/dev/null
+  kubectl -n "${NAMESPACE}" apply -f "${TMPDIR_LOCAL}/aimxs-full-override.yaml" >/dev/null
 }
 
 assert_runtime_selected_policy_provider() {
@@ -304,10 +304,10 @@ main() {
   start_port_forward
 
   apply_oss_mode_and_verify
-  apply_aimxs_mode_and_verify "aimxs-hosted" 'aimxs-policy-hosted\.epydios\.com' "aimxs-hosted"
-  apply_aimxs_mode_and_verify "aimxs-customer-hosted" 'aimxs-policy\.epydios-system\.svc\.cluster\.local' "aimxs-customer-hosted"
+  apply_aimxs_mode_and_verify "aimxs-https" 'aimxs-policy-hosted\.epydios\.com' "aimxs-https"
+  apply_aimxs_mode_and_verify "aimxs-full" 'aimxs-policy\.epydios-system\.svc\.cluster\.local' "aimxs-full"
 
-  echo "M10.4 deployment-mode switching passed (oss-only -> aimxs-hosted -> aimxs-customer-hosted) under a single contract."
+  echo "M10.4 deployment-mode switching passed (oss-only -> aimxs-https -> aimxs-full) under a single contract."
 }
 
 main "$@"

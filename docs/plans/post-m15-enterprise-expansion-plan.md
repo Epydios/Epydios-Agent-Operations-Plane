@@ -299,7 +299,7 @@ Exit gate:
 - completed slice 11: locked the local managed Codex process path to `read-only` sandbox mode at both the Mac runtime launcher and the runtime adapter boundary so the worker can no longer mutate the scratch workspace directly before proposal/approval review
 - next batch: continue the local managed-Codex operator verification flow on Mac against the synthesized gateway, API-login, and read-only-sandbox boundary and close any remaining defects exposed by operator testing
 - planned follow-on inside M21: add secure Settings-side credential capture using encrypted or keychain-backed local storage so operators do not have to pre-seed local ref-values files for routine Mac testing
-- planned follow-on after that is `M22` for local or customer-hosted AIMXS decision-provider work on the existing policy boundary
+- planned follow-on after that is `M22` for aimxs-full AIMXS decision-provider work on the existing policy boundary
 - keep Chat, VS Code, CLI, workflow, and chatops on the same native M16/M18 contract
 
 Do not:
@@ -406,11 +406,11 @@ Exit gate:
 
 ### M22
 
-Local or customer-hosted AIMXS decision-provider boundary. Planned, not active.
+Local or aimxs-full AIMXS decision-provider boundary. Planned, not active.
 
 Deliverables:
 
-- decide the local or customer-hosted AIMXS testing posture on the existing `PolicyProvider` boundary
+- decide the aimxs-full AIMXS testing posture on the existing `PolicyProvider` boundary
 - add a local AIMXS test harness on the same provider contract
 - verify no-egress or local-boundary operation for AIMXS local mode
 - document the runtime and operator path for local AIMXS testing

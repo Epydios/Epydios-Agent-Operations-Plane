@@ -368,9 +368,9 @@
     {
       "id": "M22",
       "name": "local_aimxs_decision_provider_boundary",
-      "goal": "evaluate and then implement local or customer-hosted AIMXS decision-provider operation on the existing policy boundary after M21 stabilization is complete",
+      "goal": "evaluate and then implement aimxs-full AIMXS decision-provider operation on the existing policy boundary after M21 stabilization is complete",
       "deliverables": [
-        "local or customer-hosted AIMXS provider mode decision record",
+        "aimxs-full AIMXS provider mode decision record",
         "AIMXS local test harness on the existing PolicyProvider boundary",
         "no-egress or local-boundary verification for AIMXS local mode",
         "runtime and operator documentation for local AIMXS testing"
@@ -380,5 +380,5 @@
     }
   ],
   "recommended_immediate_next_step": "M21 is active. Completed slices: browser live-mode stabilization, repo-local desktop cache hygiene, the documented local-Mac runtime/operator diagnostics path, live polling refresh stability, local invoke/operator-editing stabilization, live disclosure/output stabilization, refresh-status debounce, local managed-Codex gateway-boundary synthesis, isolated per-session CODEX_HOME plus API-key auth bootstrap for managed Codex process mode, reasoning-effort clamping, read-only sandbox enforcement, governed-proposal prompt enforcement for mutating work, and approved-proposal execution normalization. Next batch: continue the local managed-Codex operator verification flow on Mac, use a fresh thread to prove deny leaves the scratch file absent, approve creates it exactly once, same-thread read resumes correctly, and governed delete removes it cleanly, then close any remaining defects exposed by operator testing.",
-  "parallel_execution_note": "M15 remains open globally, but the active follow-on engineering work is M21 stabilization. Keep every client surface on the same native M16/M18 contract, keep M22 parked for local or customer-hosted AIMXS work, do not reopen M20, and focus M21 only on operator-visible stabilization, turnkey local managed-Codex testing, isolated API-key auth for local process mode, and secure credential handling follow-ons."
+  "parallel_execution_note": "M15 remains open globally, but the active follow-on engineering work is M21 stabilization. Keep every client surface on the same native M16/M18 contract, keep M22 parked for aimxs-full AIMXS work, do not reopen M20, and focus M21 only on operator-visible stabilization, turnkey local managed-Codex testing, isolated API-key auth for local process mode, and secure credential handling follow-ons."
 }

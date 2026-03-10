@@ -3,7 +3,7 @@ kind: ExtensionProvider
 metadata:
   name: aimxs-policy-primary
   labels:
-    epydios.ai/deployment-mode: aimxs-hosted
+    epydios.ai/deployment-mode: aimxs-https
 spec:
   providerType: PolicyProvider
   providerId: aimxs-policy-primary

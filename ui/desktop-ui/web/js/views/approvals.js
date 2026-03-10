@@ -134,7 +134,7 @@ export function renderApprovalFeedback(ui, tone, message) {
   if (!ui.approvalsFeedback) {
     return;
   }
-  const title = tone === "error" ? "Approval decision failed" : tone === "ok" ? "Approval decision submitted" : "Approvals";
+  const title = tone === "error" ? "Approval decision failed" : tone === "ok" ? "Approval decision submitted" : "Pending Approvals";
   const state = tone === "error" ? "error" : tone === "ok" ? "success" : tone === "warn" ? "warn" : "info";
   ui.approvalsFeedback.innerHTML = renderPanelStateMetric(state, title, message || "");
 }
@@ -147,143 +147,77 @@ function capabilityCountLabel(item) {
   return `${capabilities.length} capability${capabilities.length === 1 ? "" : "ies"}`;
 }
 
-export function renderApprovals(ui, store, approvalPayload, filters, selectedRunId = "") {
-  const allItems = Array.isArray(approvalPayload?.items) ? approvalPayload.items : [];
-  store.setApprovalItems(allItems);
-  const filteredItems = filterApprovals(allItems, filters);
-  const pageState = paginateItems(filteredItems, filters?.pageSize, filters?.page);
-  const pageItems = pageState.items;
-  if (ui.approvalsPage) {
-    ui.approvalsPage.value = String(pageState.page);
-  }
-  if (ui.approvalsPageSize) {
-    ui.approvalsPageSize.value = String(pageState.pageSize);
-  }
-
-  if (filteredItems.length === 0) {
-    const warning = approvalPayload?.warning
-      ? renderPanelStateMetric("warn", "Approvals Source", approvalPayload.warning)
-      : "";
-    ui.approvalsContent.innerHTML = `${warning}${renderPanelStateMetric(
-      "empty",
-      "Approvals Queue",
-      "No approval requests match current filters.",
-      "Adjust status, scope, or time filters, then click Apply."
-    )}`;
-    if (ui.approvalsDetailContent) {
-      ui.approvalsDetailContent.innerHTML = renderPanelStateMetric(
-        "info",
-        "Approval Detail",
-        "Select an approval row to review requested capabilities and decision controls."
-      );
-      delete ui.approvalsDetailContent.dataset.selectedRunId;
-    }
-    return;
-  }
-
-  const warning = approvalPayload?.warning
-    ? renderPanelStateMetric("warn", "Approvals Source", approvalPayload.warning)
-    : "";
-
-  const rows = pageItems
-    .map((item) => {
-      const status = String(item.status || "").toUpperCase();
-      const ttl = ttlInfo(item.expiresAt);
-      const capabilitiesLabel = capabilityCountLabel(item);
-      const runId = String(item.runId || "").trim();
-      const isSelected = selectedRunId && runId === selectedRunId;
-      const toggleMarker = isSelected ? "v" : ">";
-      const reviewButton = `
-        <button
-          class="btn btn-primary btn-small approval-review-run"
-          data-approval-select-run-id="${escapeHTML(item.runId || "")}"
-          aria-controls="approvals-detail-content"
-          aria-expanded="${isSelected ? "true" : "false"}"
-        >${isSelected ? "Hide Detail" : "Review Approval"}</button>
-      `;
-      const openRunButton = `
-        <button
-          class="btn btn-secondary btn-small approval-open-run"
-          data-approval-open-run-id="${escapeHTML(item.runId || "")}"
-        >Open Run Detail</button>
-      `;
-      const actions = `
-        <div class="approval-actions action-hierarchy">
-          <div class="action-group action-group-primary">${reviewButton}</div>
-          <div class="action-group action-group-secondary">${openRunButton}</div>
-        </div>
-      `;
-
-      return `
-        <tr${isSelected ? ' class="settings-row-focus"' : ""}>
-          ${tableCell(
-            "Run ID",
-            `
-            <button class="row-action approval-row-action" type="button" data-approval-select-run-id="${escapeHTML(runId)}" aria-controls="approvals-detail-content" aria-expanded="${isSelected ? "true" : "false"}">
-              <span class="approval-row-toggle">${escapeHTML(toggleMarker)}</span>
-              <span>${escapeHTML(item.runId || "-")}</span>
-            </button>
-          `
-          )}
-          ${tableCell("Tenant", escapeHTML(item.tenantId || "-"))}
-          ${tableCell("Project", escapeHTML(item.projectId || "-"))}
-          ${tableCell("Tier", escapeHTML(String(item.tier || "-")))}
-          ${tableCell("Profile", escapeHTML(item.targetExecutionProfile || "-"))}
-          ${tableCell(
-            "TTL",
-            `
-            <span class="${escapeHTML(ttl.chipClass)}">${escapeHTML(ttl.label)}</span>
-            <div class="meta">${escapeHTML(ttl.expiresAtLabel)}</div>
-          `
-          )}
-          ${tableCell("Status", `<span class="${chipClassForStatus(status)} chip-compact">${escapeHTML(status || "-")}</span>`)}
-          ${tableCell("Capabilities", escapeHTML(capabilitiesLabel))}
-          ${tableCell("Actions", actions)}
-        </tr>
-      `;
-    })
-    .join("");
-
-  ui.approvalsContent.innerHTML = `
-    ${warning}
-    <div class="table-meta-row">
-      <span class="chip chip-neutral chip-compact">matches=${escapeHTML(String(pageState.totalItems))}</span>
-      <span class="chip chip-neutral chip-compact">page=${escapeHTML(String(pageState.page))}/${escapeHTML(String(pageState.totalPages))}</span>
-      <button class="btn btn-secondary btn-small" type="button" data-approvals-page-action="prev" ${pageState.page <= 1 ? "disabled" : ""}>Prev</button>
-      <button class="btn btn-secondary btn-small" type="button" data-approvals-page-action="next" ${pageState.page >= pageState.totalPages ? "disabled" : ""}>Next</button>
-    </div>
-    <table class="data-table approvals-table">
-      <caption class="sr-only">Approval decision queue table for the current approval filters, including run identity, scope, tier, profile, TTL, status, and actions.</caption>
-      <thead>
-        <tr>
-          <th scope="col">Run ID</th>
-          <th scope="col">Tenant</th>
-          <th scope="col">Project</th>
-          <th scope="col">Tier</th>
-          <th scope="col">Profile</th>
-          <th scope="col">TTL</th>
-          <th scope="col">Status</th>
-          <th scope="col">Capabilities</th>
-          <th scope="col">Actions</th>
-        </tr>
-      </thead>
-      <tbody>${rows}</tbody>
-    </table>
-  `;
+function isNativeDecision(item) {
+  return Boolean(item && typeof item === "object" && String(item?.selectionId || "").trim().startsWith("native:"));
 }
 
-export function renderApprovalsDetail(ui, approval) {
-  if (!ui.approvalsDetailContent) {
-    return;
-  }
+function buildNativeDecisionReviewModel(item) {
+  const status = String(item?.status || "PENDING").trim().toUpperCase();
+  const decisionType = String(item?.decisionType || "checkpoint").trim().toLowerCase();
+  const isProposal = decisionType === "proposal";
+  const identifierLabel = isProposal ? "proposalId" : "checkpointId";
+  const identifierValue = isProposal ? String(item?.proposalId || "").trim() : String(item?.checkpointId || "").trim();
+  const summary = String(item?.summary || item?.reason || "").trim();
+  const actionable = status === "PENDING";
+  return {
+    approval: item,
+    runId: "",
+    status,
+    ttl: {
+      label: "-",
+      chipClass: "chip chip-neutral chip-compact",
+      expiresAtLabel: "-",
+      expired: false
+    },
+    capabilities: [],
+    rawApprovalRecord: JSON.stringify(item || {}, null, 2),
+    capabilityRows: summary ? `<li>${escapeHTML(summary)}</li>` : "<li>No decision summary captured.</li>",
+    statusChip: chipClassForStatus(status),
+    actionable,
+    scopeLabel: `${String(item?.tenantId || "-")}/${String(item?.projectId || "-")}`,
+    traceabilityMetric: renderTraceabilityMetric(
+      "1A. Decision Traceability",
+      [
+        { label: "source", value: String(item?.source || "native-session") },
+        { label: "thread", value: String(item?.taskId || "-") },
+        { label: "session", value: String(item?.sessionId || "-") },
+        { label: "recordStatus", value: status || "UNKNOWN", tone: actionable ? "ok" : "warn" }
+      ],
+      "Use these identifiers when reviewing the current thread from the Agent approval rail.",
+      [
+        `createdAt=${formatTime(item?.createdAt)}`,
+        `${identifierLabel}=${identifierValue || "-"}`,
+        `reasonOptional=true; operatorDecisionSurface=agent-approval-review`
+      ]
+    ),
+    guardrails: [
+      actionable
+        ? "Decision controls are active because the current thread still has a pending governed decision."
+        : `Decision controls are locked because status=${status || "UNKNOWN"}.`,
+      "Decision reason is optional here; if omitted, the rail submits a default audit note showing the action came from the pinned Agent review.",
+      isProposal
+        ? "Confirm the proposal summary and command are appropriate before approval."
+        : "Confirm the checkpoint reason and scope match the current thread state before approval."
+    ],
+    detailTitle: isProposal ? "Tool Proposal" : "Approval Checkpoint",
+    identifierLabel,
+    identifierValue: identifierValue || "-",
+    detailSummary: summary || "No decision summary captured.",
+    selectionId: String(item?.selectionId || "").trim(),
+    decisionType,
+    sessionId: String(item?.sessionId || "").trim(),
+    proposalId: String(item?.proposalId || "").trim(),
+    checkpointId: String(item?.checkpointId || "").trim(),
+    hasInlineDecision: true
+  };
+}
+
+function buildApprovalReviewModel(approval) {
   if (!approval || typeof approval !== "object") {
-    ui.approvalsDetailContent.innerHTML = renderPanelStateMetric(
-      "info",
-      "Approval Detail",
-      "Select an approval row to review requested capabilities and decision controls."
-    );
-    delete ui.approvalsDetailContent.dataset.selectedRunId;
-    return;
+    return null;
+  }
+  if (isNativeDecision(approval)) {
+    return buildNativeDecisionReviewModel(approval);
   }
   const runId = String(approval?.runId || "").trim();
   const status = String(approval?.status || "").trim().toUpperCase();
@@ -310,7 +244,7 @@ export function renderApprovalsDetail(ui, approval) {
     [
       `createdAt=${formatTime(approval?.createdAt)}`,
       `expiresAt=${ttl.expiresAtLabel}`,
-      `reasonRequired=true; operatorDecisionSurface=approval-detail`
+      `reasonRequired=true; operatorDecisionSurface=approval-review-modal`
     ]
   );
   const guardrails = [
@@ -325,66 +259,395 @@ export function renderApprovalsDetail(ui, approval) {
       ? `Requested capabilities listed=${capabilities.length}; confirm each one is necessary before approving.`
       : "No requested capabilities were supplied; verify the related run detail before deciding."
   ];
-  if (runId) {
-    ui.approvalsDetailContent.dataset.selectedRunId = runId;
+  return {
+    approval,
+    runId,
+    status,
+    ttl,
+    capabilities,
+    rawApprovalRecord,
+    capabilityRows,
+    statusChip,
+    actionable,
+    scopeLabel,
+    traceabilityMetric,
+    guardrails
+  };
+}
+
+export function renderApprovals(ui, store, approvalPayload, filters, selectedRunId = "", nativeDecisionItems = []) {
+  const allItems = Array.isArray(approvalPayload?.items) ? approvalPayload.items : [];
+  store.setApprovalItems(allItems);
+  const filteredItems = filterApprovals(allItems, filters);
+  const pageState = paginateItems(filteredItems, filters?.pageSize, filters?.page);
+  const pageItems = pageState.items;
+  const nativeItems = Array.isArray(nativeDecisionItems) ? nativeDecisionItems : [];
+  if (ui.approvalsPage) {
+    ui.approvalsPage.value = String(pageState.page);
+  }
+  if (ui.approvalsPageSize) {
+    ui.approvalsPageSize.value = String(pageState.pageSize);
+  }
+  const pendingCount = filteredItems.filter((item) => String(item?.status || "").trim().toUpperCase() === "PENDING").length;
+  const expiringSoonCount = filteredItems.filter((item) => {
+    const expiresAt = String(item?.expiresAt || "").trim();
+    if (!expiresAt) {
+      return false;
+    }
+    const deltaMs = new Date(expiresAt).getTime() - Date.now();
+    return Number.isFinite(deltaMs) && deltaMs > 0 && deltaMs <= 15 * 60 * 1000;
+  }).length;
+  const approvalStateSummary = nativeItems.length > 0
+    ? "Resolve current-thread decisions first so active Agent work does not drift away from the governing prompt."
+    : pendingCount > 0
+      ? "Current thread is clear, but approval-queue items still need review in the active scope."
+      : "No pending approvals remain in the current scope.";
+  const approvalStateTone = nativeItems.length > 0
+    ? "chip chip-danger chip-compact"
+    : pendingCount > 0
+      ? "chip chip-warn chip-compact"
+      : "chip chip-ok chip-compact";
+  const approvalStateBlock = `
+    <div class="metric approval-state-card">
+      <div class="metric-title-row">
+        <div class="title">Approval State</div>
+        <span class="${approvalStateTone}">${escapeHTML(nativeItems.length > 0 ? "current thread blocked" : pendingCount > 0 ? "queue pending" : "clear")}</span>
+      </div>
+      <div class="meta">${escapeHTML(approvalStateSummary)}</div>
+      <div class="run-detail-chips">
+        <span class="chip chip-neutral chip-compact">currentThread=${escapeHTML(String(nativeItems.length))}</span>
+        <span class="chip chip-neutral chip-compact">queuePending=${escapeHTML(String(pendingCount))}</span>
+        <span class="chip chip-neutral chip-compact">expiringSoon=${escapeHTML(String(expiringSoonCount))}</span>
+        <span class="chip chip-neutral chip-compact">selected=${escapeHTML(selectedRunId || "-")}</span>
+      </div>
+    </div>
+  `;
+
+  const nativeCards = nativeItems
+    .map((item) => {
+      const status = String(item?.status || "PENDING").trim().toUpperCase();
+      const selectionId = String(item?.selectionId || "").trim();
+      const isSelected = selectedRunId && selectionId === selectedRunId;
+      const title = item?.decisionType === "proposal" ? "Current Thread Proposal" : "Current Thread Approval";
+      const identifier = item?.decisionType === "proposal"
+        ? String(item?.proposalId || "-")
+        : String(item?.checkpointId || "-");
+      const secondary = item?.decisionType === "proposal"
+        ? String(item?.summary || "No proposal summary captured.")
+        : String(item?.reason || item?.summary || "No checkpoint reason captured.");
+      return `
+        <article class="agent-approval-card ${isSelected ? "is-selected" : ""}">
+          <div class="metric-title-row">
+            <div class="title">${escapeHTML(title)}</div>
+            <span class="${chipClassForStatus(status)} chip-compact">${escapeHTML(status)}</span>
+          </div>
+          <div class="meta">${escapeHTML(String(item?.tenantId || "-"))} / ${escapeHTML(String(item?.projectId || "-"))}</div>
+          <div class="run-detail-chips">
+            <span class="chip chip-neutral chip-compact">thread=${escapeHTML(String(item?.taskId || "-"))}</span>
+            <span class="chip chip-neutral chip-compact">session=${escapeHTML(String(item?.sessionId || "-"))}</span>
+            <span class="chip chip-neutral chip-compact">${escapeHTML(item?.decisionType === "proposal" ? "proposal" : "checkpoint")}=${escapeHTML(identifier)}</span>
+          </div>
+          <div class="meta">${escapeHTML(secondary)}</div>
+          <div class="approval-actions action-hierarchy">
+            <div class="action-group action-group-primary">
+              <button
+                class="btn btn-ok btn-small approval-review-run"
+                data-approval-select-run-id="${escapeHTML(selectionId)}"
+                aria-controls="approvals-detail-content"
+                aria-expanded="${isSelected ? "true" : "false"}"
+              >${isSelected ? "Hide Review" : "Review"}</button>
+            </div>
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+
+  const nativeBlock = nativeCards
+    ? `
+      <div class="metric">
+        <div class="metric-title-row">
+          <div class="title">Current Thread Decisions</div>
+          <span class="chip chip-danger chip-compact">pending=${escapeHTML(String(nativeItems.length))}</span>
+        </div>
+        <div class="meta">These governed decisions come from the active native chat thread and are mirrored here so they stay clustered with the approval rail.</div>
+        <div class="agent-approval-list">${nativeCards}</div>
+      </div>
+    `
+    : "";
+
+  if (filteredItems.length === 0 && !nativeCards) {
+    const warning = approvalPayload?.warning
+      ? renderPanelStateMetric("warn", "Approvals Source", approvalPayload.warning)
+      : "";
+    ui.approvalsContent.innerHTML = `${approvalStateBlock}${warning}${renderPanelStateMetric(
+      "empty",
+      "Pending Approvals",
+      "No pending approvals match current filters.",
+      "Current thread decisions and queue approvals are both clear for this scope."
+    )}`;
+    if (ui.approvalsDetailContent) {
+      ui.approvalsDetailContent.innerHTML = renderPanelStateMetric(
+        "info",
+        "Approval Review",
+        "Pinned approval review appears here when you select a current-thread decision or queue approval."
+      );
+      delete ui.approvalsDetailContent.dataset.selectedRunId;
+    }
+    return;
+  }
+
+  const warning = approvalPayload?.warning
+    ? renderPanelStateMetric("warn", "Approvals Source", approvalPayload.warning)
+    : "";
+  const cards = pageItems
+    .map((item) => {
+      const status = String(item.status || "").toUpperCase();
+      const ttl = ttlInfo(item.expiresAt);
+      const capabilitiesLabel = capabilityCountLabel(item);
+      const runId = String(item.runId || "").trim();
+      const isSelected = selectedRunId && runId === selectedRunId;
+      return `
+        <article class="agent-approval-card ${isSelected ? "is-selected" : ""}">
+          <div class="metric-title-row">
+            <div class="title">${escapeHTML(runId || "unknown run")}</div>
+            <span class="${escapeHTML(ttl.chipClass)}">${escapeHTML(ttl.label)}</span>
+          </div>
+          <div class="meta">${escapeHTML(String(item.tenantId || "-"))} / ${escapeHTML(String(item.projectId || "-"))}</div>
+          <div class="run-detail-chips">
+            <span class="${chipClassForStatus(status)} chip-compact">${escapeHTML(status || "-")}</span>
+            <span class="chip chip-neutral chip-compact">tier=${escapeHTML(String(item.tier || "-"))}</span>
+            <span class="chip chip-neutral chip-compact">profile=${escapeHTML(String(item.targetExecutionProfile || "-"))}</span>
+            <span class="chip chip-neutral chip-compact">${escapeHTML(capabilitiesLabel)}</span>
+          </div>
+          <div class="meta">expires=${escapeHTML(ttl.expiresAtLabel)}</div>
+          <div class="approval-actions action-hierarchy">
+            <div class="action-group action-group-primary">
+              <button
+                class="btn btn-ok btn-small approval-review-run"
+                data-approval-select-run-id="${escapeHTML(runId)}"
+                aria-controls="approvals-detail-content"
+                aria-expanded="${isSelected ? "true" : "false"}"
+              >${isSelected ? "Hide Review" : "Review"}</button>
+            </div>
+            <div class="action-group action-group-secondary">
+              <button
+                class="btn btn-secondary btn-small approval-open-run"
+                data-approval-open-run-id="${escapeHTML(runId)}"
+              >Run Detail</button>
+            </div>
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+
+  const queueBlock = filteredItems.length === 0
+    ? renderPanelStateMetric(
+        "empty",
+        "Approval Queue",
+        "No approval-queue items match current filters.",
+        "The current thread may still have pending governed decisions above."
+      )
+    : `
+      <div class="metric">
+        <div class="metric-title-row">
+          <div class="title">Approval Queue</div>
+          <span class="chip chip-neutral chip-compact">matches=${escapeHTML(String(pageState.totalItems))}</span>
+        </div>
+        <div class="meta">Queue approvals remain visible here even when current-thread decisions are clear, so nothing in active scope gets orphaned.</div>
+        ${warning}
+        <div class="table-meta-row agent-approval-summary-row">
+          <span class="chip chip-neutral chip-compact">pending=${escapeHTML(String(pendingCount))}</span>
+          <span class="chip chip-neutral chip-compact">expiringSoon=${escapeHTML(String(expiringSoonCount))}</span>
+          <span class="chip chip-neutral chip-compact">page=${escapeHTML(String(pageState.page))}/${escapeHTML(String(pageState.totalPages))}</span>
+          <button class="btn btn-secondary btn-small" type="button" data-approvals-page-action="prev" ${pageState.page <= 1 ? "disabled" : ""}>Prev</button>
+          <button class="btn btn-secondary btn-small" type="button" data-approvals-page-action="next" ${pageState.page >= pageState.totalPages ? "disabled" : ""}>Next</button>
+        </div>
+        <div class="agent-approval-list">${cards}</div>
+      </div>
+    `;
+
+  ui.approvalsContent.innerHTML = `
+    ${approvalStateBlock}
+    ${nativeBlock}
+    ${queueBlock}
+  `;
+}
+
+export function renderApprovalsDetail(ui, approval) {
+  if (!ui.approvalsDetailContent) {
+    return;
+  }
+  const model = buildApprovalReviewModel(approval);
+  if (!model) {
+    ui.approvalsDetailContent.innerHTML = renderPanelStateMetric(
+      "info",
+      "Approval Review",
+      "Select an approval card to keep its decision context pinned in Agent.",
+      "The actual approve or deny workflow now opens in a popup so the action surface stays obvious."
+    );
+    return;
+  }
+  const selectedRunId = String(model.runId || model.selectionId || "").trim();
+  if (selectedRunId) {
+    ui.approvalsDetailContent.dataset.selectedRunId = selectedRunId;
   }
   ui.approvalsDetailContent.innerHTML = `
+    <div class="metric approval-review-selection">
+      <div class="metric-title-row">
+        <div class="title focus-anchor" tabindex="-1" data-focus-anchor="approval-detail">Pinned Approval Review</div>
+        <span class="${model.statusChip} chip-compact">status=${escapeHTML(model.status || "UNKNOWN")}</span>
+        <span class="${escapeHTML(model.ttl.chipClass)}">${escapeHTML(`ttl=${model.ttl.label}`)}</span>
+      </div>
+      <div class="meta metric-note">${escapeHTML(model.hasInlineDecision ? "Keep the selected current-thread decision pinned here and approve or deny directly from this review surface." : "Keep the selected approval pinned here, then use the popup for the actual approve or deny workflow.")}</div>
+      <div class="run-detail-chips">
+        <span class="chip chip-neutral chip-compact">${escapeHTML(model.runId ? "runId" : "thread")}=${escapeHTML(model.runId || model.approval?.taskId || "-")}</span>
+        <span class="chip chip-neutral chip-compact">tenant=${escapeHTML(model.approval?.tenantId || "-")}</span>
+        <span class="chip chip-neutral chip-compact">project=${escapeHTML(model.approval?.projectId || "-")}</span>
+        <span class="chip chip-neutral chip-compact">${escapeHTML(model.identifierLabel || "tier")}=${escapeHTML(model.identifierValue || String(model.approval?.tier || "-"))}</span>
+        <span class="chip chip-neutral chip-compact">session=${escapeHTML(model.sessionId || "-")}</span>
+        <span class="chip chip-neutral chip-compact">capabilities=${escapeHTML(String(model.capabilities.length))}</span>
+      </div>
+      <div class="meta">expiresAt=${escapeHTML(model.ttl.expiresAtLabel)}; createdAt=${escapeHTML(formatTime(model.approval?.createdAt))}</div>
+      <div class="meta">reason=${escapeHTML(String(model.detailSummary || model.approval?.reason || "").trim() || "-")}</div>
+      <div class="meta">Decision controls are ${escapeHTML(model.hasInlineDecision ? "live directly in this pinned review section" : model.actionable ? "live in the popup" : "locked because the approval is no longer actionable")}.</div>
+      <div class="approval-actions action-hierarchy">
+        ${
+          model.hasInlineDecision
+            ? `
+              <div class="field approval-inline-reason-field">
+                <span class="label">Decision Reason (Optional)</span>
+                <input
+                  class="filter-input"
+                  type="text"
+                  placeholder="optional; add context or leave blank to use the default rail note"
+                  data-native-decision-reason
+                />
+              </div>
+              <div class="action-group action-group-primary">
+                <button
+                  class="btn btn-ok"
+                  type="button"
+                  data-native-decision-action="APPROVE"
+                  data-native-decision-key="${escapeHTML(model.selectionId || "")}"
+                >Approve</button>
+              </div>
+              <div class="action-group action-group-destructive">
+                <button
+                  class="btn btn-danger"
+                  type="button"
+                  data-native-decision-action="DENY"
+                  data-native-decision-key="${escapeHTML(model.selectionId || "")}"
+                >Deny</button>
+              </div>
+            `
+            : `
+              <div class="action-group action-group-primary">
+                <button
+                  class="btn btn-ok"
+                  type="button"
+                  data-approval-open-modal-run-id="${escapeHTML(model.runId)}"
+                >Open Review Popup</button>
+              </div>
+              <div class="action-group action-group-secondary">
+                <button
+                  class="btn btn-secondary btn-small"
+                  type="button"
+                  data-approval-open-run-id="${escapeHTML(model.runId)}"
+                >Open Run Detail</button>
+              </div>
+            `
+        }
+      </div>
+    </div>
+    <div class="metric">
+      <div class="title">Review Checklist</div>
+      <div class="meta metric-note">Requested capabilities and traceability stay visible here even when the popup is closed.</div>
+      <ul class="workflow-guide-list">${model.guardrails.map((item) => `<li>${escapeHTML(item)}</li>`).join("")}</ul>
+      <ul class="quickstart-list">${model.capabilityRows}</ul>
+    </div>
+    ${model.traceabilityMetric}
+  `;
+}
+
+export function renderApprovalReviewModal(ui, approval) {
+  if (!ui.approvalReviewModalContent) {
+    return;
+  }
+  const model = buildApprovalReviewModel(approval);
+  if (!model) {
+    ui.approvalReviewModalContent.innerHTML = renderPanelStateMetric(
+      "info",
+      "Approval Review",
+      "Select a pending approval from Agent to open the popup review surface."
+    );
+    delete ui.approvalReviewModalContent.dataset.selectedRunId;
+    return;
+  }
+  ui.approvalReviewModalContent.dataset.selectedRunId = model.runId;
+  ui.approvalReviewModalContent.innerHTML = `
     <div class="metric">
       <div class="metric-title-row">
-        <div class="title focus-anchor" tabindex="-1" data-focus-anchor="approval-detail">1. Decision Context</div>
-        <span class="${statusChip} chip-compact">status=${escapeHTML(status || "UNKNOWN")}</span>
-        <span class="${escapeHTML(ttl.chipClass)}">${escapeHTML(`ttl=${ttl.label}`)}</span>
+        <div class="title focus-anchor" tabindex="-1" data-focus-anchor="approval-review-modal">1. Decision Context</div>
+        <span class="${model.statusChip} chip-compact">status=${escapeHTML(model.status || "UNKNOWN")}</span>
+        <span class="${escapeHTML(model.ttl.chipClass)}">${escapeHTML(`ttl=${model.ttl.label}`)}</span>
       </div>
       <div class="meta metric-note">Review operator context first so the decision is tied to the correct run, scope, and expiry window.</div>
       <div class="run-detail-chips">
-        <span class="chip chip-neutral chip-compact">runId=${escapeHTML(runId || "-")}</span>
-        <span class="chip chip-neutral chip-compact">tenant=${escapeHTML(approval?.tenantId || "-")}</span>
-        <span class="chip chip-neutral chip-compact">project=${escapeHTML(approval?.projectId || "-")}</span>
-        <span class="chip chip-neutral chip-compact">tier=${escapeHTML(String(approval?.tier || "-"))}</span>
-        <span class="chip chip-neutral chip-compact">profile=${escapeHTML(approval?.targetExecutionProfile || "-")}</span>
-        <span class="chip chip-neutral chip-compact">capabilities=${escapeHTML(String(capabilities.length))}</span>
+        <span class="chip chip-neutral chip-compact">runId=${escapeHTML(model.runId || "-")}</span>
+        <span class="chip chip-neutral chip-compact">tenant=${escapeHTML(model.approval?.tenantId || "-")}</span>
+        <span class="chip chip-neutral chip-compact">project=${escapeHTML(model.approval?.projectId || "-")}</span>
+        <span class="chip chip-neutral chip-compact">tier=${escapeHTML(String(model.approval?.tier || "-"))}</span>
+        <span class="chip chip-neutral chip-compact">profile=${escapeHTML(model.approval?.targetExecutionProfile || "-")}</span>
+        <span class="chip chip-neutral chip-compact">capabilities=${escapeHTML(String(model.capabilities.length))}</span>
       </div>
-      <div class="meta">expiresAt=${escapeHTML(ttl.expiresAtLabel)}; createdAt=${escapeHTML(formatTime(approval?.createdAt))}</div>
-      <div class="meta">reason=${escapeHTML(String(approval?.reason || "").trim() || "-")}</div>
+      <div class="meta">expiresAt=${escapeHTML(model.ttl.expiresAtLabel)}; createdAt=${escapeHTML(formatTime(model.approval?.createdAt))}</div>
+      <div class="meta">reason=${escapeHTML(String(model.approval?.reason || "").trim() || "-")}</div>
     </div>
-    ${traceabilityMetric}
+    ${model.traceabilityMetric}
     <div class="metric">
       <div class="title">2. Requested Capabilities</div>
       <div class="meta metric-note">Confirm the capability scope matches the requested operation before making a decision.</div>
-      <ul class="quickstart-list">${capabilityRows}</ul>
+      <ul class="quickstart-list">${model.capabilityRows}</ul>
     </div>
     <div class="metric">
       <div class="title">3. Decision Guardrails</div>
       <div class="meta metric-note">Guardrails come before actions. If any guardrail fails, stop and review the related run detail.</div>
-      <ul class="workflow-guide-list">${guardrails.map((item) => `<li>${escapeHTML(item)}</li>`).join("")}</ul>
+      <ul class="workflow-guide-list">${model.guardrails.map((item) => `<li>${escapeHTML(item)}</li>`).join("")}</ul>
       <div class="field">
         <span class="label">Decision Reason</span>
-        <input id="approval-detail-reason" class="filter-input" type="text" placeholder="required; explain why approve or deny is justified" />
+        <input
+          class="filter-input"
+          type="text"
+          placeholder="required; explain why approve or deny is justified"
+          data-approval-decision-reason
+        />
       </div>
       <div class="approval-actions action-hierarchy">
         <div class="action-group action-group-primary">
           <button
-            class="btn btn-ok btn-small"
+            class="btn btn-ok"
             type="button"
-            data-approval-detail-run-id="${escapeHTML(runId)}"
+            data-approval-detail-run-id="${escapeHTML(model.runId)}"
             data-approval-detail-decision="APPROVE"
-            ${actionable ? "" : "disabled"}
+            ${model.actionable ? "" : "disabled"}
           >Approve</button>
         </div>
         <div class="action-group action-group-secondary">
           <button
             class="btn btn-secondary btn-small"
             type="button"
-            data-approval-open-run-id="${escapeHTML(runId)}"
+            data-approval-open-run-id="${escapeHTML(model.runId)}"
           >Open Run Detail</button>
         </div>
         <div class="action-group action-group-destructive">
           <button
-            class="btn btn-danger btn-small"
+            class="btn btn-danger"
             type="button"
-            data-approval-detail-run-id="${escapeHTML(runId)}"
+            data-approval-detail-run-id="${escapeHTML(model.runId)}"
             data-approval-detail-decision="DENY"
-            ${actionable ? "" : "disabled"}
+            ${model.actionable ? "" : "disabled"}
           >Deny</button>
         </div>
       </div>
@@ -394,7 +657,7 @@ export function renderApprovalsDetail(ui, approval) {
       <div class="meta metric-note">Use the raw approval record only after the context and guardrail sections above.</div>
       <details class="artifact-panel" data-detail-key="approvals.raw_record">
         <summary>Show raw approval record</summary>
-        <pre class="monospace">${escapeHTML(rawApprovalRecord)}</pre>
+        <pre class="monospace">${escapeHTML(model.rawApprovalRecord)}</pre>
       </details>
     </div>
   `;

@@ -7,7 +7,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 SLOT_FILE="${SLOT_FILE:-${REPO_ROOT}/internal/aimxs/slot.go}"
 DOC_FILE="${DOC_FILE:-${REPO_ROOT}/docs/aimxs-plugin-slot.md}"
 PUBLICATION_DOC="${PUBLICATION_DOC:-${REPO_ROOT}/docs/runbooks/aimxs-private-sdk-publication.md}"
-AIMXS_MANIFEST="${AIMXS_MANIFEST:-${REPO_ROOT}/examples/aimxs/extensionprovider-policy-mtls-bearer.yaml}"
+AIMXS_MANIFEST="${AIMXS_MANIFEST:-${REPO_ROOT}/examples/aimxs/extensionprovider-policy-https.yaml}"
 AIMXS_COMPAT_POLICY="${AIMXS_COMPAT_POLICY:-${REPO_ROOT}/platform/upgrade/compatibility-policy-aimxs-decision-api.yaml}"
 ALLOWED_LOCAL_IMPORT="github.com/Epydios/Epydios-AgentOps-Control-Plane/internal/aimxs"
 

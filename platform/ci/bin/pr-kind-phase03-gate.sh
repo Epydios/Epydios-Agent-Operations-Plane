@@ -620,7 +620,7 @@ main() {
   fi
 
   if [ "${RUN_M10_NO_EGRESS_LOCAL_AIMXS}" = "1" ]; then
-    echo "Running M10.5 gate (customer-hosted local premium-provider no-egress proof)..."
+    echo "Running M10.5 gate (aimxs-full local premium-provider no-egress proof)..."
     local run_m5_baseline_for_m10_no_egress=1
     if [ "${RUN_M7_INTEGRATION}" = "1" ] || [ "${RUN_PHASE_RUNTIME}" = "1" ] || [ "${RUN_M9_AUTHN_AUTHZ}" = "1" ] || [ "${RUN_M9_AUTHZ_TENANCY}" = "1" ] || [ "${RUN_M9_RBAC_MATRIX}" = "1" ] || [ "${RUN_M10_PROVIDER_CONFORMANCE}" = "1" ] || [ "${RUN_M10_POLICY_GRANT_ENFORCEMENT}" = "1" ] || [ "${RUN_M10_DEPLOYMENT_MODES}" = "1" ]; then
       run_m5_baseline_for_m10_no_egress=0
@@ -661,8 +661,8 @@ main() {
   fi
 
   if [ "${RUN_M10_CUSTOMER_HOSTED_PACKAGING}" = "1" ]; then
-    echo "Running M10.7 gate (customer-hosted premium-provider packaging evidence: signed package refs + air-gapped install/update + support/SLA)..."
-    "${REPO_ROOT}/platform/local/bin/verify-m10-customer-hosted-packaging.sh"
+    echo "Running M10.7 gate (aimxs-full premium-provider packaging evidence: signed package refs + air-gapped install/update + support/SLA)..."
+    "${REPO_ROOT}/platform/local/bin/verify-m10-aimxs-full-packaging.sh"
   fi
 
   if [ "${RUN_ROTATION_CHECK}" = "1" ]; then

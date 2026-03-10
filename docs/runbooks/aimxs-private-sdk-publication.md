@@ -34,7 +34,7 @@ Define the release process for the private AIMXS SDK/reference adapter while kee
    - `./platform/local/bin/verify-aimxs-boundary.sh`
    - `./platform/local/bin/verify-m10-policy-grant-enforcement.sh`
    - `./platform/local/bin/verify-m10-aimxs-private-release.sh`
-   - `./platform/local/bin/verify-m10-customer-hosted-packaging.sh`
+   - `./platform/local/bin/verify-m10-aimxs-full-packaging.sh`
 3. Build and push private AIMXS provider image(s).
 4. Register/upgrade AIMXS `ExtensionProvider` manifests in staging.
 5. Run full staging gate profile:
@@ -63,12 +63,12 @@ Define the release process for the private AIMXS SDK/reference adapter while kee
 ## OSS Evidence Artifacts (M10.7)
 
 1. Input metadata:
-   - `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/customer-hosted-release-inputs.vars` (default)
-   - `provenance/aimxs/customer-hosted-release-inputs.vars` (repo-local fallback for offline/local-only usage)
+   - `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/aimxs-full-release-inputs.vars` (default)
+   - `provenance/aimxs/aimxs-full-release-inputs.vars` (repo-local fallback for offline/local-only usage)
 2. Generated evidence:
-   - `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/m10-7-customer-hosted-packaging-evidence-<timestamp>.json`
-   - `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/m10-7-customer-hosted-packaging-evidence-<timestamp>.json.sha256`
-   - `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/m10-7-customer-hosted-packaging-evidence-latest.json`
+   - `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/m10-7-aimxs-full-packaging-evidence-<timestamp>.json`
+   - `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/m10-7-aimxs-full-packaging-evidence-<timestamp>.json.sha256`
+   - `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/m10-7-aimxs-full-packaging-evidence-latest.json`
 
 ## Rollback
 
