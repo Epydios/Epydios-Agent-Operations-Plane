@@ -9,8 +9,14 @@ source "${SCRIPT_DIR}/lib-m21-paths.sh"
 LISTEN_HOST="${LISTEN_HOST:-127.0.0.1}"
 LISTEN_PORT="${LISTEN_PORT:-18080}"
 POSTGRES_LOCAL_PORT="${POSTGRES_LOCAL_PORT:-15432}"
+PROFILE_LOCAL_PORT="${PROFILE_LOCAL_PORT:-18181}"
+POLICY_LOCAL_PORT="${POLICY_LOCAL_PORT:-18182}"
+EVIDENCE_LOCAL_PORT="${EVIDENCE_LOCAL_PORT:-18183}"
 NAMESPACE="${NAMESPACE:-epydios-system}"
 POSTGRES_SERVICE="${POSTGRES_SERVICE:-epydios-postgres-rw}"
+PROFILE_SERVICE="${PROFILE_SERVICE:-oss-profile-static-resolver}"
+POLICY_SERVICE="${POLICY_SERVICE:-epydios-oss-policy-provider}"
+EVIDENCE_SERVICE="${EVIDENCE_SERVICE:-epydios-oss-evidence-provider}"
 POSTGRES_DB="${POSTGRES_DB:-aios_core}"
 POSTGRES_SECRET="${POSTGRES_SECRET:-epydios-postgres-app}"
 REF_VALUES_PATH="${RUNTIME_REF_VALUES_PATH:-}"
@@ -40,8 +46,14 @@ Options:
   --host HOST                 Runtime bind host (default: 127.0.0.1)
   --port PORT                 Runtime bind port (default: 18080)
   --postgres-port PORT        Local Postgres port-forward port (default: 15432)
+  --profile-port PORT         Local ProfileResolver port-forward port (default: 18181)
+  --policy-port PORT          Local PolicyProvider port-forward port (default: 18182)
+  --evidence-port PORT        Local EvidenceProvider port-forward port (default: 18183)
   --namespace NAME            Kubernetes namespace (default: epydios-system)
   --postgres-service NAME     Postgres service name (default: epydios-postgres-rw)
+  --profile-service NAME      ProfileResolver service name (default: oss-profile-static-resolver)
+  --policy-service NAME       PolicyProvider service name (default: epydios-oss-policy-provider)
+  --evidence-service NAME     EvidenceProvider service name (default: epydios-oss-evidence-provider)
   --postgres-db NAME          Postgres database (default: aios_core)
   --postgres-secret NAME      Secret with username/password (default: epydios-postgres-app)
   --ref-values-path PATH      JSON file mapping ref:// values to concrete values
@@ -144,6 +156,54 @@ join_by() {
   done
 }
 
+write_local_provider_override_file() {
+  local policy_endpoint_url="http://127.0.0.1:${POLICY_LOCAL_PORT}"
+  local profile_endpoint_url="http://127.0.0.1:${PROFILE_LOCAL_PORT}"
+  local evidence_endpoint_url="http://127.0.0.1:${EVIDENCE_LOCAL_PORT}"
+  jq -n \
+    --arg profile_endpoint_url "${profile_endpoint_url}" \
+    --arg policy_endpoint_url "${policy_endpoint_url}" \
+    --arg evidence_endpoint_url "${evidence_endpoint_url}" \
+    '{
+      version: 1,
+      overrides: [
+        {
+          active: true,
+          providerType: "ProfileResolver",
+          providerId: "oss-profile-static-resolver",
+          providerName: "oss-profile-static-resolver",
+          endpointUrl: $profile_endpoint_url,
+          timeoutSeconds: 10,
+          authMode: "None",
+          capabilities: ["profile.resolve"],
+          mode: "local-runtime-bridge"
+        },
+        {
+          active: true,
+          providerType: "PolicyProvider",
+          providerId: "oss-policy-opa",
+          providerName: "oss-policy-opa",
+          endpointUrl: $policy_endpoint_url,
+          timeoutSeconds: 10,
+          authMode: "None",
+          capabilities: ["policy.evaluate", "policy.validate_bundle"],
+          mode: "oss-only"
+        },
+        {
+          active: true,
+          providerType: "EvidenceProvider",
+          providerId: "oss-evidence-memory",
+          providerName: "oss-evidence-memory",
+          endpointUrl: $evidence_endpoint_url,
+          timeoutSeconds: 10,
+          authMode: "None",
+          capabilities: ["evidence.record", "evidence.finalize_bundle"],
+          mode: "local-runtime-bridge"
+        }
+      ]
+    }' > "${LOCAL_AIMXS_PROVIDER_OVERRIDE_PATH}"
+}
+
 load_ref_values_json() {
   if [[ -n "${REF_VALUES_PATH}" ]]; then
     jq -c . "${REF_VALUES_PATH}"
@@ -238,12 +298,36 @@ while [[ $# -gt 0 ]]; do
       POSTGRES_LOCAL_PORT="${2:-}"
       shift 2
       ;;
+    --profile-port)
+      PROFILE_LOCAL_PORT="${2:-}"
+      shift 2
+      ;;
+    --policy-port)
+      POLICY_LOCAL_PORT="${2:-}"
+      shift 2
+      ;;
+    --evidence-port)
+      EVIDENCE_LOCAL_PORT="${2:-}"
+      shift 2
+      ;;
     --namespace)
       NAMESPACE="${2:-}"
       shift 2
       ;;
     --postgres-service)
       POSTGRES_SERVICE="${2:-}"
+      shift 2
+      ;;
+    --profile-service)
+      PROFILE_SERVICE="${2:-}"
+      shift 2
+      ;;
+    --policy-service)
+      POLICY_SERVICE="${2:-}"
+      shift 2
+      ;;
+    --evidence-service)
+      EVIDENCE_SERVICE="${2:-}"
       shift 2
       ;;
     --postgres-db)
@@ -315,6 +399,21 @@ kubectl -n "${NAMESPACE}" get svc "${POSTGRES_SERVICE}" >/dev/null 2>&1 || {
   exit 1
 }
 
+kubectl -n "${NAMESPACE}" get svc "${PROFILE_SERVICE}" >/dev/null 2>&1 || {
+  echo "Missing service: ${NAMESPACE}/${PROFILE_SERVICE}" >&2
+  exit 1
+}
+
+kubectl -n "${NAMESPACE}" get svc "${POLICY_SERVICE}" >/dev/null 2>&1 || {
+  echo "Missing service: ${NAMESPACE}/${POLICY_SERVICE}" >&2
+  exit 1
+}
+
+kubectl -n "${NAMESPACE}" get svc "${EVIDENCE_SERVICE}" >/dev/null 2>&1 || {
+  echo "Missing service: ${NAMESPACE}/${EVIDENCE_SERVICE}" >&2
+  exit 1
+}
+
 kubectl -n "${NAMESPACE}" get secret "${POSTGRES_SECRET}" >/dev/null 2>&1 || {
   echo "Missing secret: ${NAMESPACE}/${POSTGRES_SECRET}" >&2
   exit 1
@@ -328,6 +427,9 @@ fi
 
 check_port_available "${LISTEN_PORT}" "Local runtime"
 check_port_available "${POSTGRES_LOCAL_PORT}" "Local Postgres"
+check_port_available "${PROFILE_LOCAL_PORT}" "Local ProfileResolver bridge"
+check_port_available "${POLICY_LOCAL_PORT}" "Local PolicyProvider bridge"
+check_port_available "${EVIDENCE_LOCAL_PORT}" "Local EvidenceProvider bridge"
 
 SESSION_ROOT="$(m21_local_runtime_session_root)"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
@@ -337,10 +439,16 @@ mkdir -p "$(m21_local_ref_vault_root)"
 mkdir -p "$(m21_local_aimxs_root)"
 
 POSTGRES_PORT_FORWARD_LOG="${SESSION_DIR}/postgres-port-forward.log"
+PROFILE_PORT_FORWARD_LOG="${SESSION_DIR}/profile-port-forward.log"
+POLICY_PORT_FORWARD_LOG="${SESSION_DIR}/policy-port-forward.log"
+EVIDENCE_PORT_FORWARD_LOG="${SESSION_DIR}/evidence-port-forward.log"
 RUNTIME_LOG="${SESSION_DIR}/runtime.log"
 RUNTIME_BINARY="$(m21_local_runtime_binary_path)"
 RUNTIME_PID=""
-PORT_FORWARD_PID=""
+POSTGRES_PORT_FORWARD_PID=""
+PROFILE_PORT_FORWARD_PID=""
+POLICY_PORT_FORWARD_PID=""
+EVIDENCE_PORT_FORWARD_PID=""
 TAIL_PID=""
 
 cleanup() {
@@ -350,8 +458,17 @@ cleanup() {
   if [[ -n "${RUNTIME_PID}" ]] && kill -0 "${RUNTIME_PID}" >/dev/null 2>&1; then
     kill "${RUNTIME_PID}" >/dev/null 2>&1 || true
   fi
-  if [[ -n "${PORT_FORWARD_PID}" ]] && kill -0 "${PORT_FORWARD_PID}" >/dev/null 2>&1; then
-    kill "${PORT_FORWARD_PID}" >/dev/null 2>&1 || true
+  if [[ -n "${POSTGRES_PORT_FORWARD_PID}" ]] && kill -0 "${POSTGRES_PORT_FORWARD_PID}" >/dev/null 2>&1; then
+    kill "${POSTGRES_PORT_FORWARD_PID}" >/dev/null 2>&1 || true
+  fi
+  if [[ -n "${PROFILE_PORT_FORWARD_PID}" ]] && kill -0 "${PROFILE_PORT_FORWARD_PID}" >/dev/null 2>&1; then
+    kill "${PROFILE_PORT_FORWARD_PID}" >/dev/null 2>&1 || true
+  fi
+  if [[ -n "${POLICY_PORT_FORWARD_PID}" ]] && kill -0 "${POLICY_PORT_FORWARD_PID}" >/dev/null 2>&1; then
+    kill "${POLICY_PORT_FORWARD_PID}" >/dev/null 2>&1 || true
+  fi
+  if [[ -n "${EVIDENCE_PORT_FORWARD_PID}" ]] && kill -0 "${EVIDENCE_PORT_FORWARD_PID}" >/dev/null 2>&1; then
+    kill "${EVIDENCE_PORT_FORWARD_PID}" >/dev/null 2>&1 || true
   fi
 }
 trap cleanup EXIT INT TERM
@@ -360,17 +477,30 @@ POSTGRES_USER="$(secret_value "${POSTGRES_SECRET}" username)"
 POSTGRES_PASSWORD="$(secret_value "${POSTGRES_SECRET}" password)"
 
 kubectl -n "${NAMESPACE}" port-forward "svc/${POSTGRES_SERVICE}" "${POSTGRES_LOCAL_PORT}:5432" > "${POSTGRES_PORT_FORWARD_LOG}" 2>&1 &
-PORT_FORWARD_PID="$!"
+POSTGRES_PORT_FORWARD_PID="$!"
 wait_for_tcp "127.0.0.1" "${POSTGRES_LOCAL_PORT}" "Postgres port-forward" || {
   tail -n 80 "${POSTGRES_PORT_FORWARD_LOG}" >&2 || true
   exit 1
 }
+
+kubectl -n "${NAMESPACE}" port-forward "svc/${PROFILE_SERVICE}" "${PROFILE_LOCAL_PORT}:8080" > "${PROFILE_PORT_FORWARD_LOG}" 2>&1 &
+PROFILE_PORT_FORWARD_PID="$!"
+wait_for_http "http://127.0.0.1:${PROFILE_LOCAL_PORT}/healthz" "ProfileResolver port-forward" "${PROFILE_PORT_FORWARD_LOG}" || exit 1
+
+kubectl -n "${NAMESPACE}" port-forward "svc/${POLICY_SERVICE}" "${POLICY_LOCAL_PORT}:8080" > "${POLICY_PORT_FORWARD_LOG}" 2>&1 &
+POLICY_PORT_FORWARD_PID="$!"
+wait_for_http "http://127.0.0.1:${POLICY_LOCAL_PORT}/healthz" "PolicyProvider port-forward" "${POLICY_PORT_FORWARD_LOG}" || exit 1
+
+kubectl -n "${NAMESPACE}" port-forward "svc/${EVIDENCE_SERVICE}" "${EVIDENCE_LOCAL_PORT}:8080" > "${EVIDENCE_PORT_FORWARD_LOG}" 2>&1 &
+EVIDENCE_PORT_FORWARD_PID="$!"
+wait_for_http "http://127.0.0.1:${EVIDENCE_LOCAL_PORT}/healthz" "EvidenceProvider port-forward" "${EVIDENCE_PORT_FORWARD_LOG}" || exit 1
 
 export PATH="${HOME}/bin:${HOME}/.local/bin:${PATH}"
 export GOCACHE="$(m21_go_cache_root)"
 export GOMODCACHE="$(m21_go_mod_cache_root)"
 
 prepare_effective_ref_values
+write_local_provider_override_file
 
 bootstrap_codex_home
 
@@ -383,6 +513,9 @@ echo "Starting local runtime with live repo contract"
 echo "  runtime_url=http://${LISTEN_HOST}:${LISTEN_PORT}"
 echo "  runtime_log=${RUNTIME_LOG}"
 echo "  postgres_port_forward_log=${POSTGRES_PORT_FORWARD_LOG}"
+echo "  profile_port_forward_log=${PROFILE_PORT_FORWARD_LOG}"
+echo "  policy_port_forward_log=${POLICY_PORT_FORWARD_LOG}"
+echo "  evidence_port_forward_log=${EVIDENCE_PORT_FORWARD_LOG}"
 echo "  session_dir=${SESSION_DIR}"
 echo "  effective_ref_values=${EFFECTIVE_REF_VALUES_PATH}"
 echo "  secure_ref_vault_index=${LOCAL_REF_VAULT_INDEX_PATH}"

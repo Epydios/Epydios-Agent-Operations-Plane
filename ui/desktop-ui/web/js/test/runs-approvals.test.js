@@ -212,6 +212,23 @@ test("run detail surfaces governed-action policy richness from the stored provid
             providerMeta: {
               baak_engaged: true,
               decision_path: "governance_provider",
+              adapter_status: "ERROR",
+              adapter_error_code: "CORE24_BASE_ADAPTER_MISSING",
+              base_adapter_present: false,
+              current_state: {
+                present: true,
+                sha256: "state-sha256-demo"
+              },
+              state_continuity: {
+                continuity_enabled: true,
+                kernel_state_in_sha256: "kernel-in-demo",
+                kernel_state_out_sha256: "kernel-out-demo",
+                kernel_state_out_present: true
+              },
+              audit_sink: {
+                active: true,
+                event_ref: "aimxs://local-full/audit/aimxs-audit-demo"
+              },
               policy_stratification: {
                 boundary_class: "external_actuator"
               }
@@ -232,6 +249,14 @@ test("run detail surfaces governed-action policy richness from the stored provid
   assert.match(ui.runDetailContent.innerHTML, /Paper Trade Request: AAPL/);
   assert.match(ui.runDetailContent.innerHTML, /finance_paper_trade/);
   assert.match(ui.runDetailContent.innerHTML, /governance_provider/);
+  assert.match(ui.runDetailContent.innerHTML, /Adapter Status/);
+  assert.match(ui.runDetailContent.innerHTML, /CORE24_BASE_ADAPTER_MISSING/);
+  assert.match(ui.runDetailContent.innerHTML, /Base Adapter Present/);
+  assert.match(ui.runDetailContent.innerHTML, /Current State Present/);
+  assert.match(ui.runDetailContent.innerHTML, /state-sha256-demo/);
+  assert.match(ui.runDetailContent.innerHTML, /State Continuity Enabled/);
+  assert.match(ui.runDetailContent.innerHTML, /Audit Sink Active/);
+  assert.match(ui.runDetailContent.innerHTML, /aimxs:\/\/local-full\/audit\/aimxs-audit-demo/);
   assert.match(ui.runDetailContent.innerHTML, /Policy Stratification Present/);
   assert.match(ui.runDetailContent.innerHTML, /Request Contract Echo Present/);
   assert.match(ui.runDetailContent.innerHTML, /sha256-demo-evidence/);

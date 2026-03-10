@@ -72,6 +72,11 @@ type localProviderOverride struct {
 	Capabilities   []string `json:"capabilities"`
 }
 
+type localProviderOverrideFile struct {
+	Version   int                     `json:"version,omitempty"`
+	Overrides []localProviderOverride `json:"overrides,omitempty"`
+}
+
 func NewProviderRegistry(k8s client.Client, localOverridePath string) *ProviderRegistry {
 	return &ProviderRegistry{k8s: k8s, localOverridePath: strings.TrimSpace(localOverridePath)}
 }
@@ -197,34 +202,78 @@ func (r *ProviderRegistry) SelectProvider(ctx context.Context, namespace, provid
 }
 
 func (r *ProviderRegistry) selectLocalOverride(providerType, requiredCapability, targetOS string, minPriority int64) (*ProviderTarget, bool) {
-	override, ok := r.readLocalOverride()
+	overrides, ok := r.readLocalOverrides()
 	if !ok {
 		return nil, false
 	}
-	if !strings.EqualFold(strings.TrimSpace(override.ProviderType), providerType) {
+	for _, override := range overrides {
+		if !strings.EqualFold(strings.TrimSpace(override.ProviderType), providerType) {
+			continue
+		}
+		if requiredCapability != "" && !containsString(override.Capabilities, requiredCapability) {
+			continue
+		}
+		if providerType == "DesktopProvider" && normalizeProviderTargetOS(targetOS) != "" {
+			continue
+		}
+		if minPriority > 0 && 1000 < minPriority {
+			continue
+		}
+		name := firstNonEmpty(override.ProviderName, override.ProviderID, "local-provider-override")
+		return &ProviderTarget{
+			Name:           name,
+			Namespace:      "",
+			ProviderType:   strings.TrimSpace(override.ProviderType),
+			ProviderID:     firstNonEmpty(override.ProviderID, name),
+			EndpointURL:    strings.TrimSpace(override.EndpointURL),
+			TimeoutSeconds: defaultInt64(override.TimeoutSeconds, 10),
+			Priority:       1000,
+			TargetOS:       "",
+			AuthMode:       firstNonEmpty(override.AuthMode, "None"),
+		}, true
+	}
+	return nil, false
+}
+
+func (r *ProviderRegistry) readLocalOverrides() ([]localProviderOverride, bool) {
+	payload, ok := r.readLocalOverrideFile()
+	if !ok {
 		return nil, false
 	}
-	if requiredCapability != "" && !containsString(override.Capabilities, requiredCapability) {
+	if len(payload.Overrides) > 0 {
+		overrides := make([]localProviderOverride, 0, len(payload.Overrides))
+		for _, item := range payload.Overrides {
+			if !item.Active || strings.TrimSpace(item.EndpointURL) == "" || strings.TrimSpace(item.ProviderType) == "" {
+				continue
+			}
+			overrides = append(overrides, item)
+		}
+		if len(overrides) == 0 {
+			return nil, false
+		}
+		return overrides, true
+	}
+
+	single, ok := r.readLocalOverride()
+	if !ok {
 		return nil, false
 	}
-	if providerType == "DesktopProvider" && normalizeProviderTargetOS(targetOS) != "" {
+	return []localProviderOverride{*single}, true
+}
+
+func (r *ProviderRegistry) readLocalOverrideFile() (*localProviderOverrideFile, bool) {
+	if strings.TrimSpace(r.localOverridePath) == "" {
 		return nil, false
 	}
-	if minPriority > 0 && 1000 < minPriority {
+	raw, err := os.ReadFile(r.localOverridePath)
+	if err != nil {
 		return nil, false
 	}
-	name := firstNonEmpty(override.ProviderName, override.ProviderID, "local-provider-override")
-	return &ProviderTarget{
-		Name:           name,
-		Namespace:      "",
-		ProviderType:   strings.TrimSpace(override.ProviderType),
-		ProviderID:     firstNonEmpty(override.ProviderID, name),
-		EndpointURL:    strings.TrimSpace(override.EndpointURL),
-		TimeoutSeconds: defaultInt64(override.TimeoutSeconds, 10),
-		Priority:       1000,
-		TargetOS:       "",
-		AuthMode:       firstNonEmpty(override.AuthMode, "None"),
-	}, true
+	var payload localProviderOverrideFile
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return nil, false
+	}
+	return &payload, true
 }
 
 func (r *ProviderRegistry) readLocalOverride() (*localProviderOverride, bool) {

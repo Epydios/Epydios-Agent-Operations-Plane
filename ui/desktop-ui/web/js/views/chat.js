@@ -39,6 +39,20 @@ function chipClassForActivityTone(value) {
   return "chip chip-neutral chip-compact";
 }
 
+function chipClassForPolicyDecision(value) {
+  const decision = String(value || "").trim().toUpperCase();
+  if (decision === "ALLOW" || decision === "APPROVE") {
+    return "chip chip-ok chip-compact";
+  }
+  if (decision === "DEFER" || decision === "WARN") {
+    return "chip chip-warn chip-compact";
+  }
+  if (decision === "DENY" || decision === "ERROR") {
+    return "chip chip-danger chip-compact";
+  }
+  return "chip chip-neutral chip-compact";
+}
+
 function isTerminalThreadStatus(value) {
   const status = String(value || "").trim().toUpperCase();
   return status === "COMPLETED" || status === "FAILED" || status === "BLOCKED" || status === "CANCELLED";
@@ -57,6 +71,116 @@ function detailKey(...parts) {
     .map((value) => String(value || "").trim().toLowerCase().replace(/[^a-z0-9._-]+/g, "_"))
     .filter(Boolean)
     .join(".");
+}
+
+function objectValue(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+function stringArrayValue(value) {
+  return Array.isArray(value)
+    ? value
+        .map((item) => normalizedString(item))
+        .filter(Boolean)
+    : [];
+}
+
+function isGovernedActionProposal(item = {}) {
+  return normalizedString(item?.proposalType, item?.toolType).toLowerCase() === "governed_action_request";
+}
+
+function renderGovernedRunLink(runId) {
+  const normalizedRunId = normalizedString(runId);
+  if (!normalizedRunId) {
+    return "";
+  }
+  return `
+    <div class="action-group action-group-secondary">
+      <button
+        class="btn btn-secondary btn-small"
+        type="button"
+        data-chat-action="open-governed-run"
+        data-chat-run-id="${escapeHTML(normalizedRunId)}"
+      >Open Run Detail</button>
+    </div>
+  `;
+}
+
+function renderGovernedProposalSummary(item = {}, options = {}) {
+  const payload = objectValue(item?.payload);
+  const financeOrder = objectValue(item?.financeOrder && Object.keys(item.financeOrder || {}).length ? item.financeOrder : payload.financeOrder);
+  const requiredGrants = stringArrayValue(item?.requiredGrants?.length ? item.requiredGrants : payload.requiredGrants);
+  const requestLabel = normalizedString(item?.requestLabel, normalizedString(payload?.requestLabel, "Governed Action Request"));
+  const requestSummary = normalizedString(item?.requestSummary, normalizedString(payload?.requestSummary, normalizedString(item?.summary, "No governed request summary captured.")));
+  const runSnapshot = objectValue(item?.governedRun);
+  const runId = normalizedString(item?.runId, normalizedString(runSnapshot?.runId));
+  const runStatus = normalizedString(item?.runStatus, normalizedString(runSnapshot?.status));
+  const policyDecision = normalizedString(item?.policyDecision, normalizedString(runSnapshot?.policyDecision)).toUpperCase();
+  const selectedPolicyProvider = normalizedString(item?.selectedPolicyProvider, normalizedString(runSnapshot?.selectedPolicyProvider));
+  const showResult = options.showResult !== false;
+
+  return `
+    <div class="chat-governed-proposal">
+      <div class="metric-title-row">
+        <div class="title">${escapeHTML(requestLabel)}</div>
+        ${policyDecision ? `<span class="${chipClassForPolicyDecision(policyDecision)}">${escapeHTML(policyDecision)}</span>` : ""}
+      </div>
+      <div class="meta">${escapeHTML(requestSummary)}</div>
+      <div class="run-detail-chips">
+        <span class="chip chip-neutral chip-compact">action=${escapeHTML(normalizedString(item?.actionType, normalizedString(payload?.actionType, "-")))}</span>
+        <span class="chip chip-neutral chip-compact">resource=${escapeHTML(normalizedString(item?.resourceKind, normalizedString(payload?.resourceKind, "-")))}/${escapeHTML(normalizedString(item?.resourceName, normalizedString(payload?.resourceName, "-")))}</span>
+        <span class="chip chip-neutral chip-compact">boundary=${escapeHTML(normalizedString(item?.boundaryClass, normalizedString(payload?.boundaryClass, "-")))}</span>
+        <span class="chip chip-neutral chip-compact">risk=${escapeHTML(normalizedString(item?.riskTier, normalizedString(payload?.riskTier, "-")))}</span>
+        <span class="chip chip-neutral chip-compact">evidence=${escapeHTML(normalizedString(item?.evidenceReadiness, normalizedString(payload?.evidenceReadiness, "-")))}</span>
+        <span class="chip chip-neutral chip-compact">grants=${escapeHTML(String(requiredGrants.length))}</span>
+      </div>
+      ${requiredGrants.length ? `<div class="meta">requiredGrants=${escapeHTML(requiredGrants.join(", "))}</div>` : ""}
+      ${Object.keys(financeOrder).length ? `<div class="meta">financeOrder=${escapeHTML(JSON.stringify(financeOrder))}</div>` : ""}
+      ${
+        showResult && (runId || policyDecision || selectedPolicyProvider || runStatus)
+          ? `
+            <div class="run-detail-chips">
+              ${runId ? `<span class="chip chip-neutral chip-compact">run=${escapeHTML(runId)}</span>` : ""}
+              ${runStatus ? `<span class="${chipClassForSessionStatus(runStatus)}">${escapeHTML(runStatus)}</span>` : ""}
+              ${selectedPolicyProvider ? `<span class="chip chip-neutral chip-compact">provider=${escapeHTML(selectedPolicyProvider)}</span>` : ""}
+            </div>
+            ${renderGovernedRunLink(runId)}
+          `
+          : ""
+      }
+    </div>
+  `;
+}
+
+function renderGovernedActionResultSummary(item = {}) {
+  const resultPayload = objectValue(item?.resultPayload);
+  const governedRun = objectValue(resultPayload?.governedRun);
+  if (!Object.keys(governedRun).length) {
+    return "";
+  }
+  const policyResponse = objectValue(governedRun?.policyResponse);
+  const reasons = Array.isArray(policyResponse?.reasons) ? policyResponse.reasons : [];
+  const firstReason = objectValue(reasons[0]);
+  const runId = normalizedString(governedRun?.runId);
+  const runStatus = normalizedString(governedRun?.status);
+  const policyDecision = normalizedString(governedRun?.policyDecision).toUpperCase();
+  const provider = normalizedString(governedRun?.selectedPolicyProvider);
+  return `
+    <div class="chat-governed-proposal">
+      <div class="metric-title-row">
+        <div class="title">Governed Run Result</div>
+        ${policyDecision ? `<span class="${chipClassForPolicyDecision(policyDecision)}">${escapeHTML(policyDecision)}</span>` : ""}
+      </div>
+      <div class="run-detail-chips">
+        ${runId ? `<span class="chip chip-neutral chip-compact">run=${escapeHTML(runId)}</span>` : ""}
+        ${runStatus ? `<span class="${chipClassForSessionStatus(runStatus)}">${escapeHTML(runStatus)}</span>` : ""}
+        ${provider ? `<span class="chip chip-neutral chip-compact">provider=${escapeHTML(provider)}</span>` : ""}
+        ${governedRun?.policyGrantTokenPresent ? `<span class="chip chip-ok chip-compact">grantToken=true</span>` : ""}
+      </div>
+      ${firstReason?.message ? `<div class="meta">${escapeHTML(String(firstReason.message))}</div>` : ""}
+      ${renderGovernedRunLink(runId)}
+    </div>
+  `;
 }
 
 function renderHistoryItems(history = {}, activeTaskId = "", context = {}) {
@@ -244,6 +368,9 @@ function renderToolActions(items = []) {
           const resultPayload = item?.resultPayload && typeof item.resultPayload === "object"
             ? JSON.stringify(item.resultPayload, null, 2)
             : "";
+          const governedRunSummary = normalizedString(item?.toolType).toLowerCase() === "governed_action_request"
+            ? renderGovernedActionResultSummary(item)
+            : "";
           return `
             <details class="details-shell chat-review-details" data-detail-key="${escapeHTML(toolActionDetailKey)}" open>
               <summary>${escapeHTML(String(item?.toolActionId || "-"))} · ${escapeHTML(String(item?.toolType || "-"))} · ${escapeHTML(String(item?.status || "-"))}</summary>
@@ -252,6 +379,7 @@ function renderToolActions(items = []) {
                 <span class="chip chip-neutral chip-compact">worker=${escapeHTML(String(item?.workerId || "-"))}</span>
                 <span class="chip chip-neutral chip-compact">approval=${escapeHTML(String(item?.approvalCheckpointId || "-"))}</span>
               </div>
+              ${governedRunSummary}
               <div class="filter-row settings-editor-actions">
                 <div class="action-hierarchy">
                   <div class="action-group action-group-secondary">
@@ -283,7 +411,9 @@ function renderToolProposals(items = []) {
           const status = String(item?.status || "PENDING").trim().toUpperCase();
           const command = String(item?.command || "").trim();
           const pending = status === "PENDING";
+          const governed = isGovernedActionProposal(item);
           const proposalDetailKey = detailKey("chat", "tool_proposal", sessionId || "unknown", proposalId || "unknown");
+          const resolutionMeta = `${escapeHTML(item?.reviewedAt ? `reviewed=${formatTime(item.reviewedAt)}` : "proposal resolved")}${item?.reason ? `; reason=${escapeHTML(String(item.reason))}` : ""}`;
           return `
             <details class="details-shell chat-review-details" data-detail-key="${escapeHTML(proposalDetailKey)}" open data-chat-tool-proposal-row data-chat-session-id="${escapeHTML(sessionId)}" data-chat-proposal-id="${escapeHTML(proposalId)}">
               <summary>${escapeHTML(proposalId || "-")} · ${escapeHTML(String(item?.proposalType || "-"))} · ${escapeHTML(status)}</summary>
@@ -294,8 +424,14 @@ function renderToolProposals(items = []) {
                 ${item?.toolActionId ? `<span class="chip chip-ok chip-compact">toolAction=${escapeHTML(String(item.toolActionId))}</span>` : ""}
                 ${item?.actionStatus ? `<span class="${chipClassForSessionStatus(item.actionStatus)}">action=${escapeHTML(String(item.actionStatus))}</span>` : ""}
               </div>
-              <div class="meta">${escapeHTML(String(item?.summary || "No proposal summary captured."))}</div>
-              ${command ? `<pre class="code-block">${escapeHTML(command)}</pre>` : `<div class="meta">No command payload captured for this proposal.</div>`}
+              ${
+                governed
+                  ? renderGovernedProposalSummary(item)
+                  : `
+                    <div class="meta">${escapeHTML(String(item?.summary || "No proposal summary captured."))}</div>
+                    ${command ? `<pre class="code-block">${escapeHTML(command)}</pre>` : `<div class="meta">No command payload captured for this proposal.</div>`}
+                  `
+              }
               ${
                 pending
                   ? `
@@ -313,18 +449,18 @@ function renderToolProposals(items = []) {
                           data-chat-action="approve-tool-proposal"
                           data-chat-session-id="${escapeHTML(sessionId)}"
                           data-chat-proposal-id="${escapeHTML(proposalId)}"
-                        >Approve Proposal</button>
+                        >${governed ? "Approve Request" : "Approve Proposal"}</button>
                         <button
                           class="btn btn-danger btn-small"
                           type="button"
                           data-chat-action="deny-tool-proposal"
                           data-chat-session-id="${escapeHTML(sessionId)}"
                           data-chat-proposal-id="${escapeHTML(proposalId)}"
-                        >Deny Proposal</button>
+                        >${governed ? "Deny Request" : "Deny Proposal"}</button>
                       </div>
                     </div>
                   `
-                  : `<div class="meta">${escapeHTML(item?.reviewedAt ? `reviewed=${formatTime(item.reviewedAt)}` : "proposal resolved")}${item?.reason ? `; reason=${escapeHTML(String(item.reason))}` : ""}</div>`
+                  : `<div class="meta">${resolutionMeta}</div>`
               }
             </details>
           `;
@@ -388,14 +524,21 @@ function renderTurnActionInbox(approvalItems = [], proposalItems = []) {
     .map((item) => {
       const sessionId = String(item?.sessionId || "").trim();
       const proposalId = String(item?.proposalId || "").trim();
+      const governed = isGovernedActionProposal(item);
+      const proposalLabel = governed
+        ? normalizedString(item?.requestLabel, "Governed Action Request")
+        : "Tool Proposal";
+      const proposalSummary = governed
+        ? normalizedString(item?.requestSummary, normalizedString(item?.summary, "No governed request summary captured."))
+        : normalizedString(item?.summary, "No proposal summary captured.");
       return `
         <article class="chat-review-inbox-card" data-chat-tool-proposal-row data-chat-session-id="${escapeHTML(sessionId)}" data-chat-proposal-id="${escapeHTML(proposalId)}">
           <div class="metric-title-row">
-            <div class="title">Tool Proposal</div>
+            <div class="title">${escapeHTML(proposalLabel)}</div>
             <span class="${chipClassForSessionStatus(item?.status || "PENDING")}">${escapeHTML(String(item?.status || "PENDING").trim().toUpperCase())}</span>
           </div>
           <div class="meta">proposal=${escapeHTML(proposalId || "-")}; type=${escapeHTML(String(item?.proposalType || "-"))}</div>
-          <div class="meta">${escapeHTML(String(item?.summary || "No proposal summary captured."))}</div>
+          <div class="meta">${escapeHTML(proposalSummary)}</div>
           <div class="chat-approval-action-group">
             <input
               class="filter-input chat-approval-reason-input"
@@ -410,14 +553,14 @@ function renderTurnActionInbox(approvalItems = [], proposalItems = []) {
                 data-chat-action="approve-tool-proposal"
                 data-chat-session-id="${escapeHTML(sessionId)}"
                 data-chat-proposal-id="${escapeHTML(proposalId)}"
-              >Approve Proposal</button>
+              >${governed ? "Approve Request" : "Approve Proposal"}</button>
               <button
                 class="btn btn-danger"
                 type="button"
                 data-chat-action="deny-tool-proposal"
                 data-chat-session-id="${escapeHTML(sessionId)}"
                 data-chat-proposal-id="${escapeHTML(proposalId)}"
-              >Deny Proposal</button>
+              >${governed ? "Deny Request" : "Deny Proposal"}</button>
             </div>
           </div>
         </article>

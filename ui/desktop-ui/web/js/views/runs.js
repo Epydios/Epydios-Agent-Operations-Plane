@@ -160,6 +160,9 @@ function derivePolicyRichness(run) {
   const providerMeta = readObject(aimxsOutput.providerMeta);
   const providerPolicy = readObject(providerMeta.policy_stratification);
   const requestContract = readObject(providerMeta.request_contract);
+  const providerCurrentState = readObject(providerMeta.current_state);
+  const providerContinuity = readObject(providerMeta.state_continuity);
+  const providerAuditSink = readObject(providerMeta.audit_sink);
   const outputContract = readObject(aimxsOutput.requestContract);
   const evidence = readObject(aimxsOutput.evidence);
   const financeOrder = readObject(requestGoverned.finance_order);
@@ -197,9 +200,19 @@ function derivePolicyRichness(run) {
     providerId,
     decisionPath,
     baakEngaged: providerMeta.baak_engaged === true,
+    adapterStatus: String(providerMeta.adapter_status || "").trim(),
+    adapterErrorCode: String(providerMeta.adapter_error_code || "").trim(),
+    baseAdapterPresent: providerMeta.base_adapter_present !== false,
     grantTokenPresent: run?.policyGrantTokenPresent === true || policyResponse.grantTokenPresent === true,
     policyStratificationPresent,
     requestContractEchoPresent,
+    currentStatePresent: providerCurrentState.present === true,
+    currentStateHash: String(providerCurrentState.sha256 || "").trim(),
+    continuityEnabled: providerContinuity.continuity_enabled === true,
+    kernelStateInPresent: Boolean(String(providerContinuity.kernel_state_in_sha256 || "").trim()),
+    kernelStateOutPresent: providerContinuity.kernel_state_out_present === true || Boolean(String(providerContinuity.kernel_state_out_sha256 || "").trim()),
+    auditSinkActive: providerAuditSink.active === true,
+    auditEventRef: String(providerAuditSink.event_ref || "").trim(),
     evidenceHash,
     evidenceRefCount: evidenceRefs.length,
     evidenceRefs,
@@ -604,6 +617,16 @@ export function renderRunDetail(ui, run, options = {}) {
                   <tr>${tableCell("Signal", "Handshake Required")}${tableCell("Value", escapeHTML(policyRichness.handshakeRequired ? "true" : "false"))}</tr>
                   <tr>${tableCell("Signal", "Decision Path")}${tableCell("Value", escapeHTML(policyRichness.decisionPath || "-"))}</tr>
                   <tr>${tableCell("Signal", "BAAK Engaged")}${tableCell("Value", escapeHTML(policyRichness.baakEngaged ? "true" : "false"))}</tr>
+                  <tr>${tableCell("Signal", "Adapter Status")}${tableCell("Value", escapeHTML(policyRichness.adapterStatus || "-"))}</tr>
+                  <tr>${tableCell("Signal", "Adapter Error Code")}${tableCell("Value", escapeHTML(policyRichness.adapterErrorCode || "-"))}</tr>
+                  <tr>${tableCell("Signal", "Base Adapter Present")}${tableCell("Value", escapeHTML(policyRichness.baseAdapterPresent ? "true" : "false"))}</tr>
+                  <tr>${tableCell("Signal", "Current State Present")}${tableCell("Value", escapeHTML(policyRichness.currentStatePresent ? "true" : "false"))}</tr>
+                  <tr>${tableCell("Signal", "Current State Hash")}${tableCell("Value", escapeHTML(policyRichness.currentStateHash || "-"))}</tr>
+                  <tr>${tableCell("Signal", "State Continuity Enabled")}${tableCell("Value", escapeHTML(policyRichness.continuityEnabled ? "true" : "false"))}</tr>
+                  <tr>${tableCell("Signal", "Kernel State In Present")}${tableCell("Value", escapeHTML(policyRichness.kernelStateInPresent ? "true" : "false"))}</tr>
+                  <tr>${tableCell("Signal", "Kernel State Out Present")}${tableCell("Value", escapeHTML(policyRichness.kernelStateOutPresent ? "true" : "false"))}</tr>
+                  <tr>${tableCell("Signal", "Audit Sink Active")}${tableCell("Value", escapeHTML(policyRichness.auditSinkActive ? "true" : "false"))}</tr>
+                  <tr>${tableCell("Signal", "Audit Event Ref")}${tableCell("Value", escapeHTML(policyRichness.auditEventRef || "-"))}</tr>
                   <tr>${tableCell("Signal", "Policy Stratification Present")}${tableCell("Value", escapeHTML(policyRichness.policyStratificationPresent ? "true" : "false"))}</tr>
                   <tr>${tableCell("Signal", "Request Contract Echo Present")}${tableCell("Value", escapeHTML(policyRichness.requestContractEchoPresent ? "true" : "false"))}</tr>
                   <tr>${tableCell("Signal", "Grant Token Present")}${tableCell("Value", escapeHTML(policyRichness.grantTokenPresent ? "true" : "false"))}</tr>
