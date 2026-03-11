@@ -72,6 +72,7 @@ test("session client preserves governed action proposal richness and linked run 
               riskTier: "high",
               requiredGrants: ["grant.trading.supervisor"],
               evidenceReadiness: "PARTIAL",
+              operatorApprovalRequired: false,
               handshakeRequired: true,
               financeOrder: {
                 symbol: "AAPL",
@@ -92,15 +93,16 @@ test("session client preserves governed action proposal richness and linked run 
             proposalId: "proposal-governed-1",
             proposalType: "governed_action_request",
             workerId: "worker-governed-1",
-            decision: "APPROVE",
-            status: "APPROVED",
-            reason: "approved for governed evaluation",
+            decision: "AUTO",
+            status: "DEFERRED",
+            reason: "Supervisor trading grant is still required.",
             toolActionId: "tool-action-governed-1",
             actionStatus: "COMPLETED",
             runId: "run-governed-1",
             runStatus: "COMPLETED",
             policyDecision: "DEFER",
-            selectedPolicyProvider: "aimxs-full"
+            selectedPolicyProvider: "aimxs-full",
+            operatorApprovalRequired: false
           }
         }
       ]
@@ -117,4 +119,7 @@ test("session client preserves governed action proposal richness and linked run 
   assert.equal(proposal.policyDecision, "DEFER");
   assert.equal(proposal.selectedPolicyProvider, "aimxs-full");
   assert.equal(proposal.governedRun.runId, "run-governed-1");
+  assert.equal(proposal.decision, "AUTO");
+  assert.equal(proposal.status, "DEFERRED");
+  assert.equal(proposal.operatorApprovalRequired, false);
 });

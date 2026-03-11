@@ -17,6 +17,7 @@ const DEFAULT_CONFIG = {
     sessionByIdPrefix: "/v1alpha2/runtime/sessions/",
     workerCapabilities: "/v1alpha2/runtime/worker-capabilities",
     policyPacks: "/v1alpha2/runtime/policy-packs",
+    runtimeIdentity: "/v1alpha2/runtime/identity",
     exportProfiles: "/v1alpha2/runtime/export-profiles",
     orgAdminProfiles: "/v1alpha2/runtime/org-admin-profiles",
     terminalSessions: "/v1alpha1/runtime/terminal/sessions",

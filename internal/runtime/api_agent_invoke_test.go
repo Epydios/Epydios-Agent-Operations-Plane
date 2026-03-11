@@ -308,6 +308,85 @@ func TestRuntimeIntegrationInvokeManagedCodexWorkerBridge(t *testing.T) {
 	}
 }
 
+func TestRuntimeIntegrationInvokeStoresGovernanceContextOnManagedSession(t *testing.T) {
+	const (
+		tenantID  = "tenant-a"
+		projectID = "project-a"
+	)
+	store := newMemoryRunStore()
+	handler := newTestAPIServerWithInvoker(t, store, map[string]interface{}{
+		"ref://gateways/litellm/openai-compatible":                     "https://gateway.local",
+		"ref://projects/project-a/gateways/litellm/bearer-token":       "gateway-token",
+		"ref://projects/project-a/providers/openai-compatible/api-key": "unused-direct-key",
+	}, roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		return jsonHTTPResponse(http.StatusOK, map[string]interface{}{
+			"status":      "completed",
+			"output_text": "managed codex bridge response",
+			"usage": map[string]interface{}{
+				"output_tokens": 21,
+			},
+		})
+	}))
+
+	rr := requestJSON(t, handler, http.MethodPost, "/v1alpha1/runtime/integrations/invoke", map[string]interface{}{
+		"meta": map[string]interface{}{
+			"tenantId":  tenantID,
+			"projectId": projectID,
+			"requestId": "req-managed-codex-demo-governance",
+		},
+		"agentProfileId": "codex",
+		"executionMode":  "managed_codex_worker",
+		"prompt":         "Prepare a governed compliance report request.",
+		"governanceContext": map[string]interface{}{
+			"source": "desktop_settings_local_demo",
+			"persona": map[string]interface{}{
+				"enabled":         true,
+				"subjectId":       "demo.operator",
+				"clientId":        "desktop-demo",
+				"roles":           []string{"compliance.viewer"},
+				"approvedForProd": false,
+			},
+			"policy": map[string]interface{}{
+				"enabled":                  true,
+				"reviewMode":               "policy_first",
+				"handshakeRequired":        true,
+				"advisoryAutoShape":        true,
+				"financeSupervisorGrant":   true,
+				"financeEvidenceReadiness": "PARTIAL",
+				"productionDeleteDeny":     true,
+				"policyBucketPrefix":       "desktop-demo",
+			},
+		},
+	})
+	if rr.Code != http.StatusOK {
+		t.Fatalf("POST integration invoke code=%d body=%s", rr.Code, rr.Body.String())
+	}
+
+	var response AgentInvokeResponse
+	decodeResponseBody(t, rr, &response)
+	session, err := store.GetSession(context.Background(), response.SessionID)
+	if err != nil {
+		t.Fatalf("get session: %v", err)
+	}
+	summary := parseRawJSONObject(session.Summary)
+	governanceContext := extractJSONObjectValue(summary["governanceContext"])
+	if got := normalizedInterfaceString(extractJSONObjectValue(governanceContext["persona"])["subjectId"]); got != "demo.operator" {
+		t.Fatalf("session summary governanceContext persona.subjectId=%q want demo.operator", got)
+	}
+
+	actions, err := store.ListToolActions(context.Background(), ToolActionListQuery{SessionID: response.SessionID})
+	if err != nil {
+		t.Fatalf("list tool actions: %v", err)
+	}
+	if len(actions) != 1 {
+		t.Fatalf("tool actions=%d want 1", len(actions))
+	}
+	requestPayload := parseRawJSONObject(actions[0].RequestPayload)
+	if got := normalizedInterfaceString(extractJSONObjectValue(extractJSONObjectValue(requestPayload["governanceContext"])["policy"])["reviewMode"]); got != "policy_first" {
+		t.Fatalf("tool action governanceContext policy.reviewMode=%q want policy_first", got)
+	}
+}
+
 func TestRuntimeIntegrationInvokeMapsQuotaFailureToTooManyRequests(t *testing.T) {
 	const (
 		tenantID  = "tenant-a"
@@ -626,6 +705,224 @@ func TestRuntimeIntegrationInvokeManagedCodexWorkerRequiresCodexProfile(t *testi
 	})
 	if rr.Code != http.StatusBadRequest {
 		t.Fatalf("POST integration invoke code=%d body=%s want %d", rr.Code, rr.Body.String(), http.StatusBadRequest)
+	}
+}
+
+func TestRuntimeIntegrationInvokeManagedCodexWorkerAutoRoutesGovernedActionProposal(t *testing.T) {
+	const (
+		tenantID  = "tenant-a"
+		projectID = "project-a"
+	)
+	store := newMemoryRunStore()
+	refJSON, err := json.Marshal(map[string]interface{}{
+		"ref://gateways/litellm/openai-compatible":               "https://gateway.local",
+		"ref://projects/project-a/gateways/litellm/bearer-token": "gateway-token",
+	})
+	if err != nil {
+		t.Fatalf("marshal managed codex refs: %v", err)
+	}
+	invoker := NewAgentInvoker(store, AgentInvokerConfig{RefValuesJSON: string(refJSON)})
+	orchestrator := &Orchestrator{
+		Namespace:        "epydios-system",
+		Store:            store,
+		ProviderRegistry: &fakeGovernedActionProviderClient{},
+	}
+	var prompts []string
+	invoker.managed["codex"] = codexManagedWorkerAdapter{
+		mode:        "process",
+		workdir:     "/tmp",
+		sandboxMode: "read-only",
+		timeout:     15 * time.Second,
+		runProcess: func(_ context.Context, req codexProcessRequest) ([]byte, error) {
+			prompts = append(prompts, req.Prompt)
+			if strings.Contains(req.Prompt, "Governed tool execution result:") {
+				return []byte(strings.Join([]string{
+					`{"type":"turn.started"}`,
+					`{"type":"item.completed","item":{"id":"item_resume","type":"agent_message","text":"{\"message\":\"Managed Codex completed the governed paper-trade review and the request is cleared.\",\"tool_proposals\":[]}"}}`,
+					`{"type":"turn.completed","usage":{"input_tokens":16,"output_tokens":20}}`,
+				}, "\n")), nil
+			}
+			return []byte(strings.Join([]string{
+				`{"type":"thread.started","thread_id":"thread-allow-1"}`,
+				`{"type":"turn.started"}`,
+				`{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"{\"message\":\"I translated the request into a governed paper-trade action.\",\"tool_proposals\":[{\"type\":\"governed_action_request\",\"summary\":\"BUY 5 MSFT in paper account paper-main\",\"confidence\":\"structured\",\"requestLabel\":\"Paper Trade Request: MSFT\",\"requestSummary\":\"BUY 5 MSFT in paper account paper-main\",\"demoProfile\":\"finance_paper_trade\",\"actionType\":\"trade.execute\",\"actionClass\":\"execute\",\"actionVerb\":\"execute\",\"actionTarget\":\"paper-broker-order\",\"resourceKind\":\"broker-order\",\"resourceNamespace\":\"epydios-system\",\"resourceName\":\"paper-order-msft\",\"resourceId\":\"paper-order-msft\",\"boundaryClass\":\"external_actuator\",\"riskTier\":\"low\",\"requiredGrants\":[],\"evidenceReadiness\":\"READY\",\"handshakeRequired\":true,\"environment\":\"dev\",\"operatorApprovalRequired\":false,\"workflowKind\":\"external_action_request\",\"financeOrder\":{\"symbol\":\"MSFT\",\"side\":\"buy\",\"quantity\":5,\"account\":\"paper-main\"}}]}"}}`,
+				`{"type":"turn.completed","usage":{"input_tokens":10,"output_tokens":24}}`,
+			}, "\n")), nil
+		},
+	}
+	handler := NewAPIServer(store, orchestrator, nil).WithAgentInvoker(invoker).Routes()
+
+	rr := requestJSON(t, handler, http.MethodPost, "/v1alpha1/runtime/integrations/invoke", map[string]interface{}{
+		"meta": map[string]interface{}{
+			"tenantId":  tenantID,
+			"projectId": projectID,
+			"requestId": "req-managed-codex-process-auto-governed",
+		},
+		"agentProfileId": "codex",
+		"executionMode":  "managed_codex_worker",
+		"prompt":         "Prepare a low-risk governed paper trade for 5 MSFT in paper-main.",
+	})
+	if rr.Code != http.StatusOK {
+		t.Fatalf("POST integration invoke code=%d body=%s", rr.Code, rr.Body.String())
+	}
+
+	var response AgentInvokeResponse
+	decodeResponseBody(t, rr, &response)
+	if len(response.ToolProposals) != 1 {
+		t.Fatalf("toolProposals=%d want 1", len(response.ToolProposals))
+	}
+	session, err := store.GetSession(context.Background(), response.SessionID)
+	if err != nil {
+		t.Fatalf("get session after invoke: %v", err)
+	}
+	if session.Status == SessionStatusAwaitingApproval {
+		t.Fatalf("session status=%q should not require manual approval", session.Status)
+	}
+	if session.Status != SessionStatusCompleted {
+		t.Fatalf("session status=%q want %q", session.Status, SessionStatusCompleted)
+	}
+
+	runs, err := store.ListRuns(context.Background(), RunListQuery{TenantID: tenantID, ProjectID: projectID})
+	if err != nil {
+		t.Fatalf("list runs: %v", err)
+	}
+	if len(runs) != 1 {
+		t.Fatalf("run count=%d want 1", len(runs))
+	}
+	if runs[0].PolicyDecision != "ALLOW" {
+		t.Fatalf("policyDecision=%q want ALLOW", runs[0].PolicyDecision)
+	}
+
+	events, err := store.ListSessionEvents(context.Background(), SessionEventListQuery{SessionID: response.SessionID})
+	if err != nil {
+		t.Fatalf("list session events: %v", err)
+	}
+	sawAutoDecision := false
+	for _, event := range events {
+		if event.EventType != SessionEventType("tool_proposal.decided") {
+			continue
+		}
+		payload := parseRawJSONObject(event.Payload)
+		if normalizedInterfaceString(payload["decision"]) == "AUTO" {
+			sawAutoDecision = true
+			if normalizedInterfaceString(payload["policyDecision"]) != "ALLOW" {
+				t.Fatalf("auto-routed policyDecision=%q want ALLOW", normalizedInterfaceString(payload["policyDecision"]))
+			}
+		}
+	}
+	if !sawAutoDecision {
+		t.Fatalf("session events missing AUTO governed tool_proposal.decided: %+v", events)
+	}
+	if len(prompts) != 2 {
+		t.Fatalf("runProcess prompts=%d want 2", len(prompts))
+	}
+	if !strings.Contains(prompts[1], "Governed tool execution result:") {
+		t.Fatalf("continuation prompt missing governed result section: %s", prompts[1])
+	}
+}
+
+func TestRuntimeIntegrationInvokeManagedCodexWorkerAutoRoutesComplianceGovernedActionProposal(t *testing.T) {
+	const (
+		tenantID  = "tenant-a"
+		projectID = "project-a"
+	)
+	store := newMemoryRunStore()
+	refJSON, err := json.Marshal(map[string]interface{}{
+		"ref://gateways/litellm/openai-compatible":               "https://gateway.local",
+		"ref://projects/project-a/gateways/litellm/bearer-token": "gateway-token",
+	})
+	if err != nil {
+		t.Fatalf("marshal managed codex refs: %v", err)
+	}
+	invoker := NewAgentInvoker(store, AgentInvokerConfig{RefValuesJSON: string(refJSON)})
+	orchestrator := &Orchestrator{
+		Namespace:        "epydios-system",
+		Store:            store,
+		ProviderRegistry: &fakeGovernedActionProviderClient{},
+	}
+	invoker.managed["codex"] = codexManagedWorkerAdapter{
+		mode:        "process",
+		workdir:     "/tmp",
+		sandboxMode: "read-only",
+		timeout:     15 * time.Second,
+		runProcess: func(_ context.Context, req codexProcessRequest) ([]byte, error) {
+			if strings.Contains(req.Prompt, "Governed tool execution result:") {
+				return []byte(strings.Join([]string{
+					`{"type":"turn.started"}`,
+					`{"type":"item.completed","item":{"id":"item_resume","type":"agent_message","text":"{\"message\":\"Managed Codex completed the governed compliance review and the report request is cleared.\",\"tool_proposals\":[]}"}}`,
+					`{"type":"turn.completed","usage":{"input_tokens":18,"output_tokens":24}}`,
+				}, "\n")), nil
+			}
+			return []byte(strings.Join([]string{
+				`{"type":"thread.started","thread_id":"thread-compliance-1"}`,
+				`{"type":"turn.started"}`,
+				`{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"{\"message\":\"I translated the request into a governed compliance report action.\",\"tool_proposals\":[{\"type\":\"governed_action_request\",\"summary\":\"Request a compliance conflict report for MSFT versus existing AAPL holdings.\",\"confidence\":\"structured\",\"requestLabel\":\"Compliance Conflict Report\",\"requestSummary\":\"Request a compliance report on whether holding MSFT creates a conflict if we already hold AAPL.\",\"demoProfile\":\"compliance_report\",\"workflowKind\":\"advisory_request\",\"actionType\":\"compliance.report.request\",\"actionClass\":\"read\",\"actionVerb\":\"request\",\"actionTarget\":\"compliance-review\",\"resourceKind\":\"compliance-report\",\"resourceNamespace\":\"epydios-system\",\"resourceName\":\"compliance-conflict-report\",\"resourceId\":\"compliance-conflict-report\",\"boundaryClass\":\"model_gateway\",\"riskTier\":\"low\",\"requiredGrants\":[],\"evidenceReadiness\":\"READY\",\"handshakeRequired\":true,\"environment\":\"dev\",\"operatorApprovalRequired\":false}]}"}}`,
+				`{"type":"turn.completed","usage":{"input_tokens":16,"output_tokens":30}}`,
+			}, "\n")), nil
+		},
+	}
+	handler := NewAPIServer(store, orchestrator, nil).WithAgentInvoker(invoker).Routes()
+	reqCtx := withRuntimeIdentity(context.Background(), &RuntimeIdentity{
+		Subject:    "user-123",
+		ClientID:   "desktop-ui",
+		Roles:      []string{"compliance.viewer", PermissionRunCreate},
+		TenantIDs:  []string{tenantID},
+		ProjectIDs: []string{projectID},
+	})
+
+	rr := requestJSONWithContext(t, handler, reqCtx, http.MethodPost, "/v1alpha1/runtime/integrations/invoke", map[string]interface{}{
+		"meta": map[string]interface{}{
+			"tenantId":  tenantID,
+			"projectId": projectID,
+			"requestId": "req-managed-codex-process-auto-compliance",
+		},
+		"agentProfileId": "codex",
+		"executionMode":  "managed_codex_worker",
+		"prompt":         "Prepare a governed request asking compliance for a report on whether holding MSFT would create a conflict if we already hold AAPL.",
+	})
+	if rr.Code != http.StatusOK {
+		t.Fatalf("POST integration invoke code=%d body=%s", rr.Code, rr.Body.String())
+	}
+
+	var response AgentInvokeResponse
+	decodeResponseBody(t, rr, &response)
+	if len(response.ToolProposals) != 1 {
+		t.Fatalf("toolProposals=%d want 1", len(response.ToolProposals))
+	}
+	session, err := store.GetSession(context.Background(), response.SessionID)
+	if err != nil {
+		t.Fatalf("get session after invoke: %v", err)
+	}
+	if session.Status != SessionStatusCompleted {
+		t.Fatalf("session status=%q want %q", session.Status, SessionStatusCompleted)
+	}
+
+	runs, err := store.ListRuns(context.Background(), RunListQuery{TenantID: tenantID, ProjectID: projectID})
+	if err != nil {
+		t.Fatalf("list runs: %v", err)
+	}
+	if len(runs) != 1 {
+		t.Fatalf("run count=%d want 1", len(runs))
+	}
+	if runs[0].PolicyDecision != "ALLOW" {
+		t.Fatalf("policyDecision=%q want ALLOW", runs[0].PolicyDecision)
+	}
+	runDetail, err := store.GetRun(context.Background(), runs[0].RunID)
+	if err != nil {
+		t.Fatalf("get run detail: %v", err)
+	}
+	requestPayload := parseRawJSONObject(runDetail.RequestPayload)
+	if got := normalizedInterfaceString(extractJSONObjectValue(extractJSONObjectValue(requestPayload["meta"])["actor"])["subject"]); got != "user-123" {
+		t.Fatalf("request meta actor subject=%q want user-123", got)
+	}
+	context := extractJSONObjectValue(requestPayload["context"])
+	governedAction := extractJSONObjectValue(context["governed_action"])
+	if got := normalizedInterfaceString(governedAction["workflow_kind"]); got != governedActionWorkflowAdvisoryRequest {
+		t.Fatalf("workflow_kind=%q want %q", got, governedActionWorkflowAdvisoryRequest)
+	}
+	authority := extractJSONObjectValue(context["actor_authority"])
+	if got := normalizedInterfaceString(authority["client_id"]); got != "desktop-ui" {
+		t.Fatalf("actor_authority client_id=%q want desktop-ui", got)
 	}
 }
 

@@ -2,7 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   buildGovernedActionRunPayload,
-  evaluateGovernedActionIssues
+  evaluateGovernedActionIssues,
+  renderGovernedActionReviewSummary
 } from "../views/governed-action.js";
 
 test("governed action run payload uses the shared contract on a runtime-compatible request", () => {
@@ -38,6 +39,24 @@ test("governed action run payload uses the shared contract on a runtime-compatib
       claims: {
         sub: "user-demo"
       }
+    },
+    {
+      persona: {
+        enabled: true,
+        label: "Local Demo Persona",
+        subjectId: "demo.operator.local",
+        clientId: "desktop-demo-local",
+        rolesText: "compliance.viewer"
+      },
+      policy: {
+        enabled: true,
+        reviewMode: "policy_first",
+        handshakeRequired: true,
+        financeSupervisorGrant: true,
+        financeEvidenceReadiness: "PARTIAL",
+        productionDeleteDeny: true,
+        policyBucketPrefix: "desktop-demo"
+      }
     }
   );
 
@@ -46,6 +65,7 @@ test("governed action run payload uses the shared contract on a runtime-compatib
   assert.equal(payload.context.governed_action.contract_id, "epydios.governed-action.v1");
   assert.equal(payload.context.governed_action.origin_surface, "home.governed_action_request");
   assert.equal(payload.context.governed_action.finance_order.symbol, "AAPL");
+  assert.equal(payload.context.governed_action.demo_governance.persona.subjectId, "demo.operator.local");
   assert.equal(payload.context.policy_stratification.boundary_class, "external_actuator");
   assert.equal(payload.task.demoProfile, "finance_paper_trade");
 });
@@ -69,4 +89,22 @@ test("governed action validation warns when differentiation inputs are weakened"
   assert.ok(issues.some((issue) => issue.message.includes("Evidence readiness is READY")));
   assert.ok(issues.some((issue) => issue.message.includes("Handshake enforcement is off")));
   assert.ok(issues.some((issue) => issue.message.includes("Risk tier is not high")));
+});
+
+test("governed action review summary colors the stored policy decision", () => {
+  const markup = renderGovernedActionReviewSummary({
+    runId: "run-allow-001",
+    policyDecision: "ALLOW",
+    requestPayload: {
+      context: {
+        governed_action: {
+          workflow_kind: "external_action_request",
+          demo_profile: "finance_paper_trade"
+        }
+      }
+    }
+  });
+
+  assert.match(markup, /chip chip-ok chip-compact">decision=ALLOW/);
+  assert.match(markup, /workflow=external_action_request/);
 });

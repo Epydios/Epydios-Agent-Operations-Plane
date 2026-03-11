@@ -371,7 +371,6 @@ aimxs_local_host = sys.argv[14]
 aimxs_local_port = int(sys.argv[15])
 secure_ref_prefix = "/__agentops/secure-refs"
 aimxs_activation_prefix = "/__agentops/aimxs/activation"
-aimxs_probe_prefix = "/__agentops/aimxs/probe"
 secure_ref_index_version = 1
 aimxs_primary_provider_name = "aimxs-policy-primary"
 aimxs_full_provider_name = "aimxs-full"
@@ -1295,108 +1294,6 @@ def collect_aimxs_activation_status(message="", applied=False, requested_mode=""
     return payload
 
 
-def build_probe_differential_signals(capabilities, response_payload):
-    payload = response_payload if isinstance(response_payload, dict) else {}
-    output = payload.get("output") if isinstance(payload.get("output"), dict) else {}
-    aimxs = output.get("aimxs") if isinstance(output.get("aimxs"), dict) else {}
-    provider_meta = aimxs.get("providerMeta") if isinstance(aimxs.get("providerMeta"), dict) else {}
-    evidence = aimxs.get("evidence") if isinstance(aimxs.get("evidence"), dict) else {}
-    evidence_refs = aimxs.get("evidenceRefs")
-    if not isinstance(evidence_refs, list):
-        evidence_refs = payload.get("evidenceRefs") if isinstance(payload.get("evidenceRefs"), list) else []
-    capability_set = {str(item or "").strip() for item in capabilities or [] if str(item or "").strip()}
-    return {
-        "hasDeferCapability": "policy.defer" in capability_set,
-        "hasHandshakeCapability": "governance.handshake_validation" in capability_set,
-        "hasPolicyDecisionRefsCapability": "evidence.policy_decision_refs" in capability_set,
-        "hasPolicyStratification": isinstance(provider_meta.get("policy_stratification"), dict) and bool(provider_meta.get("policy_stratification")),
-        "baakEngaged": bool(provider_meta.get("baak_engaged")),
-        "hasEvidenceHash": bool(str(evidence.get("evidence_hash") or "").strip()),
-        "evidenceRefsCount": len(evidence_refs),
-    }
-
-
-def evaluate_oss_probe(payload):
-    if not has_kubectl():
-        raise RuntimeError("kubectl is required to evaluate oss-only from the Desktop self-check panel.")
-    local_port = reserve_local_port()
-    log_handle = tempfile.NamedTemporaryFile(prefix="agentops-oss-probe.", suffix=".log", delete=False)
-    log_path = log_handle.name
-    process = subprocess.Popen(
-        [
-            "kubectl",
-            "-n",
-            namespace,
-            "port-forward",
-            "svc/epydios-oss-policy-provider",
-            f"{local_port}:8080",
-        ],
-        stdout=log_handle,
-        stderr=subprocess.STDOUT,
-        text=True,
-    )
-    log_handle.close()
-    try:
-        wait_for_http_json(f"http://127.0.0.1:{local_port}/v1alpha1/capabilities", timeout_seconds=8)
-        return http_json(
-            f"http://127.0.0.1:{local_port}/v1alpha1/policy-provider/evaluate",
-            method="POST",
-            payload=payload,
-            timeout=10,
-        )
-    except Exception as error:
-        raise RuntimeError(f"OSS provider probe failed: {error}. Port-forward log: {log_path}")
-    finally:
-        stop_process(process)
-
-
-def evaluate_aimxs_probe(payload):
-    snapshot = collect_aimxs_activation_status()
-    active_mode = str(snapshot.get("activeMode") or "").strip().lower()
-    if active_mode not in ("oss-only", "aimxs-full"):
-        raise RuntimeError("Desktop self-check currently supports only oss-only or aimxs-full. Switch modes in Settings first.")
-    if active_mode == "aimxs-full":
-        local_status = collect_aimxs_full_local_status()
-        endpoint_url = str(local_status.get("endpointUrl") or aimxs_local_endpoint_url).strip() or aimxs_local_endpoint_url
-        response_payload = http_json(
-            f"{endpoint_url}/v1alpha1/policy-provider/evaluate",
-            method="POST",
-            payload=payload,
-            timeout=10,
-        )
-        provider_id = str(local_status.get("providerId") or snapshot.get("selectedProviderId") or aimxs_full_provider_name).strip()
-        provider_name = str(local_status.get("providerName") or snapshot.get("selectedProviderName") or aimxs_full_provider_name).strip()
-        capabilities = list(local_status.get("capabilities") or snapshot.get("capabilities") or [])
-    else:
-        response_payload = evaluate_oss_probe(payload)
-        provider_id = str(snapshot.get("selectedProviderId") or oss_policy_provider_name).strip()
-        provider_name = str(snapshot.get("selectedProviderName") or oss_policy_provider_name).strip()
-        capabilities = list(snapshot.get("capabilities") or [])
-
-    decision = str(response_payload.get("decision") or "").strip().upper()
-    signals = build_probe_differential_signals(capabilities, response_payload)
-    summary = (
-        f"{active_mode} returned {decision or 'UNKNOWN'} via {provider_id or provider_name or 'unknown-provider'}; "
-        f"deferCapability={signals['hasDeferCapability']}; "
-        f"handshakeCapability={signals['hasHandshakeCapability']}; "
-        f"policyStratification={signals['hasPolicyStratification']}; "
-        f"evidenceHash={signals['hasEvidenceHash']}; "
-        f"evidenceRefs={signals['evidenceRefsCount']}."
-    )
-    return {
-        "mode": active_mode,
-        "providerId": provider_id,
-        "providerName": provider_name,
-        "decision": decision,
-        "summary": summary,
-        "evaluatedAt": datetime.utcnow().replace(microsecond=0).isoformat() + "Z",
-        "capabilities": capabilities,
-        "requestPayload": payload,
-        "responsePayload": response_payload,
-        "differentialSignals": signals,
-    }
-
-
 def wait_for_aimxs_mode(target_mode, timeout_seconds=25):
     deadline = time.time() + timeout_seconds
     last = collect_aimxs_activation_status(requested_mode=target_mode)
@@ -1547,9 +1444,6 @@ class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
     def _is_aimxs_route(self):
         return self.path == aimxs_activation_prefix or self.path.startswith(f"{aimxs_activation_prefix}/")
 
-    def _is_aimxs_probe_route(self):
-        return self.path == aimxs_probe_prefix or self.path.startswith(f"{aimxs_probe_prefix}/")
-
     def _should_proxy(self):
         return mode == "live" and runtime_proxy_base and (
             self.path == "/healthz"
@@ -1648,20 +1542,6 @@ class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
         except RuntimeError as error:
             json_response(self, 500, {"message": str(error)})
 
-    def _handle_aimxs_probe_route(self):
-        try:
-            parsed = urllib.parse.urlparse(self.path)
-            route = parsed.path
-            if self.command == "POST" and route == f"{aimxs_probe_prefix}/evaluate":
-                payload = read_json_body(self)
-                json_response(self, 200, evaluate_aimxs_probe(payload))
-                return
-            json_response(self, 404, {"message": "Unknown AIMXS probe route."})
-        except ValueError as error:
-            json_response(self, 400, {"message": str(error)})
-        except RuntimeError as error:
-            json_response(self, 500, {"message": str(error)})
-
     def _proxy_request(self):
         url = urllib.parse.urljoin(runtime_proxy_base, self.path)
         length = int(self.headers.get("Content-Length") or 0)
@@ -1711,9 +1591,6 @@ class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
         if self._is_aimxs_route():
             self._handle_aimxs_route()
             return
-        if self._is_aimxs_probe_route():
-            self._handle_aimxs_probe_route()
-            return
         if self._should_proxy():
             self._proxy_request()
             return
@@ -1725,9 +1602,6 @@ class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
             return
         if self._is_aimxs_route():
             self._handle_aimxs_route()
-            return
-        if self._is_aimxs_probe_route():
-            self._handle_aimxs_probe_route()
             return
         if self._should_proxy():
             self._proxy_request()

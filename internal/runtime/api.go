@@ -109,6 +109,7 @@ func (s *APIServer) Routes() http.Handler {
 	mux.HandleFunc("/v1alpha2/runtime/approvals/", s.handleApprovalCheckpointByIDV1Alpha2)
 	mux.HandleFunc("/v1alpha2/runtime/worker-capabilities", s.handleWorkerCapabilitiesV1Alpha2)
 	mux.HandleFunc("/v1alpha2/runtime/policy-packs", s.handlePolicyPacksV1Alpha2)
+	mux.HandleFunc("/v1alpha2/runtime/identity", s.handleRuntimeIdentityV1Alpha2)
 	mux.HandleFunc("/v1alpha2/runtime/export-profiles", s.handleExportProfilesV1Alpha2)
 	mux.HandleFunc("/v1alpha2/runtime/org-admin-profiles", s.handleOrgAdminProfilesV1Alpha2)
 	return loggingMiddleware(mux)
@@ -1378,6 +1379,12 @@ func (s *APIServer) handlePostIntegrationInvoke(w http.ResponseWriter, r *http.R
 			"systemPrompt":    strings.TrimSpace(req.SystemPrompt),
 			"maxOutputTokens": req.MaxOutputTokens,
 			"executionMode":   invokeDescriptor.executionMode,
+			"governanceContext": func() interface{} {
+				if len(req.GovernanceContext) == 0 {
+					return nil
+				}
+				return req.GovernanceContext
+			}(),
 		}),
 		CreatedAt: invokeStartedAt,
 		UpdatedAt: invokeStartedAt,
@@ -2219,31 +2226,37 @@ func injectActorIdentity(meta *ObjectMeta, ctx context.Context) {
 	if meta.Actor == nil {
 		meta.Actor = JSONObject{}
 	}
-	if _, exists := meta.Actor["subject"]; !exists {
-		meta.Actor["subject"] = identity.Subject
+	mergeActorIdentityFields(meta.Actor, identity)
+}
+
+func mergeActorIdentityFields(actor JSONObject, identity *RuntimeIdentity) {
+	if actor == nil || identity == nil {
+		return
+	}
+	if _, exists := actor["subject"]; !exists {
+		actor["subject"] = identity.Subject
 	}
 	if identity.ClientID != "" {
-		if _, exists := meta.Actor["clientId"]; !exists {
-			meta.Actor["clientId"] = identity.ClientID
+		if _, exists := actor["clientId"]; !exists {
+			actor["clientId"] = identity.ClientID
 		}
 	}
 	if len(identity.Roles) > 0 {
-		if _, exists := meta.Actor["roles"]; !exists {
-			roles := append([]string(nil), identity.Roles...)
-			meta.Actor["roles"] = roles
+		if _, exists := actor["roles"]; !exists {
+			actor["roles"] = append([]string(nil), identity.Roles...)
 		}
 	}
-	if _, exists := meta.Actor["authn"]; !exists {
-		meta.Actor["authn"] = "oidc-jwt"
+	if _, exists := actor["authn"]; !exists {
+		actor["authn"] = "oidc-jwt"
 	}
 	if len(identity.TenantIDs) > 0 {
-		if _, exists := meta.Actor["tenantScopes"]; !exists {
-			meta.Actor["tenantScopes"] = append([]string(nil), identity.TenantIDs...)
+		if _, exists := actor["tenantScopes"]; !exists {
+			actor["tenantScopes"] = append([]string(nil), identity.TenantIDs...)
 		}
 	}
 	if len(identity.ProjectIDs) > 0 {
-		if _, exists := meta.Actor["projectScopes"]; !exists {
-			meta.Actor["projectScopes"] = append([]string(nil), identity.ProjectIDs...)
+		if _, exists := actor["projectScopes"]; !exists {
+			actor["projectScopes"] = append([]string(nil), identity.ProjectIDs...)
 		}
 	}
 }

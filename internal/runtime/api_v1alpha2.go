@@ -101,6 +101,90 @@ func (s *APIServer) handleListPolicyPacksV1Alpha2(w http.ResponseWriter, r *http
 	})
 }
 
+func (s *APIServer) handleRuntimeIdentityV1Alpha2(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeAPIError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "method not allowed", false, nil)
+		return
+	}
+	ctx, ok := s.authorizeRequest(w, r, PermissionRunRead)
+	if !ok {
+		return
+	}
+	identity, _ := RuntimeIdentityFromContext(ctx)
+	writeJSON(w, http.StatusOK, runtimeIdentityResponse(identity, s.auth))
+}
+
+func runtimeIdentityResponse(identity *RuntimeIdentity, auth *AuthEnforcer) RuntimeIdentityResponse {
+	authEnabled := auth != nil && auth.Enabled()
+	effectivePermissions := []string{}
+	if authEnabled && identity != nil {
+		for _, permission := range []string{PermissionRunRead, PermissionRunCreate} {
+			if auth.identityHasPermission(identity, permission) {
+				effectivePermissions = append(effectivePermissions, permission)
+			}
+		}
+	} else if !authEnabled {
+		effectivePermissions = []string{PermissionRunCreate, PermissionRunRead}
+	}
+	claimKeys := []string{}
+	if identity != nil && len(identity.Claims) > 0 {
+		for key := range identity.Claims {
+			if strings.TrimSpace(key) != "" {
+				claimKeys = append(claimKeys, key)
+			}
+		}
+		sort.Strings(claimKeys)
+	}
+	authorityBasis := "runtime_auth_disabled"
+	source := "runtime.auth.disabled"
+	authenticated := false
+	if identity != nil {
+		authenticated = true
+		if authEnabled {
+			authorityBasis = "bearer_token_jwt"
+			source = "runtime.auth.context"
+		} else {
+			authorityBasis = "runtime_context_identity"
+			source = "runtime.context"
+		}
+	} else if authEnabled {
+		authorityBasis = "authenticated_identity_missing"
+		source = "runtime.auth.context"
+	}
+	response := RuntimeIdentityResponse{
+		GeneratedAt:          time.Now().UTC(),
+		Source:               source,
+		AuthEnabled:          authEnabled,
+		Authenticated:        authenticated,
+		AuthorityBasis:       authorityBasis,
+		PolicyMatrixRequired: auth != nil && auth.cfg.RequirePolicyMatrix,
+		PolicyRuleCount: func() int {
+			if auth == nil {
+				return 0
+			}
+			return len(auth.policyRules)
+		}(),
+		Identity: RuntimeIdentitySummary{
+			EffectivePermissions: effectivePermissions,
+			ClaimKeys:            claimKeys,
+		},
+	}
+	if auth != nil {
+		response.RoleClaim = auth.cfg.RoleClaim
+		response.ClientIDClaim = auth.cfg.ClientIDClaim
+		response.TenantClaim = auth.cfg.TenantClaim
+		response.ProjectClaim = auth.cfg.ProjectClaim
+	}
+	if identity != nil {
+		response.Identity.Subject = identity.Subject
+		response.Identity.ClientID = identity.ClientID
+		response.Identity.Roles = append([]string(nil), identity.Roles...)
+		response.Identity.TenantIDs = append([]string(nil), identity.TenantIDs...)
+		response.Identity.ProjectIDs = append([]string(nil), identity.ProjectIDs...)
+	}
+	return response
+}
+
 func (s *APIServer) handleExportProfilesV1Alpha2(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeAPIError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "method not allowed", false, nil)
@@ -1819,7 +1903,7 @@ func (s *APIServer) executeApprovedToolProposalAction(ctx context.Context, sessi
 	}
 	toolType := resolveToolProposalType(proposal, action)
 	if strings.EqualFold(toolType, governedActionProposalType) {
-		return s.executeApprovedGovernedActionProposal(ctx, session, proposal, action, decidedAt)
+		return s.executeGovernedActionProposal(ctx, session, proposal, action, decidedAt, "APPROVE", "")
 	}
 	if !strings.EqualFold(toolType, "terminal_command") {
 		return ToolActionStatusAuthorized
@@ -2088,22 +2172,33 @@ func (s *APIServer) executeApprovedToolProposalAction(ctx context.Context, sessi
 	return finalStatus
 }
 
-func (s *APIServer) executeApprovedGovernedActionProposal(ctx context.Context, session *SessionRecord, proposal *sessionToolProposal, action *ToolActionRecord, decidedAt time.Time) ToolActionStatus {
+func (s *APIServer) executeGovernedActionProposal(ctx context.Context, session *SessionRecord, proposal *sessionToolProposal, action *ToolActionRecord, decidedAt time.Time, operatorDecision, operatorReason string) ToolActionStatus {
 	if s == nil || s.store == nil || session == nil || proposal == nil || action == nil {
 		return ToolActionStatusAuthorized
 	}
+	operatorDecision = strings.ToUpper(strings.TrimSpace(operatorDecision))
+	if operatorDecision == "" {
+		operatorDecision = "APPROVE"
+	}
+	autoRouted := operatorDecision == "AUTO"
 	startedAt := time.Now().UTC()
-	runReq, normalizedProposal, err := buildRunCreateRequestFromGovernedActionProposal(session, proposal, startedAt)
+	identity, _ := RuntimeIdentityFromContext(ctx)
+	runReq, normalizedProposal, err := buildRunCreateRequestFromGovernedActionProposal(session, proposal, startedAt, identity)
 	if err != nil {
 		failedAt := time.Now().UTC()
 		action.Status = ToolActionStatusFailed
 		action.UpdatedAt = failedAt
-		action.ResultPayload = mustMarshalJSON(map[string]interface{}{
-			"decision":   "APPROVE",
+		resultPayload := map[string]interface{}{
+			"decision":   operatorDecision,
 			"reviewedAt": decidedAt.Format(time.RFC3339),
 			"failedAt":   failedAt.Format(time.RFC3339),
 			"error":      err.Error(),
-		})
+			"reviewMode": map[bool]string{true: "policy_first_auto", false: "operator_review"}[autoRouted],
+		}
+		if strings.TrimSpace(operatorReason) != "" {
+			resultPayload["reason"] = strings.TrimSpace(operatorReason)
+		}
+		action.ResultPayload = mustMarshalJSON(resultPayload)
 		s.upsertToolActionBestEffort(ctx, action)
 		s.appendSessionEventBestEffort(ctx, &SessionEventRecord{
 			SessionID: session.SessionID,
@@ -2115,7 +2210,7 @@ func (s *APIServer) executeApprovedGovernedActionProposal(ctx context.Context, s
 				"status":       ToolActionStatusFailed,
 				"proposalId":   proposal.ProposalID,
 				"error":        err.Error(),
-				"summary":      "Approved governed action proposal could not be converted into a runtime run request.",
+				"summary":      map[bool]string{true: "Auto-routed governed action proposal could not be converted into a runtime run request.", false: "Approved governed action proposal could not be converted into a runtime run request."}[autoRouted],
 			}),
 			Timestamp: failedAt,
 		})
@@ -2128,14 +2223,24 @@ func (s *APIServer) executeApprovedGovernedActionProposal(ctx context.Context, s
 	requestPayload := parseRawJSONObject(action.RequestPayload)
 	requestPayload["runRequest"] = runReq
 	requestPayload["proposal"] = normalizedProposal
+	requestPayload["reviewMode"] = map[bool]string{true: "policy_first_auto", false: "operator_review"}[autoRouted]
+	requestPayload["operatorApprovalRequired"] = governedActionProposalRequiresOperatorApproval(proposal)
+	if strings.TrimSpace(operatorReason) != "" {
+		requestPayload["reason"] = strings.TrimSpace(operatorReason)
+	}
 	action.RequestPayload = mustMarshalJSON(requestPayload)
 	action.Status = ToolActionStatusStarted
 	action.UpdatedAt = startedAt
-	action.ResultPayload = mustMarshalJSON(map[string]interface{}{
-		"decision":   "APPROVE",
+	startedPayload := map[string]interface{}{
+		"decision":   operatorDecision,
 		"reviewedAt": decidedAt.Format(time.RFC3339),
 		"startedAt":  startedAt.Format(time.RFC3339),
-	})
+		"reviewMode": map[bool]string{true: "policy_first_auto", false: "operator_review"}[autoRouted],
+	}
+	if strings.TrimSpace(operatorReason) != "" {
+		startedPayload["reason"] = strings.TrimSpace(operatorReason)
+	}
+	action.ResultPayload = mustMarshalJSON(startedPayload)
 	s.upsertToolActionBestEffort(ctx, action)
 	s.appendSessionEventBestEffort(ctx, &SessionEventRecord{
 		SessionID: session.SessionID,
@@ -2146,7 +2251,7 @@ func (s *APIServer) executeApprovedGovernedActionProposal(ctx context.Context, s
 			"toolType":     action.ToolType,
 			"status":       ToolActionStatusStarted,
 			"proposalId":   proposal.ProposalID,
-			"summary":      "Approved governed action proposal started runtime policy evaluation.",
+			"summary":      map[bool]string{true: "Governed action proposal auto-routed into runtime policy evaluation.", false: "Approved governed action proposal started runtime policy evaluation."}[autoRouted],
 		}),
 		Timestamp: startedAt,
 	})
@@ -2156,7 +2261,7 @@ func (s *APIServer) executeApprovedGovernedActionProposal(ctx context.Context, s
 		Payload: mustMarshalJSON(map[string]interface{}{
 			"workerId": proposal.WorkerID,
 			"status":   WorkerStatusRunning,
-			"summary":  "Approved governed action proposal is being evaluated through the runtime policy boundary.",
+			"summary":  map[bool]string{true: "Governed action proposal is being evaluated through the runtime policy boundary without a manual preclearance step.", false: "Approved governed action proposal is being evaluated through the runtime policy boundary."}[autoRouted],
 			"payload": map[string]interface{}{
 				"stage":        "governed_action_started",
 				"percent":      70,
@@ -2178,19 +2283,24 @@ func (s *APIServer) executeApprovedGovernedActionProposal(ctx context.Context, s
 	if err != nil {
 		action.Status = ToolActionStatusFailed
 		action.UpdatedAt = finishedAt
-		action.ResultPayload = mustMarshalJSON(map[string]interface{}{
-			"decision":   "APPROVE",
+		failedPayload := map[string]interface{}{
+			"decision":   operatorDecision,
 			"reviewedAt": decidedAt.Format(time.RFC3339),
 			"startedAt":  startedAt.Format(time.RFC3339),
 			"failedAt":   finishedAt.Format(time.RFC3339),
 			"error":      err.Error(),
+			"reviewMode": map[bool]string{true: "policy_first_auto", false: "operator_review"}[autoRouted],
 			"governedRun": func() interface{} {
 				if run == nil {
 					return nil
 				}
 				return buildGovernedActionRunSnapshot(run)
 			}(),
-		})
+		}
+		if strings.TrimSpace(operatorReason) != "" {
+			failedPayload["reason"] = strings.TrimSpace(operatorReason)
+		}
+		action.ResultPayload = mustMarshalJSON(failedPayload)
 		s.upsertToolActionBestEffort(ctx, action)
 		s.appendSessionEventBestEffort(ctx, &SessionEventRecord{
 			SessionID: session.SessionID,
@@ -2208,7 +2318,7 @@ func (s *APIServer) executeApprovedGovernedActionProposal(ctx context.Context, s
 					return ""
 				}(),
 				"error":   err.Error(),
-				"summary": "Approved governed action proposal failed during runtime evaluation.",
+				"summary": map[bool]string{true: "Auto-routed governed action proposal failed during runtime evaluation.", false: "Approved governed action proposal failed during runtime evaluation."}[autoRouted],
 			}),
 			Timestamp: finishedAt,
 		})
@@ -2246,14 +2356,19 @@ func (s *APIServer) executeApprovedGovernedActionProposal(ctx context.Context, s
 	action.PolicyDecision = strings.TrimSpace(run.PolicyDecision)
 	action.UpdatedAt = finishedAt
 	governedRun := buildGovernedActionRunSnapshot(run)
-	action.ResultPayload = mustMarshalJSON(map[string]interface{}{
-		"decision":    "APPROVE",
+	completedPayload := map[string]interface{}{
+		"decision":    operatorDecision,
 		"reviewedAt":  decidedAt.Format(time.RFC3339),
 		"startedAt":   startedAt.Format(time.RFC3339),
 		"completedAt": finishedAt.Format(time.RFC3339),
 		"status":      finalStatus,
+		"reviewMode":  map[bool]string{true: "policy_first_auto", false: "operator_review"}[autoRouted],
 		"governedRun": governedRun,
-	})
+	}
+	if strings.TrimSpace(operatorReason) != "" {
+		completedPayload["reason"] = strings.TrimSpace(operatorReason)
+	}
+	action.ResultPayload = mustMarshalJSON(completedPayload)
 	s.upsertToolActionBestEffort(ctx, action)
 	evidenceID := fmt.Sprintf("%s-governed-run-evidence", action.ToolActionID)
 	s.upsertEvidenceRecordBestEffort(ctx, &EvidenceRecord{
@@ -2331,6 +2446,122 @@ func (s *APIServer) executeApprovedGovernedActionProposal(ctx context.Context, s
 		s.transitionSessionAfterStandaloneToolAction(ctx, session, finalStatus, finishedAt, proposal, action.ToolActionID)
 	}
 	return finalStatus
+}
+
+func proposalStatusFromGovernedPolicyDecision(policyDecision string, actionStatus ToolActionStatus) string {
+	switch strings.ToUpper(strings.TrimSpace(policyDecision)) {
+	case "ALLOW":
+		return "CLEARED"
+	case "DEFER":
+		return "DEFERRED"
+	case "DENY":
+		return "DENIED"
+	}
+	if actionStatus == ToolActionStatusFailed {
+		return "FAILED"
+	}
+	return "RESOLVED"
+}
+
+func proposalReasonFromGovernedAction(action *ToolActionRecord) string {
+	if action == nil {
+		return ""
+	}
+	resultPayload := parseRawJSONObject(action.ResultPayload)
+	if reason := strings.TrimSpace(normalizedInterfaceString(resultPayload["reason"])); reason != "" {
+		return reason
+	}
+	governedRun := extractJSONObjectValue(resultPayload["governedRun"])
+	policyResponse := extractJSONObjectValue(governedRun["policyResponse"])
+	reasons, _ := policyResponse["reasons"].([]interface{})
+	for _, candidate := range reasons {
+		reasonObject := extractJSONObjectValue(candidate)
+		if message := strings.TrimSpace(normalizedInterfaceString(reasonObject["message"])); message != "" {
+			return message
+		}
+		if code := strings.TrimSpace(normalizedInterfaceString(reasonObject["code"])); code != "" {
+			return code
+		}
+	}
+	if message := strings.TrimSpace(normalizedInterfaceString(governedRun["errorMessage"])); message != "" {
+		return message
+	}
+	if message := strings.TrimSpace(normalizedInterfaceString(resultPayload["error"])); message != "" {
+		return message
+	}
+	return ""
+}
+
+func autoGovernedProposalSummary(policyDecision string) string {
+	switch strings.ToUpper(strings.TrimSpace(policyDecision)) {
+	case "ALLOW":
+		return "Governed action proposal auto-routed through policy and cleared for the next execution stage."
+	case "DEFER":
+		return "Governed action proposal auto-routed through policy and deferred pending additional governance state."
+	case "DENY":
+		return "Governed action proposal auto-routed through policy and blocked."
+	default:
+		return "Governed action proposal auto-routed through policy evaluation."
+	}
+}
+
+func (s *APIServer) autoExecuteGovernedActionProposal(ctx context.Context, session *SessionRecord, proposal *sessionToolProposal, decidedAt time.Time) {
+	if s == nil || s.store == nil || session == nil || proposal == nil {
+		return
+	}
+	toolActionID := fmt.Sprintf("%s-tool-proposal-%s", session.SessionID, sanitizeIDFragment(proposal.ProposalID))
+	action := &ToolActionRecord{
+		ToolActionID: toolActionID,
+		SessionID:    session.SessionID,
+		WorkerID:     proposal.WorkerID,
+		TenantID:     session.TenantID,
+		ProjectID:    session.ProjectID,
+		ToolType:     normalizeStringOrDefault(resolveToolProposalType(proposal, nil), governedActionProposalType),
+		Status:       ToolActionStatusAuthorized,
+		Source:       "v1alpha2.runtime.tool-proposal-auto-policy",
+		RequestPayload: mustMarshalJSON(map[string]interface{}{
+			"proposalId":               proposal.ProposalID,
+			"proposalType":             resolveToolProposalType(proposal, nil),
+			"summary":                  proposal.Summary,
+			"proposal":                 proposal.Payload,
+			"decision":                 "AUTO",
+			"reason":                   "policy-first auto evaluation",
+			"operatorApprovalRequired": false,
+			"reviewMode":               "policy_first_auto",
+		}),
+		ResultPayload: mustMarshalJSON(map[string]interface{}{
+			"decision":   "AUTO",
+			"reviewedAt": decidedAt.Format(time.RFC3339),
+			"reviewMode": "policy_first_auto",
+		}),
+		CreatedAt: decidedAt,
+		UpdatedAt: decidedAt,
+	}
+	actionStatus := s.executeGovernedActionProposal(ctx, session, proposal, action, decidedAt, "AUTO", "policy-first auto evaluation")
+	runID, runStatus, policyDecision, selectedPolicyProvider := extractGovernedRunSummaryFromToolAction(action)
+	reason := proposalReasonFromGovernedAction(action)
+	now := time.Now().UTC()
+	s.appendSessionEventBestEffort(ctx, &SessionEventRecord{
+		SessionID: session.SessionID,
+		EventType: SessionEventType("tool_proposal.decided"),
+		Payload: mustMarshalJSON(map[string]interface{}{
+			"proposalId":               proposal.ProposalID,
+			"proposalType":             proposal.ProposalType,
+			"workerId":                 proposal.WorkerID,
+			"decision":                 "AUTO",
+			"status":                   proposalStatusFromGovernedPolicyDecision(policyDecision, actionStatus),
+			"reason":                   reason,
+			"toolActionId":             toolActionID,
+			"actionStatus":             actionStatus,
+			"runId":                    runID,
+			"runStatus":                runStatus,
+			"policyDecision":           policyDecision,
+			"selectedPolicyProvider":   selectedPolicyProvider,
+			"operatorApprovalRequired": false,
+			"summary":                  autoGovernedProposalSummary(policyDecision),
+		}),
+		Timestamp: now,
+	})
 }
 
 func normalizeToolProposalTimeoutSeconds(value interface{}) int {

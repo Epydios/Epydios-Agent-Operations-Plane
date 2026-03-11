@@ -2,6 +2,8 @@ package runtime
 
 import (
 	"context"
+	"encoding/json"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -114,8 +116,60 @@ func TestBuildManagedCodexPromptAllowsGovernedMutationProposals(t *testing.T) {
 	if !strings.Contains(prompt, "`governed_action_request`") {
 		t.Fatalf("prompt missing governed action proposal guidance: %s", prompt)
 	}
-	if !strings.Contains(prompt, "paper-trade or finance requests") {
-		t.Fatalf("prompt missing finance governed-action guidance: %s", prompt)
+	if !strings.Contains(prompt, "low-risk allow-shaped finance requests") {
+		t.Fatalf("prompt missing allow-shaped finance guidance: %s", prompt)
+	}
+	if !strings.Contains(prompt, "compliance reports") {
+		t.Fatalf("prompt missing advisory/compliance governed guidance: %s", prompt)
+	}
+	if !strings.Contains(prompt, "high-risk defer-shaped finance requests") {
+		t.Fatalf("prompt missing defer-shaped finance guidance: %s", prompt)
+	}
+	if !strings.Contains(prompt, "clear deny-shaped requests") {
+		t.Fatalf("prompt missing deny-shaped finance guidance: %s", prompt)
+	}
+	if !strings.Contains(prompt, "environment") || !strings.Contains(prompt, "operatorApprovalRequired") {
+		t.Fatalf("prompt missing governed-action routing fields: %s", prompt)
+	}
+	if !strings.Contains(prompt, "return `null` instead of omitting the field") {
+		t.Fatalf("prompt missing null guidance: %s", prompt)
+	}
+}
+
+func TestBuildManagedCodexPromptIncludesDemoGovernanceOverlay(t *testing.T) {
+	prompt := buildManagedCodexPrompt(codexProcessRequest{
+		Prompt: "Prepare a compliance report request.",
+		GovernanceContext: JSONObject{
+			"persona": JSONObject{
+				"enabled":         true,
+				"subjectId":       "demo.operator",
+				"clientId":        "desktop-demo",
+				"roles":           []string{"compliance.viewer"},
+				"approvedForProd": false,
+			},
+			"policy": JSONObject{
+				"enabled":                  true,
+				"reviewMode":               "policy_first",
+				"handshakeRequired":        true,
+				"advisoryAutoShape":        true,
+				"financeSupervisorGrant":   true,
+				"financeEvidenceReadiness": "PARTIAL",
+				"productionDeleteDeny":     true,
+				"policyBucketPrefix":       "desktop-demo",
+			},
+		},
+	})
+	if !strings.Contains(prompt, "Active local demo governance overlay") {
+		t.Fatalf("prompt missing local demo governance overlay section: %s", prompt)
+	}
+	if !strings.Contains(prompt, "subjectId=\"demo.operator\"") {
+		t.Fatalf("prompt missing demo persona subject: %s", prompt)
+	}
+	if !strings.Contains(prompt, "operatorApprovalRequired=false") {
+		t.Fatalf("prompt missing policy-first review guidance: %s", prompt)
+	}
+	if !strings.Contains(prompt, "policy bucket prefix \"desktop-demo\"") {
+		t.Fatalf("prompt missing policy bucket prefix guidance: %s", prompt)
 	}
 }
 
@@ -159,9 +213,41 @@ func TestBuildManagedCodexContinuationPromptAllowsGovernedMutationProposals(t *t
 	if !strings.Contains(prompt, "return it as a governed `tool_proposals` terminal command") {
 		t.Fatalf("continuation prompt missing governed mutation guidance: %s", prompt)
 	}
-	if !strings.Contains(prompt, "If the next step is a real-world external action, return a `governed_action_request` proposal") {
+	if !strings.Contains(prompt, "If the next step is a real-world external action or a governed informational request") {
 		t.Fatalf("continuation prompt missing governed action continuation guidance: %s", prompt)
 	}
+	if !strings.Contains(prompt, "return `null` instead of omitting the field") {
+		t.Fatalf("continuation prompt missing null guidance: %s", prompt)
+	}
+}
+
+func TestWriteCodexOutputSchemaUsesFlatProposalItems(t *testing.T) {
+	path, err := writeCodexOutputSchema()
+	if err != nil {
+		t.Fatalf("writeCodexOutputSchema error: %v", err)
+	}
+	defer os.Remove(path)
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile error: %v", err)
+	}
+	text := string(body)
+	if strings.Contains(text, `"oneOf"`) {
+		t.Fatalf("schema should not contain oneOf: %s", text)
+	}
+	if !strings.Contains(text, `"governed_action_request"`) {
+		t.Fatalf("schema missing governed action type enum: %s", text)
+	}
+	var payload map[string]interface{}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		t.Fatalf("schema decode error: %v", err)
+	}
+	properties := payload["properties"].(map[string]interface{})
+	toolProposals := properties["tool_proposals"].(map[string]interface{})
+	items := toolProposals["items"].(map[string]interface{})
+	assertSchemaRequiresAllProperties(t, items)
+	financeOrder := items["properties"].(map[string]interface{})["financeOrder"].(map[string]interface{})
+	assertSchemaRequiresAllProperties(t, financeOrder)
 }
 
 func TestCodexManagedWorkerAdapterProcessModeParsesGovernedActionProposal(t *testing.T) {
@@ -176,7 +262,7 @@ func TestCodexManagedWorkerAdapterProcessModeParsesGovernedActionProposal(t *tes
 			return []byte(strings.Join([]string{
 				`{"type":"thread.started","thread_id":"thread-1"}`,
 				`{"type":"turn.started"}`,
-				`{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"{\"message\":\"I converted the operator request into a governed trade proposal.\",\"tool_proposals\":[{\"type\":\"governed_action_request\",\"summary\":\"BUY 25 AAPL in paper account paper-main\",\"confidence\":\"structured\",\"requestLabel\":\"Paper Trade Request: AAPL\",\"requestSummary\":\"BUY 25 AAPL in paper account paper-main\",\"demoProfile\":\"finance_paper_trade\",\"actionType\":\"trade.execute\",\"actionClass\":\"execute\",\"actionVerb\":\"execute\",\"actionTarget\":\"paper-broker-order\",\"resourceKind\":\"broker-order\",\"resourceNamespace\":\"epydios-system\",\"resourceName\":\"paper-order-aapl\",\"resourceId\":\"paper-order-aapl\",\"boundaryClass\":\"external_actuator\",\"riskTier\":\"high\",\"requiredGrants\":[\"grant.trading.supervisor\"],\"evidenceReadiness\":\"PARTIAL\",\"handshakeRequired\":true,\"workflowKind\":\"external_action_request\",\"financeOrder\":{\"symbol\":\"AAPL\",\"side\":\"buy\",\"quantity\":25,\"account\":\"paper-main\"}}]}"}}`,
+				`{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"{\"message\":\"I converted the operator request into a governed trade proposal.\",\"tool_proposals\":[{\"type\":\"governed_action_request\",\"summary\":\"BUY 25 AAPL in paper account paper-main\",\"confidence\":\"structured\",\"requestLabel\":\"Paper Trade Request: AAPL\",\"requestSummary\":\"BUY 25 AAPL in paper account paper-main\",\"demoProfile\":\"finance_paper_trade\",\"actionType\":\"trade.execute\",\"actionClass\":\"execute\",\"actionVerb\":\"execute\",\"actionTarget\":\"paper-broker-order\",\"resourceKind\":\"broker-order\",\"resourceNamespace\":\"epydios-system\",\"resourceName\":\"paper-order-aapl\",\"resourceId\":\"paper-order-aapl\",\"boundaryClass\":\"external_actuator\",\"riskTier\":\"high\",\"requiredGrants\":[\"grant.trading.supervisor\"],\"evidenceReadiness\":\"PARTIAL\",\"handshakeRequired\":true,\"environment\":\"dev\",\"operatorApprovalRequired\":false,\"workflowKind\":\"external_action_request\",\"financeOrder\":{\"symbol\":\"AAPL\",\"side\":\"buy\",\"quantity\":25,\"account\":\"paper-main\"}}]}"}}`,
 				`{"type":"turn.completed","usage":{"input_tokens":12,"output_tokens":34}}`,
 			}, "\n")), nil
 		},
@@ -208,6 +294,12 @@ func TestCodexManagedWorkerAdapterProcessModeParsesGovernedActionProposal(t *tes
 	if got := strings.TrimSpace(normalizedInterfaceString(proposal["riskTier"])); got != "high" {
 		t.Fatalf("riskTier=%q", got)
 	}
+	if got := strings.TrimSpace(normalizedInterfaceString(proposal["environment"])); got != "dev" {
+		t.Fatalf("environment=%q", got)
+	}
+	if got := normalizedInterfaceBool(proposal["operatorApprovalRequired"]); got {
+		t.Fatalf("operatorApprovalRequired=%t want false", got)
+	}
 	grants := normalizeGovernedActionStringSlice(proposal["requiredGrants"])
 	if len(grants) != 1 || grants[0] != "grant.trading.supervisor" {
 		t.Fatalf("requiredGrants=%v", grants)
@@ -218,6 +310,113 @@ func TestCodexManagedWorkerAdapterProcessModeParsesGovernedActionProposal(t *tes
 	}
 	if got := strings.TrimSpace(normalizedInterfaceString(financeOrder["symbol"])); got != "AAPL" {
 		t.Fatalf("finance symbol=%q", got)
+	}
+}
+
+func TestCodexManagedWorkerAdapterProcessModeParsesComplianceGovernedActionProposal(t *testing.T) {
+	adapter := codexManagedWorkerAdapter{
+		mode:        "process",
+		cliPath:     "codex",
+		homeDir:     "/tmp/codex-home",
+		workdir:     "/tmp",
+		sandboxMode: "read-only",
+		timeout:     15 * time.Second,
+		runProcess: func(_ context.Context, _ codexProcessRequest) ([]byte, error) {
+			return []byte(strings.Join([]string{
+				`{"type":"thread.started","thread_id":"thread-1"}`,
+				`{"type":"turn.started"}`,
+				`{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"{\"message\":\"I converted the operator request into a governed compliance report request.\",\"tool_proposals\":[{\"type\":\"governed_action_request\",\"summary\":\"Request a compliance conflict report for MSFT versus existing AAPL holdings.\",\"confidence\":\"structured\",\"requestLabel\":\"Compliance Conflict Report\",\"requestSummary\":\"Request a compliance report on whether holding MSFT creates a conflict if we already hold AAPL.\",\"demoProfile\":\"compliance_report\",\"workflowKind\":\"advisory_request\",\"actionType\":\"compliance.report.request\",\"actionClass\":\"read\",\"actionVerb\":\"request\",\"actionTarget\":\"compliance-review\",\"resourceKind\":\"compliance-report\",\"resourceNamespace\":\"epydios-system\",\"resourceName\":\"compliance-conflict-report\",\"resourceId\":\"compliance-conflict-report\",\"boundaryClass\":\"model_gateway\",\"riskTier\":\"low\",\"requiredGrants\":[],\"evidenceReadiness\":\"READY\",\"handshakeRequired\":true,\"environment\":\"dev\",\"operatorApprovalRequired\":false}]}"}}`,
+				`{"type":"turn.completed","usage":{"input_tokens":18,"output_tokens":40}}`,
+			}, "\n")), nil
+		},
+	}
+
+	result, err := adapter.RunTurn(context.Background(), AgentInvokeRequest{
+		Prompt:       "ask compliance for a conflict report about MSFT if we already hold AAPL",
+		SystemPrompt: "stay concise",
+	}, agentProfileConfig{
+		ID:    "codex",
+		Model: "gpt-5-codex",
+	}, nil, nil)
+	if err != nil {
+		t.Fatalf("RunTurn error: %v", err)
+	}
+	proposal := result.toolProposals[0]
+	if got := strings.TrimSpace(normalizedInterfaceString(proposal["demoProfile"])); got != governedActionDemoProfileCompliance {
+		t.Fatalf("demoProfile=%q want %q", got, governedActionDemoProfileCompliance)
+	}
+	if got := strings.TrimSpace(normalizedInterfaceString(proposal["workflowKind"])); got != governedActionWorkflowAdvisoryRequest {
+		t.Fatalf("workflowKind=%q want %q", got, governedActionWorkflowAdvisoryRequest)
+	}
+	if got := strings.TrimSpace(normalizedInterfaceString(proposal["actionType"])); got != "compliance.report.request" {
+		t.Fatalf("actionType=%q want compliance.report.request", got)
+	}
+	if got := strings.TrimSpace(normalizedInterfaceString(proposal["boundaryClass"])); got != "model_gateway" {
+		t.Fatalf("boundaryClass=%q want model_gateway", got)
+	}
+	if got := strings.TrimSpace(normalizedInterfaceString(proposal["riskTier"])); got != "low" {
+		t.Fatalf("riskTier=%q want low", got)
+	}
+}
+
+func TestCodexManagedWorkerAdapterProcessModeRejectsInvalidProposal(t *testing.T) {
+	adapter := codexManagedWorkerAdapter{
+		mode:        "process",
+		cliPath:     "codex",
+		homeDir:     "/tmp/codex-home",
+		workdir:     "/tmp",
+		sandboxMode: "read-only",
+		timeout:     15 * time.Second,
+		runProcess: func(_ context.Context, _ codexProcessRequest) ([]byte, error) {
+			return []byte(strings.Join([]string{
+				`{"type":"thread.started","thread_id":"thread-1"}`,
+				`{"type":"turn.started"}`,
+				`{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"{\"message\":\"I tried to return a malformed proposal.\",\"tool_proposals\":[{\"type\":\"terminal_command\",\"summary\":\"Missing command\",\"confidence\":\"structured\"}]}"}}`,
+				`{"type":"turn.completed","usage":{"input_tokens":12,"output_tokens":34}}`,
+			}, "\n")), nil
+		},
+	}
+
+	_, err := adapter.RunTurn(context.Background(), AgentInvokeRequest{
+		Prompt:       "return malformed governed proposal",
+		SystemPrompt: "stay concise",
+	}, agentProfileConfig{
+		ID:    "codex",
+		Model: "gpt-5-codex",
+	}, nil, nil)
+	if err == nil {
+		t.Fatal("RunTurn error should reject invalid proposal")
+	}
+	if !strings.Contains(err.Error(), "invalid proposal") {
+		t.Fatalf("RunTurn error=%v want invalid proposal", err)
+	}
+}
+
+func assertSchemaRequiresAllProperties(t *testing.T, schema map[string]interface{}) {
+	t.Helper()
+	properties, ok := schema["properties"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("schema missing properties: %#v", schema)
+	}
+	requiredValues, ok := schema["required"].([]interface{})
+	if !ok {
+		t.Fatalf("schema missing required array: %#v", schema)
+	}
+	required := make(map[string]struct{}, len(requiredValues))
+	for _, value := range requiredValues {
+		name, ok := value.(string)
+		if !ok {
+			t.Fatalf("required value has unexpected type: %#v", value)
+		}
+		required[strings.TrimSpace(name)] = struct{}{}
+	}
+	if len(required) != len(properties) {
+		t.Fatalf("required count=%d properties count=%d", len(required), len(properties))
+	}
+	for key := range properties {
+		if _, ok := required[key]; !ok {
+			t.Fatalf("required missing property %q", key)
+		}
 	}
 }
 

@@ -866,6 +866,16 @@ select.filter-input:disabled {
   align-content: start;
 }
 
+.agent-thread-state-card .policy-outcome-banner {
+  margin-top: var(--space-3);
+  border-width: 2px;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+}
+
+.agent-thread-state-card .policy-outcome-banner .title {
+  font-size: 1rem;
+}
+
 .agent-chat-composer .settings-agent-test-textarea {
   min-height: 7.5rem;
 }
@@ -1398,6 +1408,14 @@ select.filter-input:disabled {
   letter-spacing: 0.01em;
 }
 
+.settings-metric {
+  align-content: start;
+}
+
+.settings-metric .meta code {
+  overflow-wrap: anywhere;
+}
+
 .settings-subpanel-configuration .settings-editor-grid {
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 }
@@ -1470,6 +1488,18 @@ select.filter-input:disabled {
     grid-column: span 4;
   }
 
+  .settings-subpanel-configuration > .settings-metric-identity-authority {
+    grid-column: span 4;
+  }
+
+  .settings-subpanel-configuration > .settings-metric-policy-contract {
+    grid-column: span 4;
+  }
+
+  .settings-subpanel-configuration > .settings-metric-demo-governance {
+    grid-column: span 12;
+  }
+
   .settings-subpanel-configuration > .settings-metric-editor {
     grid-column: span 7;
   }
@@ -1507,11 +1537,19 @@ select.filter-input:disabled {
   }
 
   .settings-subpanel-diagnostics > .settings-metric-sync {
-    grid-column: span 8;
+    grid-column: span 4;
   }
 
   .settings-subpanel-diagnostics > .settings-metric-config-changes,
   .settings-subpanel-diagnostics > .settings-metric-provider-contracts {
+    grid-column: span 12;
+  }
+
+  .settings-subpanel-diagnostics > .settings-metric-runtime-identity {
+    grid-column: span 4;
+  }
+
+  .settings-subpanel-diagnostics > .settings-metric-policy-packs {
     grid-column: span 12;
   }
 
@@ -1520,7 +1558,7 @@ select.filter-input:disabled {
   }
 
   .settings-subpanel-diagnostics > .settings-metric-endpoints {
-    grid-column: span 8;
+    grid-column: span 12;
   }
 }
 
@@ -2203,6 +2241,87 @@ select.filter-input:disabled {
   gap: var(--space-2);
 }
 
+.history-review-layout {
+  display: grid;
+  gap: var(--space-3);
+  min-height: 0;
+}
+
+.history-runs-list,
+.history-run-detail {
+  min-height: 0;
+}
+
+.history-runs-list {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.run-row-submeta {
+  margin-top: var(--space-2);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-xs);
+}
+
+.policy-outcome-banner {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+  border-radius: var(--radius-2);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface) 94%, transparent), color-mix(in srgb, var(--panel) 82%, transparent)),
+    var(--surface-raised);
+  box-shadow: var(--shadow-1), var(--shadow-inset);
+}
+
+.policy-outcome-banner.is-allow {
+  border-color: color-mix(in srgb, var(--ok) 34%, var(--line));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--ok) 9%, transparent), transparent 86%),
+    color-mix(in srgb, var(--surface) 92%, var(--panel));
+}
+
+.policy-outcome-banner.is-defer {
+  border-color: color-mix(in srgb, var(--warn) 38%, var(--line));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--warn) 10%, transparent), transparent 86%),
+    color-mix(in srgb, var(--surface) 92%, var(--panel));
+}
+
+.policy-outcome-banner.is-deny,
+.policy-outcome-banner.is-error {
+  border-color: color-mix(in srgb, var(--danger) 36%, var(--line));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--danger) 10%, transparent), transparent 86%),
+    color-mix(in srgb, var(--surface) 92%, var(--panel));
+}
+
+.policy-outcome-banner .title {
+  margin: 0;
+}
+
+.policy-outcome-detail {
+  font-size: var(--font-size-sm);
+  color: var(--ink-soft);
+}
+
+.policy-outcome-banner.is-allow .policy-outcome-detail {
+  color: color-mix(in srgb, var(--ok) 78%, var(--ink));
+}
+
+.policy-outcome-banner.is-defer .policy-outcome-detail {
+  color: color-mix(in srgb, var(--warn) 82%, var(--ink));
+}
+
+.policy-outcome-banner.is-deny .policy-outcome-detail,
+.policy-outcome-banner.is-error .policy-outcome-detail {
+  color: color-mix(in srgb, var(--danger) 82%, var(--ink));
+}
+
 .footer {
   width: min(var(--max-content-width), calc(100% - (2 * var(--shell-gutter))));
   margin: 0 auto var(--space-5);
@@ -2232,6 +2351,26 @@ select.filter-input:disabled {
 
   .table-meta-row {
     gap: var(--space-1);
+  }
+}
+
+@media (min-width: 1160px) {
+  .history-review-layout {
+    grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+    align-items: start;
+  }
+
+  .history-runs-list,
+  .history-run-detail {
+    max-height: calc(100vh - 9.5rem);
+    overflow: auto;
+    padding-right: var(--space-1);
+  }
+
+  .history-run-detail {
+    position: sticky;
+    top: 6.8rem;
+    align-self: start;
   }
 }
 

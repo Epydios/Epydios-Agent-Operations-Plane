@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { renderApprovals, renderApprovalsDetail, renderApprovalReviewModal } from "../views/approvals.js";
-import { renderRunDetail } from "../views/runs.js";
+import { renderRunDetail, renderRuns } from "../views/runs.js";
 
 test("approvals rail includes current thread decisions in the pending approvals section", () => {
   const ui = {
@@ -50,7 +50,7 @@ test("approvals rail includes current thread decisions in the pending approvals 
   assert.match(ui.approvalsContent.innerHTML, /Hide Review/);
 });
 
-test("approval side panel renders a pinned summary with popup affordance", () => {
+test("approval side panel renders a pinned summary without popup-oriented copy", () => {
   const ui = { approvalsDetailContent: { innerHTML: "", dataset: {} } };
   renderApprovalsDetail(ui, {
     runId: "run-20260309-001",
@@ -65,7 +65,8 @@ test("approval side panel renders a pinned summary with popup affordance", () =>
   });
 
   assert.match(ui.approvalsDetailContent.innerHTML, /Pinned Approval Review/);
-  assert.match(ui.approvalsDetailContent.innerHTML, /Open Review Popup/);
+  assert.match(ui.approvalsDetailContent.innerHTML, /Open Run Detail/);
+  assert.doesNotMatch(ui.approvalsDetailContent.innerHTML, /popup/i);
   assert.match(ui.approvalsDetailContent.innerHTML, /capabilities=2/);
   assert.doesNotMatch(ui.approvalsDetailContent.innerHTML, />Approve<\/button>/);
 });
@@ -165,13 +166,31 @@ test("run detail surfaces governed-action policy richness from the stored provid
       createdAt: "2026-03-10T08:00:00Z",
       updatedAt: "2026-03-10T08:00:05Z",
       requestPayload: {
+        meta: {
+          actor: {
+            subject: "user-123",
+            clientId: "desktop-ui",
+            authn: "oidc-jwt",
+            authorityBasis: "runtime_identity"
+          }
+        },
         context: {
+          actor_authority: {
+            authority_basis: "runtime_identity",
+            authn: "oidc-jwt",
+            subject: "user-123",
+            client_id: "desktop-ui",
+            roles: ["compliance.viewer", "runtime.run.create"],
+            tenant_scopes: ["tenant-demo"],
+            project_scopes: ["project-trading"]
+          },
           governed_action: {
             contract_id: "epydios.governed-action.v1",
             workflow_kind: "external_action_request",
             request_label: "Paper Trade Request: AAPL",
             demo_profile: "finance_paper_trade",
             request_summary: "BUY 25 AAPL in paper account paper-main",
+            operator_approval_required: false,
             finance_order: {
               symbol: "AAPL",
               side: "buy",
@@ -246,8 +265,19 @@ test("run detail surfaces governed-action policy richness from the stored provid
   );
 
   assert.match(ui.runDetailContent.innerHTML, /2\. Policy Richness/);
+  assert.match(ui.runDetailContent.innerHTML, /Operator Gate vs Policy Gate/);
+  assert.match(ui.runDetailContent.innerHTML, /operatorGate=policy-first/);
+  assert.match(ui.runDetailContent.innerHTML, /chip chip-warn chip-compact">effect=execution deferred/);
+  assert.match(ui.runDetailContent.innerHTML, /chip chip-warn chip-compact">decision=DEFER/);
+  assert.match(ui.runDetailContent.innerHTML, /effect=execution deferred/);
+  assert.match(ui.runDetailContent.innerHTML, /deferred the request\./);
   assert.match(ui.runDetailContent.innerHTML, /Paper Trade Request: AAPL/);
   assert.match(ui.runDetailContent.innerHTML, /finance_paper_trade/);
+  assert.match(ui.runDetailContent.innerHTML, /Operator Approval Required/);
+  assert.match(ui.runDetailContent.innerHTML, /Actor Subject/);
+  assert.match(ui.runDetailContent.innerHTML, /user-123/);
+  assert.match(ui.runDetailContent.innerHTML, /Authority Roles/);
+  assert.match(ui.runDetailContent.innerHTML, /compliance.viewer/);
   assert.match(ui.runDetailContent.innerHTML, /governance_provider/);
   assert.match(ui.runDetailContent.innerHTML, /Adapter Status/);
   assert.match(ui.runDetailContent.innerHTML, /CORE24_BASE_ADAPTER_MISSING/);
@@ -260,4 +290,73 @@ test("run detail surfaces governed-action policy richness from the stored provid
   assert.match(ui.runDetailContent.innerHTML, /Policy Stratification Present/);
   assert.match(ui.runDetailContent.innerHTML, /Request Contract Echo Present/);
   assert.match(ui.runDetailContent.innerHTML, /sha256-demo-evidence/);
+});
+
+test("history run list surfaces color-coded policy effects", () => {
+  const ui = {
+    runsContent: { innerHTML: "" },
+    runDetailContent: { innerHTML: "", dataset: {} },
+    runsPage: { value: "1" },
+    runsPageSize: { value: "25" }
+  };
+  const store = {
+    setRunItems() {}
+  };
+
+  renderRuns(
+    ui,
+    store,
+    {
+      items: [
+        {
+          runId: "run-allow-001",
+          tenantId: "tenant-demo",
+          projectId: "project-trading",
+          status: "COMPLETED",
+          policyDecision: "ALLOW",
+          selectedPolicyProvider: "oss-policy-opa",
+          createdAt: "2026-03-10T10:00:00Z",
+          updatedAt: "2026-03-10T10:00:05Z"
+        },
+        {
+          runId: "run-defer-001",
+          tenantId: "tenant-demo",
+          projectId: "project-trading",
+          status: "POLICY_EVALUATED",
+          policyDecision: "DEFER",
+          selectedPolicyProvider: "aimxs-full",
+          createdAt: "2026-03-10T10:05:00Z",
+          updatedAt: "2026-03-10T10:05:05Z"
+        },
+        {
+          runId: "run-deny-001",
+          tenantId: "tenant-demo",
+          projectId: "project-trading",
+          status: "FAILED",
+          policyDecision: "DENY",
+          selectedPolicyProvider: "aimxs-full",
+          createdAt: "2026-03-10T10:10:00Z",
+          updatedAt: "2026-03-10T10:10:05Z"
+        }
+      ]
+    },
+    {
+      runId: "",
+      tenant: "",
+      project: "",
+      status: "",
+      decision: "",
+      sortBy: "updated_desc",
+      limit: 25,
+      timeRange: "",
+      timeFrom: "",
+      timeTo: "",
+      pageSize: 25,
+      page: 1
+    }
+  );
+
+  assert.match(ui.runsContent.innerHTML, /chip chip-ok chip-compact">effect=policy cleared/);
+  assert.match(ui.runsContent.innerHTML, /chip chip-warn chip-compact">effect=execution deferred/);
+  assert.match(ui.runsContent.innerHTML, /chip chip-danger chip-compact">effect=policy blocked/);
 });
