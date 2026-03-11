@@ -13,13 +13,13 @@ function selectedAttr(current, value) {
 
 function chipClassForSessionStatus(value) {
   const status = String(value || "").trim().toUpperCase();
-  if (status === "COMPLETED" || status === "READY" || status === "SUCCESS") {
+  if (status === "COMPLETED" || status === "READY" || status === "SUCCESS" || status === "CLEARED") {
     return "chip chip-ok chip-compact";
   }
-  if (status === "RUNNING" || status === "AWAITING_APPROVAL" || status === "AWAITING_WORKER" || status === "WARN") {
+  if (status === "RUNNING" || status === "AWAITING_APPROVAL" || status === "AWAITING_WORKER" || status === "WARN" || status === "DEFERRED") {
     return "chip chip-warn chip-compact";
   }
-  if (status === "FAILED" || status === "BLOCKED" || status === "CANCELLED" || status === "ERROR" || status === "INVALID") {
+  if (status === "FAILED" || status === "BLOCKED" || status === "CANCELLED" || status === "ERROR" || status === "INVALID" || status === "DENIED") {
     return "chip chip-danger chip-compact";
   }
   return "chip chip-neutral chip-compact";
@@ -51,6 +51,10 @@ function chipClassForPolicyDecision(value) {
     return "chip chip-danger chip-compact";
   }
   return "chip chip-neutral chip-compact";
+}
+
+function chipClassForPolicyEffect(outcome = {}) {
+  return chipClassForPolicyDecision(outcome?.decision);
 }
 
 function isTerminalThreadStatus(value) {
@@ -106,6 +110,80 @@ function renderGovernedRunLink(runId) {
   `;
 }
 
+function derivePolicyOutcomePresentation(decisionValue, providerValue, reasonValue) {
+  const decision = normalizedString(decisionValue).toUpperCase();
+  const provider = normalizedString(providerValue);
+  const reason = normalizedString(reasonValue);
+  if (decision === "ALLOW") {
+    return {
+      decision,
+      provider,
+      effectLabel: "policy cleared",
+      bannerClass: "policy-outcome-banner is-allow",
+      headline: `${provider || "Policy provider"} cleared the request.`,
+      detail: reason || "This request passed policy evaluation and is ready for the next execution stage."
+    };
+  }
+  if (decision === "DEFER") {
+    return {
+      decision,
+      provider,
+      effectLabel: "execution deferred",
+      bannerClass: "policy-outcome-banner is-defer",
+      headline: `${provider || "Policy provider"} deferred the request.`,
+      detail: reason || "The request is deferred pending additional grants, evidence, or other governance readiness."
+    };
+  }
+  if (decision === "DENY") {
+    return {
+      decision,
+      provider,
+      effectLabel: "policy blocked",
+      bannerClass: "policy-outcome-banner is-deny",
+      headline: `${provider || "Policy provider"} blocked the request.`,
+      detail: reason || "The request failed policy evaluation and should not proceed."
+    };
+  }
+  return {
+    decision,
+    provider,
+    effectLabel: "policy pending",
+    bannerClass: "policy-outcome-banner",
+    headline: "The provider outcome is still pending.",
+    detail: reason || "Review the linked run detail before treating this request as cleared."
+  };
+}
+
+function latestPolicyOutcomeFromTurns(turns = []) {
+  const turnList = Array.isArray(turns) ? turns : [];
+  for (let turnIndex = turnList.length - 1; turnIndex >= 0; turnIndex -= 1) {
+    const sessionView = turnList[turnIndex]?.sessionView;
+    const proposals = listNativeToolProposals(sessionView);
+    for (let proposalIndex = proposals.length - 1; proposalIndex >= 0; proposalIndex -= 1) {
+      const proposal = proposals[proposalIndex];
+      const decision = normalizedString(proposal?.policyDecision).toUpperCase();
+      if (!decision) {
+        continue;
+      }
+      const provider = normalizedString(proposal?.selectedPolicyProvider);
+      const runId = normalizedString(proposal?.runId);
+      const requestLabel = normalizedString(
+        proposal?.requestLabel,
+        normalizedString(objectValue(proposal?.payload)?.requestLabel, normalizedString(proposal?.summary, "Governed Action Request"))
+      );
+      const outcome = derivePolicyOutcomePresentation(decision, provider, normalizedString(proposal?.reason));
+      return {
+        decision,
+        provider,
+        runId,
+        requestLabel,
+        outcome
+      };
+    }
+  }
+  return null;
+}
+
 function renderGovernedProposalSummary(item = {}, options = {}) {
   const payload = objectValue(item?.payload);
   const financeOrder = objectValue(item?.financeOrder && Object.keys(item.financeOrder || {}).length ? item.financeOrder : payload.financeOrder);
@@ -117,6 +195,7 @@ function renderGovernedProposalSummary(item = {}, options = {}) {
   const runStatus = normalizedString(item?.runStatus, normalizedString(runSnapshot?.status));
   const policyDecision = normalizedString(item?.policyDecision, normalizedString(runSnapshot?.policyDecision)).toUpperCase();
   const selectedPolicyProvider = normalizedString(item?.selectedPolicyProvider, normalizedString(runSnapshot?.selectedPolicyProvider));
+  const policyOutcome = derivePolicyOutcomePresentation(policyDecision, selectedPolicyProvider, "");
   const showResult = options.showResult !== false;
 
   return `
@@ -143,6 +222,7 @@ function renderGovernedProposalSummary(item = {}, options = {}) {
               ${runId ? `<span class="chip chip-neutral chip-compact">run=${escapeHTML(runId)}</span>` : ""}
               ${runStatus ? `<span class="${chipClassForSessionStatus(runStatus)}">${escapeHTML(runStatus)}</span>` : ""}
               ${selectedPolicyProvider ? `<span class="chip chip-neutral chip-compact">provider=${escapeHTML(selectedPolicyProvider)}</span>` : ""}
+              ${policyDecision ? `<span class="${chipClassForPolicyEffect(policyOutcome)}">effect=${escapeHTML(policyOutcome.effectLabel)}</span>` : ""}
             </div>
             ${renderGovernedRunLink(runId)}
           `
@@ -153,6 +233,7 @@ function renderGovernedProposalSummary(item = {}, options = {}) {
 }
 
 function renderGovernedActionResultSummary(item = {}) {
+  const requestPayload = objectValue(item?.requestPayload);
   const resultPayload = objectValue(item?.resultPayload);
   const governedRun = objectValue(resultPayload?.governedRun);
   if (!Object.keys(governedRun).length) {
@@ -165,11 +246,26 @@ function renderGovernedActionResultSummary(item = {}) {
   const runStatus = normalizedString(governedRun?.status);
   const policyDecision = normalizedString(governedRun?.policyDecision).toUpperCase();
   const provider = normalizedString(governedRun?.selectedPolicyProvider);
+  const reviewMode = normalizedString(resultPayload?.reviewMode, normalizedString(requestPayload?.reviewMode));
+  const operatorApprovalRequired =
+    requestPayload?.operatorApprovalRequired === true
+    || reviewMode === "operator_review";
+  const operatorGateLabel = operatorApprovalRequired ? "manual review" : "policy-first";
+  const outcome = derivePolicyOutcomePresentation(policyDecision, provider, firstReason?.message);
   return `
     <div class="chat-governed-proposal">
       <div class="metric-title-row">
         <div class="title">Governed Run Result</div>
         ${policyDecision ? `<span class="${chipClassForPolicyDecision(policyDecision)}">${escapeHTML(policyDecision)}</span>` : ""}
+      </div>
+      <div class="${escapeHTML(outcome.bannerClass)}">
+        <div class="run-detail-chips">
+          <span class="chip chip-neutral chip-compact">operatorGate=${escapeHTML(operatorGateLabel)}</span>
+          <span class="chip chip-neutral chip-compact">provider=${escapeHTML(outcome.provider || "-")}</span>
+          <span class="${chipClassForPolicyEffect(outcome)}">effect=${escapeHTML(outcome.effectLabel)}</span>
+        </div>
+        <div class="policy-outcome-detail">${escapeHTML(outcome.headline)}</div>
+        <div class="meta">${escapeHTML(outcome.detail)}</div>
       </div>
       <div class="run-detail-chips">
         ${runId ? `<span class="chip chip-neutral chip-compact">run=${escapeHTML(runId)}</span>` : ""}
@@ -177,7 +273,6 @@ function renderGovernedActionResultSummary(item = {}) {
         ${provider ? `<span class="chip chip-neutral chip-compact">provider=${escapeHTML(provider)}</span>` : ""}
         ${governedRun?.policyGrantTokenPresent ? `<span class="chip chip-ok chip-compact">grantToken=true</span>` : ""}
       </div>
-      ${firstReason?.message ? `<div class="meta">${escapeHTML(String(firstReason.message))}</div>` : ""}
       ${renderGovernedRunLink(runId)}
     </div>
   `;
@@ -413,7 +508,9 @@ function renderToolProposals(items = []) {
           const pending = status === "PENDING";
           const governed = isGovernedActionProposal(item);
           const proposalDetailKey = detailKey("chat", "tool_proposal", sessionId || "unknown", proposalId || "unknown");
-          const resolutionMeta = `${escapeHTML(item?.reviewedAt ? `reviewed=${formatTime(item.reviewedAt)}` : "proposal resolved")}${item?.reason ? `; reason=${escapeHTML(String(item.reason))}` : ""}`;
+          const resolutionMeta = item?.decision === "AUTO"
+            ? `${escapeHTML(item?.reviewedAt ? `policyEvaluated=${formatTime(item.reviewedAt)}` : "policy evaluated")}${item?.reason ? `; reason=${escapeHTML(String(item.reason))}` : ""}`
+            : `${escapeHTML(item?.reviewedAt ? `reviewed=${formatTime(item.reviewedAt)}` : "proposal resolved")}${item?.reason ? `; reason=${escapeHTML(String(item.reason))}` : ""}`;
           return `
             <details class="details-shell chat-review-details" data-detail-key="${escapeHTML(proposalDetailKey)}" open data-chat-tool-proposal-row data-chat-session-id="${escapeHTML(sessionId)}" data-chat-proposal-id="${escapeHTML(proposalId)}">
               <summary>${escapeHTML(proposalId || "-")} · ${escapeHTML(String(item?.proposalType || "-"))} · ${escapeHTML(status)}</summary>
@@ -525,9 +622,9 @@ function renderTurnActionInbox(approvalItems = [], proposalItems = []) {
       const sessionId = String(item?.sessionId || "").trim();
       const proposalId = String(item?.proposalId || "").trim();
       const governed = isGovernedActionProposal(item);
-      const proposalLabel = governed
-        ? normalizedString(item?.requestLabel, "Governed Action Request")
-        : "Tool Proposal";
+          const proposalLabel = governed
+            ? normalizedString(item?.requestLabel, "Governed Action Request")
+            : "Tool Proposal";
       const proposalSummary = governed
         ? normalizedString(item?.requestSummary, normalizedString(item?.summary, "No governed request summary captured."))
         : normalizedString(item?.summary, "No proposal summary captured.");
@@ -537,7 +634,7 @@ function renderTurnActionInbox(approvalItems = [], proposalItems = []) {
             <div class="title">${escapeHTML(proposalLabel)}</div>
             <span class="${chipClassForSessionStatus(item?.status || "PENDING")}">${escapeHTML(String(item?.status || "PENDING").trim().toUpperCase())}</span>
           </div>
-          <div class="meta">proposal=${escapeHTML(proposalId || "-")}; type=${escapeHTML(String(item?.proposalType || "-"))}</div>
+          <div class="meta">proposal=${escapeHTML(proposalId || "-")}; type=${escapeHTML(String(item?.proposalType || "-"))}; manualReview=${escapeHTML(String(item?.operatorApprovalRequired === true))}</div>
           <div class="meta">${escapeHTML(proposalSummary)}</div>
           <div class="chat-approval-action-group">
             <input
@@ -1104,7 +1201,7 @@ export function renderChat(ui, settingsPayload = {}, chatState = {}) {
   const startAction = taskId && threadState?.isResolvedThread ? "start-followup-thread" : "start-thread";
   const startLabel = taskId && threadState?.isResolvedThread ? "New Follow-up Thread" : "Start Thread";
   const sendLabel = taskId && threadState?.isResolvedThread ? "Reopen and Send" : "Send Message";
-  const executionMode = String(chatState.executionMode || thread?.executionMode || "raw_model_invoke").trim().toLowerCase();
+  const executionMode = String(chatState.executionMode || thread?.executionMode || "managed_codex_worker").trim().toLowerCase();
   const selectedWorker = latestTurn?.sessionView?.timeline?.selectedWorker || {};
   const catalogState = chatState?.catalogs && typeof chatState.catalogs === "object" ? chatState.catalogs : {};
   const governedExportSelection = resolveChatGovernedExportSelection(chatState?.exportSelection || {}, catalogState?.exportProfiles || null);
@@ -1119,6 +1216,7 @@ export function renderChat(ui, settingsPayload = {}, chatState = {}) {
   const historyCount = Number(history?.count ?? 0) || 0;
   const archivedCount = Number(history?.archivedCount ?? 0) || 0;
   const historySummary = String(history?.message || "Use Thread History to reopen or archive prior work without burying the current chat.").trim();
+  const latestPolicyOutcome = latestPolicyOutcomeFromTurns(turns);
   const focusSummary = buildAgentFocusSummary({
     taskId,
     threadState,
@@ -1230,6 +1328,26 @@ export function renderChat(ui, settingsPayload = {}, chatState = {}) {
             <span class="chip chip-neutral chip-compact">workerStatus=${escapeHTML(String(threadState?.latestWorkerStatus || "-"))}</span>
             <span class="chip chip-neutral chip-compact">approvals=${escapeHTML(String(threadState?.openApprovalCount ?? 0))}</span>
           </div>
+          ${
+            latestPolicyOutcome
+              ? `
+                <div class="${escapeHTML(latestPolicyOutcome.outcome.bannerClass)}">
+                  <div class="metric-title-row">
+                    <div class="title">Latest Policy Outcome</div>
+                    <span class="${chipClassForPolicyDecision(latestPolicyOutcome.decision)}">${escapeHTML(latestPolicyOutcome.decision)}</span>
+                  </div>
+                  <div class="run-detail-chips">
+                    <span class="chip chip-neutral chip-compact">provider=${escapeHTML(latestPolicyOutcome.provider || "-")}</span>
+                    <span class="${chipClassForPolicyEffect(latestPolicyOutcome.outcome)}">effect=${escapeHTML(latestPolicyOutcome.outcome.effectLabel)}</span>
+                    <span class="chip chip-neutral chip-compact">request=${escapeHTML(latestPolicyOutcome.requestLabel || "-")}</span>
+                  </div>
+                  <div class="policy-outcome-detail">${escapeHTML(latestPolicyOutcome.outcome.headline)}</div>
+                  <div class="meta">${escapeHTML(latestPolicyOutcome.outcome.detail)}</div>
+                  ${renderGovernedRunLink(latestPolicyOutcome.runId)}
+                </div>
+              `
+              : `<div class="meta">Latest Policy Outcome: no governed policy result has been recorded on this thread yet.</div>`
+          }
           <div class="run-detail-chips">
             <span class="chip chip-neutral chip-compact">workerType=${escapeHTML(String(latestActivity?.selectedWorkerType || selectedWorker?.workerType || "-"))}</span>
             <span class="chip chip-neutral chip-compact">workerAdapter=${escapeHTML(String(latestActivity?.selectedWorkerAdapterId || selectedWorker?.adapterId || "-"))}</span>

@@ -8,55 +8,59 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 )
 
 type codexProcessRequest struct {
-	CLIPath      string
-	HomeDir      string
-	Prompt       string
-	SystemPrompt string
-	Model        string
-	Workdir      string
-	SandboxMode  string
-	Timeout      time.Duration
-	Boundary     *managedWorkerProviderBoundary
+	CLIPath           string
+	HomeDir           string
+	Prompt            string
+	SystemPrompt      string
+	Model             string
+	Workdir           string
+	SandboxMode       string
+	Timeout           time.Duration
+	Boundary          *managedWorkerProviderBoundary
+	GovernanceContext JSONObject
 }
 
 type codexStructuredProposal struct {
-	Type              string   `json:"type"`
-	Summary           string   `json:"summary"`
-	Command           string   `json:"command"`
-	Stdin             string   `json:"stdin"`
-	CWD               string   `json:"cwd"`
-	TimeoutSeconds    int      `json:"timeoutSeconds"`
-	ReadOnlyRequested bool     `json:"readOnlyRequested"`
-	Confidence        string   `json:"confidence"`
-	RequestLabel      string   `json:"requestLabel,omitempty"`
-	RequestSummary    string   `json:"requestSummary,omitempty"`
-	DemoProfile       string   `json:"demoProfile,omitempty"`
-	SubjectType       string   `json:"subjectType,omitempty"`
-	SubjectID         string   `json:"subjectId,omitempty"`
-	ApprovedForProd   bool     `json:"approvedForProd,omitempty"`
-	ActionType        string   `json:"actionType,omitempty"`
-	ActionClass       string   `json:"actionClass,omitempty"`
-	ActionVerb        string   `json:"actionVerb,omitempty"`
-	ActionTarget      string   `json:"actionTarget,omitempty"`
-	ResourceKind      string   `json:"resourceKind,omitempty"`
-	ResourceNamespace string   `json:"resourceNamespace,omitempty"`
-	ResourceName      string   `json:"resourceName,omitempty"`
-	ResourceID        string   `json:"resourceId,omitempty"`
-	BoundaryClass     string   `json:"boundaryClass,omitempty"`
-	RiskTier          string   `json:"riskTier,omitempty"`
-	RequiredGrants    []string `json:"requiredGrants,omitempty"`
-	EvidenceReadiness string   `json:"evidenceReadiness,omitempty"`
-	HandshakeRequired bool     `json:"handshakeRequired,omitempty"`
-	DryRun            bool     `json:"dryRun,omitempty"`
-	PolicyBucketID    string   `json:"policyBucketId,omitempty"`
-	WorkflowKind      string   `json:"workflowKind,omitempty"`
-	FinanceOrder      *struct {
+	Type                     string   `json:"type"`
+	Summary                  string   `json:"summary"`
+	Command                  string   `json:"command"`
+	Stdin                    string   `json:"stdin"`
+	CWD                      string   `json:"cwd"`
+	TimeoutSeconds           int      `json:"timeoutSeconds"`
+	ReadOnlyRequested        bool     `json:"readOnlyRequested"`
+	Confidence               string   `json:"confidence"`
+	RequestLabel             string   `json:"requestLabel,omitempty"`
+	RequestSummary           string   `json:"requestSummary,omitempty"`
+	DemoProfile              string   `json:"demoProfile,omitempty"`
+	SubjectType              string   `json:"subjectType,omitempty"`
+	SubjectID                string   `json:"subjectId,omitempty"`
+	ApprovedForProd          bool     `json:"approvedForProd,omitempty"`
+	Environment              string   `json:"environment,omitempty"`
+	ActionType               string   `json:"actionType,omitempty"`
+	ActionClass              string   `json:"actionClass,omitempty"`
+	ActionVerb               string   `json:"actionVerb,omitempty"`
+	ActionTarget             string   `json:"actionTarget,omitempty"`
+	ResourceKind             string   `json:"resourceKind,omitempty"`
+	ResourceNamespace        string   `json:"resourceNamespace,omitempty"`
+	ResourceName             string   `json:"resourceName,omitempty"`
+	ResourceID               string   `json:"resourceId,omitempty"`
+	BoundaryClass            string   `json:"boundaryClass,omitempty"`
+	RiskTier                 string   `json:"riskTier,omitempty"`
+	RequiredGrants           []string `json:"requiredGrants,omitempty"`
+	EvidenceReadiness        string   `json:"evidenceReadiness,omitempty"`
+	HandshakeRequired        bool     `json:"handshakeRequired,omitempty"`
+	OperatorApprovalRequired bool     `json:"operatorApprovalRequired,omitempty"`
+	DryRun                   bool     `json:"dryRun,omitempty"`
+	PolicyBucketID           string   `json:"policyBucketId,omitempty"`
+	WorkflowKind             string   `json:"workflowKind,omitempty"`
+	FinanceOrder             *struct {
 		Symbol   string `json:"symbol,omitempty"`
 		Side     string `json:"side,omitempty"`
 		Quantity int    `json:"quantity,omitempty"`
@@ -100,15 +104,16 @@ func (a codexManagedWorkerAdapter) runCodexProcessTurn(ctx context.Context, req 
 		}
 	}
 	processReq := codexProcessRequest{
-		CLIPath:      strings.TrimSpace(a.cliPath),
-		HomeDir:      strings.TrimSpace(a.homeDir),
-		Prompt:       strings.TrimSpace(req.Prompt),
-		SystemPrompt: strings.TrimSpace(req.SystemPrompt),
-		Model:        strings.TrimSpace(profile.Model),
-		Workdir:      workdir,
-		SandboxMode:  strings.TrimSpace(a.sandboxMode),
-		Timeout:      a.timeout,
-		Boundary:     boundary,
+		CLIPath:           strings.TrimSpace(a.cliPath),
+		HomeDir:           strings.TrimSpace(a.homeDir),
+		Prompt:            strings.TrimSpace(req.Prompt),
+		SystemPrompt:      strings.TrimSpace(req.SystemPrompt),
+		Model:             strings.TrimSpace(profile.Model),
+		Workdir:           workdir,
+		SandboxMode:       strings.TrimSpace(a.sandboxMode),
+		Timeout:           a.timeout,
+		Boundary:          boundary,
+		GovernanceContext: req.GovernanceContext,
 	}
 	run := a.runProcess
 	if run == nil {
@@ -283,6 +288,58 @@ func writeCodexOutputSchema() (string, error) {
 		return "", err
 	}
 	defer file.Close()
+	financeOrderProperties := map[string]interface{}{
+		"symbol":   codexSchemaNullableType("string"),
+		"side":     codexSchemaNullableType("string"),
+		"quantity": codexSchemaNullableType("integer"),
+		"account":  codexSchemaNullableType("string"),
+	}
+	toolProposalProperties := map[string]interface{}{
+		"type": map[string]interface{}{
+			"type": "string",
+			"enum": []string{"terminal_command", governedActionProposalType},
+		},
+		"summary":           map[string]interface{}{"type": "string"},
+		"command":           codexSchemaNullableType("string"),
+		"stdin":             codexSchemaNullableType("string"),
+		"cwd":               codexSchemaNullableType("string"),
+		"timeoutSeconds":    codexSchemaNullableType("integer"),
+		"readOnlyRequested": codexSchemaNullableType("boolean"),
+		"confidence":        map[string]interface{}{"type": "string"},
+		"requestLabel":      codexSchemaNullableType("string"),
+		"requestSummary":    codexSchemaNullableType("string"),
+		"demoProfile":       codexSchemaNullableType("string"),
+		"subjectType":       codexSchemaNullableType("string"),
+		"subjectId":         codexSchemaNullableType("string"),
+		"approvedForProd":   codexSchemaNullableType("boolean"),
+		"environment":       codexSchemaNullableType("string"),
+		"actionType":        codexSchemaNullableType("string"),
+		"actionClass":       codexSchemaNullableType("string"),
+		"actionVerb":        codexSchemaNullableType("string"),
+		"actionTarget":      codexSchemaNullableType("string"),
+		"resourceKind":      codexSchemaNullableType("string"),
+		"resourceNamespace": codexSchemaNullableType("string"),
+		"resourceName":      codexSchemaNullableType("string"),
+		"resourceId":        codexSchemaNullableType("string"),
+		"boundaryClass":     codexSchemaNullableType("string"),
+		"riskTier":          codexSchemaNullableType("string"),
+		"requiredGrants": map[string]interface{}{
+			"type":  []string{"array", "null"},
+			"items": map[string]interface{}{"type": "string"},
+		},
+		"evidenceReadiness":        codexSchemaNullableType("string"),
+		"handshakeRequired":        codexSchemaNullableType("boolean"),
+		"operatorApprovalRequired": codexSchemaNullableType("boolean"),
+		"dryRun":                   codexSchemaNullableType("boolean"),
+		"policyBucketId":           codexSchemaNullableType("string"),
+		"workflowKind":             codexSchemaNullableType("string"),
+		"financeOrder": map[string]interface{}{
+			"type":                 []string{"object", "null"},
+			"properties":           financeOrderProperties,
+			"required":             codexSchemaRequiredKeys(financeOrderProperties),
+			"additionalProperties": false,
+		},
+	}
 	schema := map[string]interface{}{
 		"type": "object",
 		"properties": map[string]interface{}{
@@ -290,68 +347,10 @@ func writeCodexOutputSchema() (string, error) {
 			"tool_proposals": map[string]interface{}{
 				"type": "array",
 				"items": map[string]interface{}{
-					"oneOf": []map[string]interface{}{
-						{
-							"type": "object",
-							"properties": map[string]interface{}{
-								"type":              map[string]interface{}{"const": "terminal_command"},
-								"summary":           map[string]interface{}{"type": "string"},
-								"command":           map[string]interface{}{"type": "string"},
-								"stdin":             map[string]interface{}{"type": "string"},
-								"cwd":               map[string]interface{}{"type": "string"},
-								"timeoutSeconds":    map[string]interface{}{"type": "integer"},
-								"readOnlyRequested": map[string]interface{}{"type": "boolean"},
-								"confidence":        map[string]interface{}{"type": "string"},
-							},
-							"required":             []string{"type", "summary", "command", "stdin", "cwd", "timeoutSeconds", "readOnlyRequested", "confidence"},
-							"additionalProperties": false,
-						},
-						{
-							"type": "object",
-							"properties": map[string]interface{}{
-								"type":              map[string]interface{}{"const": governedActionProposalType},
-								"summary":           map[string]interface{}{"type": "string"},
-								"confidence":        map[string]interface{}{"type": "string"},
-								"requestLabel":      map[string]interface{}{"type": "string"},
-								"requestSummary":    map[string]interface{}{"type": "string"},
-								"demoProfile":       map[string]interface{}{"type": "string"},
-								"subjectType":       map[string]interface{}{"type": "string"},
-								"subjectId":         map[string]interface{}{"type": "string"},
-								"approvedForProd":   map[string]interface{}{"type": "boolean"},
-								"actionType":        map[string]interface{}{"type": "string"},
-								"actionClass":       map[string]interface{}{"type": "string"},
-								"actionVerb":        map[string]interface{}{"type": "string"},
-								"actionTarget":      map[string]interface{}{"type": "string"},
-								"resourceKind":      map[string]interface{}{"type": "string"},
-								"resourceNamespace": map[string]interface{}{"type": "string"},
-								"resourceName":      map[string]interface{}{"type": "string"},
-								"resourceId":        map[string]interface{}{"type": "string"},
-								"boundaryClass":     map[string]interface{}{"type": "string"},
-								"riskTier":          map[string]interface{}{"type": "string"},
-								"requiredGrants": map[string]interface{}{
-									"type":  "array",
-									"items": map[string]interface{}{"type": "string"},
-								},
-								"evidenceReadiness": map[string]interface{}{"type": "string"},
-								"handshakeRequired": map[string]interface{}{"type": "boolean"},
-								"dryRun":            map[string]interface{}{"type": "boolean"},
-								"policyBucketId":    map[string]interface{}{"type": "string"},
-								"workflowKind":      map[string]interface{}{"type": "string"},
-								"financeOrder": map[string]interface{}{
-									"type": "object",
-									"properties": map[string]interface{}{
-										"symbol":   map[string]interface{}{"type": "string"},
-										"side":     map[string]interface{}{"type": "string"},
-										"quantity": map[string]interface{}{"type": "integer"},
-										"account":  map[string]interface{}{"type": "string"},
-									},
-									"additionalProperties": false,
-								},
-							},
-							"required":             []string{"type", "summary", "confidence", "requestLabel", "requestSummary", "actionType", "actionTarget", "resourceKind", "resourceName", "riskTier", "requiredGrants", "evidenceReadiness"},
-							"additionalProperties": false,
-						},
-					},
+					"type":                 "object",
+					"properties":           toolProposalProperties,
+					"required":             codexSchemaRequiredKeys(toolProposalProperties),
+					"additionalProperties": false,
 				},
 			},
 		},
@@ -368,6 +367,21 @@ func writeCodexOutputSchema() (string, error) {
 	return file.Name(), nil
 }
 
+func codexSchemaNullableType(baseType string) map[string]interface{} {
+	return map[string]interface{}{
+		"type": []string{baseType, "null"},
+	}
+}
+
+func codexSchemaRequiredKeys(properties map[string]interface{}) []string {
+	keys := make([]string, 0, len(properties))
+	for key := range properties {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
 func buildManagedCodexPrompt(req codexProcessRequest) string {
 	sections := make([]string, 0, 3)
 	if strings.TrimSpace(req.SystemPrompt) != "" {
@@ -376,12 +390,15 @@ func buildManagedCodexPrompt(req codexProcessRequest) string {
 	sections = append(sections, strings.Join([]string{
 		"You are the managed Codex worker running under AgentOps.",
 		"Return final operator-facing text in the `message` field.",
-		"Use `tool_proposals` for governed actions that should be reviewed before execution.",
+		"Use `tool_proposals` for governed actions that should be evaluated through the runtime policy boundary before execution.",
 		"Two governed proposal types are allowed: `terminal_command` and `governed_action_request`.",
 		"Never execute mutating or environment-changing commands directly.",
-		"If the operator request describes a real-world external action, API actuation, broker action, robot action, browser action, or other governed execution target, return a `governed_action_request` proposal instead of a shell command.",
-		"For paper-trade or finance requests, prefer `governed_action_request` with `demoProfile=finance_paper_trade`, `actionType=trade.execute`, `boundaryClass=external_actuator`, `riskTier=high`, `requiredGrants=[\"grant.trading.supervisor\"]`, `evidenceReadiness=PARTIAL`, and `handshakeRequired=true`.",
-		"Populate `governed_action_request` with requestLabel, requestSummary, actionType, actionClass, actionVerb, actionTarget, resourceKind, resourceNamespace, resourceName, resourceId, boundaryClass, riskTier, requiredGrants, evidenceReadiness, handshakeRequired, and financeOrder when relevant.",
+		"If the operator request describes a real-world external action, API actuation, broker action, robot action, browser action, compliance review request, eligibility report request, or other governed target, return a `governed_action_request` proposal instead of a shell command.",
+		"For benign informational governance requests such as compliance reports, conflict checks, eligibility reviews, or advisory asks, use `demoProfile=compliance_report`, `workflowKind=advisory_request`, `actionType=compliance.report.request`, `actionClass=read`, `actionVerb=request`, `actionTarget=compliance-review`, `resourceKind=compliance-report`, `boundaryClass=model_gateway`, `riskTier=low`, `requiredGrants=[]`, `evidenceReadiness=READY`, `handshakeRequired=true`, and `operatorApprovalRequired=false` unless the operator explicitly asks for manual preclearance.",
+		"For low-risk allow-shaped finance requests, use `demoProfile=finance_paper_trade`, `environment=dev`, `actionType=trade.execute`, `boundaryClass=external_actuator`, `riskTier=low`, `requiredGrants=[]`, `evidenceReadiness=READY`, `handshakeRequired=true`, and `operatorApprovalRequired=false` unless the operator explicitly asks for manual preclearance.",
+		"For high-risk defer-shaped finance requests, use `demoProfile=finance_paper_trade`, `environment=dev`, `actionType=trade.execute`, `boundaryClass=external_actuator`, `riskTier=high`, `requiredGrants=[\"grant.trading.supervisor\"]`, `evidenceReadiness=PARTIAL`, `handshakeRequired=true`, and `operatorApprovalRequired=false` unless the operator explicitly asks for manual preclearance.",
+		"For clear deny-shaped requests, use standard request fields instead of hidden test markers. Prefer destructive verbs like `delete` plus `environment=prod` and `approvedForProd=false` when the operator intent is an unapproved production-destructive action.",
+		"Populate `governed_action_request` with requestLabel, requestSummary, actionType, actionClass, actionVerb, actionTarget, resourceKind, resourceNamespace, resourceName, resourceId, boundaryClass, riskTier, requiredGrants, evidenceReadiness, handshakeRequired, environment, workflowKind, operatorApprovalRequired, and financeOrder when relevant.",
 		"If the operator request requires creating or modifying a file, express that work as a governed `tool_proposals` terminal command using `command` = `tee <target>` and `stdin` = the exact file contents.",
 		"If the operator request requires deleting a file, express that work as a governed `tool_proposals` terminal command using `command` = `rm <target>`.",
 		"If the operator request requires reading a file, prefer `command` = `cat <target>` with `readOnlyRequested=true`.",
@@ -389,12 +406,60 @@ func buildManagedCodexPrompt(req codexProcessRequest) string {
 		"Do not use shell redirection, pipes, heredocs, interpreter wrappers, or shell control operators in governed terminal proposals.",
 		"Do not answer with only a sandbox refusal when the request can be satisfied by returning a governed proposal.",
 		"Each `terminal_command` proposal must include command, stdin, cwd, timeoutSeconds, readOnlyRequested, and confidence.",
-		"Each `governed_action_request` proposal must include requestLabel, requestSummary, actionType, actionTarget, resourceKind, resourceName, riskTier, requiredGrants, evidenceReadiness, and confidence.",
+		"Each `governed_action_request` proposal must include requestLabel, requestSummary, actionType, actionTarget, resourceKind, resourceName, riskTier, requiredGrants, evidenceReadiness, environment, operatorApprovalRequired, and confidence.",
+		"For fields that do not apply to the chosen proposal type, return `null` instead of omitting the field.",
 		"If a command does not need input content, set `stdin` to the empty string.",
 		"If no tool proposal is needed, return an empty `tool_proposals` array.",
 	}, "\n"))
+	if governanceOverlay := buildManagedCodexGovernanceOverlaySection(req); governanceOverlay != "" {
+		sections = append(sections, governanceOverlay)
+	}
 	sections = append(sections, "Operator request:\n"+strings.TrimSpace(req.Prompt))
 	return strings.Join(sections, "\n\n")
+}
+
+func buildManagedCodexGovernanceOverlaySection(req codexProcessRequest) string {
+	governance := req.GovernanceContext
+	if len(governance) == 0 {
+		return ""
+	}
+	lines := []string{
+		"Active local demo governance overlay:",
+		"This overlay comes from Desktop Settings and is system-owned local demo configuration, not operator prompt text.",
+	}
+	persona := extractJSONObjectValue(governance["persona"])
+	if normalizedInterfaceBool(persona["enabled"]) {
+		lines = append(lines,
+			fmt.Sprintf("Use demo persona subjectId=%q when shaping governed requests.", normalizedInterfaceString(persona["subjectId"])),
+			fmt.Sprintf("Use demo persona clientId=%q as local authority context.", normalizedInterfaceString(persona["clientId"])),
+			fmt.Sprintf("Use demo persona roles=%v as local authority context.", normalizeGovernedActionStringSlice(persona["roles"])),
+			fmt.Sprintf("Use demo persona approvedForProd=%t unless the operator explicitly asks for a different governed posture.", normalizedInterfaceBool(persona["approvedForProd"])),
+		)
+	}
+	policy := extractJSONObjectValue(governance["policy"])
+	if normalizedInterfaceBool(policy["enabled"]) {
+		reviewMode := normalizeStringOrDefault(normalizedInterfaceString(policy["reviewMode"]), "policy_first")
+		lines = append(lines,
+			fmt.Sprintf("Set operatorApprovalRequired=%t by default because local demo reviewMode=%s.", reviewMode == "manual_review", reviewMode),
+			fmt.Sprintf("Set handshakeRequired=%t by default because the local demo policy overlay requires it.", !payloadHasExplicitFalse(policy["handshakeRequired"])),
+		)
+		if normalizedInterfaceBool(policy["advisoryAutoShape"]) {
+			lines = append(lines, "Benign advisory or compliance asks should be modeled as compliance.report.request advisory_request proposals instead of execution actions.")
+		}
+		if normalizedInterfaceBool(policy["financeSupervisorGrant"]) {
+			lines = append(lines, fmt.Sprintf("High-risk finance paper trades should require grant.trading.supervisor and evidenceReadiness=%s.", normalizeGovernedActionEvidenceReadiness(normalizedInterfaceString(policy["financeEvidenceReadiness"]))))
+		}
+		if normalizedInterfaceBool(policy["productionDeleteDeny"]) {
+			lines = append(lines, "Production-destructive requests should stay deny-shaped: use environment=prod, destructive verbs like delete, and approvedForProd=false.")
+		}
+		if prefix := strings.TrimSpace(normalizedInterfaceString(policy["policyBucketPrefix"])); prefix != "" {
+			lines = append(lines, fmt.Sprintf("Use policy bucket prefix %q for governed demo requests when you need a policyBucketId.", prefix))
+		}
+	}
+	if len(lines) == 2 {
+		return ""
+	}
+	return strings.Join(lines, "\n")
 }
 
 func buildManagedCodexContinuationPrompt(req managedWorkerContinuationRequest) string {
@@ -408,12 +473,13 @@ func buildManagedCodexContinuationPrompt(req managedWorkerContinuationRequest) s
 		"Return final operator-facing text in the `message` field.",
 		"Use `tool_proposals` only if another governed tool step is strictly required.",
 		"Never execute mutating or environment-changing commands directly.",
-		"If the next step is a real-world external action, return a `governed_action_request` proposal instead of a shell command.",
+		"If the next step is a real-world external action or a governed informational request such as a compliance report or advisory review, return a `governed_action_request` proposal instead of a shell command.",
 		"If another file creation or modification step is required, return it as a governed `tool_proposals` terminal command using `command` = `tee <target>` and `stdin` = the exact file contents.",
 		"If another file deletion step is required, return it as a governed `tool_proposals` terminal command using `command` = `rm <target>`.",
 		"If another file read step is required, prefer `command` = `cat <target>` with `readOnlyRequested=true`.",
 		"Each `terminal_command` proposal must include `stdin`; use the empty string when the command does not need input content.",
-		"Each `governed_action_request` proposal must include requestLabel, requestSummary, actionType, actionTarget, resourceKind, resourceName, riskTier, requiredGrants, evidenceReadiness, and confidence.",
+		"Each `governed_action_request` proposal must include requestLabel, requestSummary, actionType, actionTarget, resourceKind, resourceName, riskTier, requiredGrants, evidenceReadiness, environment, operatorApprovalRequired, and confidence.",
+		"For fields that do not apply to the chosen proposal type, return `null` instead of omitting the field.",
 		"Do not use shell redirection, pipes, heredocs, interpreter wrappers, or shell control operators in governed terminal proposals.",
 	}, "\n"))
 	if req.Task != nil && strings.TrimSpace(req.Task.Intent) != "" {
@@ -596,6 +662,9 @@ func parseCodexProcessTranscript(transcript []byte) (*managedWorkerTurnResult, e
 	toolProposals := make([]JSONObject, 0, len(structured.ToolProposals))
 	for idx, proposal := range structured.ToolProposals {
 		proposal = normalizeCodexStructuredProposal(proposal)
+		if err := validateCodexStructuredProposal(proposal); err != nil {
+			return nil, fmt.Errorf("codex worker emitted invalid proposal %d: %w", idx+1, err)
+		}
 		proposalID := fmt.Sprintf("codex-proposal-%d", idx+1)
 		proposalPayload := JSONObject{
 			"proposalId": proposalID,
@@ -644,31 +713,33 @@ func normalizeCodexStructuredProposal(proposal codexStructuredProposal) codexStr
 
 func normalizeCodexGovernedActionProposal(proposal codexStructuredProposal) codexStructuredProposal {
 	normalized := normalizeGovernedActionProposalPayload(JSONObject{
-		"type":              governedActionProposalType,
-		"summary":           proposal.Summary,
-		"confidence":        proposal.Confidence,
-		"requestLabel":      proposal.RequestLabel,
-		"requestSummary":    proposal.RequestSummary,
-		"demoProfile":       proposal.DemoProfile,
-		"subjectType":       proposal.SubjectType,
-		"subjectId":         proposal.SubjectID,
-		"approvedForProd":   proposal.ApprovedForProd,
-		"actionType":        proposal.ActionType,
-		"actionClass":       proposal.ActionClass,
-		"actionVerb":        proposal.ActionVerb,
-		"actionTarget":      proposal.ActionTarget,
-		"resourceKind":      proposal.ResourceKind,
-		"resourceNamespace": proposal.ResourceNamespace,
-		"resourceName":      proposal.ResourceName,
-		"resourceId":        proposal.ResourceID,
-		"boundaryClass":     proposal.BoundaryClass,
-		"riskTier":          proposal.RiskTier,
-		"requiredGrants":    proposal.RequiredGrants,
-		"evidenceReadiness": proposal.EvidenceReadiness,
-		"handshakeRequired": proposal.HandshakeRequired,
-		"dryRun":            proposal.DryRun,
-		"policyBucketId":    proposal.PolicyBucketID,
-		"workflowKind":      proposal.WorkflowKind,
+		"type":                     governedActionProposalType,
+		"summary":                  proposal.Summary,
+		"confidence":               proposal.Confidence,
+		"requestLabel":             proposal.RequestLabel,
+		"requestSummary":           proposal.RequestSummary,
+		"demoProfile":              proposal.DemoProfile,
+		"subjectType":              proposal.SubjectType,
+		"subjectId":                proposal.SubjectID,
+		"approvedForProd":          proposal.ApprovedForProd,
+		"environment":              proposal.Environment,
+		"actionType":               proposal.ActionType,
+		"actionClass":              proposal.ActionClass,
+		"actionVerb":               proposal.ActionVerb,
+		"actionTarget":             proposal.ActionTarget,
+		"resourceKind":             proposal.ResourceKind,
+		"resourceNamespace":        proposal.ResourceNamespace,
+		"resourceName":             proposal.ResourceName,
+		"resourceId":               proposal.ResourceID,
+		"boundaryClass":            proposal.BoundaryClass,
+		"riskTier":                 proposal.RiskTier,
+		"requiredGrants":           proposal.RequiredGrants,
+		"evidenceReadiness":        proposal.EvidenceReadiness,
+		"handshakeRequired":        proposal.HandshakeRequired,
+		"operatorApprovalRequired": proposal.OperatorApprovalRequired,
+		"dryRun":                   proposal.DryRun,
+		"policyBucketId":           proposal.PolicyBucketID,
+		"workflowKind":             proposal.WorkflowKind,
 		"financeOrder": func() JSONObject {
 			if proposal.FinanceOrder == nil {
 				return nil
@@ -690,6 +761,7 @@ func normalizeCodexGovernedActionProposal(proposal codexStructuredProposal) code
 	proposal.SubjectType = normalizedInterfaceString(normalized["subjectType"])
 	proposal.SubjectID = normalizedInterfaceString(normalized["subjectId"])
 	proposal.ApprovedForProd = normalizedInterfaceBool(normalized["approvedForProd"])
+	proposal.Environment = normalizedInterfaceString(normalized["environment"])
 	proposal.ActionType = normalizedInterfaceString(normalized["actionType"])
 	proposal.ActionClass = normalizedInterfaceString(normalized["actionClass"])
 	proposal.ActionVerb = normalizedInterfaceString(normalized["actionVerb"])
@@ -703,6 +775,7 @@ func normalizeCodexGovernedActionProposal(proposal codexStructuredProposal) code
 	proposal.RequiredGrants = normalizeGovernedActionStringSlice(normalized["requiredGrants"])
 	proposal.EvidenceReadiness = normalizedInterfaceString(normalized["evidenceReadiness"])
 	proposal.HandshakeRequired = normalizedInterfaceBool(normalized["handshakeRequired"])
+	proposal.OperatorApprovalRequired = normalizedInterfaceBool(normalized["operatorApprovalRequired"])
 	proposal.DryRun = normalizedInterfaceBool(normalized["dryRun"])
 	proposal.PolicyBucketID = normalizedInterfaceString(normalized["policyBucketId"])
 	proposal.WorkflowKind = normalizedInterfaceString(normalized["workflowKind"])
@@ -722,34 +795,76 @@ func normalizeCodexGovernedActionProposal(proposal codexStructuredProposal) code
 	return proposal
 }
 
+func validateCodexStructuredProposal(proposal codexStructuredProposal) error {
+	proposalType := normalizeStringOrDefault(strings.TrimSpace(proposal.Type), "terminal_command")
+	if strings.TrimSpace(proposal.Summary) == "" {
+		return fmt.Errorf("%s proposal summary is required", proposalType)
+	}
+	switch proposalType {
+	case "terminal_command":
+		if strings.TrimSpace(proposal.Command) == "" {
+			return fmt.Errorf("terminal_command proposal command is required")
+		}
+		return nil
+	case governedActionProposalType:
+		missing := make([]string, 0, 8)
+		for _, field := range []struct {
+			name  string
+			value string
+		}{
+			{name: "requestLabel", value: proposal.RequestLabel},
+			{name: "requestSummary", value: proposal.RequestSummary},
+			{name: "actionType", value: proposal.ActionType},
+			{name: "actionTarget", value: proposal.ActionTarget},
+			{name: "resourceKind", value: proposal.ResourceKind},
+			{name: "resourceName", value: proposal.ResourceName},
+			{name: "riskTier", value: proposal.RiskTier},
+			{name: "evidenceReadiness", value: proposal.EvidenceReadiness},
+			{name: "environment", value: proposal.Environment},
+		} {
+			if strings.TrimSpace(field.value) == "" {
+				missing = append(missing, field.name)
+			}
+		}
+		if len(missing) > 0 {
+			return fmt.Errorf("governed_action_request proposal missing required fields: %s", strings.Join(missing, ", "))
+		}
+		return nil
+	default:
+		return fmt.Errorf("unsupported proposal type %q", proposalType)
+	}
+}
+
 func structuredProposalJSONObject(proposal codexStructuredProposal) JSONObject {
 	if strings.EqualFold(proposal.Type, governedActionProposalType) {
 		payload := JSONObject{
-			"type":              governedActionProposalType,
-			"summary":           strings.TrimSpace(proposal.Summary),
-			"confidence":        normalizeStringOrDefault(proposal.Confidence, "structured"),
-			"requestLabel":      strings.TrimSpace(proposal.RequestLabel),
-			"requestSummary":    strings.TrimSpace(proposal.RequestSummary),
-			"demoProfile":       strings.TrimSpace(proposal.DemoProfile),
-			"subjectType":       strings.TrimSpace(proposal.SubjectType),
-			"subjectId":         strings.TrimSpace(proposal.SubjectID),
-			"approvedForProd":   proposal.ApprovedForProd,
-			"actionType":        strings.TrimSpace(proposal.ActionType),
-			"actionClass":       strings.TrimSpace(proposal.ActionClass),
-			"actionVerb":        strings.TrimSpace(proposal.ActionVerb),
-			"actionTarget":      strings.TrimSpace(proposal.ActionTarget),
-			"resourceKind":      strings.TrimSpace(proposal.ResourceKind),
-			"resourceNamespace": strings.TrimSpace(proposal.ResourceNamespace),
-			"resourceName":      strings.TrimSpace(proposal.ResourceName),
-			"resourceId":        strings.TrimSpace(proposal.ResourceID),
-			"boundaryClass":     strings.TrimSpace(proposal.BoundaryClass),
-			"riskTier":          strings.TrimSpace(proposal.RiskTier),
-			"requiredGrants":    append([]string(nil), proposal.RequiredGrants...),
-			"evidenceReadiness": strings.TrimSpace(proposal.EvidenceReadiness),
-			"handshakeRequired": proposal.HandshakeRequired,
-			"dryRun":            proposal.DryRun,
-			"policyBucketId":    strings.TrimSpace(proposal.PolicyBucketID),
-			"workflowKind":      strings.TrimSpace(proposal.WorkflowKind),
+			"type":                     governedActionProposalType,
+			"summary":                  strings.TrimSpace(proposal.Summary),
+			"confidence":               normalizeStringOrDefault(proposal.Confidence, "structured"),
+			"requestLabel":             strings.TrimSpace(proposal.RequestLabel),
+			"requestSummary":           strings.TrimSpace(proposal.RequestSummary),
+			"demoProfile":              strings.TrimSpace(proposal.DemoProfile),
+			"subjectType":              strings.TrimSpace(proposal.SubjectType),
+			"subjectId":                strings.TrimSpace(proposal.SubjectID),
+			"approvedForProd":          proposal.ApprovedForProd,
+			"environment":              strings.TrimSpace(proposal.Environment),
+			"actionType":               strings.TrimSpace(proposal.ActionType),
+			"actionClass":              strings.TrimSpace(proposal.ActionClass),
+			"actionVerb":               strings.TrimSpace(proposal.ActionVerb),
+			"actionTarget":             strings.TrimSpace(proposal.ActionTarget),
+			"resourceKind":             strings.TrimSpace(proposal.ResourceKind),
+			"resourceNamespace":        strings.TrimSpace(proposal.ResourceNamespace),
+			"resourceName":             strings.TrimSpace(proposal.ResourceName),
+			"resourceId":               strings.TrimSpace(proposal.ResourceID),
+			"boundaryClass":            strings.TrimSpace(proposal.BoundaryClass),
+			"riskTier":                 strings.TrimSpace(proposal.RiskTier),
+			"requiredGrants":           append([]string(nil), proposal.RequiredGrants...),
+			"evidenceReadiness":        strings.TrimSpace(proposal.EvidenceReadiness),
+			"handshakeRequired":        proposal.HandshakeRequired,
+			"operatorApprovalRequired": proposal.OperatorApprovalRequired,
+			"dryRun":                   proposal.DryRun,
+			"policyBucketId":           strings.TrimSpace(proposal.PolicyBucketID),
+			"workflowKind":             strings.TrimSpace(proposal.WorkflowKind),
 		}
 		if proposal.FinanceOrder != nil {
 			payload["financeOrder"] = JSONObject{

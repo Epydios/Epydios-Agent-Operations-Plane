@@ -139,9 +139,13 @@ test("chat view surfaces governed action proposals and linked run detail from th
                     workerId: "worker-governed-chat-1",
                     source: "runtime.tool-proposal-decision",
                     requestPayload: {
-                      proposalId: "proposal-governed-chat-1"
+                      proposalId: "proposal-governed-chat-1",
+                      operatorApprovalRequired: false,
+                      reviewMode: "policy_first_auto"
                     },
                     resultPayload: {
+                      decision: "AUTO",
+                      reviewMode: "policy_first_auto",
                       governedRun: {
                         runId: "run-governed-chat-1",
                         status: "COMPLETED",
@@ -187,6 +191,7 @@ test("chat view surfaces governed action proposals and linked run detail from th
                         riskTier: "high",
                         requiredGrants: ["grant.trading.supervisor"],
                         evidenceReadiness: "PARTIAL",
+                        operatorApprovalRequired: false,
                         handshakeRequired: true,
                         financeOrder: {
                           symbol: "AAPL",
@@ -207,15 +212,16 @@ test("chat view surfaces governed action proposals and linked run detail from th
                       proposalId: "proposal-governed-chat-1",
                       proposalType: "governed_action_request",
                       workerId: "worker-governed-chat-1",
-                      decision: "APPROVE",
-                      status: "APPROVED",
-                      reason: "approved for governed policy evaluation",
+                      decision: "AUTO",
+                      status: "DEFERRED",
+                      reason: "Supervisor trading grant is still required.",
                       toolActionId: "tool-action-governed-chat-1",
                       actionStatus: "COMPLETED",
                       runId: "run-governed-chat-1",
                       runStatus: "COMPLETED",
                       policyDecision: "DEFER",
-                      selectedPolicyProvider: "aimxs-full"
+                      selectedPolicyProvider: "aimxs-full",
+                      operatorApprovalRequired: false
                     }
                   }
                 ]
@@ -234,6 +240,11 @@ test("chat view surfaces governed action proposals and linked run detail from th
   assert.match(ui.chatContent.innerHTML, /aimxs-full/);
   assert.match(ui.chatContent.innerHTML, /Open Run Detail/);
   assert.match(ui.chatContent.innerHTML, /Governed Run Result/);
+  assert.match(ui.chatContent.innerHTML, /Latest Policy Outcome/);
+  assert.match(ui.chatContent.innerHTML, /operatorGate=policy-first/);
+  assert.match(ui.chatContent.innerHTML, /chip chip-warn chip-compact">effect=execution deferred/);
+  assert.match(ui.chatContent.innerHTML, /effect=execution deferred/);
+  assert.match(ui.chatContent.innerHTML, /deferred the request\./);
 });
 
 test("chat view renders governed export profile controls from the export-profile catalog", () => {

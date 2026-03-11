@@ -306,6 +306,9 @@ class AimxsLocalFullRuntime:
     def evaluate(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         policy = normalize_policy_stratification(payload)
         contract = normalize_governed_action_context(payload)
+        deny_response = self._evaluate_standard_deny(payload, policy, contract)
+        if deny_response is not None:
+            return deny_response
         if self._should_use_governance_path(policy):
             return self._evaluate_with_governance_provider(payload, policy, contract)
         return self._evaluate_allow_path(payload, policy, contract)
@@ -349,7 +352,8 @@ class AimxsLocalFullRuntime:
             return True
         if str(policy.get("evidence_readiness") or "READY").upper() != "READY":
             return True
-        if isinstance(policy.get("gates"), dict) and policy["gates"]:
+        gates = policy.get("gates") if isinstance(policy.get("gates"), dict) else {}
+        if gates.get("core18.kernel_state.continuity") is True:
             return True
         return False
 
@@ -505,6 +509,135 @@ class AimxsLocalFullRuntime:
             },
             "evidenceRefs": [evidence.evidence_id, f"sha256:{evidence.evidence_hash}"],
             "output": output,
+        }
+
+    def _standard_deny_reasons(self, payload: Dict[str, Any]) -> List[Dict[str, Any]]:
+        meta = normalize_mapping(payload.get("meta"))
+        subject = normalize_mapping(payload.get("subject"))
+        subject_attrs = normalize_mapping(subject.get("attributes"))
+        action = normalize_mapping(payload.get("action"))
+        environment = first_non_empty(meta.get("environment"), "dev").lower()
+        mode = first_non_empty(payload.get("mode"), "enforce").lower()
+        subject_type = first_non_empty(subject.get("type")).lower()
+        action_verb = first_non_empty(action.get("verb"), action.get("type")).lower()
+
+        reasons: List[Dict[str, Any]] = []
+        if action_verb == "delete":
+            reasons.append(
+                build_reason(
+                    "DELETE_DENIED",
+                    "delete verb is denied by AIMXS local full policy."
+                )
+            )
+        if environment == "prod" and mode != "audit" and subject_type == "user" and not bool(subject_attrs.get("approvedForProd")):
+            reasons.append(
+                build_reason(
+                    "PROD_APPROVAL_REQUIRED",
+                    "user subject requires approvedForProd=true for prod enforce mode."
+                )
+            )
+        return reasons
+
+    def _evaluate_standard_deny(self, payload: Dict[str, Any], policy: Dict[str, Any], contract: Dict[str, Any]) -> Dict[str, Any] | None:
+        reasons = self._standard_deny_reasons(payload)
+        if not reasons:
+            return None
+        proposal_id, state_id = self._request_ids(payload)
+        current_state = self._current_state(payload, proposal_id, state_id, policy, contract)
+        evidence_hash = canonical_hash(
+            {
+                "proposalId": proposal_id,
+                "stateId": state_id,
+                "policy": policy,
+                "reasons": reasons,
+                "payload": payload,
+            }
+        )
+        provider_meta = {
+            "provider": "AIMXS_LOCAL_FULL",
+            "providerId": AIMXS_PROVIDER_ID,
+            "providerVersion": AIMXS_PROVIDER_VERSION,
+            "baak_engaged": True,
+            "decision_path": "local_deny",
+            "request_contract": contract,
+            "audit_sink": {
+                "active": True,
+                "event_ref": "",
+                "events_path": str(self._audit_sink.events_path),
+            },
+            "current_state": {
+                "present": bool(current_state),
+                "sha256": canonical_hash(current_state),
+                "keys": sorted(current_state.keys()),
+            },
+            "state_continuity": {
+                "continuity_enabled": False,
+                "kernel_state_in_sha256": "",
+                "kernel_state_out_sha256": "",
+                "kernel_state_out_present": False,
+            },
+            "policy_stratification": {
+                "boundary_class": policy["boundary_class"],
+                "required_grants": list(policy["required_grants"]),
+                "evidence_readiness": policy["evidence_readiness"],
+                "action_class": policy["action_class"],
+                "risk_tier": policy["risk_tier"],
+                "policy_bucket_id": policy["policy_bucket_id"],
+            },
+        }
+        evidence = {
+            "evidence_id": f"EVIDENCE_{proposal_id}",
+            "proposal_id": proposal_id,
+            "decision_id": f"DECISION_{proposal_id}",
+            "evidence_hash": evidence_hash,
+            "pointers": [
+                {
+                    "ref": "aimxs://local-full/request",
+                    "hash": evidence_hash,
+                    "preview": {
+                        "proposalId": proposal_id,
+                        "stateId": state_id,
+                        "reasonCodes": [first_non_empty(item.get("code")) for item in reasons],
+                    },
+                }
+            ],
+            "summary": "AIMXS local full deterministic deny envelope.",
+        }
+        self._audit_sink.emit_audit_event(
+            {
+                "event_type": "aimxs_local_full_deny",
+                "proposal_id": proposal_id,
+                "state_id": state_id,
+                "decision_id": f"DECISION_{proposal_id}",
+                "outcome": "DENY",
+                "reason_codes": [first_non_empty(item.get("code")) for item in reasons],
+                "policy_stratification": provider_meta["policy_stratification"],
+                "current_state_hash": provider_meta["current_state"]["sha256"],
+                "current_state_keys": provider_meta["current_state"]["keys"],
+            }
+        )
+        provider_meta["audit_sink"]["event_ref"] = self._audit_sink.last_event_ref
+        self._persist_state(state_id, current_state, provider_meta)
+        return {
+            "decision": "DENY",
+            "reasons": reasons,
+            "policyBundle": {
+                "policyId": "AIMXS_LOCAL_FULL_POLICY",
+                "policyVersion": AIMXS_PROVIDER_VERSION,
+                "checksum": evidence_hash,
+            },
+            "evidenceRefs": [evidence["evidence_id"], f"sha256:{evidence_hash}"],
+            "output": {
+                "aimxs": {
+                    "providerId": AIMXS_PROVIDER_ID,
+                    "providerVersion": AIMXS_PROVIDER_VERSION,
+                    "mode": "aimxs-full",
+                    "providerMeta": provider_meta,
+                    "requestContract": contract,
+                    "policyStratification": provider_meta["policy_stratification"],
+                    "evidence": evidence,
+                }
+            },
         }
 
     def _evaluate_allow_path(self, payload: Dict[str, Any], policy: Dict[str, Any], contract: Dict[str, Any]) -> Dict[str, Any]:

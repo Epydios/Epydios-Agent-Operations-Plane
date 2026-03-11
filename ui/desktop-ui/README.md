@@ -287,11 +287,7 @@ Recommended operator path:
 10. For a manual provider-level side-by-side between `oss-only` and `aimxs-full`, use [aimxs-oss-manual-side-by-side.md](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/docs/runbooks/aimxs-oss-manual-side-by-side.md).
    - Use this when you want the lowest-level provider comparison.
    - It intentionally omits `aimxs-https`.
-11. For a field-driven in-product self-check, stay inside `Settings -> Configuration -> AIMXS Richness Self-Check`.
-   - Fill or adjust the probe fields, click `Evaluate Current Mode`, then switch `AIMXS Deployment Contract` between `oss-only` and `aimxs-full` and repeat.
-   - The panel stores the captured `oss-only` and `aimxs-full` results side by side and renders the differential summary directly in the product.
-   - This is a truthful Desktop self-check, but it is still provider-level inside the product, not the managed-agent chat path.
-12. For the real recordable product demo path, use [aimxs-governed-action-demo.md](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/docs/runbooks/aimxs-governed-action-demo.md).
+11. For the real recordable product demo path, use [aimxs-governed-action-demo.md](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/docs/runbooks/aimxs-governed-action-demo.md).
    - This path stays inside the actual product after startup.
    - It uses `Home -> Governed Action Request`, then reviews the real stored result in `History -> 2. Policy Richness`.
    - It is the current source of truth for a recordable `oss-only` versus `aimxs-full` operator demo.

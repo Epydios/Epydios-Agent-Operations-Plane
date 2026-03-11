@@ -110,7 +110,14 @@ function eventTone(eventType, payload = {}) {
     return "warn";
   }
   if (type === "tool_proposal.decided") {
-    return status === "DENIED" ? "warn" : "ok";
+    const policyDecision = normalizedString(payload?.policyDecision).toUpperCase();
+    if (policyDecision === "DENY" || status === "DENIED") {
+      return "danger";
+    }
+    if (policyDecision === "DEFER" || status === "DEFERRED") {
+      return "warn";
+    }
+    return "ok";
   }
   if (type.endsWith(".completed") || type.endsWith(".recorded") || type === "worker.output.delta" || status === "COMPLETED" || status === "READY" || status === "RUNNING") {
     return "ok";
@@ -434,6 +441,7 @@ export function listNativeToolProposals(sessionView = {}) {
         requiredGrants: stringArrayValue(proposalPayload?.requiredGrants),
         evidenceReadiness: normalizedString(proposalPayload?.evidenceReadiness),
         handshakeRequired: proposalPayload?.handshakeRequired === true,
+        operatorApprovalRequired: proposalPayload?.operatorApprovalRequired === true,
         financeOrder: objectValue(proposalPayload?.financeOrder),
         confidence: normalizedString(proposalPayload?.confidence),
         decision: "",
@@ -482,6 +490,7 @@ export function listNativeToolProposals(sessionView = {}) {
         runStatus: normalizedString(payload?.runStatus, existing.runStatus),
         policyDecision: normalizedString(payload?.policyDecision, existing.policyDecision),
         selectedPolicyProvider: normalizedString(payload?.selectedPolicyProvider, existing.selectedPolicyProvider),
+        operatorApprovalRequired: payload?.operatorApprovalRequired === true || existing.operatorApprovalRequired === true,
         reviewedAt: normalizedString(item?.timestamp),
         decisionSequence: Number(item?.sequence || 0) || 0
       });
@@ -1284,7 +1293,8 @@ export async function invokeOperatorChatTurn(api, scope = {}, thread = {}, draft
     executionMode: normalizedDraft.executionMode,
     prompt: normalizedDraft.prompt,
     systemPrompt: normalizedDraft.systemPrompt,
-    maxOutputTokens: normalizedDraft.maxOutputTokens
+    maxOutputTokens: normalizedDraft.maxOutputTokens,
+    governanceContext: draft?.governanceContext || null
   });
   const sessionView = response?.applied && response?.sessionId
     ? await loadNativeSessionView(api, response.sessionId, { tailCount: 8, waitSeconds: 1 })

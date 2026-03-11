@@ -150,8 +150,15 @@ function readStringArray(value) {
 
 function derivePolicyRichness(run) {
   const requestPayload = readObject(run?.requestPayload);
+  const requestMeta = readObject(requestPayload.meta);
+  const requestActor = readObject(requestMeta.actor);
+  const requestSubject = readObject(requestPayload.subject);
+  const requestSubjectAttributes = readObject(requestSubject.attributes);
+  const requestAction = readObject(requestPayload.action);
   const requestContext = readObject(requestPayload.context);
   const requestGoverned = readObject(requestContext.governed_action);
+  const actorAuthority = readObject(requestContext.actor_authority);
+  const governedAuthority = readObject(requestGoverned.authority_context);
   const requestPolicy = readObject(requestContext.policy_stratification);
   const requestTask = readObject(requestPayload.task);
   const policyResponse = readObject(run?.policyResponse);
@@ -169,6 +176,15 @@ function derivePolicyRichness(run) {
   const reasons = Array.isArray(policyResponse.reasons) ? policyResponse.reasons : [];
   const firstReason = readObject(reasons[0]);
   const requiredGrants = readStringArray(requestPolicy.required_grants);
+  const authorityRoles = readStringArray(actorAuthority.roles).length
+    ? readStringArray(actorAuthority.roles)
+    : readStringArray(governedAuthority.roles);
+  const authorityTenantScopes = readStringArray(actorAuthority.tenant_scopes).length
+    ? readStringArray(actorAuthority.tenant_scopes)
+    : readStringArray(governedAuthority.tenant_scopes);
+  const authorityProjectScopes = readStringArray(actorAuthority.project_scopes).length
+    ? readStringArray(actorAuthority.project_scopes)
+    : readStringArray(governedAuthority.project_scopes);
   const evidenceRefs = readStringArray(policyResponse.evidenceRefs);
   const contractId = String(requestGoverned.contract_id || requestContract.contract_id || outputContract.contract_id || "").trim();
   const providerId = String(
@@ -191,11 +207,22 @@ function derivePolicyRichness(run) {
     requestLabel: String(requestGoverned.request_label || requestTask.requestLabel || "").trim(),
     demoProfile: String(requestGoverned.demo_profile || requestTask.demoProfile || "").trim(),
     requestSummary: String(requestGoverned.request_summary || requestTask.summary || requestTask.intent || "").trim(),
+    environment: String(requestMeta.environment || "").trim(),
+    actionType: String(requestAction.type || "").trim(),
+    actionVerb: String(requestAction.verb || "").trim(),
+    approvedForProd: requestSubjectAttributes.approvedForProd === true,
     boundaryClass: String(requestPolicy.boundary_class || providerPolicy.boundary_class || "").trim(),
     riskTier: String(requestPolicy.risk_tier || providerPolicy.risk_tier || "").trim(),
     requiredGrants,
     evidenceReadiness: String(requestPolicy.evidence_readiness || providerPolicy.evidence_readiness || "").trim(),
     handshakeRequired: requestPolicy?.gates?.["core14.adapter_present.enforce_handshake"] === true,
+    actorSubject: String(actorAuthority.subject || requestActor.subject || governedAuthority.subject || "").trim(),
+    actorClientId: String(actorAuthority.client_id || requestActor.clientId || governedAuthority.client_id || "").trim(),
+    authorityBasis: String(actorAuthority.authority_basis || requestActor.authorityBasis || governedAuthority.authority_basis || "").trim(),
+    authnMethod: String(actorAuthority.authn || requestActor.authn || governedAuthority.authn || "").trim(),
+    authorityRoles,
+    authorityTenantScopes,
+    authorityProjectScopes,
     decision,
     providerId,
     decisionPath,
@@ -217,8 +244,57 @@ function derivePolicyRichness(run) {
     evidenceRefCount: evidenceRefs.length,
     evidenceRefs,
     firstReason: String(firstReason.message || firstReason.code || "").trim(),
-    financeOrder
+    financeOrder,
+    operatorApprovalRequired: requestGoverned.operator_approval_required === true || requestPayload?.annotations?.governedAction?.operatorApprovalRequired === true
   };
+}
+
+function derivePolicyOutcomePresentation(run, policyRichness = {}) {
+  const decision = String(policyRichness?.decision || run?.policyDecision || "").trim().toUpperCase();
+  const provider = String(policyRichness?.providerId || run?.selectedPolicyProvider || "").trim();
+  const primaryReason = String(policyRichness?.firstReason || "").trim();
+  if (decision === "ALLOW") {
+    return {
+      decision,
+      provider,
+      effectLabel: "policy cleared",
+      bannerClass: "policy-outcome-banner is-allow",
+      headline: `${provider || "Policy provider"} cleared the request.`,
+      detail: primaryReason || "This request passed policy evaluation and is ready for the next execution stage."
+    };
+  }
+  if (decision === "DEFER") {
+    return {
+      decision,
+      provider,
+      effectLabel: "execution deferred",
+      bannerClass: "policy-outcome-banner is-defer",
+      headline: `${provider || "Policy provider"} deferred the request.`,
+      detail: primaryReason || "The request is deferred pending additional grants, evidence, or other governance readiness."
+    };
+  }
+  if (decision === "DENY") {
+    return {
+      decision,
+      provider,
+      effectLabel: "policy blocked",
+      bannerClass: "policy-outcome-banner is-deny",
+      headline: `${provider || "Policy provider"} blocked the request.`,
+      detail: primaryReason || "The request failed policy evaluation and should not proceed."
+    };
+  }
+  return {
+    decision,
+    provider,
+    effectLabel: "policy pending",
+    bannerClass: "policy-outcome-banner",
+    headline: "The provider outcome is still pending.",
+    detail: primaryReason || "Review the stored run response before treating this request as cleared."
+  };
+}
+
+function chipClassForPolicyEffect(outcome = {}) {
+  return `${chipClassForStatus(outcome?.decision || "")} chip-compact`;
 }
 
 export function readRunFilters(ui) {
@@ -349,6 +425,7 @@ export function renderRuns(ui, store, runPayload, filters) {
       const runId = String(item.runId || "").trim();
       const isSelected = selectedRunID && runId === selectedRunID;
       const toggleMarker = isSelected ? "v" : ">";
+      const outcome = derivePolicyOutcomePresentation(item);
       return `
         <tr${isSelected ? ' class="settings-row-focus"' : ""}>
           ${tableCell(
@@ -358,6 +435,10 @@ export function renderRuns(ui, store, runPayload, filters) {
               <span class="run-row-toggle">${escapeHTML(toggleMarker)}</span>
               <span>${escapeHTML(item.runId || "-")}</span>
             </button>
+            <div class="run-row-submeta">
+              <span class="chip chip-neutral chip-compact">provider=${escapeHTML(outcome.provider || "-")}</span>
+              <span class="${chipClassForPolicyEffect(outcome)}">effect=${escapeHTML(outcome.effectLabel)}</span>
+            </div>
           `
           )}
           ${tableCell("Tenant", escapeHTML(item.tenantId || "-"))}
@@ -473,6 +554,7 @@ export function renderRunDetail(ui, run, options = {}) {
   const artifactEntries = buildArtifactEntries(run);
   const artifactAccess = buildArtifactAccessEntries(run, evidenceStages);
   const policyRichness = derivePolicyRichness(run);
+  const policyOutcome = derivePolicyOutcomePresentation(run, policyRichness);
   const runStatus = String(run?.status || "").toUpperCase();
   const runDecision = String(run?.policyDecision || "").toUpperCase();
   const runStatusChipClass = runStatus ? chipClassForStatus(runStatus) : "chip chip-neutral";
@@ -589,11 +671,26 @@ export function renderRunDetail(ui, run, options = {}) {
             <div class="meta">This run did not use the governed-action request contract.</div>
           `
           : `
+            <div class="${escapeHTML(policyOutcome.bannerClass)}">
+              <div class="metric-title-row">
+                <div class="title">Operator Gate vs Policy Gate</div>
+                ${policyOutcome.decision ? `<span class="${chipClassForStatus(policyOutcome.decision)} chip-compact">policy=${escapeHTML(policyOutcome.decision)}</span>` : ""}
+              </div>
+              <div class="run-detail-chips">
+                <span class="chip chip-neutral chip-compact">operatorGate=${escapeHTML(policyRichness.operatorApprovalRequired ? "manual review" : "policy-first")}</span>
+                <span class="chip chip-neutral chip-compact">provider=${escapeHTML(policyOutcome.provider || "-")}</span>
+                <span class="${chipClassForPolicyEffect(policyOutcome)}">effect=${escapeHTML(policyOutcome.effectLabel)}</span>
+              </div>
+              <div class="policy-outcome-detail">${escapeHTML(policyOutcome.headline)}</div>
+              <div class="meta">${escapeHTML(policyOutcome.detail)}</div>
+            </div>
             <div class="run-detail-chips">
-              <span class="chip chip-neutral chip-compact">decision=${escapeHTML(policyRichness.decision || "UNSET")}</span>
+              <span class="${`${chipClassForStatus(policyRichness.decision || "UNSET")} chip-compact`}">decision=${escapeHTML(policyRichness.decision || "UNSET")}</span>
               <span class="chip chip-neutral chip-compact">provider=${escapeHTML(policyRichness.providerId || "-")}</span>
               <span class="chip chip-neutral chip-compact">workflow=${escapeHTML(policyRichness.workflowKind || "-")}</span>
               <span class="chip chip-neutral chip-compact">profile=${escapeHTML(policyRichness.demoProfile || "-")}</span>
+              <span class="chip chip-neutral chip-compact">env=${escapeHTML(policyRichness.environment || "-")}</span>
+              <span class="chip chip-neutral chip-compact">verb=${escapeHTML(policyRichness.actionVerb || "-")}</span>
               <span class="chip chip-neutral chip-compact">boundary=${escapeHTML(policyRichness.boundaryClass || "-")}</span>
               <span class="chip chip-neutral chip-compact">risk=${escapeHTML(policyRichness.riskTier || "-")}</span>
               <span class="chip chip-neutral chip-compact">grants=${escapeHTML(String(policyRichness.requiredGrants.length))}</span>
@@ -612,10 +709,22 @@ export function renderRunDetail(ui, run, options = {}) {
                   <tr>${tableCell("Signal", "Request Label")}${tableCell("Value", escapeHTML(policyRichness.requestLabel || "-"))}</tr>
                   <tr>${tableCell("Signal", "Request Summary")}${tableCell("Value", escapeHTML(policyRichness.requestSummary || "-"))}</tr>
                   <tr>${tableCell("Signal", "Contract ID")}${tableCell("Value", escapeHTML(policyRichness.contractId || "-"))}</tr>
-                  <tr>${tableCell("Signal", "Required Grants")}${tableCell("Value", escapeHTML(policyRichness.requiredGrants.join(", ") || "-"))}</tr>
-                  <tr>${tableCell("Signal", "Evidence Readiness")}${tableCell("Value", escapeHTML(policyRichness.evidenceReadiness || "-"))}</tr>
-                  <tr>${tableCell("Signal", "Handshake Required")}${tableCell("Value", escapeHTML(policyRichness.handshakeRequired ? "true" : "false"))}</tr>
-                  <tr>${tableCell("Signal", "Decision Path")}${tableCell("Value", escapeHTML(policyRichness.decisionPath || "-"))}</tr>
+                  <tr>${tableCell("Signal", "Environment")}${tableCell("Value", escapeHTML(policyRichness.environment || "-"))}</tr>
+                  <tr>${tableCell("Signal", "Action Type")}${tableCell("Value", escapeHTML(policyRichness.actionType || "-"))}</tr>
+                  <tr>${tableCell("Signal", "Action Verb")}${tableCell("Value", escapeHTML(policyRichness.actionVerb || "-"))}</tr>
+                  <tr>${tableCell("Signal", "Approved For Prod")}${tableCell("Value", escapeHTML(policyRichness.approvedForProd ? "true" : "false"))}</tr>
+                  <tr>${tableCell("Signal", "Operator Approval Required")}${tableCell("Value", escapeHTML(policyRichness.operatorApprovalRequired ? "true" : "false"))}</tr>
+	                  <tr>${tableCell("Signal", "Required Grants")}${tableCell("Value", escapeHTML(policyRichness.requiredGrants.join(", ") || "-"))}</tr>
+	                  <tr>${tableCell("Signal", "Evidence Readiness")}${tableCell("Value", escapeHTML(policyRichness.evidenceReadiness || "-"))}</tr>
+	                  <tr>${tableCell("Signal", "Handshake Required")}${tableCell("Value", escapeHTML(policyRichness.handshakeRequired ? "true" : "false"))}</tr>
+	                  <tr>${tableCell("Signal", "Actor Subject")}${tableCell("Value", escapeHTML(policyRichness.actorSubject || "-"))}</tr>
+	                  <tr>${tableCell("Signal", "Actor Client ID")}${tableCell("Value", escapeHTML(policyRichness.actorClientId || "-"))}</tr>
+	                  <tr>${tableCell("Signal", "Authority Basis")}${tableCell("Value", escapeHTML(policyRichness.authorityBasis || "-"))}</tr>
+	                  <tr>${tableCell("Signal", "Authn Method")}${tableCell("Value", escapeHTML(policyRichness.authnMethod || "-"))}</tr>
+	                  <tr>${tableCell("Signal", "Authority Roles")}${tableCell("Value", escapeHTML(policyRichness.authorityRoles.join(", ") || "-"))}</tr>
+	                  <tr>${tableCell("Signal", "Tenant Scopes")}${tableCell("Value", escapeHTML(policyRichness.authorityTenantScopes.join(", ") || "-"))}</tr>
+	                  <tr>${tableCell("Signal", "Project Scopes")}${tableCell("Value", escapeHTML(policyRichness.authorityProjectScopes.join(", ") || "-"))}</tr>
+	                  <tr>${tableCell("Signal", "Decision Path")}${tableCell("Value", escapeHTML(policyRichness.decisionPath || "-"))}</tr>
                   <tr>${tableCell("Signal", "BAAK Engaged")}${tableCell("Value", escapeHTML(policyRichness.baakEngaged ? "true" : "false"))}</tr>
                   <tr>${tableCell("Signal", "Adapter Status")}${tableCell("Value", escapeHTML(policyRichness.adapterStatus || "-"))}</tr>
                   <tr>${tableCell("Signal", "Adapter Error Code")}${tableCell("Value", escapeHTML(policyRichness.adapterErrorCode || "-"))}</tr>

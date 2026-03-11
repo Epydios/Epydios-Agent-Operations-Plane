@@ -15,12 +15,6 @@ import {
   validateAimxsOverride
 } from "./aimxs/state.js";
 import {
-  AIMXS_PROBE_STATE_KEY,
-  buildAimxsProbeRequest,
-  normalizeAimxsProbeState,
-  readAimxsProbeInput
-} from "./aimxs/probe.js";
-import {
   readAimxsEditorInput as readAimxsEditorDraft,
   renderAimxsEditorFeedback
 } from "./aimxs/editor.js";
@@ -53,6 +47,12 @@ import {
   renderGovernedActionPolicyHints,
   renderGovernedActionFeedback
 } from "./views/governed-action.js";
+import {
+  DEMO_GOVERNANCE_STATE_KEY,
+  buildDemoGovernanceContext,
+  normalizeDemoGovernanceOverlay,
+  validateDemoGovernanceOverlay
+} from "./runtime/demo-governance.js";
 import {
   readApprovalFilters,
   renderApprovals,
@@ -302,6 +302,7 @@ const INTEGRATION_OVERRIDES_KEY = "epydios.agentops.desktop.integrations.project
 const INCIDENT_HISTORY_KEY = "epydios.agentops.desktop.incident.history.v1";
 const CONFIG_CHANGE_HISTORY_KEY = "epydios.agentops.desktop.settings.change.history.v1";
 const OPERATOR_CHAT_ARCHIVE_KEY = "epydios.agentops.desktop.chat.archive.v1";
+const DEMO_GOVERNANCE_EDITOR_KEY = DEMO_GOVERNANCE_STATE_KEY;
 const APPROVAL_SELECTION_NONE = "__approval_selection_none__";
 const PROJECT_ANY_SCOPE_KEY = "__project_any__";
 const WORKSPACE_VIEW_IDS = new Set(["home", "agent", "history", "incidents", "settings"]);
@@ -345,7 +346,6 @@ let aimxsEditorState = {
   message: ""
 };
 let aimxsActivationSnapshot = buildDefaultAimxsActivationSnapshot();
-let aimxsProbeState = normalizeAimxsProbeState();
 let localSecureRefSnapshot = {
   available: false,
   platform: "unknown",
@@ -364,6 +364,12 @@ let localSecureRefEditorState = {
   status: "clean",
   message: ""
 };
+let demoGovernanceOverlay = normalizeDemoGovernanceOverlay();
+let demoGovernanceEditorState = {
+  overlay: normalizeDemoGovernanceOverlay(),
+  status: "clean",
+  message: ""
+};
 let agentInvokeState = {
   agentProfileId: "",
   prompt: "",
@@ -378,7 +384,7 @@ let operatorChatState = {
   title: "",
   intent: "",
   agentProfileId: "",
-  executionMode: "raw_model_invoke",
+  executionMode: "managed_codex_worker",
   systemPrompt: "",
   prompt: "",
   maxOutputTokens: 1024,
@@ -556,7 +562,7 @@ function buildFollowUpOperatorChatDraft(draft = {}, thread = {}) {
     title: normalizedTitle,
     intent: String(draft.intent || thread.intent || "").trim(),
     agentProfileId: String(draft.agentProfileId || thread.agentProfileId || "").trim().toLowerCase(),
-    executionMode: String(draft.executionMode || thread.executionMode || "raw_model_invoke").trim().toLowerCase(),
+    executionMode: String(draft.executionMode || thread.executionMode || "managed_codex_worker").trim().toLowerCase(),
     prompt: ""
   };
 }
@@ -983,6 +989,78 @@ function readLocalSecureRefInput() {
     customRef: String(customRef.value || "").trim(),
     secretValue: String(secretValue.value || "")
   };
+}
+
+function readDemoGovernanceInput() {
+  const root = ui.settingsContent;
+  if (!root) {
+    return null;
+  }
+  const read = (selector) => root.querySelector(selector);
+  const personaEnabled = read("#settings-demo-persona-enabled");
+  const personaLabel = read("#settings-demo-persona-label");
+  const personaSubjectId = read("#settings-demo-persona-subject-id");
+  const personaClientId = read("#settings-demo-persona-client-id");
+  const personaRolesText = read("#settings-demo-persona-roles");
+  const personaTenantScope = read("#settings-demo-persona-tenant-scope");
+  const personaProjectScope = read("#settings-demo-persona-project-scope");
+  const personaApprovedForProd = read("#settings-demo-persona-approved-for-prod");
+  const policyEnabled = read("#settings-demo-policy-enabled");
+  const policyReviewMode = read("#settings-demo-policy-review-mode");
+  const policyBucketPrefix = read("#settings-demo-policy-bucket-prefix");
+  const policyHandshakeRequired = read("#settings-demo-policy-handshake-required");
+  const policyAdvisoryAutoShape = read("#settings-demo-policy-advisory-auto-shape");
+  const policyFinanceSupervisorGrant = read("#settings-demo-policy-finance-supervisor-grant");
+  const policyFinanceEvidenceReadiness = read("#settings-demo-policy-finance-evidence-readiness");
+  const policyProductionDeleteDeny = read("#settings-demo-policy-production-delete-deny");
+
+  if (
+    !(personaEnabled instanceof HTMLInputElement) ||
+    !(personaLabel instanceof HTMLInputElement) ||
+    !(personaSubjectId instanceof HTMLInputElement) ||
+    !(personaClientId instanceof HTMLInputElement) ||
+    !(personaRolesText instanceof HTMLInputElement) ||
+    !(personaTenantScope instanceof HTMLInputElement) ||
+    !(personaProjectScope instanceof HTMLInputElement) ||
+    !(personaApprovedForProd instanceof HTMLInputElement) ||
+    !(policyEnabled instanceof HTMLInputElement) ||
+    !(policyReviewMode instanceof HTMLSelectElement) ||
+    !(policyBucketPrefix instanceof HTMLInputElement) ||
+    !(policyHandshakeRequired instanceof HTMLInputElement) ||
+    !(policyAdvisoryAutoShape instanceof HTMLInputElement) ||
+    !(policyFinanceSupervisorGrant instanceof HTMLInputElement) ||
+    !(policyFinanceEvidenceReadiness instanceof HTMLSelectElement) ||
+    !(policyProductionDeleteDeny instanceof HTMLInputElement)
+  ) {
+    return null;
+  }
+
+  return normalizeDemoGovernanceOverlay({
+    persona: {
+      enabled: personaEnabled.checked,
+      label: personaLabel.value,
+      subjectId: personaSubjectId.value,
+      clientId: personaClientId.value,
+      rolesText: personaRolesText.value,
+      tenantScope: personaTenantScope.value,
+      projectScope: personaProjectScope.value,
+      approvedForProd: personaApprovedForProd.checked
+    },
+    policy: {
+      enabled: policyEnabled.checked,
+      reviewMode: policyReviewMode.value,
+      policyBucketPrefix: policyBucketPrefix.value,
+      handshakeRequired: policyHandshakeRequired.checked,
+      advisoryAutoShape: policyAdvisoryAutoShape.checked,
+      financeSupervisorGrant: policyFinanceSupervisorGrant.checked,
+      financeEvidenceReadiness: policyFinanceEvidenceReadiness.value,
+      productionDeleteDeny: policyProductionDeleteDeny.checked
+    }
+  });
+}
+
+function activeDemoGovernanceContext(session) {
+  return buildDemoGovernanceContext(demoGovernanceOverlay, session);
 }
 
 function normalizeAgentInvokeDraft(input = {}) {
@@ -2488,46 +2566,6 @@ function renderAimxsEditorFeedbackInline(state) {
   });
 }
 
-function renderAimxsProbeFeedbackInline(state) {
-  if (!ui.settingsContent) {
-    return;
-  }
-  const chip = ui.settingsContent.querySelector("#settings-aimxs-probe-status-chip");
-  if (chip instanceof HTMLElement) {
-    chip.className = settingsEditorChipClass(state?.status);
-    chip.textContent = settingsEditorStatusLabel(state?.status);
-  }
-
-  const feedback = ui.settingsContent.querySelector("#settings-aimxs-probe-feedback");
-  if (feedback instanceof HTMLElement) {
-    const parts = [];
-    const message = String(state?.message || "").trim();
-    if (message) {
-      parts.push(`<div class="meta">${escapeHTML(message)}</div>`);
-    }
-    parts.push(
-      `<div class="meta">This panel is provider-level inside the Desktop product. It is not the managed-agent chat path.</div>`
-    );
-    const activeMode = String(aimxsActivationSnapshot?.activeMode || "").trim().toLowerCase();
-    if (activeMode !== "oss-only" && activeMode !== "aimxs-full") {
-      parts.push(
-        '<div class="meta settings-editor-warn">Switch AIMXS Deployment Contract to <code>oss-only</code> or <code>aimxs-full</code> before running this self-check.</div>'
-      );
-    }
-    parts.push(
-      `<div class="meta">storedModes=${escapeHTML(
-        Object.keys(aimxsProbeState?.resultsByMode || {}).join(", ") || "-"
-      )}; activeMode=${escapeHTML(activeMode || "unknown")}</div>`
-    );
-    feedback.innerHTML = parts.join("");
-  }
-
-  const payload = ui.settingsContent.querySelector("#settings-aimxs-probe-payload");
-  if (payload instanceof HTMLElement) {
-    payload.textContent = JSON.stringify(buildAimxsProbeRequest(state?.draft || {}), null, 2);
-  }
-}
-
 function renderLocalSecureRefFeedbackInline(state) {
   if (!ui.settingsContent) {
     return;
@@ -2555,6 +2593,38 @@ function renderLocalSecureRefFeedbackInline(state) {
   parts.push(`<div class="meta">exportPath=<code>${escapeHTML(localSecureRefSnapshot.exportPath || "-")}</code></div>`);
   if (localSecureRefSnapshot.lastExportedAt) {
     parts.push(`<div class="meta">lastExportedAt=${escapeHTML(String(localSecureRefSnapshot.lastExportedAt))}</div>`);
+  }
+  feedback.innerHTML = parts.join("");
+}
+
+function renderDemoGovernanceFeedbackInline(state) {
+  if (!ui.settingsContent) {
+    return;
+  }
+  const chip = ui.settingsContent.querySelector("#settings-demo-governance-status-chip");
+  if (chip instanceof HTMLElement) {
+    chip.className = settingsEditorChipClass(state?.status);
+    chip.textContent = settingsEditorStatusLabel(state?.status);
+  }
+
+  const feedback = ui.settingsContent.querySelector("#settings-demo-governance-feedback");
+  if (!(feedback instanceof HTMLElement)) {
+    return;
+  }
+
+  const parts = [];
+  const message = String(state?.message || "").trim();
+  if (message) {
+    parts.push(`<div class="meta">${escapeHTML(message)}</div>`);
+  }
+  parts.push(
+    "<div class=\"meta\">Runtime identity remains authoritative. This overlay only shapes local demo governed requests.</div>"
+  );
+  for (const item of Array.isArray(state?.errors) ? state.errors : []) {
+    parts.push(`<div class="meta settings-editor-error">Blocked: ${escapeHTML(item)}</div>`);
+  }
+  for (const item of Array.isArray(state?.warnings) ? state.warnings : []) {
+    parts.push(`<div class="meta settings-editor-warn">Review before save: ${escapeHTML(item)}</div>`);
   }
   feedback.innerHTML = parts.join("");
 }
@@ -3037,7 +3107,8 @@ function clearDataPanels() {
     ui.approvalsDetailContent.innerHTML = renderPanelStateMetric(
       "info",
       "Approval Review",
-      "Select an approval card to pin its context, then use the popup review surface for approve or deny."
+      "Select an approval card to pin its context in Agent.",
+      "Use the pinned review section and run detail. Do not rely on the legacy review overlay."
     );
     delete ui.approvalsDetailContent.dataset.selectedRunId;
   }
@@ -3181,7 +3252,7 @@ function refreshGovernedActionPreview(session) {
   ensureGovernedActionDefaults(ui, session);
   const input = readGovernedActionInput(ui);
   const issues = evaluateGovernedActionIssues(input);
-  const payload = buildGovernedActionRunPayload(input, session);
+  const payload = buildGovernedActionRunPayload(input, session, demoGovernanceOverlay);
   renderGovernedActionPolicyHints(ui, input, issues);
   renderGovernedActionPayload(ui, payload);
   return { input, issues, payload };
@@ -3928,7 +3999,15 @@ async function main() {
     readSavedJSON(AIMXS_OVERRIDE_KEY),
     baselineChoices?.aimxs || {}
   );
-  aimxsProbeState = normalizeAimxsProbeState(readSavedJSON(AIMXS_PROBE_STATE_KEY));
+  demoGovernanceOverlay = normalizeDemoGovernanceOverlay(readSavedJSON(DEMO_GOVERNANCE_EDITOR_KEY));
+  demoGovernanceEditorState = {
+    overlay: normalizeDemoGovernanceOverlay(demoGovernanceOverlay),
+    status: demoGovernanceOverlay?.persona?.enabled || demoGovernanceOverlay?.policy?.enabled ? "saved" : "clean",
+    message:
+      demoGovernanceOverlay?.persona?.enabled || demoGovernanceOverlay?.policy?.enabled
+        ? "Local demo governance overlay loaded from browser storage."
+        : "No local demo governance overlay is active."
+  };
   let integrationOverrides = readSavedJSON(INTEGRATION_OVERRIDES_KEY);
   let configChangeHistory = parseConfigChangeHistoryStoragePayload(
     readSavedValue(CONFIG_CHANGE_HISTORY_KEY)
@@ -3946,8 +4025,8 @@ async function main() {
   const persistAimxsOverride = () => {
     saveJSON(AIMXS_OVERRIDE_KEY, aimxsOverride);
   };
-  const persistAimxsProbeState = () => {
-    saveJSON(AIMXS_PROBE_STATE_KEY, aimxsProbeState);
+  const persistDemoGovernanceOverlay = () => {
+    saveJSON(DEMO_GOVERNANCE_EDITOR_KEY, demoGovernanceOverlay);
   };
   const persistConfigChangeHistory = () => {
     try {
@@ -4289,6 +4368,8 @@ async function main() {
       choices: getRuntimeChoices(),
       themeMode: initialThemeMode,
       selectedAgentProfileId: initialAgentID,
+      runtimeIdentity: null,
+      policyPacksCatalog: null,
       aimxsActivation: aimxsActivationSnapshot,
       localSecureRefs: localSecureRefSnapshot
     }),
@@ -4371,13 +4452,15 @@ async function main() {
         const approvalScope = readApprovalFilters(ui);
         persistListFilterStateFromUI();
 
-        const [health, pipeline, providers, runs, localSecureRefs, aimxsActivation] = await Promise.all([
+        const [health, pipeline, providers, runs, localSecureRefs, aimxsActivation, runtimeIdentity, policyPacksCatalog] = await Promise.all([
           api.getHealth(),
           api.getPipelineStatus(),
           api.getProviders(),
           api.getRuntimeRuns(runScope.limit),
           api.getLocalSecureRefs(),
-          api.getAimxsActivation()
+          api.getAimxsActivation(),
+          api.getRuntimeIdentity(),
+          api.listRuntimePolicyPacks({ clientSurface: "desktop" })
         ]);
         localSecureRefSnapshot = normalizeLocalSecureRefSnapshot(localSecureRefs);
         aimxsActivationSnapshot = normalizeAimxsActivationSnapshot(aimxsActivation);
@@ -4426,6 +4509,8 @@ async function main() {
           runs,
           approvals,
           audit,
+          runtimeIdentity,
+          policyPacksCatalog,
           themeMode: selectedThemeMode,
           selectedAgentProfileId,
           aimxsActivation: aimxsActivationSnapshot,
@@ -4468,11 +4553,6 @@ async function main() {
           integrationOverrides,
           runtimeIntegrationSyncStateByProject
         );
-        aimxsProbeState = normalizeAimxsProbeState(aimxsProbeState, {
-          tenantId: settingsWithConfigChanges?.summary?.tenantId || session?.claims?.tenant_id || "",
-          projectId: settingsWithConfigChanges?.summary?.projectId || session?.claims?.project_id || "",
-          environment: settingsWithConfigChanges?.summary?.environment || "dev"
-        });
         const nativeApprovalRailItems = buildNativeApprovalRailItems(operatorChatState.thread || {});
         let selectedApprovalRunId = readPinnedApprovalSelectionId();
         let selectedApproval = resolveApprovalSelection(selectedApprovalRunId);
@@ -4492,7 +4572,7 @@ async function main() {
         renderSettings(ui, settingsWithConfigChanges, editorState, {
           subview: settingsSubviewState,
           aimxsEditor: aimxsEditorState,
-          aimxsProbe: aimxsProbeState,
+          demoGovernance: demoGovernanceEditorState,
           localSecureRefEditor: localSecureRefEditorState,
           agentTest: {
             ...agentInvokeState,
@@ -5646,7 +5726,10 @@ async function main() {
       };
       await refresh();
       try {
-        const result = await invokeOperatorChatTurn(api, scope, operatorChatState.thread, draft);
+        const result = await invokeOperatorChatTurn(api, scope, operatorChatState.thread, {
+          ...draft,
+          governanceContext: activeDemoGovernanceContext(getSession())
+        });
         const turn = {
           requestId: String(result?.response?.requestId || "").trim(),
           taskId: String(result?.response?.taskId || operatorChatState.thread.taskId || "").trim(),
@@ -6268,10 +6351,29 @@ async function main() {
     }
     const integrationFieldNode = target.closest("[data-settings-int-field]");
     const aimxsFieldNode = target.closest("[data-settings-aimxs-field]");
-    const aimxsProbeFieldNode = target.closest("[data-settings-aimxs-probe-field]");
+    const demoGovernanceFieldNode = target.closest("[data-settings-demo-governance-field]");
     const agentTestFieldNode = target.closest("[data-settings-agent-test-field]");
     const localSecureRefFieldNode = target.closest("[data-settings-local-ref-field]");
-    if (!integrationFieldNode && !aimxsFieldNode && !aimxsProbeFieldNode && !agentTestFieldNode && !localSecureRefFieldNode) {
+    if (!integrationFieldNode && !aimxsFieldNode && !demoGovernanceFieldNode && !agentTestFieldNode && !localSecureRefFieldNode) {
+      return;
+    }
+    if (demoGovernanceFieldNode) {
+      const draft = readDemoGovernanceInput();
+      if (!draft) {
+        return;
+      }
+      const validation = validateDemoGovernanceOverlay(draft);
+      demoGovernanceEditorState = {
+        overlay: validation.overlay,
+        status: validation.valid ? "dirty" : "invalid",
+        message: validation.valid
+          ? "Local demo governance overlay changed. Save Demo Overlay when you want Agent and governed-action requests to use it."
+          : "Local demo governance overlay is blocked. Fix the fields below, then save again.",
+        errors: validation.errors,
+        warnings: validation.warnings
+      };
+      renderDemoGovernanceFeedbackInline(demoGovernanceEditorState);
+      refreshGovernedActionPreview(getSession());
       return;
     }
     if (localSecureRefFieldNode) {
@@ -6335,22 +6437,6 @@ async function main() {
       renderAimxsEditorFeedbackInline(aimxsEditorState);
       return;
     }
-    if (aimxsProbeFieldNode) {
-      const draft = readAimxsProbeInput(ui.settingsContent);
-      if (!draft) {
-        return;
-      }
-      aimxsProbeState = normalizeAimxsProbeState({
-        ...aimxsProbeState,
-        draft,
-        status: "dirty",
-        message:
-          "Probe fields changed. Review the generated payload below, then click Evaluate Current Mode when you are ready to capture this mode."
-      });
-      persistAimxsProbeState();
-      renderAimxsProbeFeedbackInline(aimxsProbeState);
-      return;
-    }
     const projectID = activeProjectScope(getSession());
     const draft = readIntegrationEditorInput();
     if (!draft) {
@@ -6407,6 +6493,89 @@ async function main() {
       setIncidentSubview("audit", true);
       await refresh();
       focusRenderedRegion(ui.auditContent);
+      return;
+    }
+    const demoGovernanceActionNode = target.closest("[data-settings-demo-governance-action]");
+    if (demoGovernanceActionNode instanceof HTMLElement) {
+      const action = String(demoGovernanceActionNode.dataset.settingsDemoGovernanceAction || "")
+        .trim()
+        .toLowerCase();
+      if (!action) {
+        return;
+      }
+      if (action === "clear") {
+        demoGovernanceOverlay = normalizeDemoGovernanceOverlay();
+        demoGovernanceEditorState = {
+          overlay: normalizeDemoGovernanceOverlay(),
+          status: "saved",
+          message: "Local demo governance overlay cleared.",
+          errors: [],
+          warnings: []
+        };
+        persistDemoGovernanceOverlay();
+        recordConfigChange({
+          action: "settings.demo_governance.clear",
+          status: "saved",
+          source: "local-ui",
+          event: "settings.demo_governance.clear",
+          providerId: "demo-governance"
+        });
+        refreshGovernedActionPreview(getSession());
+        await refresh();
+        return;
+      }
+
+      const draft = readDemoGovernanceInput() || demoGovernanceEditorState.overlay || demoGovernanceOverlay;
+      if (action === "reset") {
+        demoGovernanceEditorState = {
+          overlay: normalizeDemoGovernanceOverlay(demoGovernanceOverlay),
+          status: "clean",
+          message:
+            demoGovernanceOverlay?.persona?.enabled || demoGovernanceOverlay?.policy?.enabled
+              ? "Unsaved demo governance changes were discarded."
+              : "No local demo governance overlay is active.",
+          errors: [],
+          warnings: []
+        };
+        await refresh();
+        return;
+      }
+      if (action !== "save") {
+        return;
+      }
+      const validation = validateDemoGovernanceOverlay(draft);
+      if (!validation.valid) {
+        demoGovernanceEditorState = {
+          overlay: validation.overlay,
+          status: "invalid",
+          message: "Local demo governance overlay is blocked. Fix the fields below, then save again.",
+          errors: validation.errors,
+          warnings: validation.warnings
+        };
+        renderDemoGovernanceFeedbackInline(demoGovernanceEditorState);
+        return;
+      }
+      demoGovernanceOverlay = normalizeDemoGovernanceOverlay(validation.overlay);
+      demoGovernanceEditorState = {
+        overlay: normalizeDemoGovernanceOverlay(demoGovernanceOverlay),
+        status: "saved",
+        message:
+          demoGovernanceOverlay?.persona?.enabled || demoGovernanceOverlay?.policy?.enabled
+            ? "Local demo governance overlay saved. Agent and governed-action requests will include it on the next run."
+            : "No local demo governance overlay is active.",
+        errors: [],
+        warnings: validation.warnings
+      };
+      persistDemoGovernanceOverlay();
+      recordConfigChange({
+        action: "settings.demo_governance.save",
+        status: "saved",
+        source: "local-ui",
+        event: "settings.demo_governance.save",
+        providerId: "demo-governance"
+      });
+      refreshGovernedActionPreview(getSession());
+      await refresh();
       return;
     }
     const localSecureRefActionNode = target.closest("[data-settings-local-ref-action]");
@@ -6714,103 +6883,6 @@ async function main() {
       }
       return;
     }
-    const aimxsProbeActionNode = target.closest("[data-settings-aimxs-probe-action]");
-    if (aimxsProbeActionNode instanceof HTMLElement) {
-      const action = String(aimxsProbeActionNode.dataset.settingsAimxsProbeAction || "")
-        .trim()
-        .toLowerCase();
-      if (!action) {
-        return;
-      }
-      const draft = readAimxsProbeInput(ui.settingsContent);
-      if ((action === "evaluate" || action === "clear-results") && !draft) {
-        aimxsProbeState = normalizeAimxsProbeState({
-          ...aimxsProbeState,
-          status: "invalid",
-          message: "AIMXS probe controls are unavailable in this view. Reopen Settings and retry."
-        });
-        persistAimxsProbeState();
-        renderAimxsProbeFeedbackInline(aimxsProbeState);
-        return;
-      }
-      if (action === "clear-results") {
-        aimxsProbeState = normalizeAimxsProbeState({
-          ...aimxsProbeState,
-          draft,
-          resultsByMode: {},
-          lastResult: null,
-          status: "clean",
-          message: "Stored oss-only and aimxs-full probe results were cleared."
-        });
-        persistAimxsProbeState();
-        await refresh();
-        return;
-      }
-      if (action !== "evaluate") {
-        return;
-      }
-      const activeMode = String(aimxsActivationSnapshot?.activeMode || "").trim().toLowerCase();
-      if (activeMode !== "oss-only" && activeMode !== "aimxs-full") {
-        aimxsProbeState = normalizeAimxsProbeState({
-          ...aimxsProbeState,
-          draft,
-          status: "invalid",
-          message: "Switch AIMXS Deployment Contract to oss-only or aimxs-full before running this self-check."
-        });
-        persistAimxsProbeState();
-        renderAimxsProbeFeedbackInline(aimxsProbeState);
-        return;
-      }
-      aimxsProbeState = normalizeAimxsProbeState({
-        ...aimxsProbeState,
-        draft,
-        status: "pending",
-        message: `Evaluating ${activeMode} with the current probe fields...`
-      });
-      persistAimxsProbeState();
-      renderAimxsProbeFeedbackInline(aimxsProbeState);
-      try {
-        const payload = buildAimxsProbeRequest(draft);
-        const result = await api.evaluateAimxsProbe(payload);
-        const mode = String(result?.mode || activeMode).trim().toLowerCase();
-        const nextResults = {
-          ...(aimxsProbeState.resultsByMode || {})
-        };
-        if (mode === "oss-only" || mode === "aimxs-full") {
-          nextResults[mode] = result;
-        }
-        aimxsProbeState = normalizeAimxsProbeState({
-          ...aimxsProbeState,
-          draft,
-          resultsByMode: nextResults,
-          lastResult: result,
-          status: "applied",
-          message: String(
-            result?.summary ||
-              `Captured ${mode || activeMode} differential result from the current live policy mode.`
-          ).trim()
-        });
-        persistAimxsProbeState();
-        recordConfigChange({
-          action: "settings.aimxs.probe.evaluate",
-          status: "applied",
-          source: "local-launcher",
-          event: "settings.aimxs.probe.evaluate",
-          providerId: String(result?.providerId || mode || activeMode || "aimxs-probe").trim()
-        });
-        await refresh();
-      } catch (error) {
-        aimxsProbeState = normalizeAimxsProbeState({
-          ...aimxsProbeState,
-          draft,
-          status: "error",
-          message: `AIMXS self-check failed: ${error.message}`
-        });
-        persistAimxsProbeState();
-        renderAimxsProbeFeedbackInline(aimxsProbeState);
-      }
-      return;
-    }
     const actionNode = target.closest("[data-settings-int-action]");
     const agentTestActionNode = target.closest("[data-settings-agent-test-action]");
     if (agentTestActionNode instanceof HTMLElement) {
@@ -6888,6 +6960,7 @@ async function main() {
       await refresh();
 
       try {
+        const governanceContext = activeDemoGovernanceContext(session);
         const result = await api.invokeIntegrationAgent({
           meta: {
             tenantId: tenantID,
@@ -6897,7 +6970,8 @@ async function main() {
           agentProfileId: draft.agentProfileId,
           prompt: draft.prompt,
           systemPrompt: draft.systemPrompt,
-          maxOutputTokens: draft.maxOutputTokens
+          maxOutputTokens: draft.maxOutputTokens,
+          governanceContext
         });
         const sessionView = result?.applied && result?.sessionId
           ? await hydrateAgentInvokeSessionView(result.sessionId)
@@ -8056,11 +8130,6 @@ async function main() {
         status: "clean",
         message: describeAimxsSyncedMessage(aimxsOverride)
       };
-      refresh().catch(() => {});
-      return;
-    }
-    if (event.key === AIMXS_PROBE_STATE_KEY) {
-      aimxsProbeState = normalizeAimxsProbeState(readSavedJSON(AIMXS_PROBE_STATE_KEY));
       refresh().catch(() => {});
       return;
     }

@@ -1,4 +1,4 @@
-import { escapeHTML, renderPanelStateMetric } from "./common.js";
+import { chipClassForStatus, escapeHTML, renderPanelStateMetric } from "./common.js";
 import {
   GOVERNED_ACTION_DEMO_PROFILE_FINANCE_PAPER,
   buildGovernedActionRequest,
@@ -6,6 +6,10 @@ import {
   normalizeGovernedActionEvidenceReadiness,
   normalizeGovernedActionRiskTier
 } from "../runtime/governed-action-contract.js";
+import {
+  applyDemoGovernanceToGovernedActionInput,
+  buildDemoGovernanceContext
+} from "../runtime/demo-governance.js";
 
 function parsePositiveInteger(value, fallback = 0) {
   const parsed = Number.parseInt(String(value || "").trim(), 10);
@@ -196,25 +200,27 @@ export function evaluateGovernedActionIssues(input) {
   return issues;
 }
 
-export function buildGovernedActionRunPayload(input, session) {
+export function buildGovernedActionRunPayload(input, session, demoGovernanceOverlay = null) {
   const actorSub = String(session?.claims?.sub || "").trim() || "anonymous-operator";
   const actorId = actorSub || "anonymous-operator";
+  const adjustedInput = applyDemoGovernanceToGovernedActionInput(input, demoGovernanceOverlay, session);
+  const demoGovernanceContext = buildDemoGovernanceContext(demoGovernanceOverlay, session);
   const financeOrder =
-    String(input.demoProfile || "").trim() === GOVERNED_ACTION_DEMO_PROFILE_FINANCE_PAPER
+    String(adjustedInput.demoProfile || "").trim() === GOVERNED_ACTION_DEMO_PROFILE_FINANCE_PAPER
       ? {
-          symbol: String(input.financeSymbol || "").trim().toUpperCase(),
-          side: normalizeFinanceSide(input.financeSide),
-          quantity: parsePositiveInteger(input.financeQuantity, 25),
-          account: String(input.financeAccount || "").trim() || "paper-main"
+          symbol: String(adjustedInput.financeSymbol || "").trim().toUpperCase(),
+          side: normalizeFinanceSide(adjustedInput.financeSide),
+          quantity: parsePositiveInteger(adjustedInput.financeQuantity, 25),
+          account: String(adjustedInput.financeAccount || "").trim() || "paper-main"
         }
       : null;
   const request = buildGovernedActionRequest({
-    ...input,
+    ...adjustedInput,
     actor: actorId,
     originSurface: "home.governed_action_request"
   });
   const governedContext = request.context?.governed_action || {};
-  const summary = String(input.requestSummary || "").trim();
+  const summary = String(adjustedInput.requestSummary || "").trim();
   const payload = {
     meta: {
       requestId: input.requestId || request.meta.requestId,
@@ -232,9 +238,9 @@ export function buildGovernedActionRunPayload(input, session) {
     task: {
       intent: summary,
       summary,
-      requestLabel: governedContext.request_label || input.requestLabel,
+      requestLabel: governedContext.request_label || adjustedInput.requestLabel,
       workflowKind: governedContext.workflow_kind || "external_action_request",
-      demoProfile: governedContext.demo_profile || input.demoProfile
+      demoProfile: governedContext.demo_profile || adjustedInput.demoProfile
     },
     context: {
       ...request.context,
@@ -242,7 +248,8 @@ export function buildGovernedActionRunPayload(input, session) {
         ...governedContext,
         operator_actor_id: actorId,
         request_summary: summary,
-        finance_order: financeOrder || undefined
+        finance_order: financeOrder || undefined,
+        demo_governance: demoGovernanceContext || undefined
       }
     },
     mode: request.mode,
@@ -251,10 +258,13 @@ export function buildGovernedActionRunPayload(input, session) {
       originSurface: "home.governed_action_request",
       governedAction: {
         contractId: governedContext.contract_id || "",
-        demoProfile: governedContext.demo_profile || input.demoProfile
+        demoProfile: governedContext.demo_profile || adjustedInput.demoProfile
       }
     }
   };
+  if (demoGovernanceContext) {
+    payload.context.demo_governance = demoGovernanceContext;
+  }
   return payload;
 }
 
@@ -327,7 +337,7 @@ export function renderGovernedActionReviewSummary(run) {
     <div class="meta">Review this run in History to compare the actual provider response, evidence refs, and policy stratification.</div>
     <div class="run-detail-chips">
       <span class="chip chip-neutral chip-compact">runId=${escapeHTML(String(run?.runId || "-"))}</span>
-      <span class="chip chip-neutral chip-compact">decision=${escapeHTML(decision)}</span>
+      <span class="${`${chipClassForStatus(decision)} chip-compact`}">decision=${escapeHTML(decision)}</span>
       <span class="chip chip-neutral chip-compact">workflow=${escapeHTML(String(governed.workflow_kind || "-"))}</span>
       <span class="chip chip-neutral chip-compact">profile=${escapeHTML(String(governed.demo_profile || "-"))}</span>
     </div>

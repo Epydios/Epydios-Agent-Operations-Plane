@@ -1,5 +1,4 @@
 import { escapeHTML } from "../views/common.js";
-import { renderAimxsProbeMetric as renderAimxsProbeMetricInternal } from "./probe.js";
 import {
   collectAimxsSecureRefItems,
   describeAimxsSettingsMessage,
@@ -24,10 +23,6 @@ function chipClassForAimxsActivationState(value) {
 
 export function collectAimxsKnownLocalSecureRefs(settings) {
   return collectAimxsSecureRefItems(settings);
-}
-
-export function renderAimxsProbeMetric(viewState = {}, activation = {}) {
-  return renderAimxsProbeMetricInternal(viewState, activation);
 }
 
 export function renderAimxsStatusMetric(settings, chipClassForEndpointState) {

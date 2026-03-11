@@ -24,13 +24,14 @@ import (
 )
 
 type AgentInvokeRequest struct {
-	Meta            ObjectMeta `json:"meta"`
-	TaskID          string     `json:"taskId,omitempty"`
-	AgentProfileID  string     `json:"agentProfileId,omitempty"`
-	ExecutionMode   string     `json:"executionMode,omitempty"`
-	Prompt          string     `json:"prompt"`
-	SystemPrompt    string     `json:"systemPrompt,omitempty"`
-	MaxOutputTokens int        `json:"maxOutputTokens,omitempty"`
+	Meta              ObjectMeta `json:"meta"`
+	TaskID            string     `json:"taskId,omitempty"`
+	AgentProfileID    string     `json:"agentProfileId,omitempty"`
+	ExecutionMode     string     `json:"executionMode,omitempty"`
+	Prompt            string     `json:"prompt"`
+	SystemPrompt      string     `json:"systemPrompt,omitempty"`
+	MaxOutputTokens   int        `json:"maxOutputTokens,omitempty"`
+	GovernanceContext JSONObject `json:"governanceContext,omitempty"`
 }
 
 type AgentInvokeResponse struct {

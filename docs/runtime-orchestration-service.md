@@ -42,6 +42,7 @@ This service moves policy/evidence/profile execution flow out of ad-hoc scripts 
 - `POST /v1alpha1/runtime/integrations/invoke` (`meta.tenantId`, `meta.projectId`, optional `agentProfileId`, `prompt`, optional `systemPrompt`, optional `maxOutputTokens`)
 - `GET /v1alpha2/runtime/worker-capabilities?executionMode=...&workerType=...&adapterId=...`
 - `GET /v1alpha2/runtime/policy-packs?packId=...&permission=...&executionMode=...&workerType=...&adapterId=...&clientSurface=...`
+- `GET /v1alpha2/runtime/identity`
 - `GET /v1alpha2/runtime/export-profiles?exportProfile=...&reportType=...&clientSurface=...&audience=...&retentionClass=...`
 - `GET /v1alpha2/runtime/org-admin-profiles?profileId=...&organizationModel=...&roleBundle=...&clientSurface=...`
 - `GET /v1alpha2/runtime/sessions/{sessionId}/evidence/export?format=jsonl|json&kind=...&retentionClass=...&exportProfile=...&audience=...&exportRetentionClass=...`
@@ -87,6 +88,22 @@ This service moves policy/evidence/profile execution flow out of ad-hoc scripts 
 - Policy-pack entries now also carry:
   - `roleBundles`
   - `decisionSurfaces`
+
+## Runtime Identity Contract (M21 read-only baseline)
+
+- Endpoint scope is runtime-authz protected and currently requires the same read permission as session and run reads.
+- `GET /v1alpha2/runtime/identity` returns the runtime-auth view of the current operator identity and the policy/authorization basis attached to that identity.
+- Current response coverage:
+  - whether runtime auth is enabled
+  - whether the request is authenticated
+  - authority basis (`bearer_token_jwt`, `runtime_auth_disabled`, or local context identity)
+  - current subject, client id, roles, tenant scopes, and project scopes
+  - effective runtime permissions derived from the current authz role or policy matrix
+  - claim-key inventory
+  - policy-matrix requirement flag and current policy-rule count
+- Intended use:
+  - power the Desktop `Settings` identity/authority inspection surface
+  - let operators verify who is acting under what authority without inferring identity from a governed run after the fact
 
 ## Export Profile Catalog Contract (M20 baseline)
 

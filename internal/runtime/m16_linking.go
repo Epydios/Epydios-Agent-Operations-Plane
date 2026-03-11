@@ -124,6 +124,14 @@ func (s *APIServer) ensureInvokeSession(ctx context.Context, req *AgentInvokeReq
 		return nil, nil, fmt.Errorf("task %q not found", taskID)
 	}
 	if task == nil {
+		annotations := map[string]interface{}{
+			"agentProfileId": strings.TrimSpace(req.AgentProfileID),
+			"systemPrompt":   strings.TrimSpace(req.SystemPrompt),
+			"executionMode":  descriptor.executionMode,
+		}
+		if len(req.GovernanceContext) > 0 {
+			annotations["governanceContext"] = req.GovernanceContext
+		}
 		task = &TaskRecord{
 			TaskID:      taskID,
 			RequestID:   req.Meta.RequestID,
@@ -136,11 +144,7 @@ func (s *APIServer) ensureInvokeSession(ctx context.Context, req *AgentInvokeReq
 			Status:      TaskStatusInProgress,
 			CreatedAt:   now,
 			UpdatedAt:   now,
-			Annotations: mustMarshalJSON(map[string]interface{}{
-				"agentProfileId": strings.TrimSpace(req.AgentProfileID),
-				"systemPrompt":   strings.TrimSpace(req.SystemPrompt),
-				"executionMode":  descriptor.executionMode,
-			}),
+			Annotations: mustMarshalJSON(annotations),
 		}
 	} else {
 		if task.TenantID != req.Meta.TenantID || task.ProjectID != req.Meta.ProjectID {
@@ -161,6 +165,14 @@ func (s *APIServer) ensureInvokeSession(ctx context.Context, req *AgentInvokeReq
 	newSession := false
 	if session == nil {
 		newSession = true
+		summary := map[string]interface{}{
+			"agentProfileId":  strings.TrimSpace(req.AgentProfileID),
+			"maxOutputTokens": req.MaxOutputTokens,
+			"executionMode":   descriptor.executionMode,
+		}
+		if len(req.GovernanceContext) > 0 {
+			summary["governanceContext"] = req.GovernanceContext
+		}
 		session = &SessionRecord{
 			SessionID:   sessionID,
 			TaskID:      taskID,
@@ -170,19 +182,23 @@ func (s *APIServer) ensureInvokeSession(ctx context.Context, req *AgentInvokeReq
 			SessionType: descriptor.sessionType,
 			Status:      SessionStatusRunning,
 			Source:      descriptor.sessionSource,
-			Summary: mustMarshalJSON(map[string]interface{}{
-				"agentProfileId":  strings.TrimSpace(req.AgentProfileID),
-				"maxOutputTokens": req.MaxOutputTokens,
-				"executionMode":   descriptor.executionMode,
-			}),
-			CreatedAt: now,
-			StartedAt: now,
-			UpdatedAt: now,
+			Summary:     mustMarshalJSON(summary),
+			CreatedAt:   now,
+			StartedAt:   now,
+			UpdatedAt:   now,
 		}
 	} else {
 		session.SessionType = descriptor.sessionType
 		session.Source = descriptor.sessionSource
 		session.Status = SessionStatusRunning
+		summary := parseRawJSONObject(session.Summary)
+		summary["agentProfileId"] = strings.TrimSpace(req.AgentProfileID)
+		summary["maxOutputTokens"] = req.MaxOutputTokens
+		summary["executionMode"] = descriptor.executionMode
+		if len(req.GovernanceContext) > 0 {
+			summary["governanceContext"] = req.GovernanceContext
+		}
+		session.Summary = mustMarshalJSON(summary)
 		session.UpdatedAt = now
 	}
 	if err := s.store.UpsertSession(ctx, session); err != nil {
@@ -302,7 +318,18 @@ func (s *APIServer) markInvokeSessionResult(ctx context.Context, task *TaskRecor
 		ExecutionMode:  response.ExecutionMode,
 	}
 	descriptor := invokeExecutionDescriptorForRequest(req)
-	pendingToolProposalReview := invokeErr == nil && descriptor.executionMode == AgentInvokeExecutionModeManagedCodexWorker && len(response.ToolProposals) > 0
+	pendingToolProposalReview := false
+	autoGovernedProposalCount := 0
+	if invokeErr == nil && descriptor.executionMode == AgentInvokeExecutionModeManagedCodexWorker {
+		for _, proposal := range response.ToolProposals {
+			if strings.EqualFold(normalizedInterfaceString(proposal["type"]), governedActionProposalType) &&
+				!normalizedInterfaceBool(proposal["operatorApprovalRequired"]) {
+				autoGovernedProposalCount++
+				continue
+			}
+			pendingToolProposalReview = true
+		}
+	}
 	if invokeErr != nil {
 		task.Status = TaskStatusFailed
 		session.Status = SessionStatusFailed
@@ -310,6 +337,10 @@ func (s *APIServer) markInvokeSessionResult(ctx context.Context, task *TaskRecor
 	} else if pendingToolProposalReview {
 		task.Status = TaskStatusInProgress
 		session.Status = SessionStatusAwaitingApproval
+		session.CompletedAt = nil
+	} else if autoGovernedProposalCount > 0 {
+		task.Status = TaskStatusInProgress
+		session.Status = SessionStatusRunning
 		session.CompletedAt = nil
 	} else {
 		task.Status = TaskStatusCompleted
@@ -388,6 +419,9 @@ func (s *APIServer) markInvokeSessionResult(ctx context.Context, task *TaskRecor
 		if pendingToolProposalReview {
 			workerStatus = WorkerStatusWaiting
 			payload["summary"] = "Managed Codex worker completed the turn and is waiting for governed tool proposal review."
+		} else if autoGovernedProposalCount > 0 {
+			workerStatus = WorkerStatusRunning
+			payload["summary"] = "Managed Codex worker completed the turn and auto-routed governed action proposals through the runtime policy boundary."
 		}
 		toolAction.ResultPayload = mustMarshalJSON(map[string]interface{}{
 			"provider":           response.Provider,
@@ -438,6 +472,7 @@ func (s *APIServer) markInvokeSessionResult(ctx context.Context, task *TaskRecor
 	s.upsertToolActionBestEffort(ctx, toolAction)
 	progressStage := "completed"
 	progressSummary := descriptor.completedSummary
+	autoGovernedProposals := make([]*sessionToolProposal, 0, autoGovernedProposalCount)
 	if invokeErr == nil {
 		outputChunks := append([]string(nil), response.WorkerOutputChunks...)
 		if len(outputChunks) == 0 {
@@ -532,6 +567,16 @@ func (s *APIServer) markInvokeSessionResult(ctx context.Context, task *TaskRecor
 				}),
 				Timestamp: now,
 			})
+			if strings.EqualFold(proposalType, governedActionProposalType) && !normalizedInterfaceBool(proposalPayload["operatorApprovalRequired"]) {
+				autoGovernedProposals = append(autoGovernedProposals, &sessionToolProposal{
+					ProposalID:   proposalID,
+					ProposalType: normalizeStringOrDefault(proposalType, governedActionProposalType),
+					Summary:      proposalSummary,
+					WorkerID:     workerID,
+					Payload:      proposalPayload,
+					Status:       "PENDING",
+				})
+			}
 		}
 	} else {
 		progressStage = "failed"
@@ -540,6 +585,9 @@ func (s *APIServer) markInvokeSessionResult(ctx context.Context, task *TaskRecor
 	if pendingToolProposalReview {
 		progressStage = "awaiting_tool_review"
 		progressSummary = "Managed Codex worker is waiting for governed tool proposal review."
+	} else if autoGovernedProposalCount > 0 {
+		progressStage = "policy_first_governed_action"
+		progressSummary = "Managed Codex worker is routing governed action proposals directly into the runtime policy boundary."
 	}
 	s.appendSessionEventBestEffort(ctx, &SessionEventRecord{
 		SessionID: session.SessionID,
@@ -598,6 +646,9 @@ func (s *APIServer) markInvokeSessionResult(ctx context.Context, task *TaskRecor
 			}),
 			Timestamp: now,
 		})
+	}
+	for _, proposal := range autoGovernedProposals {
+		s.autoExecuteGovernedActionProposal(ctx, session, proposal, now)
 	}
 }
 

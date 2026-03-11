@@ -1,7 +1,6 @@
 import { escapeHTML, formatTime } from "./common.js";
 import {
   collectAimxsKnownLocalSecureRefs,
-  renderAimxsProbeMetric,
   renderAimxsSettingsMetric,
   renderAimxsStatusMetric
 } from "../aimxs/settings-view.js";
@@ -91,6 +90,57 @@ function renderProviderContractRows(items) {
         </tr>
       `;
     })
+    .join("");
+}
+
+function chipClassForAuthorityBasis(value) {
+  const basis = String(value || "").trim().toLowerCase();
+  if (basis === "bearer_token_jwt" || basis === "runtime_context_identity" || basis === "mock_bearer_token_jwt") {
+    return "chip chip-ok";
+  }
+  if (basis === "runtime_auth_disabled" || basis === "endpoint_unavailable" || basis === "unresolved") {
+    return "chip chip-warn";
+  }
+  return "chip chip-neutral";
+}
+
+function renderDelimitedCodeList(items = []) {
+  const values = Array.isArray(items) ? items.map((item) => String(item || "").trim()).filter(Boolean) : [];
+  if (values.length === 0) {
+    return "-";
+  }
+  return values.map((item) => `<code>${escapeHTML(item)}</code>`).join(", ");
+}
+
+function policyProviderLabel(settings = {}) {
+  const selectedProviderId = String(settings?.aimxs?.activation?.selectedProviderId || "").trim();
+  if (selectedProviderId) {
+    return selectedProviderId;
+  }
+  const mode = String(settings?.aimxs?.mode || "").trim().toLowerCase();
+  if (mode === "oss-only") {
+    return "oss-policy-opa";
+  }
+  if (mode === "aimxs-full") {
+    return "aimxs-full";
+  }
+  if (mode === "aimxs-https") {
+    return "aimxs-policy-primary";
+  }
+  return "-";
+}
+
+function renderPolicyPackRows(items) {
+  return (items || [])
+    .map((item) => `
+      <tr>
+        ${tableCell("Pack", `<code>${escapeHTML(item?.packId || "-")}</code>`)}
+        ${tableCell("Label", escapeHTML(item?.label || "-"))}
+        ${tableCell("Role Bundles", renderDelimitedCodeList(item?.roleBundles || []))}
+        ${tableCell("Decision Surfaces", renderDelimitedCodeList(item?.decisionSurfaces || []))}
+        ${tableCell("Boundary Requirements", renderDelimitedCodeList(item?.boundaryRequirements || []))}
+      </tr>
+    `)
     .join("");
 }
 
@@ -1107,6 +1157,137 @@ function renderLocalSecureRefPanel(settings, editorState = {}) {
   `;
 }
 
+function renderDemoGovernancePanel(runtimeIdentity = {}, editorState = {}) {
+  const overlay = editorState?.overlay && typeof editorState.overlay === "object" ? editorState.overlay : {};
+  const persona = overlay?.persona && typeof overlay.persona === "object" ? overlay.persona : {};
+  const policy = overlay?.policy && typeof overlay.policy === "object" ? overlay.policy : {};
+  const status = String(editorState?.status || "clean").trim().toLowerCase() || "clean";
+  const statusChipClass = chipClassForEditorStatus(status);
+  const feedbackLines = [];
+  const message = String(editorState?.message || "").trim();
+  if (message) {
+    feedbackLines.push(`<div class="meta">${escapeHTML(message)}</div>`);
+  }
+  const errors = Array.isArray(editorState?.errors) ? editorState.errors : [];
+  const warnings = Array.isArray(editorState?.warnings) ? editorState.warnings : [];
+  feedbackLines.push(
+    `<div class="meta">Runtime identity above remains authoritative. This overlay is local demo configuration only and does not overwrite auth-derived identity.</div>`
+  );
+  errors.forEach((item) => {
+    feedbackLines.push(`<div class="meta settings-editor-error">Blocked: ${escapeHTML(item)}</div>`);
+  });
+  warnings.forEach((item) => {
+    feedbackLines.push(`<div class="meta settings-editor-warn">Review before save: ${escapeHTML(item)}</div>`);
+  });
+  if (!message && errors.length === 0 && warnings.length === 0) {
+    feedbackLines.push(
+      "<div class=\"meta\">Set a local demo persona or policy overlay here when you want repeatable governed-action demos without pretending this is production identity management.</div>"
+    );
+  }
+  feedbackLines.push(
+    `<div class="meta">runtimeSubject=<code>${escapeHTML(runtimeIdentity?.identity?.subject || "-")}</code>; runtimeClientId=<code>${escapeHTML(runtimeIdentity?.identity?.clientId || "-")}</code></div>`
+  );
+
+  return `
+    <div class="metric settings-metric settings-metric-demo-governance">
+      <div class="metric-title-row">
+        <div class="title">Local Demo Identity + Policy Overlay</div>
+        <span id="settings-demo-governance-status-chip" class="${statusChipClass}">${escapeHTML(status)}</span>
+      </div>
+      <div class="meta">Use this only for local demo shaping on the governed-action boundary. It is not a production identity or policy editor.</div>
+      <div class="settings-editor-grid">
+        <label class="field field-wide">
+          <span class="label">Enable Demo Persona</span>
+          <input id="settings-demo-persona-enabled" type="checkbox" ${checkedAttr(Boolean(persona.enabled))} data-settings-demo-governance-field="personaEnabled" />
+        </label>
+        <label class="field">
+          <span class="label">Persona Label</span>
+          <input id="settings-demo-persona-label" class="filter-input" type="text" value="${escapeHTML(String(persona.label || "Local Demo Persona"))}" data-settings-demo-governance-field="personaLabel" />
+        </label>
+        <label class="field">
+          <span class="label">Persona Subject ID</span>
+          <input id="settings-demo-persona-subject-id" class="filter-input" type="text" value="${escapeHTML(String(persona.subjectId || ""))}" data-settings-demo-governance-field="personaSubjectId" placeholder="demo.operator.local" />
+        </label>
+        <label class="field">
+          <span class="label">Persona Client ID</span>
+          <input id="settings-demo-persona-client-id" class="filter-input" type="text" value="${escapeHTML(String(persona.clientId || ""))}" data-settings-demo-governance-field="personaClientId" placeholder="desktop-local-demo" />
+        </label>
+        <label class="field field-wide">
+          <span class="label">Persona Roles (CSV)</span>
+          <input id="settings-demo-persona-roles" class="filter-input" type="text" value="${escapeHTML(String(persona.rolesText || ""))}" data-settings-demo-governance-field="personaRolesText" placeholder="compliance.viewer, runtime.run.create" />
+        </label>
+        <label class="field">
+          <span class="label">Tenant Scope Override</span>
+          <input id="settings-demo-persona-tenant-scope" class="filter-input" type="text" value="${escapeHTML(String(persona.tenantScope || ""))}" data-settings-demo-governance-field="personaTenantScope" placeholder="tenant-local" />
+        </label>
+        <label class="field">
+          <span class="label">Project Scope Override</span>
+          <input id="settings-demo-persona-project-scope" class="filter-input" type="text" value="${escapeHTML(String(persona.projectScope || ""))}" data-settings-demo-governance-field="personaProjectScope" placeholder="project-local" />
+        </label>
+        <label class="field field-wide">
+          <span class="label">Persona Approved For Prod</span>
+          <input id="settings-demo-persona-approved-for-prod" type="checkbox" ${checkedAttr(Boolean(persona.approvedForProd))} data-settings-demo-governance-field="personaApprovedForProd" />
+        </label>
+      </div>
+      <div class="settings-editor-grid">
+        <label class="field field-wide">
+          <span class="label">Enable Demo Policy Overlay</span>
+          <input id="settings-demo-policy-enabled" type="checkbox" ${checkedAttr(Boolean(policy.enabled))} data-settings-demo-governance-field="policyEnabled" />
+        </label>
+        <label class="field">
+          <span class="label">Review Mode</span>
+          <select id="settings-demo-policy-review-mode" class="filter-input" data-settings-demo-governance-field="policyReviewMode">
+            <option value="policy_first" ${selectedAttr(String(policy.reviewMode || ""), "policy_first")}>Policy First</option>
+            <option value="manual_review" ${selectedAttr(String(policy.reviewMode || ""), "manual_review")}>Manual Review</option>
+          </select>
+        </label>
+        <label class="field">
+          <span class="label">Policy Bucket Prefix</span>
+          <input id="settings-demo-policy-bucket-prefix" class="filter-input" type="text" value="${escapeHTML(String(policy.policyBucketPrefix || "desktop-demo"))}" data-settings-demo-governance-field="policyBucketPrefix" />
+        </label>
+        <label class="field">
+          <span class="label">Handshake Required</span>
+          <input id="settings-demo-policy-handshake-required" type="checkbox" ${checkedAttr(policy.handshakeRequired !== false)} data-settings-demo-governance-field="policyHandshakeRequired" />
+        </label>
+        <label class="field">
+          <span class="label">Advisory Auto-Shape</span>
+          <input id="settings-demo-policy-advisory-auto-shape" type="checkbox" ${checkedAttr(policy.advisoryAutoShape !== false)} data-settings-demo-governance-field="policyAdvisoryAutoShape" />
+        </label>
+        <label class="field">
+          <span class="label">Finance Supervisor Grant</span>
+          <input id="settings-demo-policy-finance-supervisor-grant" type="checkbox" ${checkedAttr(policy.financeSupervisorGrant !== false)} data-settings-demo-governance-field="policyFinanceSupervisorGrant" />
+        </label>
+        <label class="field">
+          <span class="label">Finance Evidence Readiness</span>
+          <select id="settings-demo-policy-finance-evidence-readiness" class="filter-input" data-settings-demo-governance-field="policyFinanceEvidenceReadiness">
+            <option value="READY" ${selectedAttr(String(policy.financeEvidenceReadiness || ""), "READY")}>READY</option>
+            <option value="PARTIAL" ${selectedAttr(String(policy.financeEvidenceReadiness || ""), "PARTIAL")}>PARTIAL</option>
+            <option value="MISSING" ${selectedAttr(String(policy.financeEvidenceReadiness || ""), "MISSING")}>MISSING</option>
+          </select>
+        </label>
+        <label class="field">
+          <span class="label">Deny Prod Destructive Actions</span>
+          <input id="settings-demo-policy-production-delete-deny" type="checkbox" ${checkedAttr(policy.productionDeleteDeny !== false)} data-settings-demo-governance-field="policyProductionDeleteDeny" />
+        </label>
+      </div>
+      <div class="filter-row settings-editor-actions">
+        <div class="action-hierarchy">
+          <div class="action-group action-group-primary">
+            <button class="btn btn-primary" type="button" data-settings-demo-governance-action="save">Save Demo Overlay</button>
+          </div>
+          <div class="action-group action-group-secondary">
+            <button class="btn btn-secondary" type="button" data-settings-demo-governance-action="reset">Reset Unsaved</button>
+            <button class="btn btn-secondary" type="button" data-settings-demo-governance-action="clear">Clear Overlay</button>
+          </div>
+        </div>
+      </div>
+      <div id="settings-demo-governance-feedback" class="stack" role="status" aria-live="polite" aria-atomic="true">
+        ${feedbackLines.join("")}
+      </div>
+    </div>
+  `;
+}
+
 export function renderSettings(ui, settingsPayload, editorState = {}, viewState = {}) {
   if (!ui.settingsContent) {
     return;
@@ -1127,12 +1308,22 @@ export function renderSettings(ui, settingsPayload, editorState = {}, viewState 
   const localPaths = resolveLocalStoragePaths(runtimePlatform);
   const retention = resolveRetentionDays(settings);
   const configChanges = Array.isArray(settings.configChanges) ? settings.configChanges : [];
+  const runtimeIdentity = settings?.identity && typeof settings.identity === "object" ? settings.identity : {};
+  const identitySummary =
+    runtimeIdentity?.identity && typeof runtimeIdentity.identity === "object"
+      ? runtimeIdentity.identity
+      : {};
+  const policyCatalog = settings?.policyCatalog && typeof settings.policyCatalog === "object" ? settings.policyCatalog : {};
+  const policyCatalogItems = Array.isArray(policyCatalog.items) ? policyCatalog.items : [];
+  const policyPackRows = renderPolicyPackRows(policyCatalogItems);
+  const authorityChipClass = chipClassForAuthorityBasis(runtimeIdentity?.authorityBasis);
 
   const endpointRows = renderEndpointMatrixRows(endpoints);
   const providerContractRows = renderProviderContractRows(providerContracts);
   const integrationEditor = renderIntegrationEditor(settings, editorState);
   const localSecureRefPanel = renderLocalSecureRefPanel(settings, viewState?.localSecureRefEditor || {});
   const integrationInvokePanel = renderIntegrationInvokePanel(settings, viewState?.agentTest || {});
+  const demoGovernancePanel = renderDemoGovernancePanel(runtimeIdentity, viewState?.demoGovernance || {});
   const integrationSyncStatus = renderIntegrationSyncStatus(settings, editorState);
   const configChangeRows = renderConfigChangeRows(configChanges);
   const requestedSubview = String(viewState?.subview || "configuration").trim().toLowerCase();
@@ -1144,7 +1335,6 @@ export function renderSettings(ui, settingsPayload, editorState = {}, viewState 
     chipClassForEditorStatus,
     selectedAttr
   });
-  const aimxsProbeMetric = renderAimxsProbeMetric(viewState?.aimxsProbe || {}, settings?.aimxs?.activation || {});
 
   ui.settingsContent.innerHTML = `
     <div class="metric settings-metric settings-metric-scope">
@@ -1166,6 +1356,26 @@ export function renderSettings(ui, settingsPayload, editorState = {}, viewState 
         <div class="meta">activeAgentProfile=${escapeHTML(agent.label)} (${escapeHTML(agent.id)})</div>
         <div class="meta">profileProviderContract=${escapeHTML(agent.provider)}</div>
       </div>
+      <div class="metric settings-metric settings-metric-identity-authority">
+        <div class="metric-title-row">
+          <div class="title">Current Identity + Authority</div>
+          <span class="${authorityChipClass}">${escapeHTML(runtimeIdentity?.authorityBasis || "unknown")}</span>
+        </div>
+        <div class="meta">authEnabled=${escapeHTML(String(Boolean(runtimeIdentity?.authEnabled)))}; authenticated=${escapeHTML(String(Boolean(runtimeIdentity?.authenticated)))}</div>
+        <div class="meta">subject=<code>${escapeHTML(identitySummary?.subject || "-")}</code>; clientId=<code>${escapeHTML(identitySummary?.clientId || "-")}</code></div>
+        <div class="meta">roles=${renderDelimitedCodeList(identitySummary?.roles || [])}</div>
+        <div class="meta">tenantScopes=${renderDelimitedCodeList(identitySummary?.tenantIds || [])}</div>
+        <div class="meta">projectScopes=${renderDelimitedCodeList(identitySummary?.projectIds || [])}</div>
+        <div class="meta">effectivePermissions=${renderDelimitedCodeList(identitySummary?.effectivePermissions || [])}</div>
+      </div>
+      <div class="metric settings-metric settings-metric-policy-contract">
+        <div class="title">Current Policy Contract</div>
+        <div class="meta">mode=${escapeHTML(settings?.aimxs?.mode || "-")}; provider=${escapeHTML(policyProviderLabel(settings))}</div>
+        <div class="meta">policyCatalogSource=${escapeHTML(summarizeDataSource(policyCatalog?.source || "unknown"))}; packCount=${escapeHTML(String(policyCatalog?.count || policyCatalogItems.length || 0))}</div>
+        <div class="meta">policyMatrixRequired=${escapeHTML(String(Boolean(runtimeIdentity?.policyMatrixRequired)))}; policyRuleCount=${escapeHTML(String(runtimeIdentity?.policyRuleCount || 0))}</div>
+        <div class="meta">availablePacks=${renderDelimitedCodeList(policyCatalogItems.map((item) => item?.packId || ""))}</div>
+      </div>
+      ${demoGovernancePanel}
       ${integrationEditor}
       ${localSecureRefPanel}
       ${integrationInvokePanel}
@@ -1176,7 +1386,6 @@ export function renderSettings(ui, settingsPayload, editorState = {}, viewState 
         <div class="meta">gatewayMtlsKeyRef=<code>${escapeHTML(integrations.gatewayMtlsKeyRef || "-")}</code></div>
       </div>
       ${aimxsSettingsMetric}
-      ${aimxsProbeMetric}
       <div class="metric settings-metric settings-metric-runtime-defaults">
         <div class="title">Runtime Defaults + Theme</div>
         <div class="meta">realtime=${escapeHTML(realtime.mode || "-")} / ${escapeHTML(String(realtime.pollIntervalMs || "-"))}ms</div>
@@ -1259,6 +1468,30 @@ export function renderSettings(ui, settingsPayload, editorState = {}, viewState 
             </tr>
           </thead>
           <tbody>${providerContractRows || `<tr>${tableCell("Status", "No provider contracts are populated for the current scope. Select an agent profile or apply integration settings, then reopen Diagnostics.", ' colspan="8"')}</tr>`}</tbody>
+        </table>
+      </div>
+      <div class="metric settings-metric settings-metric-runtime-identity">
+        <div class="title">Runtime Identity Contract</div>
+        <div class="meta">source=${escapeHTML(runtimeIdentity?.source || "-")}; authEnabled=${escapeHTML(String(Boolean(runtimeIdentity?.authEnabled)))}; authenticated=${escapeHTML(String(Boolean(runtimeIdentity?.authenticated)))}</div>
+        <div class="meta">authorityBasis=${escapeHTML(runtimeIdentity?.authorityBasis || "-")}; roleClaim=${escapeHTML(runtimeIdentity?.roleClaim || "-")}; clientIdClaim=${escapeHTML(runtimeIdentity?.clientIdClaim || "-")}</div>
+        <div class="meta">tenantClaim=${escapeHTML(runtimeIdentity?.tenantClaim || "-")}; projectClaim=${escapeHTML(runtimeIdentity?.projectClaim || "-")}</div>
+        <div class="meta">claimKeys=${renderDelimitedCodeList(identitySummary?.claimKeys || [])}</div>
+      </div>
+      <div class="metric settings-metric settings-metric-policy-packs">
+        <div class="title">Policy Pack Catalog</div>
+        <div class="meta">Selected provider and policy mode are shown above; this table shows the runtime-native pack catalog currently exposed to the desktop surface.</div>
+        <table class="data-table settings-table">
+          <caption class="sr-only">Policy pack catalog for the current desktop surface, including pack id, label, role bundles, decision surfaces, and boundary requirements.</caption>
+          <thead>
+            <tr>
+              <th scope="col">Pack</th>
+              <th scope="col">Label</th>
+              <th scope="col">Role Bundles</th>
+              <th scope="col">Decision Surfaces</th>
+              <th scope="col">Boundary Requirements</th>
+            </tr>
+          </thead>
+          <tbody>${policyPackRows || `<tr>${tableCell("Status", "No policy packs are loaded for the current desktop surface. Refresh Diagnostics, then verify the runtime policy-pack endpoint and current scope.", ' colspan="5"')}</tr>`}</tbody>
         </table>
       </div>
       ${renderAimxsStatusMetric(settings, chipClassForEndpointState)}

@@ -227,6 +227,31 @@ type PolicyPackCatalogResponse struct {
 	Items       []PolicyPackCatalogEntry `json:"items"`
 }
 
+type RuntimeIdentitySummary struct {
+	Subject              string   `json:"subject,omitempty"`
+	ClientID             string   `json:"clientId,omitempty"`
+	Roles                []string `json:"roles,omitempty"`
+	TenantIDs            []string `json:"tenantIds,omitempty"`
+	ProjectIDs           []string `json:"projectIds,omitempty"`
+	EffectivePermissions []string `json:"effectivePermissions,omitempty"`
+	ClaimKeys            []string `json:"claimKeys,omitempty"`
+}
+
+type RuntimeIdentityResponse struct {
+	GeneratedAt          time.Time              `json:"generatedAt"`
+	Source               string                 `json:"source"`
+	AuthEnabled          bool                   `json:"authEnabled"`
+	Authenticated        bool                   `json:"authenticated"`
+	AuthorityBasis       string                 `json:"authorityBasis,omitempty"`
+	PolicyMatrixRequired bool                   `json:"policyMatrixRequired"`
+	PolicyRuleCount      int                    `json:"policyRuleCount"`
+	RoleClaim            string                 `json:"roleClaim,omitempty"`
+	ClientIDClaim        string                 `json:"clientIdClaim,omitempty"`
+	TenantClaim          string                 `json:"tenantClaim,omitempty"`
+	ProjectClaim         string                 `json:"projectClaim,omitempty"`
+	Identity             RuntimeIdentitySummary `json:"identity"`
+}
+
 type ExportProfileCatalogEntry struct {
 	ExportProfile                  string            `json:"exportProfile"`
 	Label                          string            `json:"label"`

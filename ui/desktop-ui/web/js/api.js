@@ -234,6 +234,31 @@ function mockPolicyPackCatalog() {
   };
 }
 
+function mockRuntimeIdentity() {
+  return {
+    generatedAt: nowISO(),
+    source: "mock",
+    authEnabled: true,
+    authenticated: true,
+    authorityBasis: "mock_bearer_token_jwt",
+    policyMatrixRequired: true,
+    policyRuleCount: 3,
+    roleClaim: "roles",
+    clientIdClaim: "client_id",
+    tenantClaim: "tenant_id",
+    projectClaim: "project_id",
+    identity: {
+      subject: "demo.operator",
+      clientId: "epydios-desktop-local",
+      roles: ["runtime.admin", "enterprise.ai_operator"],
+      tenantIds: ["tenant-local"],
+      projectIds: ["project-local"],
+      effectivePermissions: ["runtime.run.create", "runtime.run.read"],
+      claimKeys: ["aud", "client_id", "project_id", "roles", "sub", "tenant_id"]
+    }
+  };
+}
+
 function mockExportProfileCatalog() {
   return {
     source: "mock",
@@ -2634,6 +2659,11 @@ export class AgentOpsApi {
         detail: "Not checked yet.",
         updatedAt: ""
       },
+      runtimeIdentity: {
+        state: "unknown",
+        detail: "Not checked yet.",
+        updatedAt: ""
+      },
       runs: {
         state: "unknown",
         detail: "Not checked yet.",
@@ -2779,6 +2809,12 @@ export class AgentOpsApi {
           ...(endpointSnapshot.policyPacks || {})
         },
         {
+          id: "runtimeIdentity",
+          label: "Runtime Identity",
+          path: this.config?.endpoints?.runtimeIdentity || "",
+          ...(endpointSnapshot.runtimeIdentity || {})
+        },
+        {
           id: "runs",
           label: "Runtime Runs",
           path: this.config?.endpoints?.runs || "",
@@ -2886,6 +2922,32 @@ export class AgentOpsApi {
         ),
         activation: normalizeAimxsActivationSnapshot(context.aimxsActivation || {})
       },
+      identity: deepClone(
+        context.runtimeIdentity || {
+          source: this.config.mockMode ? "mock" : "runtime-endpoint",
+          authEnabled: Boolean(this.config?.auth?.enabled),
+          authenticated: false,
+          authorityBasis: this.config?.auth?.enabled ? "unresolved" : "runtime_auth_disabled",
+          policyMatrixRequired: false,
+          policyRuleCount: 0,
+          identity: {
+            subject: "",
+            clientId: "",
+            roles: [],
+            tenantIds: [],
+            projectIds: [],
+            effectivePermissions: [],
+            claimKeys: []
+          }
+        }
+      ),
+      policyCatalog: deepClone(
+        context.policyPacksCatalog || {
+          source: this.config.mockMode ? "mock" : "runtime-endpoint",
+          count: 0,
+          items: []
+        }
+      ),
       localSecureRefs: deepClone(
         context.localSecureRefs || {
           available: false,
@@ -3256,6 +3318,49 @@ export class AgentOpsApi {
       } else {
         this.updateEndpointStatus("policyPacks", "error", `Runtime policy-pack request failed (${error.message}).`);
       }
+      throw error;
+    }
+  }
+
+  async getRuntimeIdentity() {
+    if (this.config.mockMode) {
+      this.updateEndpointStatus("runtimeIdentity", "mock", "Mock mode enabled.");
+      return mockRuntimeIdentity();
+    }
+
+    const endpoint = this.config?.endpoints?.runtimeIdentity;
+    if (!endpoint) {
+      this.updateEndpointStatus("runtimeIdentity", "unavailable", "No runtime identity endpoint configured.");
+      throw new Error("Runtime identity endpoint is not configured.");
+    }
+
+    try {
+      const response = await this.request(this.config.runtimeApiBaseUrl, endpoint, {});
+      this.updateEndpointStatus("runtimeIdentity", "available", "Runtime identity endpoint responded.");
+      return response;
+    } catch (error) {
+      if (error.status === 404 || error.status === 405 || error.status === 501) {
+        this.updateEndpointStatus("runtimeIdentity", "unavailable", `Runtime identity endpoint returned HTTP ${error.status}.`);
+        return {
+          source: "endpoint-unavailable",
+          warning: `Runtime identity endpoint returned HTTP ${error.status}.`,
+          authEnabled: Boolean(this.config?.auth?.enabled),
+          authenticated: false,
+          authorityBasis: "endpoint_unavailable",
+          policyMatrixRequired: false,
+          policyRuleCount: 0,
+          identity: {
+            subject: "",
+            clientId: "",
+            roles: [],
+            tenantIds: [],
+            projectIds: [],
+            effectivePermissions: [],
+            claimKeys: []
+          }
+        };
+      }
+      this.updateEndpointStatus("runtimeIdentity", "error", `Runtime identity request failed (${error.message}).`);
       throw error;
     }
   }
@@ -4108,13 +4213,6 @@ export class AgentOpsApi {
 
   async applyAimxsActivation(payload = {}) {
     return this.request("", "/__agentops/aimxs/activation/apply", undefined, {
-      method: "POST",
-      body: payload
-    });
-  }
-
-  async evaluateAimxsProbe(payload = {}) {
-    return this.request("", "/__agentops/aimxs/probe/evaluate", undefined, {
       method: "POST",
       body: payload
     });

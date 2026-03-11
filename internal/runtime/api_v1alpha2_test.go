@@ -2215,6 +2215,45 @@ func TestMemoryRunStoreImplementsM16Methods(t *testing.T) {
 
 type fakeGovernedActionProviderClient struct{}
 
+func fakeGovernedActionRequestMap(input interface{}) map[string]interface{} {
+	var payload map[string]interface{}
+	if err := assignRuntimeTestJSON(&payload, input); err != nil {
+		return map[string]interface{}{}
+	}
+	return payload
+}
+
+func fakeGovernedActionPolicyDecision(input interface{}) (string, string, map[string]interface{}) {
+	payload := fakeGovernedActionRequestMap(input)
+	meta := extractJSONObjectValue(payload["meta"])
+	subject := extractJSONObjectValue(payload["subject"])
+	subjectAttributes := extractJSONObjectValue(subject["attributes"])
+	action := extractJSONObjectValue(payload["action"])
+	context := extractJSONObjectValue(payload["context"])
+	policy := extractJSONObjectValue(context["policy_stratification"])
+	requiredGrants := normalizeGovernedActionStringSlice(policy["required_grants"])
+	evidenceReadiness := strings.ToUpper(strings.TrimSpace(normalizedInterfaceString(policy["evidence_readiness"])))
+	environment := strings.ToLower(strings.TrimSpace(normalizedInterfaceString(meta["environment"])))
+	actionVerb := strings.ToLower(strings.TrimSpace(normalizedInterfaceString(action["verb"])))
+	approvedForProd := normalizedInterfaceBool(subjectAttributes["approvedForProd"])
+
+	providerPolicy := map[string]interface{}{
+		"boundary_class":     normalizedInterfaceString(policy["boundary_class"]),
+		"risk_tier":          normalizedInterfaceString(policy["risk_tier"]),
+		"required_grants":    requiredGrants,
+		"evidence_readiness": normalizedInterfaceString(policy["evidence_readiness"]),
+	}
+
+	switch {
+	case actionVerb == "delete" || (environment == "prod" && !approvedForProd):
+		return "DENY", "Production-destructive governed action is blocked without approvedForProd=true.", providerPolicy
+	case len(requiredGrants) > 0 || evidenceReadiness != "" && evidenceReadiness != "READY":
+		return "DEFER", "Supervisor trading grant is still required before execution.", providerPolicy
+	default:
+		return "ALLOW", "Governed request passed local AIMXS policy evaluation.", providerPolicy
+	}
+}
+
 func (c *fakeGovernedActionProviderClient) SelectProvider(_ context.Context, _ string, providerType, requiredCapability, targetOS string, minPriority int64) (*ProviderTarget, error) {
 	switch providerType {
 	case "ProfileResolver":
@@ -2243,7 +2282,7 @@ func (c *fakeGovernedActionProviderClient) SelectProvider(_ context.Context, _ s
 	}
 }
 
-func (c *fakeGovernedActionProviderClient) PostJSON(_ context.Context, target *ProviderTarget, path string, _ interface{}, out interface{}) error {
+func (c *fakeGovernedActionProviderClient) PostJSON(_ context.Context, target *ProviderTarget, path string, input interface{}, out interface{}) error {
 	switch target.ProviderType {
 	case "ProfileResolver":
 		if path != "/v1alpha1/profile-resolver/resolve" {
@@ -2258,8 +2297,25 @@ func (c *fakeGovernedActionProviderClient) PostJSON(_ context.Context, target *P
 		if path != "/v1alpha1/policy-provider/evaluate" {
 			return fmt.Errorf("unexpected policy path %q", path)
 		}
+		decision, message, providerPolicy := fakeGovernedActionPolicyDecision(input)
+		output := map[string]interface{}{
+			"aimxs": map[string]interface{}{
+				"providerId": "aimxs-full",
+				"providerMeta": map[string]interface{}{
+					"baak_engaged":  true,
+					"decision_path": map[string]string{"ALLOW": "finance_governed_allow", "DEFER": "finance_governed_defer", "DENY": "finance_governed_deny"}[decision],
+					"policy_stratification": providerPolicy,
+				},
+				"evidence": map[string]interface{}{
+					"evidence_hash": "sha256:governed-action-test",
+				},
+			},
+		}
+		if decision == "ALLOW" {
+			output["grantToken"] = "aimxs-grant-test"
+		}
 		return assignRuntimeTestJSON(out, map[string]interface{}{
-			"decision": "DEFER",
+			"decision": decision,
 			"source":   "aimxs-full",
 			"policyBundle": map[string]interface{}{
 				"policyId":      "AIMXS_FINANCE_DEMO",
@@ -2267,29 +2323,13 @@ func (c *fakeGovernedActionProviderClient) PostJSON(_ context.Context, target *P
 			},
 			"reasons": []map[string]interface{}{
 				{
-					"code":    "grant_required",
-					"message": "Supervisor trading grant is still required before execution.",
+					"code":    map[string]string{"ALLOW": "policy_allow", "DEFER": "grant_required", "DENY": "policy_blocked"}[decision],
+					"message": message,
 				},
 			},
 			"evidenceRefs": []string{"evidence://mock-governed-1"},
-			"output": map[string]interface{}{
-				"aimxs": map[string]interface{}{
-					"providerId": "aimxs-full",
-					"providerMeta": map[string]interface{}{
-						"baak_engaged":  true,
-						"decision_path": "finance_governed_defer",
-						"policy_stratification": map[string]interface{}{
-							"boundary_class":     "external_actuator",
-							"risk_tier":          "high",
-							"required_grants":    []string{"grant.trading.supervisor"},
-							"evidence_readiness": "PARTIAL",
-						},
-					},
-					"evidence": map[string]interface{}{
-						"evidence_hash": "sha256:governed-action-test",
-					},
-				},
-			},
+			"grantTokenPresent": decision == "ALLOW",
+			"output":            output,
 		})
 	case "EvidenceProvider":
 		switch path {

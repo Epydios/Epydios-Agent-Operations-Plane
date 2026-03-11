@@ -244,7 +244,7 @@ function buildApprovalReviewModel(approval) {
     [
       `createdAt=${formatTime(approval?.createdAt)}`,
       `expiresAt=${ttl.expiresAtLabel}`,
-      `reasonRequired=true; operatorDecisionSurface=approval-review-modal`
+      `reasonRequired=true; operatorDecisionSurface=approval-review-inline-or-run-detail`
     ]
   );
   const guardrails = [
@@ -485,7 +485,7 @@ export function renderApprovalsDetail(ui, approval) {
       "info",
       "Approval Review",
       "Select an approval card to keep its decision context pinned in Agent.",
-      "The actual approve or deny workflow now opens in a popup so the action surface stays obvious."
+      "Use the pinned review section and run detail from Agent. Do not rely on the legacy review overlay."
     );
     return;
   }
@@ -500,7 +500,7 @@ export function renderApprovalsDetail(ui, approval) {
         <span class="${model.statusChip} chip-compact">status=${escapeHTML(model.status || "UNKNOWN")}</span>
         <span class="${escapeHTML(model.ttl.chipClass)}">${escapeHTML(`ttl=${model.ttl.label}`)}</span>
       </div>
-      <div class="meta metric-note">${escapeHTML(model.hasInlineDecision ? "Keep the selected current-thread decision pinned here and approve or deny directly from this review surface." : "Keep the selected approval pinned here, then use the popup for the actual approve or deny workflow.")}</div>
+      <div class="meta metric-note">${escapeHTML(model.hasInlineDecision ? "Keep the selected current-thread decision pinned here and approve or deny directly from this review surface." : "Keep the selected approval pinned here and use run detail for the underlying record. Do not rely on the legacy review overlay.")}</div>
       <div class="run-detail-chips">
         <span class="chip chip-neutral chip-compact">${escapeHTML(model.runId ? "runId" : "thread")}=${escapeHTML(model.runId || model.approval?.taskId || "-")}</span>
         <span class="chip chip-neutral chip-compact">tenant=${escapeHTML(model.approval?.tenantId || "-")}</span>
@@ -511,7 +511,7 @@ export function renderApprovalsDetail(ui, approval) {
       </div>
       <div class="meta">expiresAt=${escapeHTML(model.ttl.expiresAtLabel)}; createdAt=${escapeHTML(formatTime(model.approval?.createdAt))}</div>
       <div class="meta">reason=${escapeHTML(String(model.detailSummary || model.approval?.reason || "").trim() || "-")}</div>
-      <div class="meta">Decision controls are ${escapeHTML(model.hasInlineDecision ? "live directly in this pinned review section" : model.actionable ? "live in the popup" : "locked because the approval is no longer actionable")}.</div>
+      <div class="meta">Decision controls are ${escapeHTML(model.hasInlineDecision ? "live directly in this pinned review section" : model.actionable ? "not exposed inline for this approval type" : "locked because the approval is no longer actionable")}.</div>
       <div class="approval-actions action-hierarchy">
         ${
           model.hasInlineDecision
@@ -543,16 +543,9 @@ export function renderApprovalsDetail(ui, approval) {
               </div>
             `
             : `
-              <div class="action-group action-group-primary">
-                <button
-                  class="btn btn-ok"
-                  type="button"
-                  data-approval-open-modal-run-id="${escapeHTML(model.runId)}"
-                >Open Review Popup</button>
-              </div>
               <div class="action-group action-group-secondary">
                 <button
-                  class="btn btn-secondary btn-small"
+                  class="btn btn-secondary"
                   type="button"
                   data-approval-open-run-id="${escapeHTML(model.runId)}"
                 >Open Run Detail</button>
@@ -563,7 +556,7 @@ export function renderApprovalsDetail(ui, approval) {
     </div>
     <div class="metric">
       <div class="title">Review Checklist</div>
-      <div class="meta metric-note">Requested capabilities and traceability stay visible here even when the popup is closed.</div>
+      <div class="meta metric-note">Requested capabilities and traceability stay visible here while you review the underlying run record.</div>
       <ul class="workflow-guide-list">${model.guardrails.map((item) => `<li>${escapeHTML(item)}</li>`).join("")}</ul>
       <ul class="quickstart-list">${model.capabilityRows}</ul>
     </div>
@@ -580,7 +573,7 @@ export function renderApprovalReviewModal(ui, approval) {
     ui.approvalReviewModalContent.innerHTML = renderPanelStateMetric(
       "info",
       "Approval Review",
-      "Select a pending approval from Agent to open the popup review surface."
+      "Select a pending approval from Agent to inspect its detail if the legacy review surface is still present."
     );
     delete ui.approvalReviewModalContent.dataset.selectedRunId;
     return;

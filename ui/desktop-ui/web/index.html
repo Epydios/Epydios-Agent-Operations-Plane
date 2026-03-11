@@ -613,7 +613,7 @@
             <div class="dialog-header">
               <div>
                 <h3 id="approval-review-modal-title">Approval Review</h3>
-                <p class="dialog-subtitle">Approve or deny from this popup so the Agent workspace stays focused on active work.</p>
+                <p class="dialog-subtitle">Legacy review surface for approvals that do not yet expose inline controls.</p>
               </div>
               <button class="btn btn-secondary btn-small" type="button" data-approval-modal-close>Close</button>
             </div>
@@ -743,8 +743,10 @@
             <div id="history-folder-feedback" class="meta">Copy a pattern here when you need a quick folder template before selecting a specific run.</div>
           </article>
         </div>
-        <div id="runs-content" class="stack"></div>
-        <div id="run-detail-content" class="stack"></div>
+        <div class="history-review-layout">
+          <div id="runs-content" class="stack history-runs-list"></div>
+          <div id="run-detail-content" class="stack history-run-detail"></div>
+        </div>
       </section>
 
       <section class="panel panel-audit" data-workspace-section="incidents">

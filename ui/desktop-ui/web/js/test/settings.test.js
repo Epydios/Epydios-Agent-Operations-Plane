@@ -83,10 +83,70 @@ test("settings view persists raw response and native timeline disclosure shells"
       },
       diagnostics: {
         providerContracts: []
+      },
+      identity: {
+        source: "runtime.auth.context",
+        authEnabled: true,
+        authenticated: true,
+        authorityBasis: "bearer_token_jwt",
+        policyMatrixRequired: true,
+        policyRuleCount: 3,
+        roleClaim: "roles",
+        clientIdClaim: "client_id",
+        tenantClaim: "tenant_id",
+        projectClaim: "project_id",
+        identity: {
+          subject: "demo.operator",
+          clientId: "epydios-desktop-local",
+          roles: ["runtime.admin", "enterprise.ai_operator"],
+          tenantIds: ["tenant-local"],
+          projectIds: ["project-local"],
+          effectivePermissions: ["runtime.run.create", "runtime.run.read"],
+          claimKeys: ["sub", "roles", "tenant_id", "project_id"]
+        }
+      },
+      policyCatalog: {
+        source: "m20.enterprise.policy_pack_catalog",
+        count: 1,
+        items: [
+          {
+            packId: "managed_codex_worker_operator",
+            label: "Managed Codex Worker Operator",
+            roleBundles: ["enterprise.operator"],
+            decisionSurfaces: ["governed_tool_action"],
+            boundaryRequirements: ["tenant_project_scope", "runtime_authz"]
+          }
+        ]
       }
     },
     {},
     {
+      demoGovernance: {
+        overlay: {
+          persona: {
+            enabled: true,
+            label: "Local Demo Persona",
+            subjectId: "demo.operator.local",
+            clientId: "desktop-demo-local",
+            rolesText: "compliance.viewer, runtime.run.create",
+            tenantScope: "tenant-local",
+            projectScope: "project-local",
+            approvedForProd: false
+          },
+          policy: {
+            enabled: true,
+            reviewMode: "policy_first",
+            handshakeRequired: true,
+            advisoryAutoShape: true,
+            financeSupervisorGrant: true,
+            financeEvidenceReadiness: "PARTIAL",
+            productionDeleteDeny: true,
+            policyBucketPrefix: "desktop-demo"
+          }
+        },
+        status: "saved",
+        message: "Local demo governance overlay saved."
+      },
       agentTest: {
         agentProfileId: "openai",
         prompt: "Reply with exactly: local-runtime-ok",
@@ -126,7 +186,13 @@ test("settings view persists raw response and native timeline disclosure shells"
   assert.match(ui.settingsContent.innerHTML, /Provider CA Ref/);
   assert.match(ui.settingsContent.innerHTML, /Activate AIMXS Mode/);
   assert.match(ui.settingsContent.innerHTML, /Refresh Activation Status/);
-  assert.match(ui.settingsContent.innerHTML, /AIMXS Richness Self-Check/);
-  assert.match(ui.settingsContent.innerHTML, /Evaluate Current Mode/);
   assert.match(ui.settingsContent.innerHTML, /clusterMode=aimxs-full/);
+  assert.match(ui.settingsContent.innerHTML, /Current Identity \+ Authority/);
+  assert.match(ui.settingsContent.innerHTML, /demo\.operator/);
+  assert.match(ui.settingsContent.innerHTML, /Current Policy Contract/);
+  assert.match(ui.settingsContent.innerHTML, /Local Demo Identity \+ Policy Overlay/);
+  assert.match(ui.settingsContent.innerHTML, /Save Demo Overlay/);
+  assert.match(ui.settingsContent.innerHTML, /Policy Bucket Prefix/);
+  assert.match(ui.settingsContent.innerHTML, /Policy Pack Catalog/);
+  assert.match(ui.settingsContent.innerHTML, /managed_codex_worker_operator/);
 });

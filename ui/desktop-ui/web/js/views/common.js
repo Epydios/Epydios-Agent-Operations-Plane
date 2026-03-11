@@ -14,6 +14,12 @@ export function chipClassForStatus(status) {
     normalized === "pass" ||
     normalized === "ready" ||
     normalized === "allow" ||
+    normalized === "approve" ||
+    normalized === "approved" ||
+    normalized === "accept" ||
+    normalized === "accepted" ||
+    normalized === "cleared" ||
+    normalized === "success" ||
     normalized === "completed" ||
     normalized === "true"
   ) {
@@ -21,9 +27,12 @@ export function chipClassForStatus(status) {
   }
   if (
     normalized === "warn" ||
+    normalized === "warning" ||
     normalized === "unknown" ||
     normalized === "pending" ||
-    normalized === "policy_evaluated"
+    normalized === "policy_evaluated" ||
+    normalized === "defer" ||
+    normalized === "deferred"
   ) {
     return "chip chip-warn";
   }
