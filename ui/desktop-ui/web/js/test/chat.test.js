@@ -78,11 +78,15 @@ test("chat view renders parity fixture state from the native contract", async ()
   assert.match(ui.chatContent.innerHTML, /proposal-1/);
   assert.match(ui.chatContent.innerHTML, /Pending Decisions/);
   assert.match(ui.chatContent.innerHTML, /Approve Proposal/);
-  assert.match(ui.chatContent.innerHTML, /Current Focus/);
+  assert.match(ui.chatContent.innerHTML, /Thread Overview/);
+  assert.match(ui.chatContent.innerHTML, /Agent Chat/);
+  assert.match(ui.chatContent.innerHTML, /Latest Reply/);
   assert.match(ui.chatContent.innerHTML, /Resolve pending decisions first/);
   assert.match(ui.chatContent.innerHTML, /Enterprise Governance Report/);
   assert.match(ui.chatContent.innerHTML, /Copy Report/);
   assert.match(ui.chatContent.innerHTML, /enterprise-default: Enterprise Default/);
+  assert.doesNotMatch(ui.chatContent.innerHTML, /Launch Worker/);
+  assert.doesNotMatch(ui.chatContent.innerHTML, /Refresh Reply/);
 });
 
 test("chat view surfaces governed action proposals and linked run detail from the same thread", () => {
@@ -247,7 +251,7 @@ test("chat view surfaces governed action proposals and linked run detail from th
   assert.match(ui.chatContent.innerHTML, /deferred the request\./);
 });
 
-test("chat view renders governed export profile controls from the export-profile catalog", () => {
+test("chat view keeps governed export profile controls off the primary agent surface", () => {
   const ui = { chatContent: { innerHTML: "" } };
   renderChat(
     ui,
@@ -290,12 +294,10 @@ test("chat view renders governed export profile controls from the export-profile
     }
   );
 
-  assert.match(ui.chatContent.innerHTML, /Governed Export Profile/);
-  assert.match(ui.chatContent.innerHTML, /data-chat-export-field="exportProfile"/);
-  assert.match(ui.chatContent.innerHTML, /data-chat-export-field="audience"/);
-  assert.match(ui.chatContent.innerHTML, /data-chat-export-field="retentionClass"/);
-  assert.match(ui.chatContent.innerHTML, /retention=archive/);
-  assert.match(ui.chatContent.innerHTML, /overlays=security_review =&gt; archive/);
+  assert.doesNotMatch(ui.chatContent.innerHTML, /Governed Export Profile/);
+  assert.doesNotMatch(ui.chatContent.innerHTML, /data-chat-export-field="exportProfile"/);
+  assert.doesNotMatch(ui.chatContent.innerHTML, /data-chat-export-field="audience"/);
+  assert.doesNotMatch(ui.chatContent.innerHTML, /data-chat-export-field="retentionClass"/);
 });
 
 test("chat governed report includes active org-admin review metadata from approval checkpoints", () => {
@@ -455,6 +457,120 @@ test("chat composer explains system instructions versus the turn prompt", () => 
 
   assert.match(ui.chatContent.innerHTML, /System Instructions/);
   assert.match(ui.chatContent.innerHTML, /durable guidance/i);
-  assert.match(ui.chatContent.innerHTML, /Turn Prompt/);
+  assert.match(ui.chatContent.innerHTML, /Prompt/);
   assert.match(ui.chatContent.innerHTML, /specific request/i);
+});
+
+test("latest policy outcome only reflects the newest turn", () => {
+  const ui = { chatContent: { innerHTML: "" } };
+  renderChat(
+    ui,
+    {
+      integrations: {
+        selectedAgentProfileId: "codex",
+        agentProfiles: [{ id: "codex", label: "Codex" }]
+      }
+    },
+    {
+      agentProfileId: "codex",
+      executionMode: "managed_codex_worker",
+      thread: {
+        taskId: "task-latest-policy-outcome",
+        tenantId: "tenant-demo",
+        projectId: "project-demo",
+        turns: [
+          {
+            sessionView: {
+              timeline: {},
+              streamItems: [],
+              source: "timeline",
+              toolProposals: [
+                {
+                  type: "governed_action_request",
+                  requestLabel: "Delete Production Config",
+                  policyDecision: "DENY",
+                  selectedPolicyProvider: "aimxs-full"
+                }
+              ]
+            }
+          },
+          {
+            sessionView: {
+              timeline: {},
+              streamItems: [],
+              source: "timeline",
+              toolProposals: []
+            }
+          }
+        ]
+      },
+      history: {
+        items: [],
+        count: 0,
+        archivedCount: 0,
+        showArchived: false,
+        message: "",
+        source: "runtime"
+      }
+    }
+  );
+
+  assert.match(ui.chatContent.innerHTML, /Latest Policy Outcome: the latest turn has not recorded a governed policy result yet\./);
+  assert.doesNotMatch(ui.chatContent.innerHTML, /Delete Production Config/);
+});
+
+test("latest reply prefers the fuller stored assistant response over truncated activity text", () => {
+  const ui = { chatContent: { innerHTML: "" } };
+  renderChat(
+    ui,
+    {
+      integrations: {
+        selectedAgentProfileId: "codex",
+        agentProfiles: [{ id: "codex", label: "Codex" }]
+      }
+    },
+    {
+      thread: {
+        taskId: "task-reply-1",
+        tenantId: "tenant-demo",
+        projectId: "project-core",
+        turns: [
+          {
+            response: {
+              sessionId: "session-reply-1",
+              outputText: "Paragraph one.\n\nParagraph two.\n\nParagraph three."
+            },
+            sessionView: {
+              timeline: {
+                session: {
+                  sessionId: "session-reply-1",
+                  status: "COMPLETED"
+                }
+              },
+              streamItems: [
+                {
+                  eventType: "worker.message",
+                  payload: {
+                    text: "Paragraph three."
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      history: {
+        items: [],
+        count: 0,
+        archivedCount: 0,
+        showArchived: false,
+        message: "",
+        source: "runtime"
+      }
+    }
+  );
+
+  assert.match(ui.chatContent.innerHTML, /Paragraph one\./);
+  assert.match(ui.chatContent.innerHTML, /Paragraph two\./);
+  assert.match(ui.chatContent.innerHTML, /Paragraph three\./);
 });

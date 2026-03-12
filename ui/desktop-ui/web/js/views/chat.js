@@ -1,4 +1,4 @@
-import { escapeHTML, formatTime } from "./common.js";
+import { displayPolicyProviderLabel, escapeHTML, formatTime } from "./common.js";
 import { buildNativeSessionActivitySummary, deriveOperatorChatThreadState, listNativeToolProposals, latestManagedWorkerTranscript } from "../runtime/session-client.js";
 import { buildEnterpriseReportEnvelope, buildGovernedExportSelectionState, renderEnterpriseReportEnvelope } from "../runtime/governance-report.js";
 
@@ -112,7 +112,7 @@ function renderGovernedRunLink(runId) {
 
 function derivePolicyOutcomePresentation(decisionValue, providerValue, reasonValue) {
   const decision = normalizedString(decisionValue).toUpperCase();
-  const provider = normalizedString(providerValue);
+  const provider = normalizedString(displayPolicyProviderLabel(providerValue), "-");
   const reason = normalizedString(reasonValue);
   if (decision === "ALLOW") {
     return {
@@ -156,30 +156,29 @@ function derivePolicyOutcomePresentation(decisionValue, providerValue, reasonVal
 
 function latestPolicyOutcomeFromTurns(turns = []) {
   const turnList = Array.isArray(turns) ? turns : [];
-  for (let turnIndex = turnList.length - 1; turnIndex >= 0; turnIndex -= 1) {
-    const sessionView = turnList[turnIndex]?.sessionView;
-    const proposals = listNativeToolProposals(sessionView);
-    for (let proposalIndex = proposals.length - 1; proposalIndex >= 0; proposalIndex -= 1) {
-      const proposal = proposals[proposalIndex];
-      const decision = normalizedString(proposal?.policyDecision).toUpperCase();
-      if (!decision) {
-        continue;
-      }
-      const provider = normalizedString(proposal?.selectedPolicyProvider);
-      const runId = normalizedString(proposal?.runId);
-      const requestLabel = normalizedString(
-        proposal?.requestLabel,
-        normalizedString(objectValue(proposal?.payload)?.requestLabel, normalizedString(proposal?.summary, "Governed Action Request"))
-      );
-      const outcome = derivePolicyOutcomePresentation(decision, provider, normalizedString(proposal?.reason));
-      return {
-        decision,
-        provider,
-        runId,
-        requestLabel,
-        outcome
-      };
+  const latestTurn = turnList.length > 0 ? turnList[turnList.length - 1] : null;
+  const sessionView = latestTurn?.sessionView;
+  const proposals = listNativeToolProposals(sessionView);
+  for (let proposalIndex = proposals.length - 1; proposalIndex >= 0; proposalIndex -= 1) {
+    const proposal = proposals[proposalIndex];
+    const decision = normalizedString(proposal?.policyDecision).toUpperCase();
+    if (!decision) {
+      continue;
     }
+    const provider = normalizedString(displayPolicyProviderLabel(proposal?.selectedPolicyProvider));
+    const runId = normalizedString(proposal?.runId);
+    const requestLabel = normalizedString(
+      proposal?.requestLabel,
+      normalizedString(objectValue(proposal?.payload)?.requestLabel, normalizedString(proposal?.summary, "Governed Action Request"))
+    );
+    const outcome = derivePolicyOutcomePresentation(decision, provider, normalizedString(proposal?.reason));
+    return {
+      decision,
+      provider,
+      runId,
+      requestLabel,
+      outcome
+    };
   }
   return null;
 }
@@ -194,7 +193,10 @@ function renderGovernedProposalSummary(item = {}, options = {}) {
   const runId = normalizedString(item?.runId, normalizedString(runSnapshot?.runId));
   const runStatus = normalizedString(item?.runStatus, normalizedString(runSnapshot?.status));
   const policyDecision = normalizedString(item?.policyDecision, normalizedString(runSnapshot?.policyDecision)).toUpperCase();
-  const selectedPolicyProvider = normalizedString(item?.selectedPolicyProvider, normalizedString(runSnapshot?.selectedPolicyProvider));
+  const selectedPolicyProvider = normalizedString(
+    displayPolicyProviderLabel(item?.selectedPolicyProvider),
+    normalizedString(displayPolicyProviderLabel(runSnapshot?.selectedPolicyProvider))
+  );
   const policyOutcome = derivePolicyOutcomePresentation(policyDecision, selectedPolicyProvider, "");
   const showResult = options.showResult !== false;
 
@@ -245,7 +247,7 @@ function renderGovernedActionResultSummary(item = {}) {
   const runId = normalizedString(governedRun?.runId);
   const runStatus = normalizedString(governedRun?.status);
   const policyDecision = normalizedString(governedRun?.policyDecision).toUpperCase();
-  const provider = normalizedString(governedRun?.selectedPolicyProvider);
+  const provider = normalizedString(displayPolicyProviderLabel(governedRun?.selectedPolicyProvider));
   const reviewMode = normalizedString(resultPayload?.reviewMode, normalizedString(requestPayload?.reviewMode));
   const operatorApprovalRequired =
     requestPayload?.operatorApprovalRequired === true
@@ -1028,7 +1030,7 @@ function buildAgentFocusSummary({
       tone: "chip chip-danger chip-compact",
       label: "review now",
       title: "Resolve pending decisions first",
-      detail: "Use the approval rail and current-turn decision inbox before asking the worker to continue mutating work.",
+      detail: "Use the decision cards and current-turn inbox before asking the worker to continue mutating work.",
       pendingApprovalCount,
       pendingProposalCount,
       turnCount,
@@ -1040,7 +1042,7 @@ function buildAgentFocusSummary({
       tone: "chip chip-warn chip-compact",
       label: "worker active",
       title: "Managed worker is active",
-      detail: "Watch worker progress, refresh if output stalls, and intervene only when approvals, proposals, or follow-up instructions are needed.",
+      detail: "Watch worker progress and intervene only when approvals, proposals, or follow-up instructions are needed.",
       pendingApprovalCount,
       pendingProposalCount,
       turnCount,
@@ -1051,7 +1053,7 @@ function buildAgentFocusSummary({
     tone: "chip chip-ok chip-compact",
     label: "ready",
     title: "Continue the current thread",
-    detail: "Send the next message, or refresh the latest reply if the current turn needs another read from native session state.",
+    detail: "Send the next message or review the latest reply before continuing the same thread.",
     pendingApprovalCount,
     pendingProposalCount,
     turnCount,
@@ -1206,17 +1208,32 @@ export function renderChat(ui, settingsPayload = {}, chatState = {}) {
   const catalogState = chatState?.catalogs && typeof chatState.catalogs === "object" ? chatState.catalogs : {};
   const governedExportSelection = resolveChatGovernedExportSelection(chatState?.exportSelection || {}, catalogState?.exportProfiles || null);
   const managedExecution = executionMode === "managed_codex_worker";
-  const managedSessionId = String(latestTurn?.sessionView?.timeline?.session?.sessionId || "").trim();
   const managedWorkerId = String(latestActivity?.selectedWorkerId || selectedWorker?.workerId || "").trim();
   const managedWorkerReady = managedExecution && Boolean(taskId) && Boolean(managedWorkerId) && !threadState?.isResolvedThread;
-  const canLaunchManagedWorker = managedExecution && Boolean(taskId) && !managedWorkerReady;
-  const canReattachManagedWorker = managedExecution && Boolean(taskId) && Boolean(managedSessionId) && !threadState?.isResolvedThread;
-  const canRecoverManagedWorker = managedExecution && Boolean(taskId);
-  const canCloseManagedWorker = managedExecution && Boolean(managedSessionId) && !threadState?.isResolvedThread;
   const historyCount = Number(history?.count ?? 0) || 0;
   const archivedCount = Number(history?.archivedCount ?? 0) || 0;
   const historySummary = String(history?.message || "Use Thread History to reopen or archive prior work without burying the current chat.").trim();
   const latestPolicyOutcome = latestPolicyOutcomeFromTurns(turns);
+  const latestReplyResponseText = String(latestTurn?.response?.outputText || "").trim();
+  const latestReplyActivityText = String(latestActivity?.latestOutputText || "").trim();
+  const latestReplyText = latestReplyResponseText.length >= latestReplyActivityText.length
+    ? latestReplyResponseText
+    : latestReplyActivityText;
+  const latestReplySessionId = String(latestTurn?.response?.sessionId || latestTurn?.sessionView?.timeline?.session?.sessionId || "").trim();
+  const latestReplyCompletedAt = String(
+    latestTurn?.response?.completedAt
+      || latestTurn?.sessionView?.timeline?.session?.completedAt
+      || latestTurn?.createdAt
+      || ""
+  ).trim();
+  const latestReplyRoute = String(latestTurn?.response?.route || "").trim();
+  const latestReplyFinishReason = String(latestTurn?.response?.finishReason || "").trim();
+  const latestReplyBoundary = String(latestTurn?.response?.boundaryProviderId || "").trim();
+  const latestReplyStatus = String(
+    latestTurn?.sessionView?.timeline?.session?.status || latestTurn?.response?.finishReason || status
+  )
+    .trim()
+    .toUpperCase() || "IDLE";
   const focusSummary = buildAgentFocusSummary({
     taskId,
     threadState,
@@ -1231,146 +1248,155 @@ export function renderChat(ui, settingsPayload = {}, chatState = {}) {
     <div class="stack chat-surface agent-chat-shell">
       <div class="panel-heading agent-panel-heading">
         <h2>Agent Workspace</h2>
-        <p class="panel-lead">Keep current work in one place: write the next message here, review thread state beside it, and use the approval rail without leaving the tab.</p>
       </div>
-      <div class="metric agent-focus-card">
-        <div class="metric-title-row">
-          <div class="title">Current Focus</div>
-          <span class="${focusSummary.tone}">${escapeHTML(focusSummary.label)}</span>
-        </div>
-        <div class="meta">${escapeHTML(focusSummary.title)}</div>
-        <div class="meta">${escapeHTML(focusSummary.detail)}</div>
-        <div class="run-detail-chips">
-          <span class="chip chip-neutral chip-compact">task=${escapeHTML(taskId || "-")}</span>
-          <span class="chip chip-neutral chip-compact">turns=${escapeHTML(String(focusSummary.turnCount))}</span>
-          <span class="chip chip-neutral chip-compact">approvals=${escapeHTML(String(focusSummary.pendingApprovalCount))}</span>
-          <span class="chip chip-neutral chip-compact">proposals=${escapeHTML(String(focusSummary.pendingProposalCount))}</span>
-          <span class="chip chip-neutral chip-compact">history=${escapeHTML(String(focusSummary.historyCount))}</span>
-          <span class="chip chip-neutral chip-compact">execution=${escapeHTML(executionModeLabel(executionMode))}</span>
-        </div>
-      </div>
-      <div class="agent-chat-top">
-        <div class="metric agent-chat-composer">
-          <div class="metric-title-row">
-            <div class="title">Current Chat</div>
-            <span class="${chipClassForSessionStatus(status)}">${escapeHTML(status.toUpperCase())}</span>
+      <div class="metric agent-top-section">
+        <div class="agent-top-grid">
+          <div class="metric agent-focus-card">
+            <div class="metric-title-row">
+              <div class="title">Thread Overview</div>
+              <span class="${focusSummary.tone}">${escapeHTML(focusSummary.label)}</span>
+            </div>
+            <div class="meta">${escapeHTML(focusSummary.title)}</div>
+            <div class="meta">${escapeHTML(focusSummary.detail)}</div>
+            <div class="run-detail-chips">
+              <span class="chip chip-neutral chip-compact">task=${escapeHTML(taskId || "-")}</span>
+              <span class="chip chip-neutral chip-compact">turns=${escapeHTML(String(focusSummary.turnCount))}</span>
+              <span class="chip chip-neutral chip-compact">approvals=${escapeHTML(String(focusSummary.pendingApprovalCount))}</span>
+              <span class="chip chip-neutral chip-compact">proposals=${escapeHTML(String(focusSummary.pendingProposalCount))}</span>
+              <span class="chip chip-neutral chip-compact">history=${escapeHTML(String(focusSummary.historyCount))}</span>
+              <span class="chip chip-neutral chip-compact">execution=${escapeHTML(executionModeLabel(executionMode))}</span>
+            </div>
           </div>
-          <div class="meta">${escapeHTML(message || "Start a thread, send the next message, and keep the current conversation visible while approvals and thread state stay nearby.")}</div>
-          <div class="settings-editor-grid chat-composer-grid">
-            <label class="field field-wide">
-              <span class="label">Thread Title</span>
-              <input id="chat-thread-title" class="filter-input" type="text" value="${escapeHTML(String(chatState.title || ""))}" data-chat-field="title" />
-            </label>
-            <label class="field">
-              <span class="label">Agent Profile</span>
-              <select id="chat-agent-profile" class="filter-input" data-chat-field="agentProfileId">${profileOptions}</select>
-            </label>
-            <label class="field">
-              <span class="label">Execution Path</span>
-              <select id="chat-execution-mode" class="filter-input" data-chat-field="executionMode">
-                <option value="raw_model_invoke" ${selectedAttr(executionMode, "raw_model_invoke")}>Raw Model Invoke</option>
-                <option value="managed_codex_worker" ${selectedAttr(executionMode, "managed_codex_worker")}>Managed Codex Worker</option>
-              </select>
-            </label>
-            <label class="field field-wide">
-              <span class="label">Thread Intent</span>
-              <input id="chat-thread-intent" class="filter-input" type="text" value="${escapeHTML(String(chatState.intent || ""))}" data-chat-field="intent" />
-            </label>
+          <div class="agent-approval-overview-slot" data-agent-approvals-overview></div>
+          <div class="agent-approval-review-slot" data-agent-approval-review></div>
+        </div>
+      </div>
+      <div class="metric agent-chat-composer">
+        <div class="metric-title-row">
+          <div class="title">Agent Chat</div>
+          <span class="${chipClassForSessionStatus(status)}">${escapeHTML(status.toUpperCase())}</span>
+        </div>
+        ${message ? `<div class="meta">${escapeHTML(message)}</div>` : ""}
+        <div class="agent-chat-heading-grid">
+          <label class="field">
+            <span class="label">Thread Title</span>
+            <input id="chat-thread-title" class="filter-input" type="text" value="${escapeHTML(String(chatState.title || ""))}" data-chat-field="title" />
+          </label>
+          <label class="field">
+            <span class="label">Agent Profile</span>
+            <select id="chat-agent-profile" class="filter-input" data-chat-field="agentProfileId">${profileOptions}</select>
+          </label>
+          <label class="field">
+            <span class="label">Execution Path</span>
+            <select id="chat-execution-mode" class="filter-input" data-chat-field="executionMode">
+              <option value="raw_model_invoke" ${selectedAttr(executionMode, "raw_model_invoke")}>Raw Model Invoke</option>
+              <option value="managed_codex_worker" ${selectedAttr(executionMode, "managed_codex_worker")}>Managed Codex Worker</option>
+            </select>
+          </label>
+          <label class="field">
+            <span class="label">Thread Intent</span>
+            <input id="chat-thread-intent" class="filter-input" type="text" value="${escapeHTML(String(chatState.intent || ""))}" data-chat-field="intent" />
+          </label>
+        </div>
+        <div class="agent-chat-state-grid">
+          <div class="metric agent-chat-side-panel">
+            <div class="metric-title-row">
+              <div class="title">Thread State</div>
+              <span class="${chipClassForSessionStatus(status)}">${escapeHTML(status.toUpperCase())}</span>
+            </div>
+            <div class="run-detail-chips">
+              <span class="chip chip-neutral chip-compact">task=${escapeHTML(taskId || "-")}</span>
+              <span class="chip chip-neutral chip-compact">session=${escapeHTML(latestReplySessionId || "-")}</span>
+              <span class="chip chip-neutral chip-compact">taskStatus=${escapeHTML(String(threadState?.taskStatus || activeHistoryItem?.status || "-"))}</span>
+              <span class="chip chip-neutral chip-compact">sessionStatus=${escapeHTML(String(threadState?.sessionStatus || "-"))}</span>
+              <span class="chip chip-neutral chip-compact">workerStatus=${escapeHTML(String(threadState?.latestWorkerStatus || "-"))}</span>
+              <span class="chip chip-neutral chip-compact">approvals=${escapeHTML(String(threadState?.openApprovalCount ?? 0))}</span>
+            </div>
+            ${
+              latestPolicyOutcome
+                ? `
+                  <div class="${escapeHTML(latestPolicyOutcome.outcome.bannerClass)}">
+                    <div class="metric-title-row">
+                      <div class="title">Latest Policy Outcome</div>
+                      <span class="${chipClassForPolicyDecision(latestPolicyOutcome.decision)}">${escapeHTML(latestPolicyOutcome.decision)}</span>
+                    </div>
+                    <div class="run-detail-chips">
+                      <span class="chip chip-neutral chip-compact">provider=${escapeHTML(latestPolicyOutcome.provider || "-")}</span>
+                      <span class="${chipClassForPolicyEffect(latestPolicyOutcome.outcome)}">effect=${escapeHTML(latestPolicyOutcome.outcome.effectLabel)}</span>
+                      <span class="chip chip-neutral chip-compact">request=${escapeHTML(latestPolicyOutcome.requestLabel || "-")}</span>
+                    </div>
+                    <div class="policy-outcome-detail">${escapeHTML(latestPolicyOutcome.outcome.headline)}</div>
+                    <div class="meta">${escapeHTML(latestPolicyOutcome.outcome.detail)}</div>
+                    ${renderGovernedRunLink(latestPolicyOutcome.runId)}
+                  </div>
+                `
+                : `<div class="meta">Latest Policy Outcome: the latest turn has not recorded a governed policy result yet.</div>`
+            }
+            <div class="run-detail-chips">
+              <span class="chip chip-neutral chip-compact">workerType=${escapeHTML(String(latestActivity?.selectedWorkerType || selectedWorker?.workerType || "-"))}</span>
+              <span class="chip chip-neutral chip-compact">workerAdapter=${escapeHTML(String(latestActivity?.selectedWorkerAdapterId || selectedWorker?.adapterId || "-"))}</span>
+              <span class="chip chip-neutral chip-compact">workerTarget=${escapeHTML(String(latestActivity?.selectedWorkerTargetEnvironment || selectedWorker?.targetEnvironment || "-"))}</span>
+            </div>
+            ${latestActivity?.latestWorkerSummary ? `<div class="meta">${escapeHTML(String(latestActivity.latestWorkerSummary))}</div>` : ""}
+            ${
+              managedExecution
+                ? `<div class="meta">${escapeHTML(
+                  managedWorkerReady
+                    ? "Managed worker is attached to the latest thread session."
+                    : "Managed worker mode is selected for this thread."
+                )}</div>`
+                : ""
+            }
+            ${catalogState?.message ? `<div class="meta">governanceCatalogs=${escapeHTML(String(catalogState.source || "-"))}; ${escapeHTML(String(catalogState.message || ""))}</div>` : ""}
+          </div>
+          <div class="metric agent-chat-side-panel">
             <label class="field field-wide">
               <span class="label">System Instructions</span>
               <span class="meta">Use this for durable guidance that should stay in effect across the whole thread.</span>
-              <textarea id="chat-system-prompt" class="filter-input settings-agent-test-textarea" rows="4" data-chat-field="systemPrompt">${escapeHTML(String(chatState.systemPrompt || ""))}</textarea>
-            </label>
-            <label class="field field-wide">
-              <span class="label">Turn Prompt</span>
-              <span class="meta">Use this for the specific request or message you want to send right now.</span>
-              <textarea id="chat-prompt" class="filter-input settings-agent-test-textarea" rows="8" data-chat-field="prompt">${escapeHTML(String(chatState.prompt || ""))}</textarea>
+              <textarea id="chat-system-prompt" class="filter-input settings-agent-test-textarea" rows="6" data-chat-field="systemPrompt">${escapeHTML(String(chatState.systemPrompt || ""))}</textarea>
             </label>
           </div>
-          <div class="filter-row settings-editor-actions agent-composer-actions">
-            <div class="action-hierarchy">
-              <div class="action-group action-group-primary">
-                <button class="btn btn-primary" type="button" data-chat-action="${startAction}">${startLabel}</button>
-                <button class="btn btn-primary" type="button" data-chat-action="send-turn" ${taskId ? "" : "disabled"}>${sendLabel}</button>
-              </div>
-              ${
-                managedExecution
-                  ? `
-                    <div class="action-group action-group-secondary">
-                      <button class="btn btn-secondary" type="button" data-chat-action="launch-managed-worker" ${canLaunchManagedWorker ? "" : "disabled"}>Launch Worker</button>
-                      <button class="btn btn-secondary" type="button" data-chat-action="reattach-managed-worker" ${canReattachManagedWorker ? "" : "disabled"}>Reattach</button>
-                      <button class="btn btn-secondary" type="button" data-chat-action="emit-worker-heartbeat" ${managedWorkerReady ? "" : "disabled"}>Heartbeat</button>
-                      <button class="btn btn-secondary" type="button" data-chat-action="recover-managed-worker" ${canRecoverManagedWorker ? "" : "disabled"}>Recover</button>
-                      <button class="btn btn-danger" type="button" data-chat-action="close-managed-worker" ${canCloseManagedWorker ? "" : "disabled"}>Close Worker</button>
-                    </div>
-                  `
-                  : ""
-              }
-              <div class="action-group action-group-secondary">
-                <button class="btn btn-secondary" type="button" data-chat-action="refresh-last-turn" ${latestTurn?.response?.sessionId ? "" : "disabled"}>Refresh Reply</button>
-              </div>
-              <div class="action-group action-group-destructive">
-                <button class="btn btn-danger" type="button" data-chat-action="reset-thread" ${taskId ? "" : "disabled"}>Clear Current Thread</button>
-              </div>
+        </div>
+        <label class="field field-wide agent-chat-prompt-field">
+          <span class="label">Prompt</span>
+          <span class="meta">Use this for the specific request or message you want to send right now.</span>
+          <textarea id="chat-prompt" class="filter-input settings-agent-test-textarea" rows="8" data-chat-field="prompt">${escapeHTML(String(chatState.prompt || ""))}</textarea>
+        </label>
+        <div class="filter-row settings-editor-actions agent-composer-actions">
+          <div class="action-hierarchy">
+            <div class="action-group action-group-primary">
+              <button class="btn btn-primary" type="button" data-chat-action="${startAction}">${startLabel}</button>
+              <button class="btn btn-primary" type="button" data-chat-action="send-turn" ${taskId ? "" : "disabled"}>${sendLabel}</button>
+            </div>
+            <div class="action-group action-group-destructive agent-chat-clear-action">
+              <button class="btn btn-danger" type="button" data-chat-action="reset-thread" ${taskId ? "" : "disabled"}>Clear Current Thread</button>
             </div>
           </div>
         </div>
-        <div class="metric settings-metric settings-metric-chat-thread agent-thread-state-card">
+        <div class="agent-chat-reply-panel">
           <div class="metric-title-row">
-            <div class="title">Thread State</div>
-            <span class="${chipClassForSessionStatus(status)}">${escapeHTML(status.toUpperCase())}</span>
+            <div class="title">Latest Reply</div>
+            <span class="${chipClassForSessionStatus(latestReplyStatus)}">${escapeHTML(latestReplyStatus)}</span>
           </div>
-          <div class="meta">task=${escapeHTML(taskId || "-")}; tenant=${escapeHTML(tenantId || "-")}; project=${escapeHTML(projectId || "-")}</div>
           <div class="run-detail-chips">
-            <span class="chip chip-neutral chip-compact">execution=${escapeHTML(executionModeLabel(executionMode))}</span>
-            <span class="chip chip-neutral chip-compact">taskStatus=${escapeHTML(String(threadState?.taskStatus || activeHistoryItem?.status || "-"))}</span>
-            <span class="chip chip-neutral chip-compact">sessionStatus=${escapeHTML(String(threadState?.sessionStatus || "-"))}</span>
-            <span class="chip chip-neutral chip-compact">workerStatus=${escapeHTML(String(threadState?.latestWorkerStatus || "-"))}</span>
-            <span class="chip chip-neutral chip-compact">approvals=${escapeHTML(String(threadState?.openApprovalCount ?? 0))}</span>
+            <span class="chip chip-neutral chip-compact">session=${escapeHTML(latestReplySessionId || "-")}</span>
+            <span class="chip chip-neutral chip-compact">route=${escapeHTML(latestReplyRoute || "-")}</span>
+            <span class="chip chip-neutral chip-compact">boundary=${escapeHTML(latestReplyBoundary || "-")}</span>
+            <span class="chip chip-neutral chip-compact">completed=${escapeHTML(latestReplyCompletedAt ? formatTime(latestReplyCompletedAt) : "-")}</span>
+            <span class="chip chip-neutral chip-compact">finishReason=${escapeHTML(latestReplyFinishReason || "-")}</span>
           </div>
           ${
-            latestPolicyOutcome
+            latestReplyText
               ? `
-                <div class="${escapeHTML(latestPolicyOutcome.outcome.bannerClass)}">
-                  <div class="metric-title-row">
-                    <div class="title">Latest Policy Outcome</div>
-                    <span class="${chipClassForPolicyDecision(latestPolicyOutcome.decision)}">${escapeHTML(latestPolicyOutcome.decision)}</span>
-                  </div>
-                  <div class="run-detail-chips">
-                    <span class="chip chip-neutral chip-compact">provider=${escapeHTML(latestPolicyOutcome.provider || "-")}</span>
-                    <span class="${chipClassForPolicyEffect(latestPolicyOutcome.outcome)}">effect=${escapeHTML(latestPolicyOutcome.outcome.effectLabel)}</span>
-                    <span class="chip chip-neutral chip-compact">request=${escapeHTML(latestPolicyOutcome.requestLabel || "-")}</span>
-                  </div>
-                  <div class="policy-outcome-detail">${escapeHTML(latestPolicyOutcome.outcome.headline)}</div>
-                  <div class="meta">${escapeHTML(latestPolicyOutcome.outcome.detail)}</div>
-                  ${renderGovernedRunLink(latestPolicyOutcome.runId)}
+                <div class="chat-message chat-message-assistant agent-chat-reply-box">
+                  <div class="label">Agent</div>
+                  <div class="chat-message-text">${escapeHTML(latestReplyText)}</div>
                 </div>
               `
-              : `<div class="meta">Latest Policy Outcome: no governed policy result has been recorded on this thread yet.</div>`
+              : `<div class="meta">No agent reply yet. Start a thread and send the first prompt to populate the latest reply.</div>`
           }
-          <div class="run-detail-chips">
-            <span class="chip chip-neutral chip-compact">workerType=${escapeHTML(String(latestActivity?.selectedWorkerType || selectedWorker?.workerType || "-"))}</span>
-            <span class="chip chip-neutral chip-compact">workerAdapter=${escapeHTML(String(latestActivity?.selectedWorkerAdapterId || selectedWorker?.adapterId || "-"))}</span>
-            <span class="chip chip-neutral chip-compact">workerTarget=${escapeHTML(String(latestActivity?.selectedWorkerTargetEnvironment || selectedWorker?.targetEnvironment || "-"))}</span>
-          </div>
-          ${latestActivity?.latestWorkerSummary ? `<div class="meta">${escapeHTML(String(latestActivity.latestWorkerSummary))}</div>` : ""}
-          ${
-            managedExecution
-              ? `<div class="meta">${escapeHTML(
-                managedWorkerReady
-                  ? "Managed worker controls are live on the latest session."
-                  : "Managed worker mode is selected. Launch or recover when you need a live bridge."
-              )}</div>`
-              : ""
-          }
-          ${catalogState?.message ? `<div class="meta">governanceCatalogs=${escapeHTML(String(catalogState.source || "-"))}; ${escapeHTML(String(catalogState.message || ""))}</div>` : ""}
         </div>
       </div>
-      <details class="details-shell agent-advanced-block" data-detail-key="agent.export_and_governance">
-        <summary>Export and governance settings</summary>
-        ${renderGovernedExportControls(governedExportSelection)}
-      </details>
-      ${renderThreadResolutionPanel(threadState, latestActivity, Boolean(taskId))}
       <div class="chat-turns-stack">
         ${renderTurnCards(turns, catalogState, governedExportSelection)}
       </div>

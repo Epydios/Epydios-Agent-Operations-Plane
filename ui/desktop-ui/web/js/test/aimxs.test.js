@@ -33,6 +33,43 @@ test("aimxs state keeps only the allowed mode set", () => {
   assert.equal(normalized.paymentEntitled, true);
 });
 
+test("baseline mode renders baseline labels while keeping internal ids", () => {
+  const settings = {
+    aimxs: {
+      paymentEntitled: false,
+      mode: "oss-only",
+      state: "ready",
+      detail: "1/1 policy providers are ready.",
+      providerIds: ["oss-policy-opa"],
+      activation: {
+        available: true,
+        state: "active",
+        message: "AIMXS activation switched the live policy-provider path to oss-only.",
+        namespace: "epydios-system",
+        activeMode: "oss-only",
+        selectedProviderId: "oss-policy-opa",
+        selectedProviderName: "oss-policy-opa",
+        selectedProviderReady: true,
+        selectedProviderProbed: true
+      }
+    }
+  };
+  const metric = renderAimxsSettingsMetric(settings, {}, {
+    chipClassForEditorStatus: () => "chip chip-neutral",
+    selectedAttr: (value, expected) => (value === expected ? "selected" : "")
+  });
+
+  assert.equal(resolveAimxsContractProfile(settings.aimxs).deploymentLabel, "baseline");
+  assert.equal(
+    describeAimxsAppliedMessage(settings.aimxs),
+    "AIMXS is set to baseline; policy routing stays on the baseline provider path."
+  );
+  assert.match(metric, /mode=baseline/);
+  assert.match(metric, /selectedPolicyProvider=baseline/);
+  assert.match(metric, />baseline<\/option>/);
+  assert.doesNotMatch(metric, />oss-only<\/option>/);
+});
+
 test("aimxs full mode stays valid without secure refs", () => {
   const normalized = normalizeAimxsOverride({ mode: "aimxs-full" }, {});
   const validation = validateAimxsOverride({ mode: "aimxs-full" }, { paymentEntitled: false });

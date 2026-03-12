@@ -7,6 +7,24 @@ export function escapeHTML(value) {
     .replace(/'/g, "&#39;");
 }
 
+export function displayAimxsModeLabel(value) {
+  const raw = String(value || "").trim();
+  const normalized = raw.toLowerCase();
+  if (normalized === "oss-only") {
+    return "baseline";
+  }
+  return raw || "-";
+}
+
+export function displayPolicyProviderLabel(value) {
+  const raw = String(value || "").trim();
+  const normalized = raw.toLowerCase();
+  if (normalized === "oss-policy-opa" || normalized === "oss-only") {
+    return "baseline";
+  }
+  return raw || "-";
+}
+
 export function chipClassForStatus(status) {
   const normalized = String(status || "").toLowerCase();
   if (

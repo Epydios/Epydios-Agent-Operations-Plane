@@ -482,8 +482,8 @@ func buildManagedCodexContinuationPrompt(req managedWorkerContinuationRequest) s
 		"For fields that do not apply to the chosen proposal type, return `null` instead of omitting the field.",
 		"Do not use shell redirection, pipes, heredocs, interpreter wrappers, or shell control operators in governed terminal proposals.",
 	}, "\n"))
-	if req.Task != nil && strings.TrimSpace(req.Task.Intent) != "" {
-		sections = append(sections, "Original task intent:\n"+strings.TrimSpace(req.Task.Intent))
+	if taskIntent := taskIntentForWorkerContext(req.Task); taskIntent != "" {
+		sections = append(sections, "Original task intent:\n"+taskIntent)
 	}
 	if strings.TrimSpace(req.PreviousOutputText) != "" {
 		sections = append(sections, "Previous managed worker output:\n"+truncateManagedCodexContinuationText(req.PreviousOutputText, 1600))

@@ -1,4 +1,4 @@
-import { escapeHTML, formatTime } from "./common.js";
+import { displayAimxsModeLabel, displayPolicyProviderLabel, escapeHTML, formatTime } from "./common.js";
 import {
   collectAimxsKnownLocalSecureRefs,
   renderAimxsSettingsMetric,
@@ -115,17 +115,17 @@ function renderDelimitedCodeList(items = []) {
 function policyProviderLabel(settings = {}) {
   const selectedProviderId = String(settings?.aimxs?.activation?.selectedProviderId || "").trim();
   if (selectedProviderId) {
-    return selectedProviderId;
+    return displayPolicyProviderLabel(selectedProviderId);
   }
   const mode = String(settings?.aimxs?.mode || "").trim().toLowerCase();
   if (mode === "oss-only") {
-    return "oss-policy-opa";
+    return "baseline";
   }
   if (mode === "aimxs-full") {
-    return "aimxs-full";
+    return displayPolicyProviderLabel("aimxs-full");
   }
   if (mode === "aimxs-https") {
-    return "aimxs-policy-primary";
+    return displayPolicyProviderLabel("aimxs-policy-primary");
   }
   return "-";
 }
@@ -1370,7 +1370,7 @@ export function renderSettings(ui, settingsPayload, editorState = {}, viewState 
       </div>
       <div class="metric settings-metric settings-metric-policy-contract">
         <div class="title">Current Policy Contract</div>
-        <div class="meta">mode=${escapeHTML(settings?.aimxs?.mode || "-")}; provider=${escapeHTML(policyProviderLabel(settings))}</div>
+        <div class="meta">mode=${escapeHTML(displayAimxsModeLabel(settings?.aimxs?.mode || "-"))}; provider=${escapeHTML(policyProviderLabel(settings))}</div>
         <div class="meta">policyCatalogSource=${escapeHTML(summarizeDataSource(policyCatalog?.source || "unknown"))}; packCount=${escapeHTML(String(policyCatalog?.count || policyCatalogItems.length || 0))}</div>
         <div class="meta">policyMatrixRequired=${escapeHTML(String(Boolean(runtimeIdentity?.policyMatrixRequired)))}; policyRuleCount=${escapeHTML(String(runtimeIdentity?.policyRuleCount || 0))}</div>
         <div class="meta">availablePacks=${renderDelimitedCodeList(policyCatalogItems.map((item) => item?.packId || ""))}</div>

@@ -1250,7 +1250,7 @@ function mockCreateRuntimeTask(payload = {}) {
     projectId: String(meta.projectId || "").trim(),
     source: String(payload.source || "mock.operator_chat").trim() || "mock.operator_chat",
     title: String(payload.title || "Operator chat thread").trim() || "Operator chat thread",
-    intent: String(payload.intent || "Run an operator-guided agent conversation.").trim(),
+    intent: String(payload.intent || "").trim(),
     requestedBy: meta.actor || {},
     status: "NEW",
     annotations: payload.annotations || {},

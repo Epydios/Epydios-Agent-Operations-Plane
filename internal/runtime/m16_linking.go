@@ -370,7 +370,7 @@ func (s *APIServer) markInvokeSessionResult(ctx context.Context, task *TaskRecor
 		"requestId":      task.RequestID,
 		"agentProfileId": response.AgentProfileID,
 		"executionMode":  descriptor.executionMode,
-		"prompt":         task.Intent,
+		"prompt":         taskIntentForWorkerContext(task),
 	})
 	createdAt := now
 	if startedAt := strings.TrimSpace(response.StartedAt); startedAt != "" {

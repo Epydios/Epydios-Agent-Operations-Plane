@@ -6,7 +6,7 @@ export function renderHealth(ui, health, pipeline) {
   const blocks = [
     { title: "Runtime", status: health.runtime?.status, detail: health.runtime?.detail },
     { title: "Providers", status: health.providers?.status, detail: health.providers?.detail },
-    { title: "Policy/Evidence", status: health.policy?.status, detail: health.policy?.detail },
+    { title: "Policy", status: health.policy?.status, detail: health.policy?.detail },
     {
       title: "Pipeline",
       status: pipeline?.status,

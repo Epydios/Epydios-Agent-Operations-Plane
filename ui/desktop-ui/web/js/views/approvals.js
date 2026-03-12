@@ -183,7 +183,7 @@ function buildNativeDecisionReviewModel(item) {
         { label: "session", value: String(item?.sessionId || "-") },
         { label: "recordStatus", value: status || "UNKNOWN", tone: actionable ? "ok" : "warn" }
       ],
-      "Use these identifiers when reviewing the current thread from the Agent approval rail.",
+      "Use these identifiers when reviewing the current thread from the Agent workspace.",
       [
         `createdAt=${formatTime(item?.createdAt)}`,
         `${identifierLabel}=${identifierValue || "-"}`,
@@ -194,7 +194,7 @@ function buildNativeDecisionReviewModel(item) {
       actionable
         ? "Decision controls are active because the current thread still has a pending governed decision."
         : `Decision controls are locked because status=${status || "UNKNOWN"}.`,
-      "Decision reason is optional here; if omitted, the rail submits a default audit note showing the action came from the pinned Agent review.",
+      "Decision reason is optional here; if omitted, the review surface submits a default audit note showing the action came from the pinned Agent review.",
       isProposal
         ? "Confirm the proposal summary and command are appropriate before approval."
         : "Confirm the checkpoint reason and scope match the current thread state before approval."
@@ -366,11 +366,11 @@ export function renderApprovals(ui, store, approvalPayload, filters, selectedRun
   const nativeBlock = nativeCards
     ? `
       <div class="metric">
-        <div class="metric-title-row">
+      <div class="metric-title-row">
           <div class="title">Current Thread Decisions</div>
           <span class="chip chip-danger chip-compact">pending=${escapeHTML(String(nativeItems.length))}</span>
         </div>
-        <div class="meta">These governed decisions come from the active native chat thread and are mirrored here so they stay clustered with the approval rail.</div>
+        <div class="meta">These governed decisions come from the active native chat thread and stay surfaced in the Agent workspace.</div>
         <div class="agent-approval-list">${nativeCards}</div>
       </div>
     `
@@ -445,14 +445,14 @@ export function renderApprovals(ui, store, approvalPayload, filters, selectedRun
   const queueBlock = filteredItems.length === 0
     ? renderPanelStateMetric(
         "empty",
-        "Approval Queue",
+        "Pending Approvals",
         "No approval-queue items match current filters.",
         "The current thread may still have pending governed decisions above."
       )
     : `
       <div class="metric">
         <div class="metric-title-row">
-          <div class="title">Approval Queue</div>
+          <div class="title">Pending Approvals</div>
           <span class="chip chip-neutral chip-compact">matches=${escapeHTML(String(pageState.totalItems))}</span>
         </div>
         <div class="meta">Queue approvals remain visible here even when current-thread decisions are clear, so nothing in active scope gets orphaned.</div>
@@ -468,11 +468,7 @@ export function renderApprovals(ui, store, approvalPayload, filters, selectedRun
       </div>
     `;
 
-  ui.approvalsContent.innerHTML = `
-    ${approvalStateBlock}
-    ${nativeBlock}
-    ${queueBlock}
-  `;
+  ui.approvalsContent.innerHTML = `${approvalStateBlock}${nativeBlock}${queueBlock}`;
 }
 
 export function renderApprovalsDetail(ui, approval) {
@@ -485,7 +481,7 @@ export function renderApprovalsDetail(ui, approval) {
       "info",
       "Approval Review",
       "Select an approval card to keep its decision context pinned in Agent.",
-      "Use the pinned review section and run detail from Agent. Do not rely on the legacy review overlay."
+      "Use the pinned review section and run detail from Agent."
     );
     return;
   }
@@ -500,7 +496,7 @@ export function renderApprovalsDetail(ui, approval) {
         <span class="${model.statusChip} chip-compact">status=${escapeHTML(model.status || "UNKNOWN")}</span>
         <span class="${escapeHTML(model.ttl.chipClass)}">${escapeHTML(`ttl=${model.ttl.label}`)}</span>
       </div>
-      <div class="meta metric-note">${escapeHTML(model.hasInlineDecision ? "Keep the selected current-thread decision pinned here and approve or deny directly from this review surface." : "Keep the selected approval pinned here and use run detail for the underlying record. Do not rely on the legacy review overlay.")}</div>
+      <div class="meta metric-note">${escapeHTML(model.hasInlineDecision ? "Keep the selected current-thread decision pinned here and approve or deny directly from this review surface." : "Keep the selected approval pinned here and use run detail for the underlying record.")}</div>
       <div class="run-detail-chips">
         <span class="chip chip-neutral chip-compact">${escapeHTML(model.runId ? "runId" : "thread")}=${escapeHTML(model.runId || model.approval?.taskId || "-")}</span>
         <span class="chip chip-neutral chip-compact">tenant=${escapeHTML(model.approval?.tenantId || "-")}</span>
@@ -508,6 +504,12 @@ export function renderApprovalsDetail(ui, approval) {
         <span class="chip chip-neutral chip-compact">${escapeHTML(model.identifierLabel || "tier")}=${escapeHTML(model.identifierValue || String(model.approval?.tier || "-"))}</span>
         <span class="chip chip-neutral chip-compact">session=${escapeHTML(model.sessionId || "-")}</span>
         <span class="chip chip-neutral chip-compact">capabilities=${escapeHTML(String(model.capabilities.length))}</span>
+      </div>
+      <div class="run-detail-chips">
+        <span class="chip chip-neutral chip-compact">scope=${escapeHTML(model.scopeLabel || "-")}</span>
+        <span class="chip chip-neutral chip-compact">source=${escapeHTML(String(model.approval?.source || (model.hasInlineDecision ? "native-session" : "approval-queue")))}</span>
+        <span class="chip chip-neutral chip-compact">created=${escapeHTML(formatTime(model.approval?.createdAt))}</span>
+        <span class="chip chip-neutral chip-compact">expires=${escapeHTML(model.ttl.expiresAtLabel)}</span>
       </div>
       <div class="meta">expiresAt=${escapeHTML(model.ttl.expiresAtLabel)}; createdAt=${escapeHTML(formatTime(model.approval?.createdAt))}</div>
       <div class="meta">reason=${escapeHTML(String(model.detailSummary || model.approval?.reason || "").trim() || "-")}</div>
@@ -553,14 +555,12 @@ export function renderApprovalsDetail(ui, approval) {
             `
         }
       </div>
-    </div>
-    <div class="metric">
-      <div class="title">Review Checklist</div>
+      <div class="meta"><strong>Review Checklist</strong></div>
       <div class="meta metric-note">Requested capabilities and traceability stay visible here while you review the underlying run record.</div>
       <ul class="workflow-guide-list">${model.guardrails.map((item) => `<li>${escapeHTML(item)}</li>`).join("")}</ul>
       <ul class="quickstart-list">${model.capabilityRows}</ul>
+      ${model.runId && !model.hasInlineDecision ? `<div class="meta">Use Run Detail for the underlying approval record and artifact trail.</div>` : ""}
     </div>
-    ${model.traceabilityMetric}
   `;
 }
 
