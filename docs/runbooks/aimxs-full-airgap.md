@@ -59,7 +59,7 @@ Define a repeatable install/update path for aimxs-full AIMXS deployments where p
 
 1. Repoint policy selection to previous known-good AIMXS package ref.
 2. Keep current package deployed but disabled for forensics if needed.
-3. If rollback fails, route policy selection to OSS provider path (`oss-only` mode).
+3. If rollback fails, route policy selection to the baseline provider path (`baseline` in the UI).
 4. Re-run strict runtime verification and capture incident evidence.
 
 ## No External Egress Guardrail

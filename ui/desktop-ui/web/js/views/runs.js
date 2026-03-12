@@ -1,6 +1,7 @@
 import {
   chipClassForStatus,
   containsCaseInsensitive,
+  displayPolicyProviderLabel,
   escapeHTML,
   formatTime,
   paginateItems,
@@ -251,7 +252,7 @@ function derivePolicyRichness(run) {
 
 function derivePolicyOutcomePresentation(run, policyRichness = {}) {
   const decision = String(policyRichness?.decision || run?.policyDecision || "").trim().toUpperCase();
-  const provider = String(policyRichness?.providerId || run?.selectedPolicyProvider || "").trim();
+  const provider = displayPolicyProviderLabel(policyRichness?.providerId || run?.selectedPolicyProvider || "");
   const primaryReason = String(policyRichness?.firstReason || "").trim();
   if (decision === "ALLOW") {
     return {
@@ -664,7 +665,7 @@ export function renderRunDetail(ui, run, options = {}) {
     </div>
     <div class="metric">
       <div class="title">2. Policy Richness</div>
-      <div class="meta metric-note">This section is sourced from the actual stored governed-action request and provider response. It is the structured comparison surface for <code>oss-only</code> versus <code>aimxs-full</code>.</div>
+      <div class="meta metric-note">This section is sourced from the actual stored governed-action request and provider response. It is the structured comparison surface for <code>baseline</code> versus <code>aimxs-full</code>.</div>
       ${
         !policyRichness.isGovernedAction
           ? `
@@ -686,7 +687,7 @@ export function renderRunDetail(ui, run, options = {}) {
             </div>
             <div class="run-detail-chips">
               <span class="${`${chipClassForStatus(policyRichness.decision || "UNSET")} chip-compact`}">decision=${escapeHTML(policyRichness.decision || "UNSET")}</span>
-              <span class="chip chip-neutral chip-compact">provider=${escapeHTML(policyRichness.providerId || "-")}</span>
+                <span class="chip chip-neutral chip-compact">provider=${escapeHTML(displayPolicyProviderLabel(policyRichness.providerId || "-"))}</span>
               <span class="chip chip-neutral chip-compact">workflow=${escapeHTML(policyRichness.workflowKind || "-")}</span>
               <span class="chip chip-neutral chip-compact">profile=${escapeHTML(policyRichness.demoProfile || "-")}</span>
               <span class="chip chip-neutral chip-compact">env=${escapeHTML(policyRichness.environment || "-")}</span>

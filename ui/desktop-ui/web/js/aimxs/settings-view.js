@@ -1,4 +1,4 @@
-import { escapeHTML } from "../views/common.js";
+import { displayAimxsModeLabel, displayPolicyProviderLabel, escapeHTML } from "../views/common.js";
 import {
   collectAimxsSecureRefItems,
   describeAimxsSettingsMessage,
@@ -19,6 +19,13 @@ function chipClassForAimxsActivationState(value) {
     return "chip chip-danger chip-compact";
   }
   return "chip chip-neutral chip-compact";
+}
+
+function presentAimxsLabelCopy(value) {
+  return String(value || "")
+    .replace(/OSS-only/g, "Baseline")
+    .replace(/\boss-only\b/g, "baseline")
+    .replace(/\boss-policy-opa\b/g, "baseline");
 }
 
 export function collectAimxsKnownLocalSecureRefs(settings) {
@@ -59,7 +66,7 @@ export function renderAimxsSettingsMetric(
     typeof chipClassForEditorStatus === "function"
       ? chipClassForEditorStatus(aimxsEditorStatus)
       : "";
-  const aimxsStatusMessage = describeAimxsSettingsMessage(aimxs, aimxsEditor.message);
+  const aimxsStatusMessage = presentAimxsLabelCopy(describeAimxsSettingsMessage(aimxs, aimxsEditor.message));
   const activationCapabilities =
     activation.capabilities.length > 0 ? activation.capabilities.join(", ") : "-";
   const activationEnabledProviders =
@@ -74,13 +81,15 @@ export function renderAimxsSettingsMetric(
           .map((item) => `<div class="meta settings-editor-warn">${escapeHTML(item)}</div>`)
           .join("")
       : "";
-  const activationMode = activation.activeMode === "unknown" ? "-" : activation.activeMode;
-  const activationSelectedProvider = activation.selectedProviderId || activation.selectedProviderName || "-";
+  const activationMode = activation.activeMode === "unknown" ? "-" : displayAimxsModeLabel(activation.activeMode);
+  const activationSelectedProvider = displayPolicyProviderLabel(
+    activation.selectedProviderId || activation.selectedProviderName || "-"
+  );
   const activationSecretsSummary =
     aimxsMode === "aimxs-full"
       ? "clusterSecrets=not required for aimxs-full"
       : aimxsMode === "oss-only"
-        ? "clusterSecrets=not required in oss-only"
+        ? "clusterSecrets=not required in baseline"
         : `clusterSecrets=bearer:${activation.secrets.bearerTokenSecret.present ? "present" : "missing"}; clientTLS:${activation.secrets.clientTlsSecret.present ? "present" : "missing"}; providerCA:${activation.secrets.caSecret.present ? "present" : "missing"}`;
 
   return `
@@ -101,7 +110,7 @@ export function renderAimxsSettingsMetric(
         <label class="field">
           <span class="label">Deployment Mode</span>
           <select id="settings-aimxs-mode" class="filter-input" data-settings-aimxs-field="mode">
-            <option value="oss-only" ${typeof selectedAttr === "function" ? selectedAttr(aimxsMode, "oss-only") : ""}>oss-only</option>
+            <option value="oss-only" ${typeof selectedAttr === "function" ? selectedAttr(aimxsMode, "oss-only") : ""}>baseline</option>
             <option value="aimxs-full" ${typeof selectedAttr === "function" ? selectedAttr(aimxsMode, "aimxs-full") : ""}>aimxs-full</option>
             <option value="aimxs-https" ${typeof selectedAttr === "function" ? selectedAttr(aimxsMode, "aimxs-https") : ""}>aimxs-https</option>
           </select>
@@ -144,7 +153,7 @@ export function renderAimxsSettingsMetric(
         <div class="meta">Apply AIMXS Settings saves the Desktop contract draft only. Activate AIMXS Mode switches the live desktop/runtime policy-provider path.</div>
         <div class="meta"><code>aimxs-https</code> requires endpoint, bearer token, controller client TLS cert/key, and provider CA refs.</div>
         <div class="meta"><code>aimxs-full</code> uses the live launcher AIMXS provider shim with no HTTPS or mTLS requirement.</div>
-        <div class="meta">${escapeHTML(activation.message || "Run Activate AIMXS Mode to apply the current contract to the live provider selection boundary.")}</div>
+        <div class="meta">${escapeHTML(presentAimxsLabelCopy(activation.message || "Run Activate AIMXS Mode to apply the current contract to the live provider selection boundary."))}</div>
         ${activationWarnings}
       </div>
     </div>

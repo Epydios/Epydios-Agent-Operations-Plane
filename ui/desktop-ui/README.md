@@ -107,14 +107,13 @@ Notes:
   - `web/js/views/providers.js`
   - `web/js/views/runs.js`
   - `web/js/views/audit.js`
-  - `web/js/views/execution-defaults.js`
   - `web/js/main.js`
 - Locked default behavior for non-blocking runtime choices:
   - Realtime transport: `polling` (`5000ms`) with `sse` option reserved.
   - Terminal mode: `interactive_sandbox_only`, with `restricted_host` blocked by default.
   - Integration routing: `gateway_first` (`litellm`) with optional direct-provider fallback.
 - Runtime-visible decision surface:
-  - `Execution Defaults` panel in `web/index.html`.
+  - The explicit `Execution Defaults` panel has since been removed from `Home`; the underlying defaults still drive `Settings` and `Developer` workflows.
 
 ## M14.2 Run Builder + Approvals Queue (Implemented)
 
@@ -280,17 +279,17 @@ Recommended operator path:
    - `Apply AIMXS Settings` saves the Desktop contract draft only.
    - `Activate AIMXS Mode` switches the live desktop/runtime policy-provider path on the local launcher path.
    - `aimxs-full` is the preferred local troubleshooting mode. It uses the live launcher AIMXS provider shim and does not require HTTPS or secure ref material.
-9. To prove the OSS-vs-AIMXS decision difference on the current local stack, run `./bin/verify-m21-aimxs-richness.sh`.
-   - The script compares provider capabilities directly, submits the same high-risk external-actuator probe to both providers, expects `aimxs-full` to `DEFER` with AIMXS evidence metadata, expects OSS to return baseline OPA output without `DEFER`, and runs the AIMXS-only handshake sample against the extracted pack adapter seam.
+9. To prove the baseline-vs-AIMXS decision difference on the current local stack, run `./bin/verify-m21-aimxs-richness.sh`.
+   - The script compares provider capabilities directly, submits the same high-risk external-actuator probe to both providers, expects `aimxs-full` to `DEFER` with AIMXS evidence metadata, expects the baseline provider to return baseline OPA output without `DEFER`, and runs the AIMXS-only handshake sample against the extracted pack adapter seam.
    - Preconditions: terminal 2 is running so `aimxs-full` is live on `http://127.0.0.1:4271`, and the cluster is reachable so the script can port-forward `svc/epydios-oss-policy-provider`.
    - `aimxs-https` is the secure external-provider path and requires the full endpoint, bearer-token, controller-client-TLS, and provider-CA ref set.
-10. For a manual provider-level side-by-side between `oss-only` and `aimxs-full`, use [aimxs-oss-manual-side-by-side.md](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/docs/runbooks/aimxs-oss-manual-side-by-side.md).
+10. For a manual provider-level side-by-side between `baseline` and `aimxs-full`, use [aimxs-oss-manual-side-by-side.md](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/docs/runbooks/aimxs-oss-manual-side-by-side.md).
    - Use this when you want the lowest-level provider comparison.
    - It intentionally omits `aimxs-https`.
 11. For the real recordable product demo path, use [aimxs-governed-action-demo.md](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/docs/runbooks/aimxs-governed-action-demo.md).
    - This path stays inside the actual product after startup.
-   - It uses `Home -> Governed Action Request`, then reviews the real stored result in `History -> 2. Policy Richness`.
-   - It is the current source of truth for a recordable `oss-only` versus `aimxs-full` operator demo.
+   - It uses `Developer -> Governed Action Request`, then reviews the real stored result in `History -> 2. Policy Richness`.
+   - It is the current source of truth for a recordable `baseline` versus `aimxs-full` operator demo.
 
 Direct defaults exist for:
 - `codex` / `openai` -> `https://api.openai.com`

@@ -73,7 +73,6 @@ import {
 } from "./views/terminal.js";
 import { renderSettings } from "./views/settings.js";
 import { buildChatTurnGovernanceReport, renderChat, resolveChatGovernedExportSelection } from "./views/chat.js";
-import { renderExecutionDefaults } from "./views/execution-defaults.js";
 import {
   closeManagedCodexWorkerSession,
   createOperatorChatThread,
@@ -116,22 +115,16 @@ import {
 const ui = {
   title: document.getElementById("app-title"),
   subtitle: document.getElementById("app-subtitle"),
-  configSummary: document.getElementById("config-summary"),
   workspaceLayout: document.getElementById("workspace-layout"),
   workspaceTabs: Array.from(document.querySelectorAll("[data-workspace-tab]")),
   workspacePanels: [],
   chatContent: document.getElementById("chat-content"),
   triageContent: document.getElementById("triage-content"),
-  executionDefaultsContent: document.getElementById("execution-defaults-content"),
   settingsContent: document.getElementById("settings-content"),
   settingsOpenAuditEventsButton: document.getElementById("settings-open-audit-events-button"),
   settingsThemeMode: document.getElementById("settings-theme-mode"),
   settingsAgentProfile: document.getElementById("settings-agent-profile"),
   authStatus: document.getElementById("auth-status"),
-  tenant: document.getElementById("tenant-value"),
-  project: document.getElementById("project-value"),
-  clientId: document.getElementById("client-id-value"),
-  subject: document.getElementById("subject-value"),
   contextProjectSelect: document.getElementById("context-project-select"),
   contextAgentProfile: document.getElementById("context-agent-profile"),
   contextEndpointBadges: document.getElementById("context-endpoint-badges"),
@@ -305,7 +298,7 @@ const OPERATOR_CHAT_ARCHIVE_KEY = "epydios.agentops.desktop.chat.archive.v1";
 const DEMO_GOVERNANCE_EDITOR_KEY = DEMO_GOVERNANCE_STATE_KEY;
 const APPROVAL_SELECTION_NONE = "__approval_selection_none__";
 const PROJECT_ANY_SCOPE_KEY = "__project_any__";
-const WORKSPACE_VIEW_IDS = new Set(["home", "agent", "history", "incidents", "settings"]);
+const WORKSPACE_VIEW_IDS = new Set(["home", "agent", "history", "incidents", "settings", "developer"]);
 const INCIDENT_SUBVIEW_IDS = new Set(["queue", "audit"]);
 const SETTINGS_SUBVIEW_IDS = new Set(["configuration", "diagnostics"]);
 const ADVANCED_SECTION_IDS = new Set(["operations", "runs", "approvals", "incidents", "settings"]);
@@ -486,6 +479,33 @@ function readPinnedApprovalSelectionId() {
 
 function isApprovalSelectionDismissed() {
   return String(ui.approvalsDetailContent?.dataset?.selectedRunId || "").trim() === APPROVAL_SELECTION_NONE;
+}
+
+function replaceAgentSlotWithMarkup(slot, markup = "") {
+  if (!(slot instanceof HTMLElement)) {
+    return;
+  }
+  const template = document.createElement("template");
+  template.innerHTML = String(markup || "").trim();
+  const nodes = Array.from(template.content.childNodes).filter((node) => {
+    return !(node.nodeType === Node.TEXT_NODE && !String(node.textContent || "").trim());
+  });
+  if (nodes.length === 0) {
+    slot.replaceWith();
+    return;
+  }
+  slot.replaceWith(...nodes);
+}
+
+function mountAgentApprovalPanels() {
+  const approvalsOverviewSlot = ui.chatContent?.querySelector("[data-agent-approvals-overview]");
+  const approvalsReviewSlot = ui.chatContent?.querySelector("[data-agent-approval-review]");
+  if (approvalsOverviewSlot instanceof HTMLElement && ui.approvalsContent instanceof HTMLElement) {
+    replaceAgentSlotWithMarkup(approvalsOverviewSlot, ui.approvalsContent.innerHTML);
+  }
+  if (approvalsReviewSlot instanceof HTMLElement) {
+    replaceAgentSlotWithMarkup(approvalsReviewSlot, ui.approvalsDetailContent?.innerHTML || "");
+  }
 }
 
 function operatorChatScopeKey(scope = {}) {
@@ -1369,7 +1389,7 @@ function saveValue(key, value) {
 
 function normalizeWorkspaceView(value, fallback = "home") {
   const aliases = {
-    operations: "home",
+    operations: "developer",
     chat: "agent",
     approvals: "agent",
     runs: "history"
@@ -3216,12 +3236,11 @@ function shouldPauseBackgroundRefresh() {
     ui.runsContent,
     ui.approvalsContent,
     ui.auditContent,
-    ui.triageContent,
-    ui.executionDefaultsContent
+    ui.triageContent
   ].some((root) => root instanceof HTMLElement && root.contains(activeElement));
 }
 
-function startRealtimeRefreshLoop(choices, refreshFn) {
+function startRealtimeRefreshLoop(choices, statusFn) {
   if (choices.realtime.mode !== "polling") {
     return () => {};
   }
@@ -3231,7 +3250,7 @@ function startRealtimeRefreshLoop(choices, refreshFn) {
       if (shouldPauseBackgroundRefresh()) {
         return;
       }
-      refreshFn().catch(() => {});
+      statusFn().catch(() => {});
     }
   }, choices.realtime.pollIntervalMs);
 
@@ -4119,10 +4138,6 @@ async function main() {
     populateAgentProfileSelect(ui, profiles, selected);
     return next;
   };
-  const renderConfigSummary = (choices) => {
-    ui.configSummary.textContent = `runtime=${config.runtimeApiBaseUrl}; registry=${config.registryApiBaseUrl}; mockMode=${config.mockMode}; authResponseType=${config.auth?.responseType || "token"}; approvalsEndpoint=${config.endpoints?.approvalsQueue || "(derived)"}; realtime=${choices.realtime.mode}/${choices.realtime.pollIntervalMs}ms; terminal=${choices.terminal.mode}; integrations=${choices.integrations.modelRouting}`;
-  };
-
   ui.title.textContent = config.appName || "Epydios AgentOps Desktop";
   ui.subtitle.textContent = `${config.environment || "unknown"} environment`;
   setWorkspaceView(readSavedValue(WORKSPACE_VIEW_PREF_KEY));
@@ -4255,8 +4270,6 @@ async function main() {
     ui.settingsThemeMode.value = initialThemeMode;
   }
   applyThemeMode(initialThemeMode);
-  renderExecutionDefaults(ui, initialChoices);
-  renderConfigSummary(initialChoices);
 
   const initialAgentID = String(initialChoices?.integrations?.selectedAgentProfileId || "")
     .trim()
@@ -4349,8 +4362,6 @@ async function main() {
   };
   await syncProjectIntegrationSettings(initialProjectScope, session, { force: true });
   initialChoices = resolveProjectChoices(initialProjectScope);
-  renderExecutionDefaults(ui, initialChoices);
-  renderConfigSummary(initialChoices);
   refreshGovernedActionPreview(session);
   refreshRunBuilderPreview(session);
   refreshTerminalPreview(session, initialChoices);
@@ -4423,7 +4434,6 @@ async function main() {
     let projectID = activeProjectScope(session);
     await syncProjectIntegrationSettings(projectID, session);
     let currentChoices = resolveProjectChoices(projectID);
-    renderExecutionDefaults(ui, currentChoices);
     refreshGovernedActionPreview(session);
     refreshRunBuilderPreview(session);
     refreshTerminalPreview(session, currentChoices);
@@ -4476,8 +4486,6 @@ async function main() {
           projectID = activeProjectScope(session);
           await syncProjectIntegrationSettings(projectID, session, { force: true });
           currentChoices = resolveProjectChoices(projectID);
-          renderExecutionDefaults(ui, currentChoices);
-          renderConfigSummary(currentChoices);
           refreshGovernedActionPreview(session);
           refreshRunBuilderPreview(session);
           refreshTerminalPreview(session, currentChoices);
@@ -4590,6 +4598,7 @@ async function main() {
         setSettingsSubview(settingsSubviewState);
         renderApprovals(ui, store, approvals, approvalScope, selectedApprovalRunId, nativeApprovalRailItems);
         renderApprovalsDetail(ui, selectedApproval);
+        mountAgentApprovalPanels();
         if (approvalReviewModalIsOpen()) {
           if (selectedApproval && !String(selectedApproval?.selectionId || "").trim().startsWith("native:")) {
             renderApprovalReviewModal(ui, selectedApproval);
@@ -4630,6 +4639,34 @@ async function main() {
         refreshQueued = false;
         refresh().catch(() => {});
       }
+    }
+  }
+
+  async function refreshStatusOnly() {
+    if (refreshInFlight) {
+      return;
+    }
+    const currentSession = getSession();
+    if (config.auth?.enabled && !currentSession.authenticated && !config.mockMode) {
+      setRefreshStatus("warn", "sign-in required");
+      return;
+    }
+    try {
+      const health = await api.getHealth();
+      const runtimeStatus = String(health?.runtime?.status || "").trim().toLowerCase();
+      const runtimeDetail = String(health?.runtime?.detail || "").trim();
+      if (runtimeStatus === "error") {
+        setRefreshStatus("error", runtimeDetail || "status check failed");
+        return;
+      }
+      if (runtimeStatus === "warn") {
+        setRefreshStatus("warn", runtimeDetail || "runtime degraded");
+        return;
+      }
+      setRefreshStatus("ok", `synced ${formatRefreshClock()}`);
+    } catch (error) {
+      const detail = String(error?.message || "").trim();
+      setRefreshStatus("error", detail || "status check failed");
     }
   }
 
@@ -5064,8 +5101,6 @@ async function main() {
       applyProjectContext(activeProject);
       await syncProjectIntegrationSettings(activeProject, session, { force: true });
       const currentChoices = resolveProjectChoices(activeProject);
-      renderExecutionDefaults(ui, currentChoices);
-      renderConfigSummary(currentChoices);
       refreshGovernedActionPreview(session);
       refreshRunBuilderPreview(session);
       refreshTerminalPreview(session, currentChoices);
@@ -5285,8 +5320,6 @@ async function main() {
     applyProjectContext(selectedProject);
     await syncProjectIntegrationSettings(selectedProject, getSession(), { force: true });
     const nextChoices = resolveProjectChoices(selectedProject);
-    renderExecutionDefaults(ui, nextChoices);
-    renderConfigSummary(nextChoices);
     refreshGovernedActionPreview(getSession());
     refreshRunBuilderPreview(getSession());
     refreshTerminalPreview(getSession(), nextChoices);
@@ -5438,6 +5471,8 @@ async function main() {
       operatorChatState = {
         ...operatorChatState,
         ...draft,
+        title: "",
+        intent: "",
         prompt: "",
         status: "idle",
         message: "Chat thread cleared. Start a new thread when ready.",
@@ -6805,8 +6840,6 @@ async function main() {
           .trim()
           .toLowerCase();
         const nextChoices = resolveProjectChoices(projectID, selectedAgentProfileId);
-        renderExecutionDefaults(ui, nextChoices);
-        renderConfigSummary(nextChoices);
         refreshGovernedActionPreview(getSession());
         refreshRunBuilderPreview(getSession());
         refreshTerminalPreview(getSession(), nextChoices);
@@ -7143,8 +7176,6 @@ async function main() {
       };
       persistIntegrationOverrides();
       const nextChoices = resolveProjectChoices(projectID, savedDraft.selectedAgentProfileId);
-      renderExecutionDefaults(ui, nextChoices);
-      renderConfigSummary(nextChoices);
       if (nextChoices?.integrations?.selectedAgentProfileId) {
         saveValue(AGENT_PREF_KEY, nextChoices.integrations.selectedAgentProfileId);
       }
@@ -7263,8 +7294,6 @@ async function main() {
         appliedAt: syncedAt
       });
       const nextChoices = resolveProjectChoices(projectID);
-      renderExecutionDefaults(ui, nextChoices);
-      renderConfigSummary(nextChoices);
       refreshGovernedActionPreview(getSession());
       refreshRunBuilderPreview(getSession());
       refreshTerminalPreview(getSession(), nextChoices);
@@ -7423,7 +7452,6 @@ async function main() {
         return;
       }
       await refresh();
-      openApprovalReviewModal(selectRunID);
       return;
     }
     const openRunNode = target.closest("[data-approval-open-run-id]");
@@ -8225,14 +8253,13 @@ async function main() {
     await refresh();
     setWorkspaceView("agent", true);
     openApprovalDetail(openApprovalRunID);
-    openApprovalReviewModal(openApprovalRunID);
   });
 
-  const stopRefreshLoop = startRealtimeRefreshLoop(getRuntimeChoices(), refresh);
+  const stopRefreshLoop = startRealtimeRefreshLoop(getRuntimeChoices(), refreshStatusOnly);
   window.addEventListener("beforeunload", stopRefreshLoop, { once: true });
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") {
-      refresh().catch(() => {});
+      refreshStatusOnly().catch(() => {});
     }
   });
 

@@ -1,6 +1,6 @@
 # AIMXS Governed Action Demo
 
-This is the real product demo path for comparing `oss-only` versus `aimxs-full`.
+This is the real product demo path for comparing `baseline` versus `aimxs-full`.
 
 It uses:
 - your normal local runtime startup
@@ -13,7 +13,7 @@ It does **not** use a script, `curl`, or hand-edited JSON as part of the demo fl
 ## Goal
 
 Submit the same finance-oriented governed action twice:
-- once in `oss-only`
+- once in `baseline`
 - once in `aimxs-full`
 
 Then compare the real stored result in `History -> Run Detail -> 2. Policy Richness`.
@@ -45,7 +45,7 @@ open "http://127.0.0.1:4173/"
 Use the **same governed-action values** in both passes.
 
 Only the mode changes:
-- pass 1: `oss-only`
+- pass 1: `baseline`
 - pass 2: `aimxs-full`
 
 Do not change:
@@ -63,18 +63,18 @@ Do not change:
 
 Leave `Request ID` blank both times so the system creates a fresh run.
 
-## Pass 1: OSS
+## Pass 1: Baseline
 
 1. Click `Settings`.
 2. In `Configuration`, find `AIMXS Deployment Contract`.
-3. Set the mode to `oss-only`.
+3. Set the mode to `baseline`.
 4. Click `Activate AIMXS Mode`.
-5. Wait for the activation summary to show `oss-only`.
-6. Click `Home`.
+5. Wait for the activation summary to show `baseline`.
+6. Click `Developer`.
 7. Find `Governed Action Request`.
 8. In `Request ID`, leave the field blank.
-9. In `Tenant`, use the current tenant already shown in the top session/context area.
-10. In `Project`, use the current project already shown in the top session/context area.
+9. In `Tenant`, use the same tenant value you are already using on this live stack.
+10. In `Project`, use the same project value you are already using on this live stack.
 11. In `Environment`, enter `dev`.
 12. In `Demo Profile`, select `Finance Paper Trade`.
 13. In `Request Label`, enter:
@@ -149,7 +149,7 @@ operator-governed-action
 3. Set the mode to `aimxs-full`.
 4. Click `Activate AIMXS Mode`.
 5. Wait for the activation summary to show `aimxs-full`.
-6. Click `Home`.
+6. Click `Developer`.
 7. Find `Governed Action Request`.
 8. In `Request ID`, leave the field blank again.
 9. Re-enter the exact same values:
@@ -222,10 +222,10 @@ grant.trading.supervisor
 
 If the local stack is healthy, the difference should look like this:
 
-### `oss-only`
+### `baseline`
 
 - `decision` should stay baseline, typically `ALLOW`
-- `provider` should be the OSS policy provider, not `aimxs-full`
+- `provider` should stay on the baseline provider path, not `aimxs-full`
 - `BAAK Engaged` should be `false`
 - `Policy Stratification Present` should be `false`
 - `Request Contract Echo Present` should be `false`
@@ -245,11 +245,11 @@ If the local stack is healthy, the difference should look like this:
 
 Record these moments:
 
-1. `Settings -> AIMXS Deployment Contract` showing `oss-only`.
-2. The exact governed-action form values in `Home`.
-3. The `History -> 2. Policy Richness` result for the OSS run.
+1. `Settings -> AIMXS Deployment Contract` showing `baseline`.
+2. The exact governed-action form values in `Developer`.
+3. The `History -> 2. Policy Richness` result for the baseline run.
 4. `Settings -> AIMXS Deployment Contract` showing `aimxs-full`.
-5. The same governed-action form values again in `Home`.
+5. The same governed-action form values again in `Developer`.
 6. The `History -> 2. Policy Richness` result for the AIMXS run.
 7. A final side-by-side verbal comparison using the recorded values.
 
@@ -260,13 +260,13 @@ Stop the demo and treat it as a defect if any of these happen:
 - the form does not submit a real run
 - the app does not open the new run in `History`
 - `2. Policy Richness` is missing
-- `oss-only` and `aimxs-full` look effectively identical
-- `aimxs-full` does not show richer governance/evidence signals than OSS
+- `baseline` and `aimxs-full` look effectively identical
+- `aimxs-full` does not show richer governance/evidence signals than the baseline path
 - the only difference is cosmetic wording instead of real policy output
 
 ## If You Need A Clean Reset
 
 1. Go back to `Settings`.
-2. Set the mode to `oss-only`.
+2. Set the mode to `baseline`.
 3. Click `Activate AIMXS Mode`.
 4. Leave the system there when you are done.

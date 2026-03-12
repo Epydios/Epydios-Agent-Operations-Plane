@@ -1,6 +1,6 @@
-# Manual OSS vs AIMXS Full Side-by-Side
+# Manual Baseline vs AIMXS Full Side-by-Side
 
-This runbook is the manual version of the scripted AIMXS richness probe. It compares `oss-only` and `aimxs-full` on the same local stack and uses the same policy-evaluation payload for both providers.
+This runbook is the manual version of the scripted AIMXS richness probe. It compares `baseline` and `aimxs-full` on the same local stack and uses the same policy-evaluation payload for both providers.
 
 This is a provider-level troubleshooting exercise, not a Desktop UI-only or chat-driven self-verification flow. Do not use it to claim that a field-only operator richness path already exists.
 
@@ -18,24 +18,24 @@ This is a provider-level troubleshooting exercise, not a Desktop UI-only or chat
 
 For the current local troubleshooting path, it means:
 
-1. Activate `oss-only` in `Settings -> Configuration -> AIMXS Deployment Contract`
-2. Observe the live status and run the manual OSS probe
+1. Activate `baseline` in `Settings -> Configuration -> AIMXS Deployment Contract`
+2. Observe the live status and run the manual baseline probe
 3. Activate `aimxs-full`
 4. Observe the live status and run the manual AIMXS probe
-5. Switch back to `oss-only`
+5. Switch back to `baseline`
 
 That is the loop. It is just controlled mode switching plus repeatable checks.
 
 `aimxs-https` is intentionally omitted from this runbook.
 
-## Step 1: Activate OSS-only
+## Step 1: Activate baseline
 
 In the Desktop UI:
 
 1. Open `Settings -> Configuration`
-2. Under `AIMXS Deployment Contract`, choose `oss-only`
+2. Under `AIMXS Deployment Contract`, choose `baseline`
 3. Click `Activate AIMXS Mode`
-4. Confirm the activation summary shows `oss-only`
+4. Confirm the activation summary shows `baseline`
 
 ## Step 2: Prepare one shared probe payload
 
@@ -103,9 +103,9 @@ cat >/tmp/agentops-aimxs-richness-probe.json <<'JSON'
 JSON
 ```
 
-## Step 3: Inspect OSS capabilities
+## Step 3: Inspect baseline capabilities
 
-Open a new terminal and port-forward the OSS provider:
+Open a new terminal and port-forward the baseline provider:
 
 ```bash
 kubectl -n epydios-system port-forward svc/epydios-oss-policy-provider 18081:8080
@@ -117,7 +117,7 @@ In another terminal:
 curl -sSf http://127.0.0.1:18081/v1alpha1/capabilities | jq
 ```
 
-Expected OSS capability shape:
+Expected baseline capability shape:
 
 - `providerId` is `oss-policy-opa`
 - `capabilities` includes `policy.evaluate` and `policy.validate_bundle`
@@ -125,7 +125,7 @@ Expected OSS capability shape:
 - `capabilities` does **not** include `evidence.policy_decision_refs`
 - `capabilities` does **not** include `policy.defer`
 
-## Step 4: Evaluate the payload against OSS
+## Step 4: Evaluate the payload against the baseline provider
 
 ```bash
 curl -sSf \
@@ -135,7 +135,7 @@ curl -sSf \
   http://127.0.0.1:18081/v1alpha1/policy-provider/evaluate | jq
 ```
 
-Expected OSS result:
+Expected baseline result:
 
 - `decision` is `ALLOW`
 - `output.engine` is `opa`
@@ -219,21 +219,21 @@ Expected handshake supplement result:
 - `missing.error_code` is `CORE14_HANDSHAKE_INVALID`
 - `valid.status` is `OK`
 
-## Step 9: Return to OSS-only
+## Step 9: Return to baseline
 
 Back in the Desktop UI:
 
-1. Choose `oss-only`
+1. Choose `baseline`
 2. Click `Activate AIMXS Mode`
-3. Confirm the activation summary shows `oss-only`
+3. Confirm the activation summary shows `baseline`
 
 ## Interpretation
 
 If the runbook behaves as expected:
 
-- OSS is still the simple baseline path
+- the baseline provider remains the simpler baseline path
 - AIMXS full is returning richer governance behavior
-- the local `aimxs-full` path is not secretly bootstrapping back to OSS
+- the local `aimxs-full` path is not secretly bootstrapping back to the baseline provider
 
 If anything deviates:
 

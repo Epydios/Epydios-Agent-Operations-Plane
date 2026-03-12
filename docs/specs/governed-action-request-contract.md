@@ -2,13 +2,13 @@
 
 ## Purpose
 
-This contract defines the real product request shape for governed external actions that must be evaluated unchanged across `oss-only` and `aimxs-full`.
+This contract defines the real product request shape for governed external actions that must be evaluated unchanged across `baseline` and `aimxs-full`.
 
 This contract is intended for recordable in-product workflows. It is not a hidden test hook.
 
 ## Rules
 
-1. The same request shape must be sent across `oss-only` and `aimxs-full`.
+1. The same request shape must be sent across `baseline` and `aimxs-full`.
 2. Provider differentiation must come from standard fields, not hidden probe markers.
 3. The product must persist and display the exact provider response for the real run or thread.
 4. Finance or paper-trading demos may use this contract, but the contract itself is generic.

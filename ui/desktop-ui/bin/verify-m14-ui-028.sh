@@ -436,7 +436,7 @@ return feedback.includes('Exported incident package');
         session_id,
         """
 const required = [
-  "execution-defaults-content",
+  "governed-action-form",
   "settings-content",
   "run-builder-form",
   "terminal-form",

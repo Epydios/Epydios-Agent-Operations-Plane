@@ -366,8 +366,8 @@ export function resolveAimxsContractProfile(aimxs = {}) {
     healthPath: "/healthz",
     capabilitiesPath: "/v1alpha1/capabilities",
     contractVersion: "v1alpha1",
-    deploymentLabel: "oss-only",
-    summary: "OSS-only policy-provider routing with AIMXS kept out of the active decision path."
+    deploymentLabel: "baseline",
+    summary: "Baseline policy-provider routing with AIMXS kept out of the active decision path."
   };
 }
 
@@ -391,7 +391,7 @@ export function describeAimxsSettingsMessage(aimxs = {}, editorMessage = "") {
     return "aimxs-full uses the local AIMXS provider shim and does not require HTTPS, bearer token, client TLS, or provider CA refs.";
   }
   if (mode === "oss-only") {
-    return "OSS-only keeps AIMXS out of the active policy route until you intentionally switch modes.";
+    return "Baseline keeps AIMXS out of the active policy route until you intentionally switch modes.";
   }
   return Boolean(aimxs?.paymentEntitled)
     ? "Entitlement is active; aimxs-https can be applied with endpoint, bearer token, client TLS, and provider CA refs."
@@ -406,7 +406,7 @@ export function describeAimxsAppliedMessage(aimxs = {}) {
   if (mode === "aimxs-https") {
     return "AIMXS is set to aimxs-https with secure provider refs prepared for the HTTPS policy path.";
   }
-  return "AIMXS is set to oss-only; policy routing stays on the OSS provider path.";
+  return "AIMXS is set to baseline; policy routing stays on the baseline provider path.";
 }
 
 export function describeAimxsSyncedMessage(aimxs = {}) {
@@ -417,5 +417,5 @@ export function describeAimxsSyncedMessage(aimxs = {}) {
   if (mode === "aimxs-https") {
     return "AIMXS settings synced from another tab; aimxs-https is active in the local Desktop state.";
   }
-  return "AIMXS settings synced from another tab; oss-only remains active.";
+  return "AIMXS settings synced from another tab; baseline remains active.";
 }

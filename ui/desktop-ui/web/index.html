@@ -40,43 +40,35 @@
       <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="settings">
         Settings
       </button>
+      <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="developer">
+        Developer
+      </button>
     </nav>
 
     <main id="workspace-layout" class="layout" data-workspace-view="home">
-      <section class="panel panel-session" data-workspace-section="home">
-        <h2>Session</h2>
-        <div class="session-grid">
-          <div>
-            <span class="label">Auth</span>
-            <span id="auth-status" class="chip chip-neutral">Unknown</span>
-          </div>
-          <div>
-            <span class="label">Tenant</span>
-            <span id="tenant-value">-</span>
-          </div>
-          <div>
-            <span class="label">Project</span>
-            <span id="project-value">-</span>
-          </div>
-          <div>
-            <span class="label">Client ID</span>
-            <span id="client-id-value">-</span>
-          </div>
-          <div>
-            <span class="label">Subject</span>
-            <span id="subject-value">-</span>
-          </div>
+      <section class="panel panel-dashboard" data-workspace-section="home">
+        <div class="panel-header">
+          <h2>Dashboard</h2>
+          <button id="refresh-button" class="btn btn-secondary">Refresh</button>
         </div>
+        <div class="dashboard-top-grid">
+          <article class="metric dashboard-auth-card">
+            <div class="title">Auth</div>
+            <div class="meta"><span id="auth-status" class="chip chip-neutral">Unknown</span></div>
+          </article>
+          <div id="health-content" class="dashboard-health-grid"></div>
+        </div>
+        <div id="triage-content" class="triage-grid dashboard-triage-grid"></div>
       </section>
 
-      <section class="panel panel-context" data-workspace-section="home">
+      <section class="panel panel-context" data-workspace-section="developer">
         <div class="panel-header">
           <h2 class="heading-inline">
             Workspace Context
             <button
               class="help-tip"
               type="button"
-              title="Project filter and endpoint status drive active scope for runs, approvals, audit, and settings."
+              title="Project scope and endpoint status drive the active developer-tool and settings scope."
               aria-label="Workspace context help"
             >?</button>
           </h2>
@@ -89,11 +81,11 @@
         </div>
         <div class="context-grid">
           <label class="field">
-            <span class="label">Project Filter</span>
+            <span class="label">Project Scope</span>
             <select id="context-project-select" class="filter-input">
               <option value="">project:any</option>
             </select>
-            <span class="field-help">Filters active project scope across operations and settings editors.</span>
+            <span class="field-help">Sets the active project scope used by developer tools and scoped settings editors.</span>
           </label>
           <div class="metric">
             <div class="title">Active Agent Profile</div>
@@ -106,78 +98,8 @@
         </div>
       </section>
 
-      <section class="panel panel-quickstart" data-workspace-section="home">
-        <div class="panel-header">
-          <div class="panel-heading">
-            <h2>Instructions</h2>
-            <p class="panel-lead">Use Home as the living orientation surface. Keep workflow reminders, storage rules, and future doc links here so the rest of the app stays focused on active work.</p>
-          </div>
-        </div>
-        <div class="guide-card-grid">
-          <article class="metric workflow-guide">
-            <div class="title">Daily Operator Flow</div>
-            <div class="meta">The normal path should stay simple: do live work in Agent, move finished evidence review to History, and only use Incidents when a run needs durable downstream handoff.</div>
-            <ol class="workflow-guide-list">
-              <li>Start in Agent for the active thread, approvals, and thread state.</li>
-              <li>Use History for past runs, evidence review, JSON drill-in, and artifact folder guidance.</li>
-              <li>Use Incidents when you need a filing package, queue tracking, or handoff output.</li>
-              <li>Use Settings for routing, storage, diagnostics, and runtime configuration changes.</li>
-            </ol>
-          </article>
-          <article class="metric guide-card">
-            <div class="title">Tab Roles</div>
-            <ul class="quickstart-list">
-              <li><strong>Home</strong>: living instructions, workflow reminders, and storage rules.</li>
-              <li><strong>Agent</strong>: current chat, current approvals, and current thread state.</li>
-              <li><strong>History</strong>: past runs, evidence, exported JSON, and folder organization.</li>
-              <li><strong>Incidents</strong>: incident packages, queue state, audit-backed handoffs, and response exports.</li>
-              <li><strong>Settings</strong>: provider routes, credentials, diagnostics, retention, and integration state.</li>
-            </ul>
-          </article>
-          <article class="metric guide-card">
-            <div class="title">Storage and Evidence Rules</div>
-            <div class="meta">Keep repo-safe provenance in Git-tracked paths. Keep screenshots, manual QA, launch snapshots, and bulky evidence in non-repo storage.</div>
-            <ul class="quickstart-list">
-              <li>Repo folder stays clean for code, config, and lightweight provenance that should ship to GitHub.</li>
-              <li>Non-repo folder is the default home for screenshots, local runtime output, visual QA, and incident handoff artifacts.</li>
-              <li>Organize new evidence by date bucket first, then by run or package ID when the artifact is specific to one workflow.</li>
-            </ul>
-            <div class="guide-path-stack">
-              <div class="guide-path-line">
-                <span class="label">Repo</span>
-                <code>EPYDIOS_AGENTOPS_DESKTOP_REPO/provenance/</code>
-                <button class="btn btn-secondary btn-small" type="button" data-copy-text="EPYDIOS_AGENTOPS_DESKTOP_REPO/provenance/" data-copy-feedback-target="home-storage-feedback">Copy Path</button>
-              </div>
-              <div class="guide-path-line">
-                <span class="label">Non-repo provenance</span>
-                <code>EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/</code>
-                <button class="btn btn-secondary btn-small" type="button" data-copy-text="EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/" data-copy-feedback-target="home-storage-feedback">Copy Path</button>
-              </div>
-              <div class="guide-path-line">
-                <span class="label">Non-repo readiness</span>
-                <code>EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/</code>
-                <button class="btn btn-secondary btn-small" type="button" data-copy-text="EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/" data-copy-feedback-target="home-storage-feedback">Copy Path</button>
-              </div>
-            </div>
-            <div id="home-storage-feedback" class="meta">Use Copy Path to move these roots to the clipboard without leaving Home.</div>
-          </article>
-        </div>
-      </section>
-
       <section class="panel panel-chat" data-workspace-section="agent">
         <div id="chat-content" class="stack"></div>
-      </section>
-
-      <section class="panel panel-execution" data-workspace-section="home" data-advanced-section="operations">
-        <h2>Execution Defaults</h2>
-        <div id="execution-defaults-content" class="stack"></div>
-      </section>
-
-      <section class="panel panel-triage" data-workspace-section="home">
-        <div class="panel-header">
-          <h2>Ops Triage</h2>
-        </div>
-        <div id="triage-content" class="triage-grid"></div>
       </section>
 
       <section class="panel panel-settings" data-workspace-section="settings">
@@ -214,11 +136,11 @@
         <div id="settings-content" class="stack"></div>
       </section>
 
-      <section class="panel panel-run-builder" data-workspace-section="home">
+      <section class="panel panel-governed-action panel-run-builder" data-workspace-section="developer">
         <div class="panel-header">
           <div class="panel-heading">
             <h2>Governed Action Request</h2>
-            <p class="panel-lead">Use the same request here under <code>oss-only</code> and <code>aimxs-full</code> to compare the real policy response on an actual runtime run. This is the product demo path, not a side probe.</p>
+            <p class="panel-lead">Use the same request here under <code>baseline</code> and <code>aimxs-full</code> to compare the real policy response on an actual runtime run. This is the product demo path, not a side probe.</p>
           </div>
         </div>
         <form id="governed-action-form" class="run-builder-grid">
@@ -359,7 +281,7 @@
         <pre id="governed-action-payload" class="monospace"></pre>
       </section>
 
-      <section class="panel panel-run-builder" data-workspace-section="home">
+      <section class="panel panel-run-builder" data-workspace-section="developer">
         <div class="panel-header">
           <h2 class="heading-inline">
             Run Builder
@@ -465,7 +387,7 @@
         <pre id="run-builder-payload" class="monospace"></pre>
       </section>
 
-      <section class="panel panel-terminal" data-workspace-section="home" data-advanced-section="operations">
+      <section class="panel panel-terminal" data-workspace-section="developer" data-advanced-section="operations">
         <div class="panel-header">
           <h2>Terminal Control</h2>
         </div>
@@ -517,14 +439,6 @@
         <pre id="terminal-payload" class="monospace"></pre>
       </section>
 
-      <section class="panel panel-health" data-workspace-section="home">
-        <div class="panel-header">
-          <h2>Platform Health</h2>
-          <button id="refresh-button" class="btn btn-secondary">Refresh</button>
-        </div>
-        <div id="health-content" class="stack"></div>
-      </section>
-
       <section class="panel panel-providers" data-workspace-section="settings">
         <div class="panel-heading">
           <h2>Provider Contract Inventory</h2>
@@ -533,7 +447,7 @@
         <div id="providers-content" class="stack"></div>
       </section>
 
-      <section class="panel panel-approvals" data-workspace-section="agent">
+      <section class="panel panel-approvals agent-approvals-support" data-workspace-section="agent">
         <div class="panel-header">
           <div class="panel-heading">
             <h2>Pending Approvals</h2>
@@ -951,10 +865,6 @@
         </section>
       </section>
     </main>
-
-    <footer class="footer">
-      <span id="config-summary">Loading configuration...</span>
-    </footer>
 
     <script type="module" src="./js/main.js"></script>
   </body>
