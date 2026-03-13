@@ -1,0 +1,141 @@
+.settings-metric-identity-authority code,
+.settings-metric-runtime-identity code {
+  overflow-wrap: anywhere;
+}
+
+.panel-identity {
+  grid-column: 1 / -1;
+}
+
+.identityops-workspace {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.identityops-primary-grid,
+.identityops-secondary-grid {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.identityops-primary-grid {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.identityops-secondary-grid {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.identityops-card {
+  min-width: 0;
+}
+
+.identityops-card code {
+  overflow-wrap: anywhere;
+}
+
+.identityops-card-secondary {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface) 94%, transparent), color-mix(in srgb, var(--secondary-bg) 76%, transparent)),
+    var(--surface-raised);
+}
+
+.identityops-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.identityops-kv-list {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.identityops-row {
+  display: grid;
+  gap: var(--space-2);
+  padding-block: var(--space-2);
+  border-top: 1px solid color-mix(in srgb, var(--border-subtle) 88%, transparent);
+}
+
+.identityops-row:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.identityops-row:last-child {
+  padding-bottom: 0;
+}
+
+.identityops-row-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.identityops-row-value {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-2);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.identityops-value-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.identityops-value-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  max-width: 100%;
+  padding: 0.35rem 0.55rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 82%, var(--secondary-bg) 18%);
+  border: 1px solid color-mix(in srgb, var(--border-subtle) 82%, transparent);
+}
+
+.identityops-value-key {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.identityops-value-text {
+  min-width: 0;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.identityops-value-text-code {
+  font-family: var(--font-mono);
+}
+
+.identityops-value-text code {
+  background: transparent;
+  padding: 0;
+  border: 0;
+  font-size: 0.79rem;
+}
+
+.identityops-empty {
+  color: var(--muted);
+}
+
+@media (min-width: 900px) {
+  .identityops-row {
+    grid-template-columns: minmax(124px, 148px) 1fr;
+    align-items: start;
+    gap: var(--space-3);
+  }
+}

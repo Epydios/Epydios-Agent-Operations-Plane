@@ -1,9 +1,14 @@
-import { displayAimxsModeLabel, displayPolicyProviderLabel, escapeHTML, formatTime } from "./common.js";
+import { escapeHTML, formatTime } from "./common.js";
 import {
   collectAimxsKnownLocalSecureRefs,
   renderAimxsSettingsMetric,
   renderAimxsStatusMetric
 } from "../aimxs/settings-view.js";
+import {
+  createIdentitySettingsSnapshot,
+  renderIdentitySettingsPanels
+} from "../domains/identityops/routes.js";
+import { renderPolicySettingsPanels } from "../domains/policyops/routes.js";
 
 function tableCell(label, content, attrs = "") {
   return `<td data-label="${escapeHTML(label)}"${attrs}>${content}</td>`;
@@ -90,57 +95,6 @@ function renderProviderContractRows(items) {
         </tr>
       `;
     })
-    .join("");
-}
-
-function chipClassForAuthorityBasis(value) {
-  const basis = String(value || "").trim().toLowerCase();
-  if (basis === "bearer_token_jwt" || basis === "runtime_context_identity" || basis === "mock_bearer_token_jwt") {
-    return "chip chip-ok";
-  }
-  if (basis === "runtime_auth_disabled" || basis === "endpoint_unavailable" || basis === "unresolved") {
-    return "chip chip-warn";
-  }
-  return "chip chip-neutral";
-}
-
-function renderDelimitedCodeList(items = []) {
-  const values = Array.isArray(items) ? items.map((item) => String(item || "").trim()).filter(Boolean) : [];
-  if (values.length === 0) {
-    return "-";
-  }
-  return values.map((item) => `<code>${escapeHTML(item)}</code>`).join(", ");
-}
-
-function policyProviderLabel(settings = {}) {
-  const selectedProviderId = String(settings?.aimxs?.activation?.selectedProviderId || "").trim();
-  if (selectedProviderId) {
-    return displayPolicyProviderLabel(selectedProviderId);
-  }
-  const mode = String(settings?.aimxs?.mode || "").trim().toLowerCase();
-  if (mode === "oss-only") {
-    return "baseline";
-  }
-  if (mode === "aimxs-full") {
-    return displayPolicyProviderLabel("aimxs-full");
-  }
-  if (mode === "aimxs-https") {
-    return displayPolicyProviderLabel("aimxs-policy-primary");
-  }
-  return "-";
-}
-
-function renderPolicyPackRows(items) {
-  return (items || [])
-    .map((item) => `
-      <tr>
-        ${tableCell("Pack", `<code>${escapeHTML(item?.packId || "-")}</code>`)}
-        ${tableCell("Label", escapeHTML(item?.label || "-"))}
-        ${tableCell("Role Bundles", renderDelimitedCodeList(item?.roleBundles || []))}
-        ${tableCell("Decision Surfaces", renderDelimitedCodeList(item?.decisionSurfaces || []))}
-        ${tableCell("Boundary Requirements", renderDelimitedCodeList(item?.boundaryRequirements || []))}
-      </tr>
-    `)
     .join("");
 }
 
@@ -1308,15 +1262,7 @@ export function renderSettings(ui, settingsPayload, editorState = {}, viewState 
   const localPaths = resolveLocalStoragePaths(runtimePlatform);
   const retention = resolveRetentionDays(settings);
   const configChanges = Array.isArray(settings.configChanges) ? settings.configChanges : [];
-  const runtimeIdentity = settings?.identity && typeof settings.identity === "object" ? settings.identity : {};
-  const identitySummary =
-    runtimeIdentity?.identity && typeof runtimeIdentity.identity === "object"
-      ? runtimeIdentity.identity
-      : {};
-  const policyCatalog = settings?.policyCatalog && typeof settings.policyCatalog === "object" ? settings.policyCatalog : {};
-  const policyCatalogItems = Array.isArray(policyCatalog.items) ? policyCatalog.items : [];
-  const policyPackRows = renderPolicyPackRows(policyCatalogItems);
-  const authorityChipClass = chipClassForAuthorityBasis(runtimeIdentity?.authorityBasis);
+  const { runtimeIdentity, identitySummary } = createIdentitySettingsSnapshot(settings);
 
   const endpointRows = renderEndpointMatrixRows(endpoints);
   const providerContractRows = renderProviderContractRows(providerContracts);
@@ -1335,6 +1281,8 @@ export function renderSettings(ui, settingsPayload, editorState = {}, viewState 
     chipClassForEditorStatus,
     selectedAttr
   });
+  const identityPanels = renderIdentitySettingsPanels(settings);
+  const policyPanels = renderPolicySettingsPanels(settings);
 
   ui.settingsContent.innerHTML = `
     <div class="metric settings-metric settings-metric-scope">
@@ -1356,25 +1304,8 @@ export function renderSettings(ui, settingsPayload, editorState = {}, viewState 
         <div class="meta">activeAgentProfile=${escapeHTML(agent.label)} (${escapeHTML(agent.id)})</div>
         <div class="meta">profileProviderContract=${escapeHTML(agent.provider)}</div>
       </div>
-      <div class="metric settings-metric settings-metric-identity-authority">
-        <div class="metric-title-row">
-          <div class="title">Current Identity + Authority</div>
-          <span class="${authorityChipClass}">${escapeHTML(runtimeIdentity?.authorityBasis || "unknown")}</span>
-        </div>
-        <div class="meta">authEnabled=${escapeHTML(String(Boolean(runtimeIdentity?.authEnabled)))}; authenticated=${escapeHTML(String(Boolean(runtimeIdentity?.authenticated)))}</div>
-        <div class="meta">subject=<code>${escapeHTML(identitySummary?.subject || "-")}</code>; clientId=<code>${escapeHTML(identitySummary?.clientId || "-")}</code></div>
-        <div class="meta">roles=${renderDelimitedCodeList(identitySummary?.roles || [])}</div>
-        <div class="meta">tenantScopes=${renderDelimitedCodeList(identitySummary?.tenantIds || [])}</div>
-        <div class="meta">projectScopes=${renderDelimitedCodeList(identitySummary?.projectIds || [])}</div>
-        <div class="meta">effectivePermissions=${renderDelimitedCodeList(identitySummary?.effectivePermissions || [])}</div>
-      </div>
-      <div class="metric settings-metric settings-metric-policy-contract">
-        <div class="title">Current Policy Contract</div>
-        <div class="meta">mode=${escapeHTML(displayAimxsModeLabel(settings?.aimxs?.mode || "-"))}; provider=${escapeHTML(policyProviderLabel(settings))}</div>
-        <div class="meta">policyCatalogSource=${escapeHTML(summarizeDataSource(policyCatalog?.source || "unknown"))}; packCount=${escapeHTML(String(policyCatalog?.count || policyCatalogItems.length || 0))}</div>
-        <div class="meta">policyMatrixRequired=${escapeHTML(String(Boolean(runtimeIdentity?.policyMatrixRequired)))}; policyRuleCount=${escapeHTML(String(runtimeIdentity?.policyRuleCount || 0))}</div>
-        <div class="meta">availablePacks=${renderDelimitedCodeList(policyCatalogItems.map((item) => item?.packId || ""))}</div>
-      </div>
+      ${identityPanels.currentIdentityAuthorityPanel}
+      ${policyPanels.currentPolicyContractPanel}
       ${demoGovernancePanel}
       ${integrationEditor}
       ${localSecureRefPanel}
@@ -1470,30 +1401,8 @@ export function renderSettings(ui, settingsPayload, editorState = {}, viewState 
           <tbody>${providerContractRows || `<tr>${tableCell("Status", "No provider contracts are populated for the current scope. Select an agent profile or apply integration settings, then reopen Diagnostics.", ' colspan="8"')}</tr>`}</tbody>
         </table>
       </div>
-      <div class="metric settings-metric settings-metric-runtime-identity">
-        <div class="title">Runtime Identity Contract</div>
-        <div class="meta">source=${escapeHTML(runtimeIdentity?.source || "-")}; authEnabled=${escapeHTML(String(Boolean(runtimeIdentity?.authEnabled)))}; authenticated=${escapeHTML(String(Boolean(runtimeIdentity?.authenticated)))}</div>
-        <div class="meta">authorityBasis=${escapeHTML(runtimeIdentity?.authorityBasis || "-")}; roleClaim=${escapeHTML(runtimeIdentity?.roleClaim || "-")}; clientIdClaim=${escapeHTML(runtimeIdentity?.clientIdClaim || "-")}</div>
-        <div class="meta">tenantClaim=${escapeHTML(runtimeIdentity?.tenantClaim || "-")}; projectClaim=${escapeHTML(runtimeIdentity?.projectClaim || "-")}</div>
-        <div class="meta">claimKeys=${renderDelimitedCodeList(identitySummary?.claimKeys || [])}</div>
-      </div>
-      <div class="metric settings-metric settings-metric-policy-packs">
-        <div class="title">Policy Pack Catalog</div>
-        <div class="meta">Selected provider and policy mode are shown above; this table shows the runtime-native pack catalog currently exposed to the desktop surface.</div>
-        <table class="data-table settings-table">
-          <caption class="sr-only">Policy pack catalog for the current desktop surface, including pack id, label, role bundles, decision surfaces, and boundary requirements.</caption>
-          <thead>
-            <tr>
-              <th scope="col">Pack</th>
-              <th scope="col">Label</th>
-              <th scope="col">Role Bundles</th>
-              <th scope="col">Decision Surfaces</th>
-              <th scope="col">Boundary Requirements</th>
-            </tr>
-          </thead>
-          <tbody>${policyPackRows || `<tr>${tableCell("Status", "No policy packs are loaded for the current desktop surface. Refresh Diagnostics, then verify the runtime policy-pack endpoint and current scope.", ' colspan="5"')}</tr>`}</tbody>
-        </table>
-      </div>
+      ${identityPanels.runtimeIdentityContractPanel}
+      ${policyPanels.policyPackCatalogPanel}
       ${renderAimxsStatusMetric(settings, chipClassForEndpointState)}
       <div class="metric settings-metric settings-metric-endpoints">
         <div class="title">Endpoint Contract Matrix</div>

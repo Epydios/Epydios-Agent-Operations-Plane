@@ -157,7 +157,7 @@ export function buildAuditHandoffText(bundle) {
     : "(none)";
 
   return [
-    "Epydios AgentOps Desktop Audit Handoff Summary",
+    "EpydiosOps Desktop Audit Handoff Summary",
     `generatedAt=${String(meta.generatedAt || "").trim() || "-"}`,
     `source=${String(meta.source || "").trim() || "-"}`,
     `actor=${String(meta.actor || "").trim() || "-"}`,

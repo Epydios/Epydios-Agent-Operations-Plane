@@ -18,10 +18,50 @@ import {
   readAimxsEditorInput as readAimxsEditorDraft,
   renderAimxsEditorFeedback
 } from "./aimxs/editor.js";
-import { setAuthDisplay } from "./views/session.js";
-import { renderHealth, renderError } from "./views/health.js";
+import {
+  createWorkspaceLayoutController,
+  normalizeWorkspaceView as normalizeShellWorkspaceView
+} from "./shell/layout/workspace.js";
+import { createWorkspaceNavController } from "./shell/nav/workspace-nav.js";
+import { initializeShellLiveRegions } from "./shell/alerts/live-regions.js";
+import { createTopbarController } from "./shell/topbar/topbar.js";
+import { createRefreshStatusController } from "./shell/topbar/refresh-status.js";
+import { initializePanelRegions } from "./shared/components/panel-region.js";
+import { copyTextToClipboard, triggerTextDownload } from "./shared/exports/text.js";
+import { handleHorizontalTabKeydown } from "./shared/forms/tablist.js";
+import {
+  activeElementWithin,
+  focusElement,
+  setSubtreeInert
+} from "./shared/utils/dom.js";
+import {
+  readSavedJSON,
+  readSavedValue,
+  saveJSON,
+  saveValue
+} from "./shared/utils/storage.js";
+import {
+  renderHomeDashboard,
+  renderHomeDashboardError
+} from "./domains/homeops/routes.js";
+import { createEmptyHomeSnapshot } from "./domains/homeops/state.js";
+import {
+  mountAgentOpsEmbeddedPanels,
+  renderAgentOpsEmptyState,
+  renderAgentOpsPage
+} from "./domains/agentops/routes.js";
+import {
+  renderIdentityOpsEmptyState,
+  renderIdentityOpsPage,
+  setIdentityAuthDisplay as setAuthDisplay
+} from "./domains/identityops/routes.js";
 import { renderProviders } from "./views/providers.js";
-import { readRunFilters, renderRuns, renderRunDetail } from "./views/runs.js";
+import {
+  readRuntimeRunFilters as readRunFilters,
+  renderRuntimeRunDetail as renderRunDetail,
+  renderRuntimeRunDetailError,
+  renderRuntimeRuns as renderRuns
+} from "./domains/runtimeops/routes.js";
 import {
   readAuditFilters,
   renderAudit,
@@ -72,7 +112,7 @@ import {
   renderTerminalHistory
 } from "./views/terminal.js";
 import { renderSettings } from "./views/settings.js";
-import { buildChatTurnGovernanceReport, renderChat, resolveChatGovernedExportSelection } from "./views/chat.js";
+import { buildChatTurnGovernanceReport, resolveChatGovernedExportSelection } from "./views/chat.js";
 import {
   closeManagedCodexWorkerSession,
   createOperatorChatThread,
@@ -113,18 +153,15 @@ import {
 } from "./views/common.js";
 
 const ui = {
-  title: document.getElementById("app-title"),
-  subtitle: document.getElementById("app-subtitle"),
   workspaceLayout: document.getElementById("workspace-layout"),
-  workspaceTabs: Array.from(document.querySelectorAll("[data-workspace-tab]")),
-  workspacePanels: [],
   chatContent: document.getElementById("chat-content"),
+  identityContent: document.getElementById("identity-content"),
   triageContent: document.getElementById("triage-content"),
   settingsContent: document.getElementById("settings-content"),
   settingsOpenAuditEventsButton: document.getElementById("settings-open-audit-events-button"),
   settingsThemeMode: document.getElementById("settings-theme-mode"),
   settingsAgentProfile: document.getElementById("settings-agent-profile"),
-  authStatus: document.getElementById("auth-status"),
+  homeDashboardAuth: document.getElementById("home-dashboard-auth"),
   contextProjectSelect: document.getElementById("context-project-select"),
   contextAgentProfile: document.getElementById("context-agent-profile"),
   contextEndpointBadges: document.getElementById("context-endpoint-badges"),
@@ -266,7 +303,6 @@ const ui = {
   rbHumanApprovalGranted: document.getElementById("rb-human-approval-granted"),
   rbRestrictedHostOptIn: document.getElementById("rb-restricted-host-opt-in"),
   rbDryRun: document.getElementById("rb-dry-run"),
-  refreshStatus: document.getElementById("refresh-status"),
   loginButton: document.getElementById("login-button"),
   logoutButton: document.getElementById("logout-button"),
   refreshButton: document.getElementById("refresh-button")
@@ -298,7 +334,24 @@ const OPERATOR_CHAT_ARCHIVE_KEY = "epydios.agentops.desktop.chat.archive.v1";
 const DEMO_GOVERNANCE_EDITOR_KEY = DEMO_GOVERNANCE_STATE_KEY;
 const APPROVAL_SELECTION_NONE = "__approval_selection_none__";
 const PROJECT_ANY_SCOPE_KEY = "__project_any__";
-const WORKSPACE_VIEW_IDS = new Set(["home", "agent", "history", "incidents", "settings", "developer"]);
+const WORKSPACE_VIEW_IDS = new Set([
+  "homeops",
+  "agentops",
+  "runtimeops",
+  "platformops",
+  "identityops",
+  "networkops",
+  "policyops",
+  "guardrailops",
+  "governanceops",
+  "complianceops",
+  "auditops",
+  "evidenceops",
+  "incidentops",
+  "settingsops",
+  "developerops"
+]);
+const WORKSPACE_VIEW_ID_LIST = Array.from(WORKSPACE_VIEW_IDS);
 const INCIDENT_SUBVIEW_IDS = new Set(["queue", "audit"]);
 const SETTINGS_SUBVIEW_IDS = new Set(["configuration", "diagnostics"]);
 const ADVANCED_SECTION_IDS = new Set(["operations", "runs", "approvals", "incidents", "settings"]);
@@ -319,6 +372,18 @@ const INCIDENT_STATUS_SORT_RANK = {
   filed: 1,
   closed: 2
 };
+const workspaceTabNodes = Array.from(document.querySelectorAll("[data-workspace-tab]"));
+const workspaceShell = createWorkspaceLayoutController({
+  layout: ui.workspaceLayout,
+  viewIds: WORKSPACE_VIEW_ID_LIST
+});
+const topbarShell = createTopbarController({
+  titleElement: document.querySelector("[data-shell-brand-title]"),
+  subtitleElement: document.querySelector("[data-shell-brand-subtitle]")
+});
+const refreshStatusShell = createRefreshStatusController(
+  document.querySelector("[data-shell-refresh-status]")
+);
 const incidentHistorySelection = new Set();
 const incidentHistoryViewState = {
   status: "",
@@ -434,27 +499,6 @@ function deepClone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
-function readSavedJSON(key) {
-  try {
-    const raw = window.localStorage.getItem(key);
-    if (!raw) {
-      return {};
-    }
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? parsed : {};
-  } catch (_) {
-    return {};
-  }
-}
-
-function saveJSON(key, value) {
-  try {
-    window.localStorage.setItem(key, JSON.stringify(value || {}));
-  } catch (_) {
-    // Local storage is optional.
-  }
-}
-
 function normalizeOperatorChatArchiveState(value) {
   const archivedByScope = value?.archivedByScope && typeof value.archivedByScope === "object"
     ? value.archivedByScope
@@ -479,33 +523,6 @@ function readPinnedApprovalSelectionId() {
 
 function isApprovalSelectionDismissed() {
   return String(ui.approvalsDetailContent?.dataset?.selectedRunId || "").trim() === APPROVAL_SELECTION_NONE;
-}
-
-function replaceAgentSlotWithMarkup(slot, markup = "") {
-  if (!(slot instanceof HTMLElement)) {
-    return;
-  }
-  const template = document.createElement("template");
-  template.innerHTML = String(markup || "").trim();
-  const nodes = Array.from(template.content.childNodes).filter((node) => {
-    return !(node.nodeType === Node.TEXT_NODE && !String(node.textContent || "").trim());
-  });
-  if (nodes.length === 0) {
-    slot.replaceWith();
-    return;
-  }
-  slot.replaceWith(...nodes);
-}
-
-function mountAgentApprovalPanels() {
-  const approvalsOverviewSlot = ui.chatContent?.querySelector("[data-agent-approvals-overview]");
-  const approvalsReviewSlot = ui.chatContent?.querySelector("[data-agent-approval-review]");
-  if (approvalsOverviewSlot instanceof HTMLElement && ui.approvalsContent instanceof HTMLElement) {
-    replaceAgentSlotWithMarkup(approvalsOverviewSlot, ui.approvalsContent.innerHTML);
-  }
-  if (approvalsReviewSlot instanceof HTMLElement) {
-    replaceAgentSlotWithMarkup(approvalsReviewSlot, ui.approvalsDetailContent?.innerHTML || "");
-  }
 }
 
 function operatorChatScopeKey(scope = {}) {
@@ -601,7 +618,7 @@ function scheduleOperatorChatFollow(delayMs, token) {
 
 function shouldOperatorChatFollow() {
   const derived = deriveOperatorChatThreadState(operatorChatState.thread);
-  return activeWorkspaceView() === "agent" && document.visibilityState !== "hidden" && derived.shouldFollow;
+  return activeWorkspaceView() === "agentops" && document.visibilityState !== "hidden" && derived.shouldFollow;
 }
 
 async function runOperatorChatFollowLoop(token) {
@@ -1371,199 +1388,12 @@ function buildOperatorChatGovernanceReportExport(thread = {}, sessionId, catalog
   return buildChatTurnGovernanceReport(turn, catalogs, exportSelection);
 }
 
-function readSavedValue(key) {
-  try {
-    return String(window.localStorage.getItem(key) || "").trim();
-  } catch (_) {
-    return "";
-  }
-}
-
-function saveValue(key, value) {
-  try {
-    window.localStorage.setItem(key, String(value || "").trim());
-  } catch (_) {
-    // Local storage is optional.
-  }
-}
-
-function normalizeWorkspaceView(value, fallback = "home") {
-  const aliases = {
-    operations: "developer",
-    chat: "agent",
-    approvals: "agent",
-    runs: "history"
-  };
-  const requested = aliases[String(value || "").trim().toLowerCase()] || String(value || "").trim().toLowerCase();
-  if (WORKSPACE_VIEW_IDS.has(requested)) {
-    return requested;
-  }
-  const fallbackView = aliases[String(fallback || "").trim().toLowerCase()] || String(fallback || "").trim().toLowerCase();
-  if (WORKSPACE_VIEW_IDS.has(fallbackView)) {
-    return fallbackView;
-  }
-  return "home";
-}
-
-function initializeWorkspacePanels() {
-  if (!(ui.workspaceLayout instanceof HTMLElement)) {
-    ui.workspacePanels = [];
-    return;
-  }
-  const layout = ui.workspaceLayout;
-  const existingPanels = Array.from(layout.querySelectorAll(":scope > [data-workspace-panel]"));
-  if (existingPanels.length > 0) {
-    ui.workspacePanels = existingPanels;
-    return;
-  }
-  const sectionNodes = Array.from(layout.querySelectorAll(":scope > [data-workspace-section]"));
-  const wrappers = new Map();
-  for (const view of WORKSPACE_VIEW_IDS) {
-    const panel = document.createElement("section");
-    panel.className = "workspace-panel";
-    panel.dataset.workspacePanel = view;
-    panel.hidden = true;
-    wrappers.set(view, panel);
-  }
-  for (const section of sectionNodes) {
-    const view = normalizeWorkspaceView(section?.dataset?.workspaceSection, "");
-    const panel = wrappers.get(view);
-    if (panel) {
-      panel.appendChild(section);
-    }
-  }
-  for (const view of WORKSPACE_VIEW_IDS) {
-    const panel = wrappers.get(view);
-    if (!(panel instanceof HTMLElement)) {
-      continue;
-    }
-    layout.appendChild(panel);
-  }
-  ui.workspacePanels = Array.from(layout.querySelectorAll(":scope > [data-workspace-panel]"));
-}
-
-function initializePanelRegions(root = document) {
-  const panels = Array.from(root.querySelectorAll(".panel"));
-  let headingCounter = 0;
-  for (const panel of panels) {
-    if (!(panel instanceof HTMLElement)) {
-      continue;
-    }
-    const heading =
-      panel.querySelector(".panel-header h2, .panel-heading h2, h2") ||
-      panel.querySelector(".title");
-    if (!(heading instanceof HTMLElement)) {
-      continue;
-    }
-    headingCounter += 1;
-    heading.id = heading.id || `panel-heading-${headingCounter}`;
-    panel.setAttribute("role", "region");
-    panel.setAttribute("aria-labelledby", heading.id);
-  }
-}
-
-function initializeLiveRegionSemantics() {
-  const liveNodes = [
-    ui.approvalsFeedback,
-    ui.auditFeedback,
-    document.getElementById("run-builder-feedback"),
-    document.getElementById("terminal-feedback"),
-    ui.incidentHistorySummary,
-    document.getElementById("settings-int-feedback"),
-    document.getElementById("settings-aimxs-feedback")
-  ];
-  for (const node of liveNodes) {
-    if (!(node instanceof HTMLElement)) {
-      continue;
-    }
-    node.setAttribute("role", "status");
-    node.setAttribute("aria-live", node.getAttribute("aria-live") || "polite");
-    node.setAttribute("aria-atomic", "true");
-  }
-  if (ui.auditHandoffPreview instanceof HTMLElement) {
-    ui.auditHandoffPreview.setAttribute("role", "region");
-    ui.auditHandoffPreview.setAttribute("aria-label", "Audit and incident handoff preview");
-    ui.auditHandoffPreview.setAttribute("aria-live", "polite");
-    ui.auditHandoffPreview.setAttribute("aria-atomic", "true");
-  }
-}
-
-function activeElementWithin(node) {
-  const active = document.activeElement;
-  return node instanceof HTMLElement && active instanceof HTMLElement && node.contains(active);
-}
-
-function setSubtreeInert(node, inactive) {
-  if (!(node instanceof HTMLElement)) {
-    return;
-  }
-  if (inactive) {
-    node.setAttribute("inert", "");
-  } else {
-    node.removeAttribute("inert");
-  }
-}
-
-function focusElement(node, options = {}) {
-  if (!(node instanceof HTMLElement)) {
-    return false;
-  }
-  if (!node.hasAttribute("tabindex") && !["BUTTON", "INPUT", "SELECT", "TEXTAREA", "SUMMARY", "A"].includes(node.tagName)) {
-    node.setAttribute("tabindex", "-1");
-  }
-  window.requestAnimationFrame(() => {
-    node.focus({ preventScroll: options.scroll === false });
-  });
-  return true;
-}
-
-function applyWorkspaceView(view) {
-  const selectedView = normalizeWorkspaceView(view, "home");
-  if (ui.workspaceLayout) {
-    ui.workspaceLayout.setAttribute("data-workspace-view", selectedView);
-  }
-  let recoverFocus = false;
-  let activeTab = null;
-  for (const tab of ui.workspaceTabs || []) {
-    const tabView = normalizeWorkspaceView(tab?.dataset?.workspaceTab, "");
-    const isActive = tabView === selectedView;
-    const panel = (ui.workspacePanels || []).find(
-      (item) => normalizeWorkspaceView(item?.dataset?.workspacePanel, "") === tabView
-    );
-    if (tabView) {
-      tab.id = tab.id || `workspace-tab-${tabView}`;
-    }
-    if (panel && tabView) {
-      panel.id = panel.id || `workspace-panel-${tabView}`;
-      panel.setAttribute("role", "tabpanel");
-      panel.setAttribute("aria-labelledby", tab.id);
-      tab.setAttribute("aria-controls", panel.id);
-    }
-    tab.classList.toggle("is-active", isActive);
-    tab.setAttribute("aria-selected", isActive ? "true" : "false");
-    tab.setAttribute("tabindex", isActive ? "0" : "-1");
-    if (isActive) {
-      activeTab = tab;
-    }
-  }
-  for (const panel of ui.workspacePanels || []) {
-    const panelView = normalizeWorkspaceView(panel?.dataset?.workspacePanel, "");
-    const isActive = panelView === selectedView;
-    if (!isActive && activeElementWithin(panel)) {
-      recoverFocus = true;
-    }
-    panel.hidden = !isActive;
-    panel.setAttribute("aria-hidden", isActive ? "false" : "true");
-    setSubtreeInert(panel, !isActive);
-  }
-  if (recoverFocus && activeTab instanceof HTMLElement) {
-    focusElement(activeTab, { scroll: false });
-  }
-  return selectedView;
+function normalizeWorkspaceView(value, fallback = "homeops") {
+  return normalizeShellWorkspaceView(value, fallback, WORKSPACE_VIEW_ID_LIST);
 }
 
 function setWorkspaceView(view, persist = false) {
-  const selectedView = applyWorkspaceView(view);
+  const selectedView = workspaceShell.applyView(view, { tabs: workspaceTabNodes });
   if (persist) {
     saveValue(WORKSPACE_VIEW_PREF_KEY, selectedView);
   }
@@ -1695,52 +1525,6 @@ function setSettingsSubview(view, persist = false) {
     saveValue(SETTINGS_SUBVIEW_PREF_KEY, selected);
   }
   return selected;
-}
-
-function getFocusableTabCandidates(nodes) {
-  return (nodes || []).filter(
-    (node) =>
-      node instanceof HTMLElement &&
-      !node.hidden &&
-      node.getAttribute("aria-hidden") !== "true" &&
-      !node.classList.contains("advanced-hidden")
-  );
-}
-
-function handleHorizontalTabKeydown(event, nodes, readValue, activate) {
-  if (!(event.target instanceof HTMLElement)) {
-    return false;
-  }
-  const key = String(event.key || "");
-  if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(key)) {
-    return false;
-  }
-  const tabs = getFocusableTabCandidates(nodes);
-  if (tabs.length === 0) {
-    return false;
-  }
-  const currentIndex = Math.max(0, tabs.indexOf(event.target.closest("[role='tab']")));
-  let nextIndex = currentIndex;
-  if (key === "Home") {
-    nextIndex = 0;
-  } else if (key === "End") {
-    nextIndex = tabs.length - 1;
-  } else if (key === "ArrowLeft" || key === "ArrowUp") {
-    nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
-  } else if (key === "ArrowRight" || key === "ArrowDown") {
-    nextIndex = (currentIndex + 1) % tabs.length;
-  }
-  const nextTab = tabs[nextIndex];
-  if (!(nextTab instanceof HTMLElement)) {
-    return false;
-  }
-  event.preventDefault();
-  const requested = readValue(nextTab);
-  if (requested) {
-    activate(requested);
-  }
-  nextTab.focus({ preventScroll: true });
-  return true;
 }
 
 function focusRenderedRegion(container, options = {}) {
@@ -1934,24 +1718,8 @@ function formatRefreshClock() {
   }
 }
 
-const REFRESH_STATUS_LOADING_DELAY_MS = 750;
-
 function setRefreshStatus(tone, detail = "") {
-  if (!(ui.refreshStatus instanceof HTMLElement)) {
-    return;
-  }
-  const state = String(tone || "").trim().toLowerCase();
-  let chipClass = "chip chip-neutral chip-compact";
-  if (state === "ok") {
-    chipClass = "chip chip-ok chip-compact";
-  } else if (state === "warn" || state === "loading") {
-    chipClass = "chip chip-warn chip-compact";
-  } else if (state === "error") {
-    chipClass = "chip chip-danger chip-compact";
-  }
-  const text = String(detail || "").trim();
-  ui.refreshStatus.className = chipClass;
-  ui.refreshStatus.textContent = text ? `Data: ${text}` : "Data: idle";
+  refreshStatusShell.setStatus(tone, detail);
 }
 
 function populateAgentProfileSelect(ui, profiles, selectedID) {
@@ -2820,37 +2588,6 @@ function downloadGovernedText(text, fileName, mimeType = "text/plain;charset=utf
   return prepared;
 }
 
-function triggerTextDownload(content, fileName, mimeType = "text/plain;charset=utf-8") {
-  const blob = new Blob([String(content || "")], { type: mimeType });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = fileName;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 0);
-}
-
-async function copyTextToClipboard(text) {
-  const payload = String(text || "");
-  if (navigator?.clipboard?.writeText) {
-    await navigator.clipboard.writeText(payload);
-    return true;
-  }
-  const area = document.createElement("textarea");
-  area.value = payload;
-  area.setAttribute("readonly", "true");
-  area.style.position = "fixed";
-  area.style.opacity = "0";
-  document.body.appendChild(area);
-  area.focus();
-  area.select();
-  const copied = document.execCommand("copy");
-  area.remove();
-  return Boolean(copied);
-}
-
 function renderAuditFilingFeedback(tone, message) {
   if (!(ui.auditFeedback instanceof HTMLElement)) {
     return;
@@ -2951,7 +2688,7 @@ function buildIncidentPackageHandoffText(pkg) {
     run?.detail?.provenance?.commandTag || run?.summary?.provenanceTag || run?.detail?.provenanceTag || ""
   ).trim() || "-";
   return [
-    "Epydios AgentOps Desktop Incident Handoff Summary",
+    "EpydiosOps Desktop Incident Handoff Summary",
     `packageId=${String(meta.packageId || "").trim() || "-"}`,
     `generatedAt=${String(meta.generatedAt || "").trim() || "-"}`,
     `actor=${String(meta.actor || "").trim() || "-"}`,
@@ -3103,13 +2840,16 @@ function clearDataPanels() {
     "Extension Providers",
     "No provider data loaded."
   );
-  if (ui.chatContent) {
-    ui.chatContent.innerHTML = renderPanelStateMetric(
-      "info",
-      "Agent Workspace",
-      "Agent workspace becomes available after scope and runtime choices load."
-    );
-  }
+  renderAgentOpsEmptyState(ui, {
+    tone: "info",
+    title: "Agent Workspace",
+    message: "Agent workspace becomes available after scope and runtime choices load."
+  });
+  renderIdentityOpsEmptyState(ui, {
+    tone: "info",
+    title: "IdentityOps",
+    message: "Identity state becomes available after configuration and runtime identity load."
+  });
   ui.settingsContent.innerHTML = renderPanelStateMetric(
     "empty",
     "Settings",
@@ -3207,6 +2947,13 @@ function renderPanelLoadingStates() {
       "loading",
       "Settings",
       "Loading configuration and diagnostics..."
+    );
+  }
+  if (ui.identityContent) {
+    ui.identityContent.innerHTML = renderPanelStateMetric(
+      "loading",
+      "IdentityOps",
+      "Loading effective identity, authority, scope, and grant state..."
     );
   }
 }
@@ -3909,110 +3656,23 @@ function renderIncidentHistoryRow(item) {
   `;
 }
 
-function summarizeOpsTriage(snapshot) {
-  const runs = Array.isArray(snapshot?.runs?.items) ? snapshot.runs.items : [];
-  const approvals = Array.isArray(snapshot?.approvals?.items) ? snapshot.approvals.items : [];
-  const audit = Array.isArray(snapshot?.audit?.items) ? snapshot.audit.items : [];
-  const terminalHistory = Array.isArray(snapshot?.terminalHistory) ? snapshot.terminalHistory : [];
-
-  const pendingApprovals = approvals.filter(
-    (item) => String(item?.status || "").trim().toUpperCase() === "PENDING"
-  );
-  const expiringSoonApprovals = pendingApprovals.filter((item) => {
-    const expiresAt = parseTimeMs(item?.expiresAt);
-    if (expiresAt <= 0) {
-      return false;
-    }
-    const delta = expiresAt - Date.now();
-    return delta > 0 && delta <= 300000;
-  });
-  const attentionRuns = runs.filter((item) => {
-    const status = String(item?.status || "").trim().toUpperCase();
-    const decision = String(item?.policyDecision || "").trim().toUpperCase();
-    return status === "FAILED" || status === "POLICY_BLOCKED" || decision === "DENY";
-  });
-  const latestAttentionRun = attentionRuns
-    .slice()
-    .sort((a, b) => parseTimeMs(b?.updatedAt) - parseTimeMs(a?.updatedAt))[0] || null;
-  const denyAuditEvents = audit.filter(
-    (item) => String(item?.decision || "").trim().toUpperCase() === "DENY"
-  );
-  const terminalPolicyBlocked = terminalHistory.filter(
-    (item) => String(item?.result?.status || "").trim().toUpperCase() === "POLICY_BLOCKED"
-  );
-  const terminalFailed = terminalHistory.filter(
-    (item) => String(item?.result?.status || "").trim().toUpperCase() === "FAILED"
-  );
-
-  return {
-    pendingApprovals: pendingApprovals.length,
-    expiringSoonApprovals: expiringSoonApprovals.length,
-    attentionRuns: attentionRuns.length,
-    latestAttentionRunId: String(latestAttentionRun?.runId || "").trim(),
-    denyAuditEvents: denyAuditEvents.length,
-    terminalPolicyBlocked: terminalPolicyBlocked.length,
-    terminalFailed: terminalFailed.length
-  };
-}
-
-function renderOpsTriage(snapshot) {
-  if (!ui.triageContent) {
-    return;
-  }
-  const triage = summarizeOpsTriage(snapshot);
-  const approvalTone = triage.pendingApprovals > 0 ? "chip chip-danger chip-compact" : "chip chip-ok chip-compact";
-  const runsTone = triage.attentionRuns > 0 ? "chip chip-danger chip-compact" : "chip chip-ok chip-compact";
-  const auditTone = triage.denyAuditEvents > 0 ? "chip chip-warn chip-compact" : "chip chip-ok chip-compact";
-  const terminalIssueCount = triage.terminalPolicyBlocked + triage.terminalFailed;
-  const terminalTone = terminalIssueCount > 0 ? "chip chip-warn chip-compact" : "chip chip-ok chip-compact";
-
-  ui.triageContent.innerHTML = `
-    <article class="triage-card">
-      <div class="title">Pending Approvals</div>
-      <div class="triage-value">${escapeHTML(String(triage.pendingApprovals))}</div>
-      <div class="meta"><span class="${approvalTone}">expiring <=5m: ${escapeHTML(String(triage.expiringSoonApprovals))}</span></div>
-      <div class="triage-actions">
-        <button class="btn btn-secondary btn-small" type="button" data-triage-action="open-approvals-pending">Open Approval Queue</button>
-      </div>
-    </article>
-    <article class="triage-card">
-      <div class="title">Runs Requiring Attention</div>
-      <div class="triage-value">${escapeHTML(String(triage.attentionRuns))}</div>
-      <div class="meta"><span class="${runsTone}">latest=${escapeHTML(triage.latestAttentionRunId || "-")}</span></div>
-      <div class="triage-actions">
-        <button
-          class="btn btn-secondary btn-small"
-          type="button"
-          data-triage-action="open-runs-attention"
-          data-triage-run-id="${escapeHTML(triage.latestAttentionRunId || "")}"
-        >Open Run List</button>
-      </div>
-    </article>
-    <article class="triage-card">
-      <div class="title">Audit Denies</div>
-      <div class="triage-value">${escapeHTML(String(triage.denyAuditEvents))}</div>
-      <div class="meta"><span class="${auditTone}">current audit scope</span></div>
-      <div class="triage-actions">
-        <button class="btn btn-secondary btn-small" type="button" data-triage-action="open-audit-deny">Filter Deny Events</button>
-      </div>
-    </article>
-    <article class="triage-card">
-      <div class="title">Terminal Issues</div>
-      <div class="triage-value">${escapeHTML(String(terminalIssueCount))}</div>
-      <div class="meta"><span class="${terminalTone}">policy_blocked=${escapeHTML(String(triage.terminalPolicyBlocked))}; failed=${escapeHTML(String(triage.terminalFailed))}</span></div>
-      <div class="triage-actions">
-        <button class="btn btn-secondary btn-small" type="button" data-triage-action="open-terminal-issues">Open Terminal History</button>
-      </div>
-    </article>
-  `;
-}
-
 async function main() {
   const config = await loadConfig();
   window.__m14MainReady = false;
-  initializeWorkspacePanels();
+  workspaceShell.initializePanels();
   initializePanelRegions();
-  initializeLiveRegionSemantics();
+  initializeShellLiveRegions({
+    liveNodes: [
+      ui.approvalsFeedback,
+      ui.auditFeedback,
+      document.getElementById("run-builder-feedback"),
+      document.getElementById("terminal-feedback"),
+      ui.incidentHistorySummary,
+      document.getElementById("settings-int-feedback"),
+      document.getElementById("settings-aimxs-feedback")
+    ],
+    handoffPreview: ui.auditHandoffPreview
+  });
   const baselineChoices = resolveRuntimeChoices(config);
   let aimxsOverride = normalizeAimxsOverride(
     readSavedJSON(AIMXS_OVERRIDE_KEY),
@@ -4138,28 +3798,22 @@ async function main() {
     populateAgentProfileSelect(ui, profiles, selected);
     return next;
   };
-  ui.title.textContent = config.appName || "Epydios AgentOps Desktop";
-  ui.subtitle.textContent = `${config.environment || "unknown"} environment`;
+  topbarShell.setBrand({
+    title: config.appName || "EpydiosOps Desktop",
+    subtitle: `${config.environment || "unknown"} environment`
+  });
   setWorkspaceView(readSavedValue(WORKSPACE_VIEW_PREF_KEY));
   setIncidentSubview(readSavedValue(INCIDENT_SUBVIEW_PREF_KEY));
   settingsSubviewState = normalizeSettingsSubview(readSavedValue(SETTINGS_SUBVIEW_PREF_KEY));
   advancedSectionState = normalizeAdvancedSectionState(readSavedJSON(ADVANCED_SECTION_STATE_KEY));
   detailsOpenState = normalizeDetailsOpenState(readSavedJSON(DETAILS_OPEN_STATE_KEY));
   applyAdvancedState();
-  for (const tab of ui.workspaceTabs || []) {
-    tab.addEventListener("click", () => {
-      const requested = String(tab.dataset.workspaceTab || "").trim().toLowerCase();
-      setWorkspaceView(requested, true);
-    });
-    tab.addEventListener("keydown", (event) => {
-      handleHorizontalTabKeydown(
-        event,
-        ui.workspaceTabs || [],
-        (node) => String(node?.dataset?.workspaceTab || "").trim().toLowerCase(),
-        (requested) => setWorkspaceView(requested, true)
-      );
-    });
-  }
+  createWorkspaceNavController({
+    tabs: workspaceTabNodes,
+    normalizeView: normalizeWorkspaceView,
+    activateView: (requested) => setWorkspaceView(requested, true),
+    onKeydown: handleHorizontalTabKeydown
+  }).bind();
   for (const tab of ui.incidentSubtabs || []) {
     tab.addEventListener("click", () => {
       const requested = String(tab.dataset.incidentSubtab || "").trim().toLowerCase();
@@ -4366,11 +4020,7 @@ async function main() {
   refreshRunBuilderPreview(session);
   refreshTerminalPreview(session, initialChoices);
 
-  let triageSnapshot = {
-    runs: { items: [] },
-    approvals: { items: [] },
-    audit: { items: [] }
-  };
+  let triageSnapshot = createEmptyHomeSnapshot();
   let latestAuditPayload = { items: [], source: "unknown" };
   let latestRunDetail = null;
   let latestRunDetailSource = "unknown";
@@ -4386,10 +4036,40 @@ async function main() {
     }),
     configChanges: buildSettingsConfigChanges(configChangeHistory, { items: [] })
   };
-  const renderTriagePanel = () => {
-    renderOpsTriage({
-      ...triageSnapshot,
-      terminalHistory: store.getTerminalHistory()
+  const renderTriagePanel = (options = {}) => {
+    const snapshot = options.snapshot || triageSnapshot;
+    const terminalHistory = Array.isArray(options.terminalHistory)
+      ? options.terminalHistory
+      : store.getTerminalHistory();
+    const dashboardOptions = {
+      session: options.session || session,
+      snapshot,
+      terminalHistory
+    };
+    if (options.snapshot) {
+      triageSnapshot = options.snapshot;
+    }
+    if (Object.prototype.hasOwnProperty.call(options, "health")) {
+      dashboardOptions.health = options.health;
+    }
+    if (Object.prototype.hasOwnProperty.call(options, "pipeline")) {
+      dashboardOptions.pipeline = options.pipeline;
+    }
+    renderHomeDashboard(ui, dashboardOptions);
+  };
+  const renderHomeErrorPanel = (message, options = {}) => {
+    const snapshot = options.snapshot || triageSnapshot;
+    const terminalHistory = Array.isArray(options.terminalHistory)
+      ? options.terminalHistory
+      : store.getTerminalHistory();
+    if (options.snapshot) {
+      triageSnapshot = options.snapshot;
+    }
+    renderHomeDashboardError(ui, {
+      session: options.session || session,
+      snapshot,
+      terminalHistory,
+      message
     });
   };
   const renderContextPanel = () => {
@@ -4400,24 +4080,13 @@ async function main() {
   let refreshInFlight = false;
   let refreshQueued = false;
   let hasHydratedPanels = false;
-  let refreshStatusLoadingTimer = 0;
-
-  function clearRefreshStatusLoadingTimer() {
-    if (!refreshStatusLoadingTimer) {
-      return;
-    }
-    window.clearTimeout(refreshStatusLoadingTimer);
-    refreshStatusLoadingTimer = 0;
-  }
 
   function scheduleRefreshStatusLoading(detail = "refreshing") {
-    clearRefreshStatusLoadingTimer();
-    refreshStatusLoadingTimer = window.setTimeout(() => {
-      refreshStatusLoadingTimer = 0;
-      if (refreshInFlight) {
-        setRefreshStatus("loading", detail);
-      }
-    }, REFRESH_STATUS_LOADING_DELAY_MS);
+    refreshStatusShell.scheduleLoading(detail, () => refreshInFlight);
+  }
+
+  function clearRefreshStatusLoadingTimer() {
+    refreshStatusShell.clearLoadingTimer();
   }
 
   async function refresh() {
@@ -4439,8 +4108,12 @@ async function main() {
     refreshTerminalPreview(session, currentChoices);
 
     if (config.auth?.enabled && !session.authenticated && !config.mockMode) {
-      renderError(ui, "Sign in is required to view runtime and provider data.");
       clearDataPanels();
+      triageSnapshot = createEmptyHomeSnapshot();
+      renderHomeErrorPanel("Sign in is required to view runtime and provider data.", {
+        snapshot: triageSnapshot,
+        terminalHistory: []
+      });
       clearRefreshStatusLoadingTimer();
       setRefreshStatus("warn", "sign-in required");
       refreshInFlight = false;
@@ -4537,11 +4210,10 @@ async function main() {
         latestSettingsSnapshot = settingsWithConfigChanges;
         triageSnapshot = { runs, approvals, audit };
         latestAuditPayload = audit || { items: [] };
-        renderTriagePanel();
+        renderTriagePanel({ health, pipeline });
         renderContextPanel();
-        renderHealth(ui, health, pipeline);
         renderProviders(ui, providers);
-        renderChat(ui, settingsWithConfigChanges, {
+        renderAgentOpsPage(ui, settingsWithConfigChanges, {
           ...operatorChatState,
           agentProfileId:
             String(
@@ -4553,6 +4225,7 @@ async function main() {
               .trim()
               .toLowerCase()
         });
+        renderIdentityOpsPage(ui, settingsWithConfigChanges, session);
         const editorState = buildSettingsEditorState(
           activeProjectScope(session),
           settingsWithConfigChanges,
@@ -4598,7 +4271,7 @@ async function main() {
         setSettingsSubview(settingsSubviewState);
         renderApprovals(ui, store, approvals, approvalScope, selectedApprovalRunId, nativeApprovalRailItems);
         renderApprovalsDetail(ui, selectedApproval);
-        mountAgentApprovalPanels();
+        mountAgentOpsEmbeddedPanels(ui);
         if (approvalReviewModalIsOpen()) {
           if (selectedApproval && !String(selectedApproval?.selectionId || "").trim().startsWith("native:")) {
             renderApprovalReviewModal(ui, selectedApproval);
@@ -4626,7 +4299,7 @@ async function main() {
       }
     } catch (error) {
       clearRefreshStatusLoadingTimer();
-      renderError(ui, `Refresh failed: ${error.message}`);
+      renderHomeErrorPanel(`Refresh failed: ${error.message}`);
       setRefreshStatus("error", "refresh failed");
     } finally {
       reconcileOperatorChatFollowLoop();
@@ -4812,7 +4485,7 @@ async function main() {
     if (!nextRunID) {
       return;
     }
-    setWorkspaceView("history", true);
+    setWorkspaceView("runtimeops", true);
     ui.runDetailContent.dataset.selectedRunId = nextRunID;
     if (ui.terminalRunId) {
       ui.terminalRunId.value = nextRunID;
@@ -4862,11 +4535,9 @@ async function main() {
         latestRunDetail = null;
         latestRunDetailSource = "unavailable";
         ui.runDetailContent.dataset.selectedRunId = nextRunID;
-        ui.runDetailContent.innerHTML = renderPanelStateMetric(
-          "error",
-          "Run Detail",
-          `Run detail failed: ${error.message}`
-        );
+        renderRuntimeRunDetailError(ui, `Run detail failed: ${error.message}`, {
+          selectedRunId: nextRunID
+        });
       }
     }
 
@@ -5106,7 +4777,9 @@ async function main() {
       refreshTerminalPreview(session, currentChoices);
       await refresh();
     } catch (error) {
-      renderError(ui, `Sign-in flow failed: ${error.message}`);
+      renderHomeErrorPanel(`Sign-in flow failed: ${error.message}`, {
+        session: getSession()
+      });
       setRefreshStatus("error", "sign-in failed");
     }
   });
@@ -5339,7 +5012,7 @@ async function main() {
       return;
     }
 
-    setWorkspaceView("settings", true);
+    setWorkspaceView("settingsops", true);
     setAdvancedSectionEnabled("settings", true, true);
     setSettingsSubview("diagnostics", true);
     await refresh();
@@ -5350,7 +5023,7 @@ async function main() {
     focusRenderedRegion(ui.settingsContent, { scroll: false });
   });
   ui.settingsOpenAuditEventsButton?.addEventListener("click", async () => {
-    setWorkspaceView("incidents", true);
+    setWorkspaceView("incidentops", true);
     setIncidentSubview("audit", true);
     if (ui.auditPage) {
       ui.auditPage.value = "1";
@@ -6524,7 +6197,7 @@ async function main() {
       if (ui.auditPage) {
         ui.auditPage.value = "1";
       }
-      setWorkspaceView("incidents", true);
+      setWorkspaceView("incidentops", true);
       setIncidentSubview("audit", true);
       await refresh();
       focusRenderedRegion(ui.auditContent);
@@ -7564,7 +7237,7 @@ async function main() {
         ui.approvalsPage.value = "1";
       }
       await refresh();
-      setWorkspaceView("agent", true);
+      setWorkspaceView("agentops", true);
       ui.approvalsContent?.scrollIntoView({ behavior: "smooth", block: "start" });
       focusRenderedRegion(ui.approvalsContent, { scroll: false });
       return;
@@ -7579,7 +7252,7 @@ async function main() {
         ui.runsPage.value = "1";
       }
       await refresh();
-      setWorkspaceView("history", true);
+      setWorkspaceView("runtimeops", true);
       if (runID) {
         await openRunDetail(runID);
       } else {
@@ -7594,7 +7267,7 @@ async function main() {
         ui.auditPage.value = "1";
       }
       await refresh();
-      setWorkspaceView("incidents", true);
+      setWorkspaceView("incidentops", true);
       setIncidentSubview("audit", true);
       ui.auditContent?.scrollIntoView({ behavior: "smooth", block: "start" });
       focusRenderedRegion(ui.auditContent, { scroll: false });
@@ -7606,7 +7279,7 @@ async function main() {
         ui.terminalHistoryStatusFilter.value = "POLICY_BLOCKED";
       }
       renderTerminalHistoryPanel();
-      setWorkspaceView("home", true);
+      setWorkspaceView("homeops", true);
       ui.terminalHistory?.scrollIntoView({ behavior: "smooth", block: "start" });
       focusRenderedRegion(ui.terminalHistory, { scroll: false });
     }
@@ -8088,7 +7761,7 @@ async function main() {
       return;
     }
     if (action === "open-audit") {
-      setWorkspaceView("incidents", true);
+      setWorkspaceView("incidentops", true);
       setIncidentSubview("audit", true);
       focusRenderedRegion(ui.auditContent, { scroll: false });
       return;
@@ -8251,7 +7924,7 @@ async function main() {
     }
 
     await refresh();
-    setWorkspaceView("agent", true);
+    setWorkspaceView("agentops", true);
     openApprovalDetail(openApprovalRunID);
   });
 
@@ -8268,5 +7941,10 @@ async function main() {
 }
 
 main().catch((error) => {
-  renderError(ui, `Bootstrap failed: ${error.message}`);
+  renderHomeDashboardError(ui, {
+    session: getSession(),
+    snapshot: createEmptyHomeSnapshot(),
+    terminalHistory: [],
+    message: `Bootstrap failed: ${error.message}`
+  });
 });

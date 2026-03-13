@@ -1,0 +1,65 @@
+@media (min-width: 1160px) {
+  .settings-subpanel-configuration > .settings-metric-policy-contract {
+    grid-column: span 4;
+  }
+
+  .settings-subpanel-diagnostics > .settings-metric-policy-packs {
+    grid-column: span 12;
+  }
+}
+
+.policy-outcome-banner {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+  border-radius: var(--radius-2);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface) 94%, transparent), color-mix(in srgb, var(--panel) 82%, transparent)),
+    var(--surface-raised);
+  box-shadow: var(--shadow-1), var(--shadow-inset);
+}
+
+.policy-outcome-banner.is-allow {
+  border-color: color-mix(in srgb, var(--ok) 34%, var(--line));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--ok) 9%, transparent), transparent 86%),
+    color-mix(in srgb, var(--surface) 92%, var(--panel));
+}
+
+.policy-outcome-banner.is-defer {
+  border-color: color-mix(in srgb, var(--warn) 38%, var(--line));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--warn) 10%, transparent), transparent 86%),
+    color-mix(in srgb, var(--surface) 92%, var(--panel));
+}
+
+.policy-outcome-banner.is-deny,
+.policy-outcome-banner.is-error {
+  border-color: color-mix(in srgb, var(--danger) 36%, var(--line));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--danger) 10%, transparent), transparent 86%),
+    color-mix(in srgb, var(--surface) 92%, var(--panel));
+}
+
+.policy-outcome-banner .title {
+  margin: 0;
+}
+
+.policy-outcome-detail {
+  font-size: var(--font-size-sm);
+  color: var(--ink-soft);
+}
+
+.policy-outcome-banner.is-allow .policy-outcome-detail {
+  color: color-mix(in srgb, var(--ok) 78%, var(--ink));
+}
+
+.policy-outcome-banner.is-defer .policy-outcome-detail {
+  color: color-mix(in srgb, var(--warn) 82%, var(--ink));
+}
+
+.policy-outcome-banner.is-deny .policy-outcome-detail,
+.policy-outcome-banner.is-error .policy-outcome-detail {
+  color: color-mix(in srgb, var(--danger) 82%, var(--ink));
+}

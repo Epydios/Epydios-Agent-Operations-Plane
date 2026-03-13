@@ -3,65 +3,91 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Epydios AgentOps Desktop</title>
+    <title>EpydiosOps Desktop</title>
     <link rel="stylesheet" href="./css/main.css" />
   </head>
   <body>
-    <header class="topbar">
+    <header class="topbar" data-shell-topbar>
       <div class="brand">
         <span class="brand-mark">
           <img src="./assets/epydios-logo.png" alt="" class="brand-logo" />
         </span>
         <div class="brand-text">
-          <h1 id="app-title">Epydios AgentOps Desktop</h1>
-          <p id="app-subtitle">Operator Console</p>
+          <h1 id="app-title" data-shell-brand-title>EpydiosOps Desktop</h1>
+          <p id="app-subtitle" data-shell-brand-subtitle>Operator Console</p>
         </div>
       </div>
       <div class="session-controls">
-        <span id="refresh-status" class="chip chip-neutral chip-compact" aria-live="polite">Data: idle</span>
+        <span id="refresh-status" class="chip chip-neutral chip-compact" aria-live="polite" data-shell-refresh-status>Data: idle</span>
         <button id="login-button" class="btn btn-primary">Sign In</button>
         <button id="logout-button" class="btn btn-secondary">Sign Out</button>
       </div>
     </header>
 
-    <nav class="workspace-nav" aria-label="Workspace sections" role="tablist" aria-orientation="horizontal">
-      <button class="workspace-tab is-active" type="button" role="tab" aria-selected="true" data-workspace-tab="home">
-        Home
-      </button>
-      <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="agent">
-        Agent
-      </button>
-      <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="history">
-        History
-      </button>
-      <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="incidents">
-        Incidents
-      </button>
-      <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="settings">
-        Settings
-      </button>
-      <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="developer">
-        Developer
-      </button>
-    </nav>
+    <div class="workspace-shell">
+      <nav class="workspace-nav" data-shell-nav aria-label="Workspace sections" role="tablist" aria-orientation="vertical">
+        <button class="workspace-tab is-active" type="button" role="tab" aria-selected="true" data-workspace-tab="homeops">
+          HomeOps
+        </button>
+        <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="agentops">
+          AgentOps
+        </button>
+        <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="runtimeops">
+          RuntimeOps
+        </button>
+        <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="platformops">
+          PlatformOps
+        </button>
+        <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="identityops">
+          IdentityOps
+        </button>
+        <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="networkops">
+          NetworkOps
+        </button>
+        <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="policyops">
+          PolicyOps
+        </button>
+        <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="guardrailops">
+          GuardrailOps
+        </button>
+        <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="governanceops">
+          GovernanceOps
+        </button>
+        <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="complianceops">
+          ComplianceOps
+        </button>
+        <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="auditops">
+          AuditOps
+        </button>
+        <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="evidenceops">
+          EvidenceOps
+        </button>
+        <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="incidentops">
+          IncidentOps
+        </button>
+        <div class="workspace-nav-spacer" aria-hidden="true"></div>
+        <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="settingsops">
+          SettingsOps
+        </button>
+        <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="developerops">
+          DeveloperOps
+        </button>
+      </nav>
 
-    <main id="workspace-layout" class="layout" data-workspace-view="home">
-      <section class="panel panel-dashboard" data-workspace-section="home">
+      <main id="workspace-layout" class="layout" data-shell-layout data-workspace-view="homeops">
+      <section class="panel panel-dashboard" data-workspace-section="homeops">
         <div class="panel-header">
           <h2>Dashboard</h2>
           <button id="refresh-button" class="btn btn-secondary">Refresh</button>
         </div>
         <div class="dashboard-top-grid">
-          <article class="metric dashboard-auth-card">
-            <div class="title">Auth</div>
-            <div class="meta"><span id="auth-status" class="chip chip-neutral">Unknown</span></div>
-          </article>
+          <article id="home-dashboard-auth" class="metric dashboard-auth-card"></article>
           <div id="health-content" class="dashboard-health-grid"></div>
         </div>
         <div id="triage-content" class="triage-grid dashboard-triage-grid"></div>
       </section>
 
-      <section class="panel panel-context" data-workspace-section="developer">
+      <section class="panel panel-context" data-workspace-section="developerops">
         <div class="panel-header">
           <h2 class="heading-inline">
             Workspace Context
@@ -98,11 +124,116 @@
         </div>
       </section>
 
-      <section class="panel panel-chat" data-workspace-section="agent">
-        <div id="chat-content" class="stack"></div>
+      <section class="panel panel-chat" data-workspace-section="agentops">
+        <div id="chat-content" class="stack" data-domain-root="agentops"></div>
       </section>
 
-      <section class="panel panel-settings" data-workspace-section="settings">
+      <section class="panel panel-identity" data-workspace-section="identityops">
+        <div class="panel-header">
+          <div class="panel-heading">
+            <h2>IdentityOps</h2>
+          </div>
+        </div>
+        <div id="identity-content" class="stack"></div>
+      </section>
+
+      <section class="panel panel-ops-placeholder" data-workspace-section="platformops" data-domain-root="platformops">
+        <div class="panel-header">
+          <div class="panel-heading">
+            <h2>PlatformOps</h2>
+          </div>
+        </div>
+        <article class="metric ops-placeholder-card">
+          <div class="title">Structure Ready</div>
+          <div class="meta">PlatformOps will own environment, provider, bridge, and release posture.</div>
+        </article>
+      </section>
+
+      <section class="panel panel-ops-placeholder" data-workspace-section="networkops" data-domain-root="networkops">
+        <div class="panel-header">
+          <div class="panel-heading">
+            <h2>NetworkOps</h2>
+          </div>
+        </div>
+        <article class="metric ops-placeholder-card">
+          <div class="title">Structure Ready</div>
+          <div class="meta">NetworkOps will own boundary path, trust, routing, and enterprise connectivity posture.</div>
+        </article>
+      </section>
+
+      <section class="panel panel-ops-placeholder" data-workspace-section="policyops" data-domain-root="policyops">
+        <div class="panel-header">
+          <div class="panel-heading">
+            <h2>PolicyOps</h2>
+          </div>
+        </div>
+        <article class="metric ops-placeholder-card">
+          <div class="title">Structure Ready</div>
+          <div class="meta">PolicyOps will own decision semantics, pack posture, and provider contract meaning.</div>
+        </article>
+      </section>
+
+      <section class="panel panel-ops-placeholder" data-workspace-section="guardrailops" data-domain-root="guardrailops">
+        <div class="panel-header">
+          <div class="panel-heading">
+            <h2>GuardrailOps</h2>
+          </div>
+        </div>
+        <article class="metric ops-placeholder-card">
+          <div class="title">Structure Ready</div>
+          <div class="meta">GuardrailOps will own non-bypassable execution constraints, kills, and containment posture.</div>
+        </article>
+      </section>
+
+      <section class="panel panel-ops-placeholder" data-workspace-section="governanceops" data-domain-root="governanceops">
+        <div class="panel-header">
+          <div class="panel-heading">
+            <h2>GovernanceOps</h2>
+          </div>
+        </div>
+        <article class="metric ops-placeholder-card">
+          <div class="title">Structure Ready</div>
+          <div class="meta">GovernanceOps will own approvals, escalation, receipts, and exception workflow.</div>
+        </article>
+      </section>
+
+      <section class="panel panel-ops-placeholder" data-workspace-section="complianceops" data-domain-root="complianceops">
+        <div class="panel-header">
+          <div class="panel-heading">
+            <h2>ComplianceOps</h2>
+          </div>
+        </div>
+        <article class="metric ops-placeholder-card">
+          <div class="title">Structure Ready</div>
+          <div class="meta">ComplianceOps will own controls, attestations, retention, and coverage posture.</div>
+        </article>
+      </section>
+
+      <section class="panel panel-ops-placeholder" data-workspace-section="auditops" data-domain-root="auditops">
+        <div class="panel-header">
+          <div class="panel-heading">
+            <h2>AuditOps</h2>
+          </div>
+        </div>
+        <article class="metric ops-placeholder-card">
+          <div class="title">Structure Ready</div>
+          <div class="meta">AuditOps will own accountability records, investigation pivots, and export posture.</div>
+        </article>
+      </section>
+
+      <section class="panel panel-ops-placeholder" data-workspace-section="evidenceops" data-domain-root="evidenceops">
+        <div class="panel-header">
+          <div class="panel-heading">
+            <h2>EvidenceOps</h2>
+          </div>
+        </div>
+        <article class="metric ops-placeholder-card">
+          <div class="title">Structure Ready</div>
+          <div class="meta">EvidenceOps will own bundles, artifacts, provenance, and proof packaging.</div>
+        </article>
+      </section>
+
+      <section class="panel panel-settings" data-workspace-section="settingsops">
         <div class="panel-header">
           <div class="panel-heading">
             <h2>Settings Control Plane</h2>
@@ -136,7 +267,7 @@
         <div id="settings-content" class="stack"></div>
       </section>
 
-      <section class="panel panel-governed-action panel-run-builder" data-workspace-section="developer">
+      <section class="panel panel-governed-action panel-run-builder" data-workspace-section="developerops">
         <div class="panel-header">
           <div class="panel-heading">
             <h2>Governed Action Request</h2>
@@ -281,7 +412,7 @@
         <pre id="governed-action-payload" class="monospace"></pre>
       </section>
 
-      <section class="panel panel-run-builder" data-workspace-section="developer">
+      <section class="panel panel-run-builder" data-workspace-section="developerops">
         <div class="panel-header">
           <h2 class="heading-inline">
             Run Builder
@@ -387,7 +518,7 @@
         <pre id="run-builder-payload" class="monospace"></pre>
       </section>
 
-      <section class="panel panel-terminal" data-workspace-section="developer" data-advanced-section="operations">
+      <section class="panel panel-terminal" data-workspace-section="developerops" data-advanced-section="operations">
         <div class="panel-header">
           <h2>Terminal Control</h2>
         </div>
@@ -439,7 +570,7 @@
         <pre id="terminal-payload" class="monospace"></pre>
       </section>
 
-      <section class="panel panel-providers" data-workspace-section="settings">
+      <section class="panel panel-providers" data-workspace-section="settingsops">
         <div class="panel-heading">
           <h2>Provider Contract Inventory</h2>
           <p class="panel-lead">Review registered extension providers, versions, endpoints, and capability coverage for the active scope.</p>
@@ -447,7 +578,7 @@
         <div id="providers-content" class="stack"></div>
       </section>
 
-      <section class="panel panel-approvals agent-approvals-support" data-workspace-section="agent">
+      <section class="panel panel-approvals agent-approvals-support" data-workspace-section="agentops" data-domain-root="governanceops-embedded">
         <div class="panel-header">
           <div class="panel-heading">
             <h2>Pending Approvals</h2>
@@ -536,7 +667,7 @@
         </dialog>
       </section>
 
-      <section class="panel panel-runs" data-workspace-section="history">
+      <section class="panel panel-runs" data-workspace-section="runtimeops">
         <div class="panel-header">
           <div class="panel-heading">
             <h2>History</h2>
@@ -663,7 +794,7 @@
         </div>
       </section>
 
-      <section class="panel panel-audit" data-workspace-section="incidents">
+      <section class="panel panel-audit" data-workspace-section="incidentops">
         <div class="panel-header">
           <div class="panel-heading">
             <h2>Incident Coordination</h2>
@@ -864,7 +995,8 @@
           <div id="audit-content" class="stack"></div>
         </section>
       </section>
-    </main>
+      </main>
+    </div>
 
     <script type="module" src="./js/main.js"></script>
   </body>

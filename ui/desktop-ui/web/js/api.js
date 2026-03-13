@@ -46,8 +46,93 @@ function summarizeRun(item) {
     policyBundleVersion: item.policyBundleVersion,
     policyGrantTokenPresent: Boolean(item.policyGrantTokenPresent),
     policyGrantTokenSha256: item.policyGrantTokenSha256,
+    evidenceRecordStatus: String(item?.evidenceRecordResponse?.status || item?.evidenceRecordStatus || "").trim(),
+    evidenceBundleStatus: String(item?.evidenceBundleResponse?.status || item?.evidenceBundleStatus || "").trim(),
     createdAt: item.createdAt,
     updatedAt: item.updatedAt
+  };
+}
+
+function parseSummaryTime(value) {
+  const ts = new Date(value || "").getTime();
+  return Number.isFinite(ts) ? ts : 0;
+}
+
+function pickLatestSummaryItem(items = [], timeFields = []) {
+  const values = Array.isArray(items) ? items : [];
+  let best = null;
+  let bestTs = 0;
+  for (const item of values) {
+    const current = item && typeof item === "object" ? item : {};
+    const ts = timeFields.reduce((max, field) => {
+      const next = parseSummaryTime(current?.[field]);
+      return next > max ? next : max;
+    }, 0);
+    if (!best || ts > bestTs) {
+      best = current;
+      bestTs = ts;
+    }
+  }
+  return best || {};
+}
+
+function summarizeIdentityTraceRun(run = {}) {
+  return {
+    runId: String(run?.runId || "").trim(),
+    requestId: String(run?.requestId || "").trim(),
+    tenantId: String(run?.tenantId || "").trim(),
+    projectId: String(run?.projectId || "").trim(),
+    environment: String(run?.environment || "").trim(),
+    status: String(run?.status || "").trim(),
+    policyDecision: String(run?.policyDecision || "").trim(),
+    selectedEvidenceProvider: String(run?.selectedEvidenceProvider || "").trim(),
+    evidenceRecordStatus: String(run?.evidenceRecordStatus || run?.evidenceRecordResponse?.status || "").trim(),
+    evidenceBundleStatus: String(run?.evidenceBundleStatus || run?.evidenceBundleResponse?.status || "").trim(),
+    policyGrantTokenPresent: Boolean(run?.policyGrantTokenPresent),
+    updatedAt: String(run?.updatedAt || run?.createdAt || "").trim()
+  };
+}
+
+function summarizeIdentityTraceApproval(approval = {}) {
+  return {
+    approvalId: String(approval?.approvalId || "").trim(),
+    runId: String(approval?.runId || "").trim(),
+    status: String(approval?.status || "").trim(),
+    tier: String(approval?.tier ?? "").trim(),
+    targetExecutionProfile: String(approval?.targetExecutionProfile || "").trim(),
+    reviewedAt: String(approval?.reviewedAt || "").trim(),
+    createdAt: String(approval?.createdAt || "").trim(),
+    expiresAt: String(approval?.expiresAt || "").trim()
+  };
+}
+
+function summarizeIdentityTraceAudit(item = {}) {
+  return {
+    ts: String(item?.ts || "").trim(),
+    event: String(item?.event || "").trim(),
+    providerId: String(item?.providerId || "").trim(),
+    decision: String(item?.decision || "").trim(),
+    tenantId: String(item?.tenantId || "").trim(),
+    projectId: String(item?.projectId || "").trim()
+  };
+}
+
+function buildIdentityTraceabilitySnapshot(context = {}) {
+  const runItems = Array.isArray(context?.runs?.items) ? context.runs.items : [];
+  const approvalItems = Array.isArray(context?.approvals?.items) ? context.approvals.items : [];
+  const auditItems = Array.isArray(context?.audit?.items) ? context.audit.items : [];
+  const latestRun = summarizeIdentityTraceRun(pickLatestSummaryItem(runItems, ["updatedAt", "createdAt"]));
+  const latestApproval = summarizeIdentityTraceApproval(
+    pickLatestSummaryItem(approvalItems, ["reviewedAt", "createdAt", "expiresAt"])
+  );
+  const latestAudit = summarizeIdentityTraceAudit(pickLatestSummaryItem(auditItems, ["ts"]));
+  return {
+    runCount: Number(context?.runs?.count || runItems.length || 0),
+    approvalCount: Number(context?.approvals?.count || approvalItems.length || 0),
+    auditCount: Number(context?.audit?.count || auditItems.length || 0),
+    latestRun,
+    latestApproval,
+    latestAudit
   };
 }
 
@@ -2783,6 +2868,7 @@ export class AgentOpsApi {
           context.approvals?.source || (this.config.mockMode ? "mock" : "runtime-endpoint"),
         audit: context.audit?.source || (this.config.mockMode ? "mock" : "runtime-endpoint")
       },
+      identityTraceability: buildIdentityTraceabilitySnapshot(context),
       endpoints: [
         {
           id: "tasks",

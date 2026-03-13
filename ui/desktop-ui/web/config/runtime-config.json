@@ -1,5 +1,5 @@
 {
-  "appName": "Epydios AgentOps Desktop",
+  "appName": "EpydiosOps Desktop",
   "environment": "local",
   "mockMode": true,
   "runtimeApiBaseUrl": "http://127.0.0.1:8080",

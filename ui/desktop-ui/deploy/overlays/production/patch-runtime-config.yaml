@@ -5,7 +5,7 @@ metadata:
 data:
   runtime-config.json: |
     {
-      "appName": "Epydios AgentOps Desktop",
+      "appName": "EpydiosOps Desktop",
       "environment": "production",
       "mockMode": false,
       "runtimeApiBaseUrl": "/",

@@ -18,7 +18,7 @@ rg -n 'data-runs-page-action|data-approvals-page-action|data-audit-page-action|d
 rg -n 'data-approval-select-run-id|data-approval-detail-run-id|function openApprovalDetail' "${MODULE_ROOT}/web/js/main.js" "${MODULE_ROOT}/web/js/views/approvals.js" >/dev/null
 
 rg -n 'Recent Configuration Changes|data-settings-config-open-audit|data-settings-subtab|data-settings-subpanel|data-advanced-section="settings"' "${MODULE_ROOT}/web/js/views/settings.js" >/dev/null
-rg -n 'data-detail-key="runs.timeline"|data-detail-key="runs.evidence_summary"|data-detail-key="runs.raw_record"' "${MODULE_ROOT}/web/js/views/runs.js" >/dev/null
+rg -n 'data-detail-key="runs.timeline"|data-detail-key="runs.evidence_summary"|data-detail-key="runs.raw_record"' "${MODULE_ROOT}/web/js/domains/runtimeops/panels/run-inventory/inventory.js" >/dev/null
 rg -n 'buildSettingsConfigChanges|recordConfigChange|CONFIG_CHANGE_HISTORY_KEY' "${MODULE_ROOT}/web/js/main.js" >/dev/null
 
 echo "V-M14-UI-030 PASS: pagination/time filters, incidents/settings subtabs, advanced-detail toggles, sticky filter/detail persistence, and settings traceability surfaces are wired."

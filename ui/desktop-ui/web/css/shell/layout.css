@@ -1,0 +1,180 @@
+.workspace-shell {
+  width: min(
+    calc(var(--max-content-width) + 18rem + var(--space-5)),
+    calc(100% - (2 * var(--shell-gutter)))
+  );
+  margin: var(--space-5) auto var(--space-6);
+  display: grid;
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.layout {
+  width: auto;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--layout-gap);
+  grid-template-columns: repeat(12, 1fr);
+}
+
+.workspace-panel {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: var(--layout-gap);
+  grid-template-columns: repeat(12, 1fr);
+  align-content: start;
+}
+
+.workspace-panel[hidden] {
+  display: none !important;
+}
+
+.panel-session,
+.panel-dashboard,
+.panel-context,
+.panel-execution,
+.panel-triage,
+.panel-quickstart,
+.panel-settings,
+.panel-run-builder,
+.panel-terminal,
+.panel-approvals,
+.panel-runs,
+.panel-audit,
+.panel-ops-placeholder {
+  grid-column: span 12;
+}
+
+.panel-health,
+.panel-providers {
+  grid-column: span 12;
+}
+
+.layout[data-workspace-view="homeops"] [data-workspace-section]:not([data-workspace-section="homeops"]),
+.layout[data-workspace-view="agentops"] [data-workspace-section]:not([data-workspace-section="agentops"]),
+.layout[data-workspace-view="runtimeops"] [data-workspace-section]:not([data-workspace-section="runtimeops"]),
+.layout[data-workspace-view="platformops"] [data-workspace-section]:not([data-workspace-section="platformops"]),
+.layout[data-workspace-view="identityops"] [data-workspace-section]:not([data-workspace-section="identityops"]),
+.layout[data-workspace-view="networkops"] [data-workspace-section]:not([data-workspace-section="networkops"]),
+.layout[data-workspace-view="policyops"] [data-workspace-section]:not([data-workspace-section="policyops"]),
+.layout[data-workspace-view="guardrailops"] [data-workspace-section]:not([data-workspace-section="guardrailops"]),
+.layout[data-workspace-view="governanceops"] [data-workspace-section]:not([data-workspace-section="governanceops"]),
+.layout[data-workspace-view="complianceops"] [data-workspace-section]:not([data-workspace-section="complianceops"]),
+.layout[data-workspace-view="auditops"] [data-workspace-section]:not([data-workspace-section="auditops"]),
+.layout[data-workspace-view="evidenceops"] [data-workspace-section]:not([data-workspace-section="evidenceops"]),
+.layout[data-workspace-view="incidentops"] [data-workspace-section]:not([data-workspace-section="incidentops"]),
+.layout[data-workspace-view="settingsops"] [data-workspace-section]:not([data-workspace-section="settingsops"]),
+.layout[data-workspace-view="developerops"] [data-workspace-section]:not([data-workspace-section="developerops"]) {
+  display: none;
+}
+
+.ops-placeholder-card {
+  min-height: 8rem;
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+}
+
+@media (min-width: 900px) {
+  .workspace-shell {
+    grid-template-columns: 16rem minmax(0, 1fr);
+    gap: var(--space-5);
+  }
+
+  .layout {
+    --layout-gap: var(--space-5);
+  }
+
+  .layout[data-workspace-view="homeops"] .panel-dashboard {
+    grid-column: span 12;
+  }
+
+  .layout[data-workspace-view="developerops"] .panel-context {
+    grid-column: span 12;
+  }
+
+  .layout[data-workspace-view="developerops"] .panel-governed-action {
+    grid-column: span 12;
+  }
+
+  .layout[data-workspace-view="developerops"] .panel-run-builder:not(.panel-governed-action) {
+    grid-column: span 7;
+  }
+
+  .layout[data-workspace-view="developerops"] .panel-terminal {
+    grid-column: span 5;
+  }
+
+  .workspace-panel[data-workspace-panel="agentops"] .panel-chat {
+    grid-column: span 12;
+  }
+
+  .workspace-panel[data-workspace-panel="runtimeops"] .panel-runs {
+    grid-column: span 12;
+  }
+
+  .layout[data-workspace-view="settingsops"] .panel-settings {
+    grid-column: span 12;
+  }
+
+  .layout[data-workspace-view="settingsops"] .panel-providers {
+    grid-column: span 12;
+  }
+
+  .panel-health,
+  .panel-providers {
+    grid-column: span 6;
+  }
+}
+
+@media (min-width: 1160px) {
+  .layout {
+    --layout-gap: var(--space-4);
+  }
+
+  .layout[data-workspace-view="homeops"] .panel-dashboard {
+    grid-column: span 12;
+  }
+
+  .layout[data-workspace-view="developerops"] .panel-context {
+    grid-column: span 12;
+  }
+
+  .layout[data-workspace-view="developerops"] .panel-governed-action {
+    grid-column: span 12;
+  }
+
+  .layout[data-workspace-view="developerops"] .panel-run-builder:not(.panel-governed-action) {
+    grid-column: span 7;
+  }
+
+  .layout[data-workspace-view="developerops"] .panel-terminal {
+    grid-column: span 5;
+  }
+
+  .workspace-panel[data-workspace-panel="agentops"] .panel-chat {
+    grid-column: span 12;
+  }
+
+  .layout[data-workspace-view="settingsops"] .panel-settings {
+    grid-column: span 12;
+  }
+
+  .layout[data-workspace-view="settingsops"] .panel-providers {
+    grid-column: span 12;
+  }
+}
+
+@media (max-width: 768px) {
+  .workspace-shell {
+    width: min(var(--max-content-width), calc(100% - (2 * var(--shell-gutter))));
+    gap: var(--space-3);
+    margin-top: var(--space-4);
+  }
+
+  .layout {
+    --panel-padding: var(--space-3);
+    gap: var(--space-3);
+  }
+}
