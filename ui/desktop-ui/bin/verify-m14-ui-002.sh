@@ -11,7 +11,7 @@ rg -n 'id="rb-tenant-id"|id="rb-project-id"' "${MODULE_ROOT}/web/index.html" >/d
 
 rg -n 'readRunFilters|readAuditFilters|readApprovalFilters' "${MODULE_ROOT}/web/js/main.js" >/dev/null
 rg -n 'tenant|project' "${MODULE_ROOT}/web/js/views/approvals.js" >/dev/null
-rg -n 'tenant|project' "${MODULE_ROOT}/web/js/views/runs.js" >/dev/null
+rg -n 'tenant|project' "${MODULE_ROOT}/web/js/domains/runtimeops/panels/run-inventory/inventory.js" >/dev/null
 rg -n 'tenant|project' "${MODULE_ROOT}/web/js/views/audit.js" >/dev/null
 
 echo "V-M14-UI-002 PASS: tenant/project scope visibility checks are wired across runs/audit/approvals/run-builder."

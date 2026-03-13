@@ -1,5 +1,5 @@
 {
-  "appName": "Epydios AgentOps Desktop",
+  "appName": "EpydiosOps Desktop",
   "environment": "staging",
   "mockMode": true,
   "runtimeApiBaseUrl": "https://runtime.epydios.com",

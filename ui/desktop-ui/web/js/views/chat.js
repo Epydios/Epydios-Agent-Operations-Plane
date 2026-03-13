@@ -1167,10 +1167,7 @@ function renderTurnCards(turns = [], catalogs = {}, exportSelection = {}) {
     .join("");
 }
 
-export function renderChat(ui, settingsPayload = {}, chatState = {}) {
-  if (!ui.chatContent) {
-    return;
-  }
+export function buildAgentWorkspaceMarkup(settingsPayload = {}, chatState = {}) {
   const settings = settingsPayload || {};
   const integrations = settings?.integrations || {};
   const profiles = Array.isArray(integrations.agentProfiles) ? integrations.agentProfiles : [];
@@ -1244,7 +1241,7 @@ export function renderChat(ui, settingsPayload = {}, chatState = {}) {
     managedExecution
   });
 
-  ui.chatContent.innerHTML = `
+  return `
     <div class="stack chat-surface agent-chat-shell">
       <div class="panel-heading agent-panel-heading">
         <h2>Agent Workspace</h2>
@@ -1428,4 +1425,11 @@ export function renderChat(ui, settingsPayload = {}, chatState = {}) {
       </details>
     </div>
   `;
+}
+
+export function renderChat(ui, settingsPayload = {}, chatState = {}) {
+  if (!ui.chatContent) {
+    return;
+  }
+  ui.chatContent.innerHTML = buildAgentWorkspaceMarkup(settingsPayload, chatState);
 }

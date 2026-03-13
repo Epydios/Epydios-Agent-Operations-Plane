@@ -1,7 +1,7 @@
 import { buildDefaultAimxsSettings } from "./aimxs/state.js";
 
 const DEFAULT_CONFIG = {
-  appName: "Epydios AgentOps Desktop",
+  appName: "EpydiosOps Desktop",
   environment: "local",
   mockMode: true,
   runtimeApiBaseUrl: "http://localhost:8080",

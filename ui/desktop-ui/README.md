@@ -102,10 +102,16 @@ Notes:
   - `web/js/state/store.js`
   - `web/js/runtime/choices.js`
   - `web/js/views/common.js`
-  - `web/js/views/session.js`
-  - `web/js/views/health.js`
+  - `web/js/views/session.js` (compatibility shim to `identityops`)
+  - `web/js/views/health.js` (compatibility shim to `runtimeops`)
   - `web/js/views/providers.js`
-  - `web/js/views/runs.js`
+  - `web/js/views/runs.js` (compatibility shim to `runtimeops`)
+  - `web/js/domains/homeops/**`
+  - `web/js/domains/agentops/**`
+  - `web/js/domains/governanceops/**`
+  - `web/js/domains/identityops/**`
+  - `web/js/domains/policyops/**`
+  - `web/js/domains/runtimeops/**`
   - `web/js/views/audit.js`
   - `web/js/main.js`
 - Locked default behavior for non-blocking runtime choices:
@@ -172,13 +178,14 @@ Notes:
   - Desktop evidence summary table is rendered from `desktopObserveResponse`, `desktopActuateResponse`, and `desktopVerifyResponse`.
   - Expandable artifact panels provide request/policy/desktop/evidence payload drill-in.
   - File:
-    - `web/js/views/runs.js`
+    - `web/js/domains/runtimeops/panels/run-inventory/inventory.js`
 - Approval-to-run evidence jump:
-  - Approvals rows include `Open Run` action.
+  - Approval review surfaces include `Open Run Detail` action.
   - Action loads run detail directly and scrolls to evidence drill-in panel for fast triage.
-  - Run detail includes `Open Related Approval` to jump back to scoped approval context.
+  - Run detail includes `Open Approval Detail` to jump back to scoped approval context.
   - Files:
-    - `web/js/views/approvals.js`
+    - `web/js/domains/governanceops/panels/approval-trace/review.js`
+    - `web/js/domains/runtimeops/panels/run-inventory/inventory.js`
     - `web/js/main.js`
 - Workspace context bar:
   - Adds top-level project scope switching that syncs project filters across runs/approvals/audit/run-builder.

@@ -1,4 +1,5 @@
 import { displayAimxsModeLabel, displayPolicyProviderLabel, escapeHTML } from "../views/common.js";
+import { presentPolicyCopy } from "../domains/policyops/routes.js";
 import {
   collectAimxsSecureRefItems,
   describeAimxsSettingsMessage,
@@ -19,13 +20,6 @@ function chipClassForAimxsActivationState(value) {
     return "chip chip-danger chip-compact";
   }
   return "chip chip-neutral chip-compact";
-}
-
-function presentAimxsLabelCopy(value) {
-  return String(value || "")
-    .replace(/OSS-only/g, "Baseline")
-    .replace(/\boss-only\b/g, "baseline")
-    .replace(/\boss-policy-opa\b/g, "baseline");
 }
 
 export function collectAimxsKnownLocalSecureRefs(settings) {
@@ -66,7 +60,7 @@ export function renderAimxsSettingsMetric(
     typeof chipClassForEditorStatus === "function"
       ? chipClassForEditorStatus(aimxsEditorStatus)
       : "";
-  const aimxsStatusMessage = presentAimxsLabelCopy(describeAimxsSettingsMessage(aimxs, aimxsEditor.message));
+  const aimxsStatusMessage = presentPolicyCopy(describeAimxsSettingsMessage(aimxs, aimxsEditor.message));
   const activationCapabilities =
     activation.capabilities.length > 0 ? activation.capabilities.join(", ") : "-";
   const activationEnabledProviders =
@@ -153,7 +147,7 @@ export function renderAimxsSettingsMetric(
         <div class="meta">Apply AIMXS Settings saves the Desktop contract draft only. Activate AIMXS Mode switches the live desktop/runtime policy-provider path.</div>
         <div class="meta"><code>aimxs-https</code> requires endpoint, bearer token, controller client TLS cert/key, and provider CA refs.</div>
         <div class="meta"><code>aimxs-full</code> uses the live launcher AIMXS provider shim with no HTTPS or mTLS requirement.</div>
-        <div class="meta">${escapeHTML(presentAimxsLabelCopy(activation.message || "Run Activate AIMXS Mode to apply the current contract to the live provider selection boundary."))}</div>
+        <div class="meta">${escapeHTML(presentPolicyCopy(activation.message || "Run Activate AIMXS Mode to apply the current contract to the live provider selection boundary."))}</div>
         ${activationWarnings}
       </div>
     </div>

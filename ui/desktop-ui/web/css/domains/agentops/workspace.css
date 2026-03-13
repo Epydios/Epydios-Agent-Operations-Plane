@@ -1,0 +1,222 @@
+.agent-chat-shell {
+  gap: var(--space-4);
+}
+
+.agent-panel-heading {
+  margin-bottom: 0;
+}
+
+.agent-top-grid,
+.agent-chat-heading-grid,
+.agent-chat-state-grid {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.agent-top-section {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.agent-top-grid {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+}
+
+.agent-chat-composer,
+.agent-chat-side-panel {
+  align-content: start;
+}
+
+.agent-chat-side-panel {
+  gap: var(--space-3);
+}
+
+.agent-chat-side-panel .policy-outcome-banner {
+  margin-top: var(--space-3);
+  border-width: 2px;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+}
+
+.agent-chat-side-panel .policy-outcome-banner .title {
+  font-size: 1rem;
+}
+
+.agent-chat-composer .settings-agent-test-textarea {
+  min-height: 7.5rem;
+}
+
+#chat-system-prompt.settings-agent-test-textarea {
+  min-height: 6rem;
+}
+
+#chat-prompt.settings-agent-test-textarea {
+  min-height: 12rem;
+}
+
+.agent-chat-prompt-field {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.agent-composer-actions {
+  margin-top: var(--space-2);
+}
+
+.agent-chat-clear-action {
+  margin-left: auto;
+}
+
+.agent-chat-reply-panel {
+  display: grid;
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
+}
+
+.agent-chat-reply-box {
+  min-height: 10rem;
+  background: color-mix(in srgb, var(--surface) 82%, var(--primary-bg));
+}
+
+.agent-top-grid > *,
+.agent-top-grid .metric {
+  min-width: 0;
+}
+
+.agent-top-grid > .metric {
+  height: 100%;
+}
+
+.agent-support-stack {
+  gap: var(--space-3);
+}
+
+.agent-thread-history-card > summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.agent-thread-history-card {
+  background: color-mix(in srgb, var(--surface) 86%, var(--panel));
+}
+
+.agent-thread-history-body {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.agent-thread-history-body .chat-thread-list {
+  max-height: 22rem;
+  overflow: auto;
+  padding-right: var(--space-1);
+}
+
+.agent-chat-heading-grid {
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+.agent-chat-heading-grid .field {
+  grid-column: auto;
+}
+
+.agent-chat-state-grid {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.agent-chat-state-grid > * {
+  min-width: 0;
+}
+
+.chat-turns-stack {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.chat-history-layout {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.chat-thread-list {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.chat-thread-list-entry {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.chat-thread-list-entry.is-archived {
+  opacity: 0.9;
+}
+
+.chat-thread-list-item {
+  display: grid;
+  gap: 0.35rem;
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+  border-radius: var(--radius-2);
+  background: color-mix(in srgb, var(--surface) 88%, var(--panel));
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  box-shadow: var(--shadow-1), var(--shadow-inset);
+}
+
+.chat-thread-list-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.chat-thread-list-item.is-active {
+  border-color: color-mix(in srgb, var(--primary) 44%, var(--line));
+  background: color-mix(in srgb, var(--primary-bg) 65%, var(--surface));
+}
+
+.chat-thread-list-title {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.chat-thread-list-meta {
+  font-size: var(--font-size-xs);
+  color: var(--ink-soft);
+}
+
+@media (min-width: 720px) {
+  .agent-top-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 960px) {
+  .agent-chat-heading-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .agent-chat-state-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1080px) {
+  .chat-history-layout {
+    grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+  }
+
+  .chat-history-layout > .settings-metric-chat-history {
+    grid-column: 1;
+  }
+}
+
+@media (min-width: 1180px) {
+  .agent-top-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}

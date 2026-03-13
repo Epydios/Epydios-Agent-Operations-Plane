@@ -1,7 +1,37 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { renderApprovals, renderApprovalsDetail, renderApprovalReviewModal } from "../views/approvals.js";
+import { renderGovernanceApprovalSummary } from "../domains/governanceops/components/embedded-approvals.js";
+import { renderHealthCards } from "../views/health.js";
 import { renderRunDetail, renderRuns } from "../views/runs.js";
+
+test("governance summary module renders embedded approval state and current thread decisions", () => {
+  const target = { innerHTML: "" };
+  renderGovernanceApprovalSummary(
+    target,
+    { items: [] },
+    [],
+    { items: [], page: 1, totalPages: 1, totalItems: 0 },
+    "native:checkpoint:session-1:approval-org-admin-1",
+    [
+      {
+        selectionId: "native:checkpoint:session-1:approval-org-admin-1",
+        decisionType: "checkpoint",
+        tenantId: "tenant-demo",
+        projectId: "project-core",
+        taskId: "thread-123",
+        sessionId: "session-1",
+        checkpointId: "approval-org-admin-1",
+        status: "PENDING",
+        summary: "Desktop verify needs approval."
+      }
+    ]
+  );
+
+  assert.match(target.innerHTML, /Approval State/);
+  assert.match(target.innerHTML, /Current Thread Decisions/);
+  assert.match(target.innerHTML, /approval-org-admin-1/);
+});
 
 test("approvals rail includes current thread decisions in the pending approvals section", () => {
   const ui = {
@@ -143,6 +173,7 @@ test("run detail surfaces artifact roots and recommended date bucket", () => {
     }
   );
 
+  assert.match(ui.runDetailContent.innerHTML, /data-domain-root="runtimeops"/);
   assert.match(ui.runDetailContent.innerHTML, /Artifact Access/);
   assert.match(ui.runDetailContent.innerHTML, /EPYDIOS_AGENTOPS_DESKTOP_REPO\/provenance\//);
   assert.match(ui.runDetailContent.innerHTML, /EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB\/provenance\//);
@@ -264,7 +295,9 @@ test("run detail surfaces governed-action policy richness from the stored provid
     }
   );
 
+  assert.match(ui.runDetailContent.innerHTML, /data-domain-root="runtimeops"/);
   assert.match(ui.runDetailContent.innerHTML, /2\. Policy Richness/);
+  assert.match(ui.runDetailContent.innerHTML, /data-domain-root="policyops"/);
   assert.match(ui.runDetailContent.innerHTML, /Operator Gate vs Policy Gate/);
   assert.match(ui.runDetailContent.innerHTML, /operatorGate=policy-first/);
   assert.match(ui.runDetailContent.innerHTML, /chip chip-warn chip-compact">effect=execution deferred/);
@@ -356,7 +389,43 @@ test("history run list surfaces color-coded policy effects", () => {
     }
   );
 
+  assert.match(ui.runsContent.innerHTML, /data-domain-root="runtimeops"/);
   assert.match(ui.runsContent.innerHTML, /chip chip-ok chip-compact">effect=policy cleared/);
   assert.match(ui.runsContent.innerHTML, /chip chip-warn chip-compact">effect=execution deferred/);
   assert.match(ui.runsContent.innerHTML, /chip chip-danger chip-compact">effect=policy blocked/);
+});
+
+test("platform health cards render through runtimeops ownership", () => {
+  const PreviousHTMLElement = globalThis.HTMLElement;
+  class FakeElement {
+    constructor() {
+      this.innerHTML = "";
+      this.dataset = {};
+    }
+  }
+  globalThis.HTMLElement = FakeElement;
+
+  try {
+    const container = new FakeElement();
+
+    renderHealthCards(
+      container,
+      {
+        runtime: { status: "ok", detail: "runtime healthy" },
+        providers: { status: "warn", detail: "provider backlog" },
+        policy: { status: "ok", detail: "policy loaded" }
+      },
+      {
+        status: "ok",
+        latestStagingGate: "pass",
+        latestProdGate: "pending"
+      }
+    );
+
+    assert.match(container.innerHTML, /data-domain-root="runtimeops"/);
+    assert.match(container.innerHTML, /Runtime/);
+    assert.match(container.innerHTML, /Pipeline/);
+  } finally {
+    globalThis.HTMLElement = PreviousHTMLElement;
+  }
 });

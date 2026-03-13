@@ -148,7 +148,7 @@ func PrepareSession(assets fs.FS, opts LaunchOptions) (*Session, error) {
 	}
 	runtimeBase := fmt.Sprintf("http://127.0.0.1:%d", opts.RuntimeLocalPort)
 	manifest := SessionManifest{
-		AppName:                "Epydios AgentOps Desktop",
+		AppName:                "EpydiosOps Desktop",
 		StartedAtUTC:           time.Now().UTC().Format(time.RFC3339),
 		Mode:                   opts.Mode,
 		RuntimeProcessMode:     runtimeProcessMode(opts),

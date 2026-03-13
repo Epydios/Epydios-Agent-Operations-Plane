@@ -51,6 +51,6 @@ grep -q 'id="approvals-content"' "${MODULE_ROOT}/web/index.html"
 grep -q 'id="audit-content"' "${MODULE_ROOT}/web/index.html"
 grep -q 'id="settings-content"' "${MODULE_ROOT}/web/index.html"
 grep -q 'id="terminal-form"' "${MODULE_ROOT}/web/index.html"
-grep -q 'data-workspace-tab="developer"' "${MODULE_ROOT}/web/index.html"
+grep -q 'data-workspace-tab="developerops"' "${MODULE_ROOT}/web/index.html"
 
 echo "M1-M4 and M14 baseline UI checks passed."

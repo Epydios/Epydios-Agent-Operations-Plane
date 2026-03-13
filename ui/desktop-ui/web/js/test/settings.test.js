@@ -188,8 +188,10 @@ test("settings view persists raw response and native timeline disclosure shells"
   assert.match(ui.settingsContent.innerHTML, /Refresh Activation Status/);
   assert.match(ui.settingsContent.innerHTML, /clusterMode=aimxs-full/);
   assert.match(ui.settingsContent.innerHTML, /Current Identity \+ Authority/);
+  assert.match(ui.settingsContent.innerHTML, /data-domain-root="identityops"/);
   assert.match(ui.settingsContent.innerHTML, /demo\.operator/);
   assert.match(ui.settingsContent.innerHTML, /Current Policy Contract/);
+  assert.match(ui.settingsContent.innerHTML, /data-domain-root="policyops"/);
   assert.match(ui.settingsContent.innerHTML, /Local Demo Identity \+ Policy Overlay/);
   assert.match(ui.settingsContent.innerHTML, /Save Demo Overlay/);
   assert.match(ui.settingsContent.innerHTML, /Policy Bucket Prefix/);

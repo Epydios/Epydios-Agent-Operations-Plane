@@ -46,7 +46,7 @@ func main() {
 
 	app := NewApp(session, runtimeProcess)
 	err = wails.Run(&options.App{
-		Title:              "Epydios AgentOps Desktop",
+		Title:              "EpydiosOps Desktop",
 		Width:              1440,
 		Height:             960,
 		MinWidth:           1180,

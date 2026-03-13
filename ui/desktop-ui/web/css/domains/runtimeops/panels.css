@@ -1,0 +1,60 @@
+.runtimeops-health-card,
+.history-summary-card,
+.runtimeops-run-summary {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.history-review-layout {
+  display: grid;
+  gap: var(--space-3);
+  min-height: 0;
+}
+
+.history-runs-list,
+.history-run-detail {
+  min-height: 0;
+}
+
+.history-runs-list {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.run-row-submeta {
+  margin-top: var(--space-2);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-xs);
+}
+
+.artifact-path-grid {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.artifact-path-card {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+  border-radius: var(--radius-2);
+  background: color-mix(in srgb, var(--surface) 90%, var(--panel));
+  box-shadow: var(--shadow-1), var(--shadow-inset);
+}
+
+.artifact-path-value {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-2);
+  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+  background: color-mix(in srgb, var(--surface) 92%, var(--panel));
+  color: var(--ink);
+  font-size: var(--font-size-xs);
+  font-family: var(--font-family-mono);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
