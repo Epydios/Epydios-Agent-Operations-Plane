@@ -134,9 +134,9 @@ try:
         session_id,
         "return !!document.getElementById('context-project-select') && "
         "document.querySelectorAll('#context-project-select option').length > 1 && "
-        "!!document.querySelector('[data-triage-action=\"open-approvals-pending\"]');",
+        "!!document.querySelector('[data-homeops-action=\"open-approvals-pending\"]');",
         timeout=30,
-        label="context and triage controls",
+        label="context and HomeOps controls",
     )
 
     selected_project = exec_js(
@@ -185,10 +185,12 @@ return endpointId;
             """
 const endpointId = arguments[0];
 const row = document.querySelector(`[data-settings-endpoint-id="${endpointId}"]`);
-return !!row && row.classList.contains('settings-row-focus');
+const integrationBoard = document.getElementById('settingsops-integration-board');
+const activeView = document.getElementById('workspace-layout')?.dataset?.workspaceView || '';
+return (!!row && row.classList.contains('settings-row-focus')) || (activeView === 'settingsops' && !!integrationBoard);
 """,
             [endpoint_id],
-            label="endpoint badge row highlight",
+            label="endpoint badge settingsops pivot",
         )
 
     def click_triage(action_id, wait_script, wait_label):
@@ -196,7 +198,11 @@ return !!row && row.classList.contains('settings-row-focus');
             session_id,
             """
 const action = arguments[0];
-const button = document.querySelector(`[data-triage-action="${action}"]`);
+const homeTab = document.querySelector('[data-workspace-tab="homeops"]');
+if (homeTab) {
+  homeTab.click();
+}
+const button = document.querySelector(`[data-homeops-action="${action}"]`);
 if (!button) return false;
 button.click();
 return true;
@@ -218,9 +224,9 @@ return true;
         "audit deny filter",
     )
     click_triage(
-        "open-terminal-issues",
-        "return document.getElementById('terminal-history-status-filter')?.value === 'POLICY_BLOCKED';",
-        "terminal issues filter",
+        "open-incidentops-active",
+        "return !!document.querySelector('#incidentops-content [data-domain-root=\"incidentops\"]');",
+        "incidentops active board",
     )
 
     run_id = ""
@@ -408,7 +414,7 @@ return status === expected;
     transition_incident(incident_entry_id, "filed")
     transition_incident(incident_entry_id, "closed")
 
-    print("V-M14-UI-011 PASS: browser smoke validated context scope, triage actions, run/approval jumps, endpoint badge jumps, and incident export lifecycle transitions.")
+    print("V-M14-UI-011 PASS: browser smoke validated context scope, HomeOps quick actions, run/approval jumps, endpoint badge jumps, and incident export lifecycle transitions.")
 except Exception as err:
     print(f"V-M14-UI-011 FAIL: {err}", file=sys.stderr)
     sys.exit(1)

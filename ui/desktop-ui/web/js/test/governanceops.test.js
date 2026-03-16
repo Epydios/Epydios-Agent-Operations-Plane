@@ -1,0 +1,277 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { renderGovernanceOpsEmptyState, renderGovernanceOpsPage } from "../domains/governanceops/routes.js";
+
+test("governanceops page renders approval queue, authority ladder, and decision receipt", () => {
+  const ui = { governanceOpsContent: { innerHTML: "" } };
+  renderGovernanceOpsPage(ui, {
+    settings: {
+      identity: {
+        source: "runtime.auth.context",
+        authorityBasis: "bearer_token_jwt",
+        identity: {
+          subject: "demo.operator",
+          clientId: "epydiosops-desktop-local",
+          roles: ["runtime.admin", "enterprise.ai_operator"],
+          tenantIds: ["tenant-demo"],
+          projectIds: ["project-core"]
+        }
+      }
+    },
+    approvals: {
+      source: "runtime-approval-endpoint",
+      items: [
+        {
+          approvalId: "approval-run-20260314-queue-001",
+          runId: "run-20260314-queue-001",
+          requestId: "req-20260314-queue-001",
+          tenantId: "tenant-demo",
+          projectId: "project-core",
+          status: "PENDING",
+          tier: 3,
+          targetExecutionProfile: "sandbox_vm_autonomous",
+          createdAt: "2026-03-14T21:00:00Z",
+          expiresAt: "2026-03-14T21:15:00Z",
+          reason: "Tier-3 desktop actuation requires explicit approval and policy grant token.",
+          annotations: {
+            orgAdminDecisionBinding: {
+              profileId: "centralized_enterprise_admin",
+              profileLabel: "Centralized Enterprise Admin",
+              category: "residency",
+              bindingId: "centralized_enterprise_admin_residency_binding",
+              bindingLabel: "Centralized Enterprise Admin Residency Binding",
+              bindingMode: "residency_exception_review",
+              selectedRoleBundle: "enterprise.break_glass_admin",
+              selectedExceptionProfiles: ["centralized_enterprise_admin_residency_exception"],
+              selectedOverlayProfiles: ["centralized_enterprise_admin_quota_overlay"],
+              requiredInputs: ["residency_exception_ticket", "tenant_id"],
+              requestedInputKeys: ["residency_exception_ticket", "tenant_id"],
+              decisionSurfaces: ["export_profile_override", "quota_override"],
+              boundaryRequirements: ["runtime_authz", "governed_export_redaction"]
+            }
+          }
+        },
+        {
+          approvalId: "approval-run-20260314-reviewed-002",
+          runId: "run-20260314-reviewed-002",
+          requestId: "req-20260314-reviewed-002",
+          tenantId: "tenant-demo",
+          projectId: "project-core",
+          status: "APPROVED",
+          tier: 2,
+          targetExecutionProfile: "managed_codex_worker",
+          createdAt: "2026-03-14T20:30:00Z",
+          reviewedAt: "2026-03-14T20:35:00Z",
+          expiresAt: "2026-03-14T20:45:00Z",
+          reason: "Approved by operator."
+        }
+      ]
+    },
+    orgAdminProfiles: {
+      source: "runtime-org-admin-endpoint",
+      items: [
+        {
+          profileId: "centralized_enterprise_admin",
+          label: "Centralized Enterprise Admin",
+          breakGlassRoleBundles: ["enterprise.break_glass_admin", "enterprise.break_glass_auditor"],
+          exceptionProfiles: [
+            {
+              profileId: "centralized_enterprise_admin_residency_exception",
+              label: "Centralized Enterprise Admin Residency Exception",
+              category: "residency",
+              requiredInputs: ["residency_exception_ticket"],
+              decisionSurfaces: ["export_profile_override"],
+              boundaryRequirements: ["runtime_authz", "governed_export_redaction"]
+            }
+          ],
+          overlayProfiles: [
+            {
+              overlayId: "centralized_enterprise_admin_quota_overlay",
+              label: "Centralized Enterprise Admin Quota Overlay",
+              category: "quota",
+              overlayMode: "quota_override_review",
+              requiredInputs: ["tenant_id"],
+              decisionSurfaces: ["quota_override"],
+              boundaryRequirements: ["runtime_authz"]
+            }
+          ]
+        }
+      ]
+    },
+    runs: {
+      source: "runtime-endpoint",
+      items: [
+        {
+          runId: "run-20260314-queue-001",
+          requestId: "req-20260314-queue-001",
+          environment: "staging",
+          status: "POLICY_EVALUATED",
+          policyDecision: "DEFER",
+          selectedPolicyProvider: "aimxs-policy-primary",
+          policyGrantTokenPresent: false,
+          evidenceBundleResponse: { status: "pending" },
+          evidenceRecordResponse: { status: "queued" }
+        },
+        {
+          runId: "run-20260314-reviewed-002",
+          requestId: "req-20260314-reviewed-002",
+          environment: "staging",
+          status: "COMPLETED",
+          policyDecision: "ALLOW",
+          selectedPolicyProvider: "aimxs-policy-primary",
+          policyGrantTokenPresent: true,
+          evidenceBundleResponse: { status: "sealed" },
+          evidenceRecordResponse: { status: "recorded" }
+        }
+      ]
+    },
+    session: {
+      claims: {
+        sub: "demo.operator",
+        client_id: "epydiosops-desktop-local"
+      }
+    },
+    now: "2026-03-14T21:05:00Z"
+  });
+
+  assert.match(ui.governanceOpsContent.innerHTML, /data-domain-root="governanceops"/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Approval Queue/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Authority Ladder/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Decision Receipt/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Active Review/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Delegation And Escalation/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Override And Exception Posture/);
+  assert.match(ui.governanceOpsContent.innerHTML, /approval-run-20260314-queue-001/);
+  assert.match(ui.governanceOpsContent.innerHTML, /approval-run-20260314-reviewed-002/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Tier 3/);
+  assert.match(ui.governanceOpsContent.innerHTML, /sandbox_vm_autonomous/);
+  assert.match(ui.governanceOpsContent.innerHTML, /demo.operator/);
+  assert.match(ui.governanceOpsContent.innerHTML, /epydiosops-desktop-local/);
+  assert.match(ui.governanceOpsContent.innerHTML, /bearer_token_jwt/);
+  assert.match(ui.governanceOpsContent.innerHTML, /runtime\.auth\.context/);
+  assert.match(ui.governanceOpsContent.innerHTML, /runtime-approval-endpoint/);
+  assert.match(ui.governanceOpsContent.innerHTML, /aimxs-policy-primary/);
+  assert.match(ui.governanceOpsContent.innerHTML, /recorded/);
+  assert.match(ui.governanceOpsContent.innerHTML, /grant token/);
+  assert.match(ui.governanceOpsContent.innerHTML, /sealed/);
+  assert.match(ui.governanceOpsContent.innerHTML, /tenant-demo/);
+  assert.match(ui.governanceOpsContent.innerHTML, /project-core/);
+  assert.match(ui.governanceOpsContent.innerHTML, /step-up approval/);
+  assert.match(ui.governanceOpsContent.innerHTML, /pending receiver/);
+  assert.match(ui.governanceOpsContent.innerHTML, /role-scoped/);
+  assert.match(ui.governanceOpsContent.innerHTML, /scope-bound/);
+  assert.match(ui.governanceOpsContent.innerHTML, /exception-linked/);
+  assert.match(ui.governanceOpsContent.innerHTML, /data-governanceops-decision="APPROVE"/);
+  assert.match(ui.governanceOpsContent.innerHTML, /data-governanceops-decision="DENY"/);
+  assert.match(ui.governanceOpsContent.innerHTML, /data-governanceops-routing-action="DEFER"/);
+  assert.match(ui.governanceOpsContent.innerHTML, /data-governanceops-routing-action="ESCALATE"/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Copy Receipt Snapshot/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Open AuditOps/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Centralized Enterprise Admin Residency Exception/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Centralized Enterprise Admin Quota Overlay/);
+  assert.match(ui.governanceOpsContent.innerHTML, /enterprise\.break_glass_admin/);
+});
+
+test("governanceops empty state renders without loaded governance context", () => {
+  const ui = { governanceOpsContent: { innerHTML: "" } };
+  renderGovernanceOpsEmptyState(ui, {
+    title: "GovernanceOps",
+    message: "Governance posture becomes available after approval, authority, and decision receipt signals load."
+  });
+
+  assert.match(ui.governanceOpsContent.innerHTML, /GovernanceOps/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Governance posture becomes available/);
+});
+
+test("governanceops page tolerates approvals without org-admin decision bindings", () => {
+  const ui = { governanceOpsContent: { innerHTML: "" } };
+  renderGovernanceOpsPage(ui, {
+    approvals: {
+      items: [
+        {
+          approvalId: "approval-no-binding-001",
+          runId: "run-no-binding-001",
+          requestId: "req-no-binding-001",
+          status: "PENDING",
+          tier: 2,
+          targetExecutionProfile: "managed_codex_worker",
+          createdAt: "2026-03-15T12:00:00Z",
+          expiresAt: "2026-03-15T12:15:00Z",
+          reason: "Awaiting standard approval."
+        }
+      ]
+    },
+    runs: {
+      items: [
+        {
+          runId: "run-no-binding-001",
+          requestId: "req-no-binding-001",
+          status: "POLICY_EVALUATED",
+          policyDecision: "DEFER"
+        }
+      ]
+    },
+    orgAdminProfiles: {
+      items: []
+    },
+    settings: {},
+    session: {},
+    now: "2026-03-15T12:05:00Z"
+  });
+
+  assert.match(ui.governanceOpsContent.innerHTML, /Override And Exception Posture/);
+  assert.match(ui.governanceOpsContent.innerHTML, /approval-no-binding-001/);
+});
+
+test("governanceops page renders selected recorded review state and operational feedback", () => {
+  const ui = { governanceOpsContent: { innerHTML: "" } };
+  renderGovernanceOpsPage(ui, {
+    approvals: {
+      items: [
+        {
+          approvalId: "approval-reviewed-ops-001",
+          runId: "run-reviewed-ops-001",
+          requestId: "req-reviewed-ops-001",
+          tenantId: "tenant-demo",
+          projectId: "project-core",
+          status: "APPROVED",
+          tier: 2,
+          targetExecutionProfile: "managed_codex_worker",
+          createdAt: "2026-03-15T12:00:00Z",
+          reviewedAt: "2026-03-15T12:03:00Z",
+          expiresAt: "2026-03-15T12:15:00Z",
+          reason: "Approved by supervisor."
+        }
+      ]
+    },
+    runs: {
+      items: [
+        {
+          runId: "run-reviewed-ops-001",
+          requestId: "req-reviewed-ops-001",
+          status: "COMPLETED",
+          policyDecision: "ALLOW",
+          selectedPolicyProvider: "aimxs-policy-primary",
+          policyGrantTokenPresent: true,
+          evidenceBundleResponse: { status: "sealed" },
+          evidenceRecordResponse: { status: "recorded" }
+        }
+      ]
+    },
+    viewState: {
+      selectedRunId: "run-reviewed-ops-001",
+      feedback: {
+        tone: "warn",
+        message: "Escalation packet copied for runId=run-reviewed-ops-001."
+      }
+    },
+    now: "2026-03-15T12:05:00Z"
+  });
+
+  assert.match(ui.governanceOpsContent.innerHTML, /Governance handoff required/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Escalation packet copied for runId=run-reviewed-ops-001/);
+  assert.match(ui.governanceOpsContent.innerHTML, /run-reviewed-ops-001/);
+  assert.match(ui.governanceOpsContent.innerHTML, /data-governanceops-decision="APPROVE"/);
+  assert.match(ui.governanceOpsContent.innerHTML, /data-governanceops-decision="APPROVE"[\s\S]*disabled/);
+  assert.match(ui.governanceOpsContent.innerHTML, /data-governanceops-routing-action="ESCALATE"[\s\S]*disabled/);
+});

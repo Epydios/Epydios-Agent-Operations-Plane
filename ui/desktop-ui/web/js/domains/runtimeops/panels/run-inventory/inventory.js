@@ -232,9 +232,9 @@ export function renderRuntimeRuns(ui, store, runPayload, filters) {
       <div data-domain-root="runtimeops" data-runtimeops-panel="run-inventory">
         ${renderPanelStateMetric(
           "empty",
-          "History",
+          "Run Inventory",
           "No runtime runs match current filters.",
-          "Adjust scope, decision, or time filters, then refresh History."
+          "Adjust scope, decision, or time filters, then refresh Run Inventory."
         )}
       </div>
     `;
@@ -253,17 +253,17 @@ export function renderRuntimeRuns(ui, store, runPayload, filters) {
   const historySummary = `
     <div class="metric history-summary-card runtimeops-run-summary" data-domain-root="runtimeops" data-runtimeops-panel="run-summary">
       <div class="metric-title-row">
-        <div class="title">History Summary</div>
+        <div class="title">Run Inventory Summary</div>
         <span class="chip chip-neutral chip-compact">matches=${escapeHTML(String(pageState.totalItems))}</span>
       </div>
-      <div class="meta">History is for finished or prior work. Review the selected run below before exporting, filing, or copying folder paths.</div>
+      <div class="meta">Review current and recent governed runs here before opening audit, evidence, or incident packaging surfaces.</div>
       <div class="run-detail-chips">
         <span class="chip chip-neutral chip-compact">completed=${escapeHTML(String(completedCount))}</span>
         <span class="chip chip-neutral chip-compact">needsAttention=${escapeHTML(String(failedCount))}</span>
         <span class="chip chip-neutral chip-compact">decisionDeny=${escapeHTML(String(deniedCount))}</span>
         <span class="chip chip-neutral chip-compact">selected=${escapeHTML(selectedRunID || "-")}</span>
       </div>
-      <div class="meta">Use the Artifact Access section in run detail to map the selected run into repo-safe provenance or non-repo date-bucket storage.</div>
+      <div class="meta">Use the Artifact Access section in run detail when you need repo-safe provenance or non-repo date-bucket storage.</div>
     </div>
   `;
 
@@ -555,7 +555,7 @@ export function renderRuntimeRunDetail(ui, run, options = {}) {
       </div>
       <div class="metric">
         <div class="title">5. Artifact Access</div>
-        <div class="meta metric-note">Copy the workspace roots you need before leaving History. Repo provenance stays Git-safe; screenshots, run notes, and incident handoff artifacts belong in non-repo folders organized by date bucket and run ID.</div>
+        <div class="meta metric-note">Copy the workspace roots you need before leaving Run Inventory. Repo provenance stays Git-safe; screenshots, run notes, and incident handoff artifacts belong in non-repo folders organized by date bucket and run ID.</div>
         <div class="meta" data-run-path-feedback>Copy a path to send it to the clipboard.</div>
         <div class="run-detail-chips">
           <span class="chip chip-neutral chip-compact">dateBucket=${escapeHTML(artifactAccess.dateBucket || "-")}</span>

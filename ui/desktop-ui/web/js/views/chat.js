@@ -958,36 +958,7 @@ function renderGovernanceReport(envelope = {}, sessionId = "") {
   `;
 }
 
-function renderThreadResolutionPanel(threadState, activitySummary, hasTask) {
-  if (!hasTask || !threadState?.isResolvedThread) {
-    return "";
-  }
-  return `
-    <div class="chat-resolution-panel">
-      <div class="metric-title-row">
-        <div class="title">Resolved Thread</div>
-        <span class="${chipClassForSessionStatus(threadState?.resolutionStatus || threadState?.sessionStatus)}">${escapeHTML(String(threadState?.resolutionStatus || threadState?.sessionStatus || "RESOLVED"))}</span>
-      </div>
-      <div class="meta">taskStatus=${escapeHTML(String(threadState?.taskStatus || "-"))}; sessionStatus=${escapeHTML(String(threadState?.sessionStatus || "-"))}; workerStatus=${escapeHTML(String(threadState?.latestWorkerStatus || "-"))}</div>
-      <div class="meta">${escapeHTML(String(threadState?.resolutionMessage || "The current thread is resolved."))}</div>
-      <div class="meta">${escapeHTML(String(activitySummary?.latestWorkerSummary || "Use a follow-up thread for a clean successor task, or reopen this task intentionally with another turn."))}</div>
-      <div class="filter-row settings-editor-actions">
-        <div class="action-hierarchy">
-          <div class="action-group action-group-primary">
-            <button class="btn btn-primary" type="button" data-chat-action="start-followup-thread">Start Follow-up Thread</button>
-          </div>
-          <div class="action-group action-group-secondary">
-            <button class="btn btn-secondary" type="button" data-chat-action="send-turn">Reopen Thread With Turn</button>
-            <button class="btn btn-secondary" type="button" data-chat-action="close-thread-view">Close Thread View</button>
-            <button class="btn btn-secondary" type="button" data-chat-action="archive-thread">Archive Thread</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function buildAgentFocusSummary({
+function buildAgentThreadSummary({
   taskId = "",
   threadState = {},
   latestActivity = {},
@@ -1005,8 +976,8 @@ function buildAgentFocusSummary({
     return {
       tone: "chip chip-neutral chip-compact",
       label: "setup",
-      title: "Start the first governed thread",
-      detail: "Set the thread title and prompt, then start the thread and send the first message from Agent.",
+      title: "Ready to start the first governed thread",
+      detail: "Set the thread header, then send the first prompt.",
       pendingApprovalCount,
       pendingProposalCount,
       turnCount,
@@ -1018,7 +989,7 @@ function buildAgentFocusSummary({
       tone: "chip chip-ok chip-compact",
       label: "resolved",
       title: "Current thread is resolved",
-      detail: "Use New Follow-up Thread for successor work or reopen this thread intentionally only when the same task must continue.",
+      detail: "Start a follow-up thread or reopen only if the same task must continue.",
       pendingApprovalCount,
       pendingProposalCount,
       turnCount,
@@ -1030,7 +1001,7 @@ function buildAgentFocusSummary({
       tone: "chip chip-danger chip-compact",
       label: "review now",
       title: "Resolve pending decisions first",
-      detail: "Use the decision cards and current-turn inbox before asking the worker to continue mutating work.",
+      detail: "Inline approvals or proposals are blocking the next governed step.",
       pendingApprovalCount,
       pendingProposalCount,
       turnCount,
@@ -1042,7 +1013,7 @@ function buildAgentFocusSummary({
       tone: "chip chip-warn chip-compact",
       label: "worker active",
       title: "Managed worker is active",
-      detail: "Watch worker progress and intervene only when approvals, proposals, or follow-up instructions are needed.",
+      detail: "Continue when the latest reply or inline decisions require operator input.",
       pendingApprovalCount,
       pendingProposalCount,
       turnCount,
@@ -1053,7 +1024,7 @@ function buildAgentFocusSummary({
     tone: "chip chip-ok chip-compact",
     label: "ready",
     title: "Continue the current thread",
-    detail: "Send the next message or review the latest reply before continuing the same thread.",
+    detail: "Review the latest reply, then continue the same thread.",
     pendingApprovalCount,
     pendingProposalCount,
     turnCount,
@@ -1066,7 +1037,7 @@ function renderTurnCards(turns = [], catalogs = {}, exportSelection = {}) {
     return `
       <div class="chat-empty-state">
         <div class="title">No turns yet</div>
-        <div class="meta">Start a thread, then send the first operator prompt. Each turn will read back native M16 session state instead of legacy run detail.</div>
+        <div class="meta">Start a thread, then send the first prompt to populate the transcript.</div>
       </div>
     `;
   }
@@ -1167,6 +1138,696 @@ function renderTurnCards(turns = [], catalogs = {}, exportSelection = {}) {
     .join("");
 }
 
+function renderAgentTranscriptSummary({
+  latestReplyText = "",
+  latestReplyStatus = "IDLE",
+  latestReplySessionId = "",
+  latestReplyRoute = "",
+  latestReplyBoundary = "",
+  latestReplyCompletedAt = "",
+  latestReplyFinishReason = "",
+  latestPolicyOutcome = null,
+  latestActivity = null,
+  selectedWorker = {},
+  taskId = "",
+  threadState = {},
+  focusSummary = {},
+  executionMode = "",
+  historyCount = 0,
+  catalogState = {}
+} = {}) {
+  const activity = latestActivity && typeof latestActivity === "object" ? latestActivity : {};
+  const worker = selectedWorker && typeof selectedWorker === "object" ? selectedWorker : {};
+  const policyMarkup = latestPolicyOutcome
+    ? `
+      <div class="${escapeHTML(latestPolicyOutcome.outcome.bannerClass)}">
+        <div class="metric-title-row">
+          <div class="title">Latest Policy Outcome</div>
+          <span class="${chipClassForPolicyDecision(latestPolicyOutcome.decision)}">${escapeHTML(latestPolicyOutcome.decision)}</span>
+        </div>
+        <div class="run-detail-chips">
+          <span class="chip chip-neutral chip-compact">provider=${escapeHTML(latestPolicyOutcome.provider || "-")}</span>
+          <span class="${chipClassForPolicyEffect(latestPolicyOutcome.outcome)}">effect=${escapeHTML(latestPolicyOutcome.outcome.effectLabel)}</span>
+          <span class="chip chip-neutral chip-compact">request=${escapeHTML(latestPolicyOutcome.requestLabel || "-")}</span>
+        </div>
+        <div class="policy-outcome-detail">${escapeHTML(latestPolicyOutcome.outcome.headline)}</div>
+        <div class="meta">${escapeHTML(latestPolicyOutcome.outcome.detail)}</div>
+        ${renderGovernedRunLink(latestPolicyOutcome.runId)}
+      </div>
+    `
+    : `<div class="meta">Latest Policy Outcome: the latest turn has not recorded a governed policy result yet.</div>`;
+  return `
+    <div class="agentops-transcript-summary-grid">
+      <div class="metric agentops-reply-spotlight">
+        <div class="metric-title-row">
+          <div class="title">Latest Reply</div>
+          <span class="${chipClassForSessionStatus(latestReplyStatus)}">${escapeHTML(latestReplyStatus)}</span>
+        </div>
+        <div class="run-detail-chips">
+          <span class="chip chip-neutral chip-compact">session=${escapeHTML(latestReplySessionId || "-")}</span>
+          <span class="chip chip-neutral chip-compact">route=${escapeHTML(latestReplyRoute || "-")}</span>
+          <span class="chip chip-neutral chip-compact">boundary=${escapeHTML(latestReplyBoundary || "-")}</span>
+          <span class="chip chip-neutral chip-compact">completed=${escapeHTML(latestReplyCompletedAt ? formatTime(latestReplyCompletedAt) : "-")}</span>
+          <span class="chip chip-neutral chip-compact">finishReason=${escapeHTML(latestReplyFinishReason || "-")}</span>
+        </div>
+        ${
+          latestReplyText
+            ? `
+              <div class="chat-message chat-message-assistant agentops-reply-box">
+                <div class="label">Agent</div>
+                <div class="chat-message-text">${escapeHTML(latestReplyText)}</div>
+              </div>
+            `
+            : `<div class="meta">No agent reply yet. Start a thread and send the first prompt to populate the transcript.</div>`
+        }
+      </div>
+      <div class="metric agentops-transcript-context">
+        <div class="metric-title-row">
+          <div class="title">Current Turn Context</div>
+          <span class="${focusSummary.tone || chipClassForSessionStatus(threadState?.sessionStatus)}">${escapeHTML(String(focusSummary.label || "idle"))}</span>
+        </div>
+        <div class="run-detail-chips">
+          <span class="chip chip-neutral chip-compact">task=${escapeHTML(taskId || "-")}</span>
+          <span class="chip chip-neutral chip-compact">taskStatus=${escapeHTML(String(threadState?.taskStatus || "-"))}</span>
+          <span class="chip chip-neutral chip-compact">sessionStatus=${escapeHTML(String(threadState?.sessionStatus || "-"))}</span>
+          <span class="chip chip-neutral chip-compact">workerStatus=${escapeHTML(String(threadState?.latestWorkerStatus || "-"))}</span>
+          <span class="chip chip-neutral chip-compact">approvals=${escapeHTML(String(threadState?.openApprovalCount ?? 0))}</span>
+          <span class="chip chip-neutral chip-compact">proposals=${escapeHTML(String(focusSummary.pendingProposalCount ?? 0))}</span>
+          <span class="chip chip-neutral chip-compact">history=${escapeHTML(String(historyCount))}</span>
+          <span class="chip chip-neutral chip-compact">execution=${escapeHTML(executionModeLabel(executionMode))}</span>
+        </div>
+        <div class="run-detail-chips">
+          <span class="chip chip-neutral chip-compact">workerType=${escapeHTML(String(activity?.selectedWorkerType || worker?.workerType || "-"))}</span>
+          <span class="chip chip-neutral chip-compact">workerAdapter=${escapeHTML(String(activity?.selectedWorkerAdapterId || worker?.adapterId || "-"))}</span>
+          <span class="chip chip-neutral chip-compact">workerTarget=${escapeHTML(String(activity?.selectedWorkerTargetEnvironment || worker?.targetEnvironment || "-"))}</span>
+        </div>
+        ${activity?.latestWorkerSummary ? `<div class="meta">${escapeHTML(String(activity.latestWorkerSummary))}</div>` : ""}
+        ${policyMarkup}
+        ${catalogState?.message ? `<div class="meta">${escapeHTML(String(catalogState.message || ""))}</div>` : ""}
+      </div>
+    </div>
+  `;
+}
+
+function renderAgentThreadHistory(history = {}, taskId = "", historyCount = 0, archivedCount = 0, historySummary = "", context = {}) {
+  return `
+    <details class="details-shell agent-thread-history-card" data-detail-key="agent.thread_history">
+      <summary>Thread History (${escapeHTML(String(historyCount))} visible${archivedCount ? `, ${escapeHTML(String(archivedCount))} archived` : ""})</summary>
+      <div class="agent-thread-history-body">
+        <div class="meta">${escapeHTML(historySummary)}</div>
+        <div class="run-detail-chips">
+          <span class="chip chip-neutral chip-compact">visible=${escapeHTML(String(historyCount))}</span>
+          <span class="chip chip-neutral chip-compact">archived=${escapeHTML(String(archivedCount))}</span>
+        </div>
+        <div class="filter-row settings-editor-actions">
+          <div class="action-hierarchy">
+            <div class="action-group action-group-secondary">
+              <button class="btn btn-secondary btn-small" type="button" data-chat-action="refresh-threads">Refresh Threads</button>
+              <button class="btn btn-secondary btn-small" type="button" data-chat-action="toggle-archived-threads">${history?.showArchived ? "Hide Archived" : "Show Archived"}</button>
+            </div>
+          </div>
+        </div>
+        <div class="chat-thread-list">
+          ${renderHistoryItems(history, taskId, context)}
+        </div>
+      </div>
+    </details>
+  `;
+}
+
+function buildAgentRunArtifactContext(latestTurn = null, latestPolicyOutcome = null) {
+  const sessionView = latestTurn?.sessionView || {};
+  const timeline = objectValue(sessionView?.timeline);
+  const session = objectValue(timeline?.session);
+  const selectedWorker = objectValue(timeline?.selectedWorker);
+  const approvals = Array.isArray(timeline?.approvalCheckpoints) ? timeline.approvalCheckpoints : [];
+  const toolActions = Array.isArray(timeline?.toolActions) ? timeline.toolActions : [];
+  const evidenceRecords = Array.isArray(timeline?.evidenceRecords) ? timeline.evidenceRecords : [];
+  const proposals = listNativeToolProposals(sessionView);
+  let runSnapshot = {};
+  for (let index = toolActions.length - 1; index >= 0; index -= 1) {
+    const candidate = objectValue(objectValue(toolActions[index]?.resultPayload).governedRun);
+    if (Object.keys(candidate).length) {
+      runSnapshot = candidate;
+      break;
+    }
+  }
+  if (!Object.keys(runSnapshot).length) {
+    for (let index = proposals.length - 1; index >= 0; index -= 1) {
+      const candidate = objectValue(proposals[index]?.governedRun);
+      if (Object.keys(candidate).length) {
+        runSnapshot = candidate;
+        break;
+      }
+    }
+  }
+  const latestEvidence = evidenceRecords.length > 0 ? evidenceRecords[evidenceRecords.length - 1] : null;
+  const latestToolAction = toolActions.length > 0 ? toolActions[toolActions.length - 1] : null;
+  return {
+    sessionId: normalizedString(session?.sessionId, normalizedString(latestTurn?.response?.sessionId)),
+    sessionStatus: normalizedString(session?.status).toUpperCase() || "IDLE",
+    runId: normalizedString(runSnapshot?.runId, normalizedString(latestPolicyOutcome?.runId)),
+    runStatus: normalizedString(runSnapshot?.status).toUpperCase(),
+    policyDecision: normalizedString(runSnapshot?.policyDecision, normalizedString(latestPolicyOutcome?.decision)).toUpperCase(),
+    policyProvider: normalizedString(runSnapshot?.selectedPolicyProvider, normalizedString(latestPolicyOutcome?.provider)),
+    approvalCount: approvals.length,
+    proposalCount: proposals.length,
+    toolActionCount: toolActions.length,
+    evidenceCount: evidenceRecords.length,
+    latestEvidenceId: normalizedString(latestEvidence?.evidenceId),
+    latestEvidenceKind: normalizedString(latestEvidence?.kind),
+    latestToolActionId: normalizedString(latestToolAction?.toolActionId),
+    route: normalizedString(latestTurn?.response?.route),
+    boundary: normalizedString(latestTurn?.response?.boundaryProviderId),
+    workerAdapter: normalizedString(selectedWorker?.adapterId, normalizedString(selectedWorker?.workerId)),
+    workerType: normalizedString(selectedWorker?.workerType)
+  };
+}
+
+function renderAgentProofChip(label, value, tone = "chip chip-neutral chip-compact") {
+  const normalizedValue = String(value ?? "").trim();
+  if (!normalizedValue) {
+    return "";
+  }
+  return `<span class="${tone}">${escapeHTML(`${label}=${normalizedValue}`)}</span>`;
+}
+
+function buildAgentDecisionPivotContext(latestTurn = null) {
+  const sessionView = latestTurn?.sessionView || {};
+  const timeline = objectValue(sessionView?.timeline);
+  const session = objectValue(timeline?.session);
+  const response = objectValue(latestTurn?.response);
+  const approvals = Array.isArray(timeline?.approvalCheckpoints) ? timeline.approvalCheckpoints : [];
+  const toolProposals = listNativeToolProposals(sessionView);
+  const turnDetailBaseKey = detailKey(
+    "chat",
+    "turn",
+    session?.sessionId || response?.sessionId || latestTurn?.requestId || "unknown"
+  );
+  const latestApproval = approvals.length > 0 ? objectValue(approvals[approvals.length - 1]) : {};
+  const latestProposal = toolProposals.length > 0 ? objectValue(toolProposals[toolProposals.length - 1]) : {};
+  return {
+    requestId: normalizedString(latestTurn?.requestId),
+    sessionId: normalizedString(session?.sessionId, response?.sessionId),
+    approvalCount: approvals.length,
+    proposalCount: toolProposals.length,
+    latestApprovalId: normalizedString(latestApproval?.approvalID, normalizedString(latestApproval?.approvalId)),
+    latestProposalId: normalizedString(latestProposal?.proposalId),
+    approvalsDetailKey: approvals.length > 0 ? detailKey(turnDetailBaseKey, "approvals") : "",
+    proposalsDetailKey: toolProposals.length > 0 ? detailKey(turnDetailBaseKey, "proposals") : ""
+  };
+}
+
+function buildAgentGovernancePivotContext(latestTurn = null, catalogs = {}, exportSelection = {}) {
+  const sessionView = latestTurn?.sessionView || {};
+  const timeline = objectValue(sessionView?.timeline);
+  const session = objectValue(timeline?.session);
+  const response = objectValue(latestTurn?.response);
+  const activity = buildNativeSessionActivitySummary(sessionView);
+  const streamItems = Array.isArray(activity?.semanticEvents) ? activity.semanticEvents : [];
+  const latestEvent = streamItems.length > 0 ? objectValue(streamItems[streamItems.length - 1]) : {};
+  const latestEventPayload = objectValue(latestEvent?.payload);
+  const governanceReport = buildChatTurnGovernanceReport(latestTurn || {}, catalogs || {}, exportSelection || {});
+  const sessionId = normalizedString(session?.sessionId, response?.sessionId);
+  const turnDetailBaseKey = detailKey(
+    "chat",
+    "turn",
+    session?.sessionId || response?.sessionId || latestTurn?.requestId || "unknown"
+  );
+  return {
+    exportProfile: normalizedString(governanceReport?.exportProfile),
+    audience: normalizedString(governanceReport?.audience),
+    summary: normalizedString(governanceReport?.summary),
+    orgAdminCount: Array.isArray(governanceReport?.applicableOrgAdmins) ? governanceReport.applicableOrgAdmins.length : 0,
+    eventCount: streamItems.length,
+    latestEventType: normalizedString(latestEvent?.eventType),
+    latestEventTimestamp: normalizedString(latestEvent?.timestamp),
+    latestDecision: normalizedString(latestEventPayload?.decision, normalizedString(latestEventPayload?.status)),
+    reportDetailKey: sessionId ? detailKey("chat", "governance_report", sessionId) : "",
+    eventsDetailKey: streamItems.length > 0 ? detailKey(turnDetailBaseKey, "events") : ""
+  };
+}
+
+function renderAgentApprovalContextDrawer(
+  focusSummary = {},
+  threadState = {},
+  decisionPivotContext = {},
+  governancePivotContext = {}
+) {
+  const approvalCount = Math.max(0, Number(focusSummary.pendingApprovalCount ?? threadState?.openApprovalCount ?? 0) || 0);
+  const proposalCount = Math.max(0, Number(focusSummary.pendingProposalCount ?? 0) || 0);
+  const pendingDecisionCount = approvalCount + proposalCount;
+  const tone = pendingDecisionCount > 0 ? "chip chip-danger chip-compact" : "chip chip-ok chip-compact";
+  const label = pendingDecisionCount > 0 ? "review now" : "clear";
+  const detail = pendingDecisionCount > 0
+    ? "Pinned review stays here while you continue the active thread."
+    : "No active thread decisions are pinned right now.";
+  const latestApprovalId = normalizedString(decisionPivotContext?.latestApprovalId);
+  const latestProposalId = normalizedString(decisionPivotContext?.latestProposalId);
+  const requestId = normalizedString(decisionPivotContext?.requestId);
+  const sessionId = normalizedString(decisionPivotContext?.sessionId);
+  const approvalsDetailKey = normalizedString(decisionPivotContext?.approvalsDetailKey);
+  const proposalsDetailKey = normalizedString(decisionPivotContext?.proposalsDetailKey);
+  const exportProfile = normalizedString(governancePivotContext?.exportProfile);
+  const audience = normalizedString(governancePivotContext?.audience);
+  const latestEventType = normalizedString(governancePivotContext?.latestEventType);
+  const latestEventTimestamp = normalizedString(governancePivotContext?.latestEventTimestamp);
+  const latestDecision = normalizedString(governancePivotContext?.latestDecision);
+  const reportDetailKey = normalizedString(governancePivotContext?.reportDetailKey);
+  const eventsDetailKey = normalizedString(governancePivotContext?.eventsDetailKey);
+  const eventCount = Math.max(0, Number(governancePivotContext?.eventCount ?? 0) || 0);
+  const orgAdminCount = Math.max(0, Number(governancePivotContext?.orgAdminCount ?? 0) || 0);
+  return `
+    <div class="metric agentops-context-panel">
+      <div class="metric-title-row">
+        <div class="title">Approval Context Drawer</div>
+        <span class="${tone}">${escapeHTML(label)}</span>
+      </div>
+      <div class="run-detail-chips">
+        <span class="chip chip-neutral chip-compact">approvals=${escapeHTML(String(approvalCount))}</span>
+        <span class="chip chip-neutral chip-compact">proposals=${escapeHTML(String(proposalCount))}</span>
+        <span class="chip chip-neutral chip-compact">sessionStatus=${escapeHTML(String(threadState?.sessionStatus || "-"))}</span>
+        <span class="chip chip-neutral chip-compact">workerStatus=${escapeHTML(String(threadState?.latestWorkerStatus || "-"))}</span>
+      </div>
+      ${
+        requestId || sessionId || latestApprovalId || latestProposalId
+          ? `
+            <div class="run-detail-chips">
+              ${requestId ? `<span class="chip chip-neutral chip-compact">request=${escapeHTML(requestId)}</span>` : ""}
+              ${sessionId ? `<span class="chip chip-neutral chip-compact">session=${escapeHTML(sessionId)}</span>` : ""}
+              ${latestApprovalId ? `<span class="chip chip-neutral chip-compact">latestApproval=${escapeHTML(latestApprovalId)}</span>` : ""}
+              ${latestProposalId ? `<span class="chip chip-neutral chip-compact">latestProposal=${escapeHTML(latestProposalId)}</span>` : ""}
+            </div>
+          `
+          : ""
+      }
+      ${
+        exportProfile || audience || latestEventType || latestDecision || eventCount > 0 || orgAdminCount > 0
+          ? `
+            <div class="run-detail-chips">
+              ${exportProfile ? `<span class="chip chip-neutral chip-compact">export=${escapeHTML(exportProfile)}</span>` : ""}
+              ${audience ? `<span class="chip chip-neutral chip-compact">audience=${escapeHTML(audience)}</span>` : ""}
+              ${orgAdminCount > 0 ? `<span class="chip chip-neutral chip-compact">orgAdmin=${escapeHTML(String(orgAdminCount))}</span>` : ""}
+              ${eventCount > 0 ? `<span class="chip chip-neutral chip-compact">decisionEvents=${escapeHTML(String(eventCount))}</span>` : ""}
+              ${latestEventType ? `<span class="chip chip-neutral chip-compact">latestEvent=${escapeHTML(latestEventType)}</span>` : ""}
+              ${latestDecision ? `<span class="chip chip-neutral chip-compact">latestDecision=${escapeHTML(latestDecision)}</span>` : ""}
+              ${latestEventTimestamp ? `<span class="chip chip-neutral chip-compact">latestAt=${escapeHTML(formatTime(latestEventTimestamp))}</span>` : ""}
+            </div>
+          `
+          : ""
+      }
+      ${
+        approvalsDetailKey || proposalsDetailKey
+          ? `
+            <div class="filter-row settings-editor-actions">
+              <div class="action-hierarchy">
+                <div class="action-group action-group-secondary">
+                  ${approvalsDetailKey ? `<button class="btn btn-secondary btn-small" type="button" data-chat-action="focus-agent-detail" data-chat-detail-key="${escapeHTML(approvalsDetailKey)}">Pin Approval Checkpoints</button>` : ""}
+                  ${proposalsDetailKey ? `<button class="btn btn-secondary btn-small" type="button" data-chat-action="focus-agent-detail" data-chat-detail-key="${escapeHTML(proposalsDetailKey)}">Pin Tool Proposals</button>` : ""}
+                </div>
+              </div>
+            </div>
+          `
+          : ""
+      }
+      ${
+        reportDetailKey || eventsDetailKey
+          ? `
+            <div class="filter-row settings-editor-actions">
+              <div class="action-hierarchy">
+                <div class="action-group action-group-secondary">
+                  ${reportDetailKey ? `<button class="btn btn-secondary btn-small" type="button" data-chat-action="focus-agent-detail" data-chat-detail-key="${escapeHTML(reportDetailKey)}">Pin Governance Receipt</button>` : ""}
+                  ${eventsDetailKey ? `<button class="btn btn-secondary btn-small" type="button" data-chat-action="focus-agent-detail" data-chat-detail-key="${escapeHTML(eventsDetailKey)}">Pin Decision History</button>` : ""}
+                </div>
+              </div>
+            </div>
+          `
+          : ""
+      }
+      <div class="meta">${escapeHTML(detail)}</div>
+    </div>
+    <div class="metric agentops-context-panel" data-agent-approval-review>
+      <div class="metric-title-row">
+        <div class="title">Pinned Approval Review</div>
+        <span class="chip chip-neutral chip-compact">context</span>
+      </div>
+      <div class="meta">Select an approval or current-thread decision to pin review context here.</div>
+    </div>
+  `;
+}
+
+function buildAgentExecutionProofContext(latestTurn = null, runArtifactContext = {}) {
+  const sessionView = latestTurn?.sessionView || {};
+  const timeline = objectValue(sessionView?.timeline);
+  const toolActions = Array.isArray(timeline?.toolActions) ? timeline.toolActions : [];
+  const evidenceRecords = Array.isArray(timeline?.evidenceRecords) ? timeline.evidenceRecords : [];
+  const events = Array.isArray(timeline?.events) ? timeline.events : [];
+  const transcript = latestManagedWorkerTranscript(sessionView);
+  const latestToolAction = toolActions.length > 0 ? objectValue(toolActions[toolActions.length - 1]) : {};
+  const latestEvidence = evidenceRecords.length > 0 ? objectValue(evidenceRecords[evidenceRecords.length - 1]) : {};
+  const latestEvent = events.length > 0 ? objectValue(events[events.length - 1]) : {};
+  const latestEventPayload = objectValue(latestEvent?.payload);
+  const anchorCount = [
+    runArtifactContext?.runId,
+    latestToolAction?.toolActionId || runArtifactContext?.latestToolActionId,
+    latestEvidence?.evidenceId || runArtifactContext?.latestEvidenceId,
+    transcript?.eventCount ? "transcript" : "",
+    latestEvent?.eventType || ""
+  ].filter(Boolean).length;
+  return {
+    anchorCount,
+    runId: normalizedString(runArtifactContext?.runId),
+    runStatus: normalizedString(runArtifactContext?.runStatus),
+    policyProvider: normalizedString(runArtifactContext?.policyProvider),
+    policyDecision: normalizedString(runArtifactContext?.policyDecision),
+    latestToolActionId: normalizedString(latestToolAction?.toolActionId, normalizedString(runArtifactContext?.latestToolActionId)),
+    latestToolType: normalizedString(latestToolAction?.toolType),
+    latestToolStatus: normalizedString(latestToolAction?.status).toUpperCase(),
+    latestToolSource: normalizedString(latestToolAction?.source),
+    latestEvidenceId: normalizedString(latestEvidence?.evidenceId, normalizedString(runArtifactContext?.latestEvidenceId)),
+    latestEvidenceKind: normalizedString(latestEvidence?.kind, normalizedString(runArtifactContext?.latestEvidenceKind)),
+    latestEvidenceCreatedAt: normalizedString(latestEvidence?.createdAt),
+    latestEvidenceRetention: normalizedString(latestEvidence?.retentionClass),
+    transcriptEventCount: Number(transcript?.eventCount || 0) || 0,
+    transcriptToolActionId: normalizedString(transcript?.toolActionId),
+    latestEventType: normalizedString(latestEvent?.eventType),
+    latestEventSequence: Number(latestEvent?.sequence || 0) || 0,
+    latestEventTimestamp: normalizedString(latestEvent?.timestamp),
+    latestEventSummary: normalizedString(latestEventPayload?.summary, normalizedString(latestEventPayload?.reason))
+  };
+}
+
+function renderAgentRunArtifactContext(context = {}) {
+  const statusValue = String(context.runStatus || context.sessionStatus || "IDLE").trim().toUpperCase() || "IDLE";
+  const hasContext = Boolean(
+    context.sessionId
+    || context.runId
+    || context.latestEvidenceId
+    || context.latestToolActionId
+    || context.toolActionCount
+    || context.evidenceCount
+  );
+  return `
+    <div class="metric agentops-context-panel">
+      <div class="metric-title-row">
+        <div class="title">Run And Artifact Context</div>
+        <span class="${chipClassForSessionStatus(statusValue)}">${escapeHTML(statusValue)}</span>
+      </div>
+      ${
+        hasContext
+          ? `
+            <div class="run-detail-chips">
+              <span class="chip chip-neutral chip-compact">session=${escapeHTML(context.sessionId || "-")}</span>
+              <span class="chip chip-neutral chip-compact">run=${escapeHTML(context.runId || "-")}</span>
+              <span class="chip chip-neutral chip-compact">route=${escapeHTML(context.route || "-")}</span>
+              <span class="chip chip-neutral chip-compact">boundary=${escapeHTML(context.boundary || "-")}</span>
+            </div>
+            <div class="run-detail-chips">
+              <span class="chip chip-neutral chip-compact">approvals=${escapeHTML(String(context.approvalCount ?? 0))}</span>
+              <span class="chip chip-neutral chip-compact">proposals=${escapeHTML(String(context.proposalCount ?? 0))}</span>
+              <span class="chip chip-neutral chip-compact">toolActions=${escapeHTML(String(context.toolActionCount ?? 0))}</span>
+              <span class="chip chip-neutral chip-compact">evidence=${escapeHTML(String(context.evidenceCount ?? 0))}</span>
+            </div>
+            <div class="run-detail-chips">
+              <span class="chip chip-neutral chip-compact">worker=${escapeHTML(context.workerAdapter || "-")}</span>
+              <span class="chip chip-neutral chip-compact">workerType=${escapeHTML(context.workerType || "-")}</span>
+              <span class="chip chip-neutral chip-compact">policyProvider=${escapeHTML(context.policyProvider || "-")}</span>
+            </div>
+            ${context.latestToolActionId ? `<div class="meta">latestToolAction=${escapeHTML(context.latestToolActionId)}</div>` : ""}
+            ${context.latestEvidenceId ? `<div class="meta">latestEvidence=${escapeHTML(context.latestEvidenceId)}${context.latestEvidenceKind ? ` · ${escapeHTML(context.latestEvidenceKind)}` : ""}</div>` : ""}
+            ${context.runId ? renderGovernedRunLink(context.runId) : ""}
+          `
+          : `<div class="meta">The active thread has not produced governed run or artifact anchors yet.</div>`
+      }
+    </div>
+  `;
+}
+
+function renderAgentExecutionProofContext(context = {}) {
+  const anchorCount = Math.max(0, Number(context.anchorCount ?? 0) || 0);
+  const proofTone = anchorCount >= 3
+    ? "chip chip-ok chip-compact"
+    : anchorCount > 0
+      ? "chip chip-warn chip-compact"
+      : "chip chip-neutral chip-compact";
+  const proofLabel = anchorCount >= 3 ? "anchored" : anchorCount > 0 ? "partial" : "pending";
+  const rows = [];
+  if (context.runId || context.policyProvider || context.policyDecision) {
+    rows.push(`
+      <div class="agentops-proof-row">
+        <div class="agentops-proof-label">Governed Run</div>
+        <div class="run-detail-chips">
+          ${renderAgentProofChip("run", context.runId)}
+          ${renderAgentProofChip("status", context.runStatus, chipClassForSessionStatus(context.runStatus || "IDLE"))}
+          ${renderAgentProofChip("policyProvider", context.policyProvider)}
+          ${renderAgentProofChip("decision", context.policyDecision, chipClassForPolicyDecision(context.policyDecision || "UNKNOWN"))}
+        </div>
+        ${context.runId ? renderGovernedRunLink(context.runId) : ""}
+      </div>
+    `);
+  }
+  if (context.latestToolActionId || context.latestToolType || context.latestToolStatus) {
+    rows.push(`
+      <div class="agentops-proof-row">
+        <div class="agentops-proof-label">Latest Tool Action</div>
+        <div class="run-detail-chips">
+          ${renderAgentProofChip("toolAction", context.latestToolActionId)}
+          ${renderAgentProofChip("type", context.latestToolType)}
+          ${renderAgentProofChip("status", context.latestToolStatus, chipClassForSessionStatus(context.latestToolStatus || "IDLE"))}
+          ${renderAgentProofChip("source", context.latestToolSource)}
+        </div>
+      </div>
+    `);
+  }
+  if (context.latestEvidenceId || context.latestEvidenceKind) {
+    rows.push(`
+      <div class="agentops-proof-row">
+        <div class="agentops-proof-label">Latest Evidence</div>
+        <div class="run-detail-chips">
+          ${renderAgentProofChip("evidence", context.latestEvidenceId)}
+          ${renderAgentProofChip("kind", context.latestEvidenceKind)}
+          ${renderAgentProofChip("retention", context.latestEvidenceRetention)}
+          ${renderAgentProofChip("created", context.latestEvidenceCreatedAt ? formatTime(context.latestEvidenceCreatedAt) : "")}
+        </div>
+      </div>
+    `);
+  }
+  if (context.transcriptEventCount || context.transcriptToolActionId) {
+    rows.push(`
+      <div class="agentops-proof-row">
+        <div class="agentops-proof-label">Worker Transcript</div>
+        <div class="run-detail-chips">
+          ${renderAgentProofChip("events", context.transcriptEventCount ? String(context.transcriptEventCount) : "")}
+          ${renderAgentProofChip("managedTurn", context.transcriptToolActionId)}
+        </div>
+      </div>
+    `);
+  }
+  if (context.latestEventType || context.latestEventSequence || context.latestEventTimestamp) {
+    rows.push(`
+      <div class="agentops-proof-row">
+        <div class="agentops-proof-label">Latest Event</div>
+        <div class="run-detail-chips">
+          ${renderAgentProofChip("type", context.latestEventType)}
+          ${renderAgentProofChip("sequence", context.latestEventSequence ? String(context.latestEventSequence) : "")}
+          ${renderAgentProofChip("at", context.latestEventTimestamp ? formatTime(context.latestEventTimestamp) : "")}
+        </div>
+        ${context.latestEventSummary ? `<div class="meta">${escapeHTML(context.latestEventSummary)}</div>` : ""}
+      </div>
+    `);
+  }
+  return `
+    <div class="metric agentops-context-panel">
+      <div class="metric-title-row">
+        <div class="title">Execution Proof</div>
+        <span class="${proofTone}">${escapeHTML(proofLabel)}</span>
+      </div>
+      ${
+        rows.length
+          ? `<div class="agentops-proof-grid">${rows.join("")}</div>`
+          : `<div class="meta">No execution proof anchors recorded for the active turn.</div>`
+      }
+    </div>
+  `;
+}
+
+function buildAgentArtifactEvidenceDrillInContext(latestTurn = null, runArtifactContext = {}) {
+  const sessionView = latestTurn?.sessionView || {};
+  const timeline = objectValue(sessionView?.timeline);
+  const session = objectValue(timeline?.session);
+  const sessionId = normalizedString(session?.sessionId, normalizedString(latestTurn?.response?.sessionId));
+  const toolActions = Array.isArray(timeline?.toolActions) ? timeline.toolActions : [];
+  const evidenceRecords = Array.isArray(timeline?.evidenceRecords) ? timeline.evidenceRecords : [];
+  const transcript = latestManagedWorkerTranscript(sessionView);
+  const latestToolAction = toolActions.length > 0 ? objectValue(toolActions[toolActions.length - 1]) : {};
+  const latestEvidence = evidenceRecords.length > 0 ? objectValue(evidenceRecords[evidenceRecords.length - 1]) : {};
+  const requestPayload = latestToolAction?.requestPayload && typeof latestToolAction.requestPayload === "object"
+    ? JSON.stringify(latestToolAction.requestPayload, null, 2)
+    : "";
+  const resultPayload = latestToolAction?.resultPayload && typeof latestToolAction.resultPayload === "object"
+    ? JSON.stringify(latestToolAction.resultPayload, null, 2)
+    : "";
+  const evidenceMetadata = latestEvidence?.metadata && typeof latestEvidence.metadata === "object"
+    ? JSON.stringify(latestEvidence.metadata, null, 2)
+    : "";
+  return {
+    sessionId,
+    runId: normalizedString(runArtifactContext?.runId),
+    toolAction: {
+      toolActionId: normalizedString(latestToolAction?.toolActionId),
+      toolType: normalizedString(latestToolAction?.toolType),
+      status: normalizedString(latestToolAction?.status).toUpperCase(),
+      source: normalizedString(latestToolAction?.source),
+      workerId: normalizedString(latestToolAction?.workerId),
+      approvalCheckpointId: normalizedString(latestToolAction?.approvalCheckpointId),
+      detailKey: normalizedString(latestToolAction?.toolActionId)
+        ? detailKey("agent", "drillin", "tool_action", sessionId || "unknown", normalizedString(latestToolAction?.toolActionId))
+        : "",
+      governedSummaryMarkup: normalizedString(latestToolAction?.toolType).toLowerCase() === "governed_action_request"
+        ? renderGovernedActionResultSummary(latestToolAction)
+        : "",
+      requestPayload,
+      resultPayload
+    },
+    evidence: {
+      evidenceId: normalizedString(latestEvidence?.evidenceId),
+      kind: normalizedString(latestEvidence?.kind),
+      toolActionId: normalizedString(latestEvidence?.toolActionId),
+      retentionClass: normalizedString(latestEvidence?.retentionClass),
+      createdAt: normalizedString(latestEvidence?.createdAt),
+      detailKey: normalizedString(latestEvidence?.evidenceId)
+        ? detailKey("agent", "drillin", "evidence", sessionId || "unknown", normalizedString(latestEvidence?.evidenceId))
+        : "",
+      metadata: evidenceMetadata
+    },
+    transcript: {
+      eventCount: Number(transcript?.eventCount || 0) || 0,
+      toolActionId: normalizedString(transcript?.toolActionId),
+      detailKey: transcript?.eventCount || normalizedString(transcript?.toolActionId) || normalizedString(transcript?.pretty)
+        ? detailKey("agent", "drillin", "transcript", sessionId || "unknown", normalizedString(transcript?.toolActionId, "latest"))
+        : "",
+      pretty: normalizedString(transcript?.pretty)
+    }
+  };
+}
+
+function renderAgentArtifactEvidenceDrillInContext(context = {}) {
+  const sessionId = normalizedString(context?.sessionId);
+  const runId = normalizedString(context?.runId);
+  const toolAction = objectValue(context?.toolAction);
+  const evidence = objectValue(context?.evidence);
+  const transcript = objectValue(context?.transcript);
+  const hasToolAction = Boolean(toolAction.toolActionId);
+  const hasEvidence = Boolean(evidence.evidenceId);
+  const hasTranscript = Boolean(transcript.eventCount || transcript.toolActionId || transcript.pretty);
+  const drillInCount = [hasToolAction, hasEvidence, hasTranscript].filter(Boolean).length;
+  const drillTone = drillInCount >= 2
+    ? "chip chip-ok chip-compact"
+    : drillInCount > 0
+      ? "chip chip-warn chip-compact"
+      : "chip chip-neutral chip-compact";
+  const drillLabel = drillInCount >= 2 ? "ready" : drillInCount > 0 ? "partial" : "empty";
+  const cards = [];
+
+  if (hasToolAction) {
+    const toolActionDetailKey = normalizedString(toolAction.detailKey, detailKey("agent", "drillin", "tool_action", sessionId || "unknown", toolAction.toolActionId || "unknown"));
+    const requestDetailKey = detailKey(toolActionDetailKey, "request");
+    const resultDetailKey = detailKey(toolActionDetailKey, "result");
+    cards.push(`
+      <details class="details-shell agentops-drillin-shell" data-detail-key="${escapeHTML(toolActionDetailKey)}">
+        <summary>Latest Tool Action Drill-In</summary>
+        <div class="run-detail-chips">
+          ${renderAgentProofChip("toolAction", toolAction.toolActionId)}
+          ${renderAgentProofChip("type", toolAction.toolType)}
+          ${renderAgentProofChip("status", toolAction.status, chipClassForSessionStatus(toolAction.status || "IDLE"))}
+          ${renderAgentProofChip("source", toolAction.source)}
+          ${renderAgentProofChip("worker", toolAction.workerId)}
+        </div>
+        ${toolAction.governedSummaryMarkup || ""}
+        <div class="filter-row settings-editor-actions">
+          <div class="action-hierarchy">
+            <div class="action-group action-group-secondary">
+              <button class="btn btn-secondary btn-small" type="button" data-chat-action="copy-tool-action-json" data-chat-session-id="${escapeHTML(sessionId)}" data-chat-tool-action-id="${escapeHTML(toolAction.toolActionId)}">Copy JSON</button>
+              <button class="btn btn-secondary btn-small" type="button" data-chat-action="download-tool-action-json" data-chat-session-id="${escapeHTML(sessionId)}" data-chat-tool-action-id="${escapeHTML(toolAction.toolActionId)}">Download JSON</button>
+            </div>
+          </div>
+        </div>
+        ${toolAction.requestPayload ? `<details class="details-shell" data-detail-key="${escapeHTML(requestDetailKey)}"><summary>Request Payload</summary><pre class="code-block">${escapeHTML(toolAction.requestPayload)}</pre></details>` : `<div class="meta">No request payload captured.</div>`}
+        ${toolAction.resultPayload ? `<details class="details-shell" data-detail-key="${escapeHTML(resultDetailKey)}"><summary>Result Payload</summary><pre class="code-block">${escapeHTML(toolAction.resultPayload)}</pre></details>` : `<div class="meta">No result payload captured.</div>`}
+      </details>
+    `);
+  }
+
+  if (hasEvidence) {
+    const evidenceDetailKey = normalizedString(evidence.detailKey, detailKey("agent", "drillin", "evidence", sessionId || "unknown", evidence.evidenceId || "unknown"));
+    cards.push(`
+      <details class="details-shell agentops-drillin-shell" data-detail-key="${escapeHTML(evidenceDetailKey)}">
+        <summary>Latest Evidence Drill-In</summary>
+        <div class="run-detail-chips">
+          ${renderAgentProofChip("evidence", evidence.evidenceId)}
+          ${renderAgentProofChip("kind", evidence.kind)}
+          ${renderAgentProofChip("toolAction", evidence.toolActionId)}
+          ${renderAgentProofChip("retention", evidence.retentionClass)}
+          ${renderAgentProofChip("created", evidence.createdAt ? formatTime(evidence.createdAt) : "")}
+        </div>
+        <div class="filter-row settings-editor-actions">
+          <div class="action-hierarchy">
+            <div class="action-group action-group-secondary">
+              <button class="btn btn-secondary btn-small" type="button" data-chat-action="copy-evidence-json" data-chat-session-id="${escapeHTML(sessionId)}" data-chat-evidence-id="${escapeHTML(evidence.evidenceId)}">Copy JSON</button>
+              <button class="btn btn-secondary btn-small" type="button" data-chat-action="download-evidence-json" data-chat-session-id="${escapeHTML(sessionId)}" data-chat-evidence-id="${escapeHTML(evidence.evidenceId)}">Download JSON</button>
+            </div>
+          </div>
+        </div>
+        ${evidence.metadata ? `<pre class="code-block">${escapeHTML(evidence.metadata)}</pre>` : `<div class="meta">No evidence metadata captured.</div>`}
+      </details>
+    `);
+  }
+
+  if (hasTranscript) {
+    const transcriptDetailKey = normalizedString(transcript.detailKey, detailKey("agent", "drillin", "transcript", sessionId || "unknown", transcript.toolActionId || "latest"));
+    cards.push(`
+      <details class="details-shell agentops-drillin-shell" data-detail-key="${escapeHTML(transcriptDetailKey)}">
+        <summary>Managed Transcript Anchor</summary>
+        <div class="run-detail-chips">
+          ${renderAgentProofChip("events", transcript.eventCount ? String(transcript.eventCount) : "")}
+          ${renderAgentProofChip("managedTurn", transcript.toolActionId)}
+        </div>
+        ${transcript.pretty ? `<pre class="code-block">${escapeHTML(transcript.pretty)}</pre>` : `<div class="meta">No worker transcript captured for the active turn.</div>`}
+      </details>
+    `);
+  }
+
+  return `
+    <div class="metric agentops-context-panel">
+      <div class="metric-title-row">
+        <div class="title">Artifact And Evidence Drill-In</div>
+        <span class="${drillTone}">${escapeHTML(drillLabel)}</span>
+      </div>
+      ${
+        runId || toolAction.detailKey || evidence.detailKey || transcript.detailKey
+          ? `
+            <div class="filter-row settings-editor-actions">
+              <div class="action-hierarchy">
+                <div class="action-group action-group-secondary">
+                  ${runId ? `<button class="btn btn-secondary btn-small" type="button" data-chat-action="open-governed-run" data-chat-run-id="${escapeHTML(runId)}">Open Active Run</button>` : ""}
+                  ${toolAction.detailKey ? `<button class="btn btn-secondary btn-small" type="button" data-chat-action="focus-agent-detail" data-chat-detail-key="${escapeHTML(toolAction.detailKey)}">Pin Latest Tool Action</button>` : ""}
+                  ${evidence.detailKey ? `<button class="btn btn-secondary btn-small" type="button" data-chat-action="focus-agent-detail" data-chat-detail-key="${escapeHTML(evidence.detailKey)}">Pin Latest Evidence</button>` : ""}
+                  ${transcript.detailKey ? `<button class="btn btn-secondary btn-small" type="button" data-chat-action="focus-agent-detail" data-chat-detail-key="${escapeHTML(transcript.detailKey)}">Pin Managed Transcript</button>` : ""}
+                </div>
+              </div>
+            </div>
+          `
+          : ""
+      }
+      ${
+        cards.length
+          ? `<div class="agentops-drillin-stack">${cards.join("")}</div>`
+          : `<div class="meta">No artifact or evidence drill-ins are available for the active turn yet.</div>`
+      }
+    </div>
+  `;
+}
+
 export function buildAgentWorkspaceMarkup(settingsPayload = {}, chatState = {}) {
   const settings = settingsPayload || {};
   const integrations = settings?.integrations || {};
@@ -1194,9 +1855,6 @@ export function buildAgentWorkspaceMarkup(settingsPayload = {}, chatState = {}) 
   const latestTurn = turns.length > 0 ? turns[turns.length - 1] : null;
   const threadState = deriveOperatorChatThreadState(thread || {});
   const latestActivity = latestTurn?.sessionView ? buildNativeSessionActivitySummary(latestTurn.sessionView) : null;
-  const activeHistoryItem = (Array.isArray(history?.items) ? history.items : []).find(
-    (item) => String(item?.taskId || "").trim() === taskId
-  );
   const startAction = taskId && threadState?.isResolvedThread ? "start-followup-thread" : "start-thread";
   const startLabel = taskId && threadState?.isResolvedThread ? "New Follow-up Thread" : "Start Thread";
   const sendLabel = taskId && threadState?.isResolvedThread ? "Reopen and Send" : "Send Message";
@@ -1205,11 +1863,9 @@ export function buildAgentWorkspaceMarkup(settingsPayload = {}, chatState = {}) 
   const catalogState = chatState?.catalogs && typeof chatState.catalogs === "object" ? chatState.catalogs : {};
   const governedExportSelection = resolveChatGovernedExportSelection(chatState?.exportSelection || {}, catalogState?.exportProfiles || null);
   const managedExecution = executionMode === "managed_codex_worker";
-  const managedWorkerId = String(latestActivity?.selectedWorkerId || selectedWorker?.workerId || "").trim();
-  const managedWorkerReady = managedExecution && Boolean(taskId) && Boolean(managedWorkerId) && !threadState?.isResolvedThread;
   const historyCount = Number(history?.count ?? 0) || 0;
   const archivedCount = Number(history?.archivedCount ?? 0) || 0;
-  const historySummary = String(history?.message || "Use Thread History to reopen or archive prior work without burying the current chat.").trim();
+  const historySummary = String(history?.message || "Resume or archive prior work without losing the current thread.").trim();
   const latestPolicyOutcome = latestPolicyOutcomeFromTurns(turns);
   const latestReplyResponseText = String(latestTurn?.response?.outputText || "").trim();
   const latestReplyActivityText = String(latestActivity?.latestOutputText || "").trim();
@@ -1231,7 +1887,7 @@ export function buildAgentWorkspaceMarkup(settingsPayload = {}, chatState = {}) 
   )
     .trim()
     .toUpperCase() || "IDLE";
-  const focusSummary = buildAgentFocusSummary({
+  const focusSummary = buildAgentThreadSummary({
     taskId,
     threadState,
     latestActivity,
@@ -1240,41 +1896,38 @@ export function buildAgentWorkspaceMarkup(settingsPayload = {}, chatState = {}) 
     historyCount,
     managedExecution
   });
+  const runArtifactContext = buildAgentRunArtifactContext(latestTurn, latestPolicyOutcome);
+  const decisionPivotContext = buildAgentDecisionPivotContext(latestTurn);
+  const governancePivotContext = buildAgentGovernancePivotContext(latestTurn, catalogState, governedExportSelection);
+  const executionProofContext = buildAgentExecutionProofContext(latestTurn, runArtifactContext);
+  const artifactEvidenceDrillInContext = buildAgentArtifactEvidenceDrillInContext(latestTurn, runArtifactContext);
 
   return `
-    <div class="stack chat-surface agent-chat-shell">
-      <div class="panel-heading agent-panel-heading">
-        <h2>Agent Workspace</h2>
+    <div class="stack chat-surface agentops-workspace">
+      <div class="panel-heading agentops-panel-heading">
+        <h2>AgentOps</h2>
       </div>
-      <div class="metric agent-top-section">
-        <div class="agent-top-grid">
-          <div class="metric agent-focus-card">
-            <div class="metric-title-row">
-              <div class="title">Thread Overview</div>
-              <span class="${focusSummary.tone}">${escapeHTML(focusSummary.label)}</span>
-            </div>
-            <div class="meta">${escapeHTML(focusSummary.title)}</div>
-            <div class="meta">${escapeHTML(focusSummary.detail)}</div>
-            <div class="run-detail-chips">
-              <span class="chip chip-neutral chip-compact">task=${escapeHTML(taskId || "-")}</span>
-              <span class="chip chip-neutral chip-compact">turns=${escapeHTML(String(focusSummary.turnCount))}</span>
-              <span class="chip chip-neutral chip-compact">approvals=${escapeHTML(String(focusSummary.pendingApprovalCount))}</span>
-              <span class="chip chip-neutral chip-compact">proposals=${escapeHTML(String(focusSummary.pendingProposalCount))}</span>
-              <span class="chip chip-neutral chip-compact">history=${escapeHTML(String(focusSummary.historyCount))}</span>
-              <span class="chip chip-neutral chip-compact">execution=${escapeHTML(executionModeLabel(executionMode))}</span>
-            </div>
-          </div>
-          <div class="agent-approval-overview-slot" data-agent-approvals-overview></div>
-          <div class="agent-approval-review-slot" data-agent-approval-review></div>
-        </div>
-      </div>
-      <div class="metric agent-chat-composer">
+      <div class="metric agentops-thread-header">
         <div class="metric-title-row">
-          <div class="title">Agent Chat</div>
-          <span class="${chipClassForSessionStatus(status)}">${escapeHTML(status.toUpperCase())}</span>
+          <div class="title">Thread Header</div>
+          <span class="${focusSummary.tone}">${escapeHTML(focusSummary.label)}</span>
         </div>
-        ${message ? `<div class="meta">${escapeHTML(message)}</div>` : ""}
-        <div class="agent-chat-heading-grid">
+        <div class="agentops-thread-summary">
+          <div class="agentops-thread-heading">
+            <div class="title">${escapeHTML(String(chatState.title || thread?.title || "New governed thread"))}</div>
+            <div class="meta">${escapeHTML(focusSummary.title)}</div>
+            <div class="meta">${escapeHTML(message || focusSummary.detail)}</div>
+          </div>
+          <div class="run-detail-chips">
+            <span class="chip chip-neutral chip-compact">task=${escapeHTML(taskId || "-")}</span>
+            <span class="chip chip-neutral chip-compact">turns=${escapeHTML(String(focusSummary.turnCount))}</span>
+            <span class="chip chip-neutral chip-compact">approvals=${escapeHTML(String(focusSummary.pendingApprovalCount))}</span>
+            <span class="chip chip-neutral chip-compact">proposals=${escapeHTML(String(focusSummary.pendingProposalCount))}</span>
+            <span class="chip chip-neutral chip-compact">history=${escapeHTML(String(focusSummary.historyCount))}</span>
+            <span class="chip chip-neutral chip-compact">execution=${escapeHTML(executionModeLabel(executionMode))}</span>
+          </div>
+        </div>
+        <div class="agentops-thread-fields">
           <label class="field">
             <span class="label">Thread Title</span>
             <input id="chat-thread-title" class="filter-input" type="text" value="${escapeHTML(String(chatState.title || ""))}" data-chat-field="title" />
@@ -1295,134 +1948,78 @@ export function buildAgentWorkspaceMarkup(settingsPayload = {}, chatState = {}) 
             <input id="chat-thread-intent" class="filter-input" type="text" value="${escapeHTML(String(chatState.intent || ""))}" data-chat-field="intent" />
           </label>
         </div>
-        <div class="agent-chat-state-grid">
-          <div class="metric agent-chat-side-panel">
-            <div class="metric-title-row">
-              <div class="title">Thread State</div>
-              <span class="${chipClassForSessionStatus(status)}">${escapeHTML(status.toUpperCase())}</span>
-            </div>
-            <div class="run-detail-chips">
-              <span class="chip chip-neutral chip-compact">task=${escapeHTML(taskId || "-")}</span>
-              <span class="chip chip-neutral chip-compact">session=${escapeHTML(latestReplySessionId || "-")}</span>
-              <span class="chip chip-neutral chip-compact">taskStatus=${escapeHTML(String(threadState?.taskStatus || activeHistoryItem?.status || "-"))}</span>
-              <span class="chip chip-neutral chip-compact">sessionStatus=${escapeHTML(String(threadState?.sessionStatus || "-"))}</span>
-              <span class="chip chip-neutral chip-compact">workerStatus=${escapeHTML(String(threadState?.latestWorkerStatus || "-"))}</span>
-              <span class="chip chip-neutral chip-compact">approvals=${escapeHTML(String(threadState?.openApprovalCount ?? 0))}</span>
-            </div>
-            ${
-              latestPolicyOutcome
-                ? `
-                  <div class="${escapeHTML(latestPolicyOutcome.outcome.bannerClass)}">
-                    <div class="metric-title-row">
-                      <div class="title">Latest Policy Outcome</div>
-                      <span class="${chipClassForPolicyDecision(latestPolicyOutcome.decision)}">${escapeHTML(latestPolicyOutcome.decision)}</span>
-                    </div>
-                    <div class="run-detail-chips">
-                      <span class="chip chip-neutral chip-compact">provider=${escapeHTML(latestPolicyOutcome.provider || "-")}</span>
-                      <span class="${chipClassForPolicyEffect(latestPolicyOutcome.outcome)}">effect=${escapeHTML(latestPolicyOutcome.outcome.effectLabel)}</span>
-                      <span class="chip chip-neutral chip-compact">request=${escapeHTML(latestPolicyOutcome.requestLabel || "-")}</span>
-                    </div>
-                    <div class="policy-outcome-detail">${escapeHTML(latestPolicyOutcome.outcome.headline)}</div>
-                    <div class="meta">${escapeHTML(latestPolicyOutcome.outcome.detail)}</div>
-                    ${renderGovernedRunLink(latestPolicyOutcome.runId)}
-                  </div>
-                `
-                : `<div class="meta">Latest Policy Outcome: the latest turn has not recorded a governed policy result yet.</div>`
-            }
-            <div class="run-detail-chips">
-              <span class="chip chip-neutral chip-compact">workerType=${escapeHTML(String(latestActivity?.selectedWorkerType || selectedWorker?.workerType || "-"))}</span>
-              <span class="chip chip-neutral chip-compact">workerAdapter=${escapeHTML(String(latestActivity?.selectedWorkerAdapterId || selectedWorker?.adapterId || "-"))}</span>
-              <span class="chip chip-neutral chip-compact">workerTarget=${escapeHTML(String(latestActivity?.selectedWorkerTargetEnvironment || selectedWorker?.targetEnvironment || "-"))}</span>
-            </div>
-            ${latestActivity?.latestWorkerSummary ? `<div class="meta">${escapeHTML(String(latestActivity.latestWorkerSummary))}</div>` : ""}
-            ${
-              managedExecution
-                ? `<div class="meta">${escapeHTML(
-                  managedWorkerReady
-                    ? "Managed worker is attached to the latest thread session."
-                    : "Managed worker mode is selected for this thread."
-                )}</div>`
-                : ""
-            }
-            ${catalogState?.message ? `<div class="meta">governanceCatalogs=${escapeHTML(String(catalogState.source || "-"))}; ${escapeHTML(String(catalogState.message || ""))}</div>` : ""}
-          </div>
-          <div class="metric agent-chat-side-panel">
-            <label class="field field-wide">
-              <span class="label">System Instructions</span>
-              <span class="meta">Use this for durable guidance that should stay in effect across the whole thread.</span>
-              <textarea id="chat-system-prompt" class="filter-input settings-agent-test-textarea" rows="6" data-chat-field="systemPrompt">${escapeHTML(String(chatState.systemPrompt || ""))}</textarea>
-            </label>
-          </div>
+      </div>
+      <div class="metric agentops-anchored-composer">
+        <div class="metric-title-row">
+          <div class="title">Anchored Composer</div>
+          <span class="${chipClassForSessionStatus(status)}">${escapeHTML(status.toUpperCase())}</span>
         </div>
-        <label class="field field-wide agent-chat-prompt-field">
-          <span class="label">Prompt</span>
-          <span class="meta">Use this for the specific request or message you want to send right now.</span>
-          <textarea id="chat-prompt" class="filter-input settings-agent-test-textarea" rows="8" data-chat-field="prompt">${escapeHTML(String(chatState.prompt || ""))}</textarea>
-        </label>
-        <div class="filter-row settings-editor-actions agent-composer-actions">
+        ${message ? `<div class="meta">${escapeHTML(message)}</div>` : ""}
+        <div class="agentops-composer-grid">
+          <label class="field field-wide">
+            <span class="label">System Instructions</span>
+            <textarea id="chat-system-prompt" class="filter-input settings-agent-test-textarea" rows="6" data-chat-field="systemPrompt">${escapeHTML(String(chatState.systemPrompt || ""))}</textarea>
+          </label>
+          <label class="field field-wide agentops-prompt-field">
+            <span class="label">Prompt</span>
+            <textarea id="chat-prompt" class="filter-input settings-agent-test-textarea" rows="8" data-chat-field="prompt">${escapeHTML(String(chatState.prompt || ""))}</textarea>
+          </label>
+        </div>
+        <div class="filter-row settings-editor-actions agentops-composer-actions">
           <div class="action-hierarchy">
             <div class="action-group action-group-primary">
               <button class="btn btn-primary" type="button" data-chat-action="${startAction}">${startLabel}</button>
               <button class="btn btn-primary" type="button" data-chat-action="send-turn" ${taskId ? "" : "disabled"}>${sendLabel}</button>
             </div>
-            <div class="action-group action-group-destructive agent-chat-clear-action">
+            <div class="action-group action-group-destructive agentops-clear-action">
               <button class="btn btn-danger" type="button" data-chat-action="reset-thread" ${taskId ? "" : "disabled"}>Clear Current Thread</button>
             </div>
           </div>
         </div>
-        <div class="agent-chat-reply-panel">
-          <div class="metric-title-row">
-            <div class="title">Latest Reply</div>
-            <span class="${chipClassForSessionStatus(latestReplyStatus)}">${escapeHTML(latestReplyStatus)}</span>
-          </div>
-          <div class="run-detail-chips">
-            <span class="chip chip-neutral chip-compact">session=${escapeHTML(latestReplySessionId || "-")}</span>
-            <span class="chip chip-neutral chip-compact">route=${escapeHTML(latestReplyRoute || "-")}</span>
-            <span class="chip chip-neutral chip-compact">boundary=${escapeHTML(latestReplyBoundary || "-")}</span>
-            <span class="chip chip-neutral chip-compact">completed=${escapeHTML(latestReplyCompletedAt ? formatTime(latestReplyCompletedAt) : "-")}</span>
-            <span class="chip chip-neutral chip-compact">finishReason=${escapeHTML(latestReplyFinishReason || "-")}</span>
-          </div>
-          ${
-            latestReplyText
-              ? `
-                <div class="chat-message chat-message-assistant agent-chat-reply-box">
-                  <div class="label">Agent</div>
-                  <div class="chat-message-text">${escapeHTML(latestReplyText)}</div>
-                </div>
-              `
-              : `<div class="meta">No agent reply yet. Start a thread and send the first prompt to populate the latest reply.</div>`
-          }
+      </div>
+      <div class="metric agentops-transcript-workspace">
+        <div class="metric-title-row">
+          <div class="title">Transcript Workspace</div>
+          <span class="${chipClassForSessionStatus(latestReplyStatus)}">${escapeHTML(latestReplyStatus)}</span>
         </div>
-      </div>
-      <div class="chat-turns-stack">
-        ${renderTurnCards(turns, catalogState, governedExportSelection)}
-      </div>
-      <details class="details-shell agent-thread-history-card" data-detail-key="agent.thread_history">
-        <summary>Thread History (${escapeHTML(String(historyCount))} visible${archivedCount ? `, ${escapeHTML(String(archivedCount))} archived` : ""})</summary>
-        <div class="agent-thread-history-body">
-          <div class="meta">${escapeHTML(historySummary)}</div>
-          <div class="run-detail-chips">
-            <span class="chip chip-neutral chip-compact">visible=${escapeHTML(String(historyCount))}</span>
-            <span class="chip chip-neutral chip-compact">archived=${escapeHTML(String(archivedCount))}</span>
-          </div>
-          <div class="filter-row settings-editor-actions">
-            <div class="action-hierarchy">
-              <div class="action-group action-group-secondary">
-                <button class="btn btn-secondary btn-small" type="button" data-chat-action="refresh-threads">Refresh Threads</button>
-                <button class="btn btn-secondary btn-small" type="button" data-chat-action="toggle-archived-threads">${history?.showArchived ? "Hide Archived" : "Show Archived"}</button>
-              </div>
+        <div class="agentops-transcript-layout">
+          <div class="agentops-transcript-main">
+            ${renderAgentTranscriptSummary({
+              latestReplyText,
+              latestReplyStatus,
+              latestReplySessionId,
+              latestReplyRoute,
+              latestReplyBoundary,
+              latestReplyCompletedAt,
+              latestReplyFinishReason,
+              latestPolicyOutcome,
+              latestActivity,
+              selectedWorker,
+              taskId,
+              threadState,
+              focusSummary,
+              executionMode,
+              historyCount,
+              catalogState
+            })}
+            <div class="chat-turns-stack agentops-transcript-feed">
+              ${renderTurnCards(turns, catalogState, governedExportSelection)}
             </div>
-          </div>
-          <div class="chat-thread-list">
-            ${renderHistoryItems(history, taskId, {
+            ${renderAgentThreadHistory(history, taskId, historyCount, archivedCount, historySummary, {
               tenantId,
               projectId,
               catalogsMessage: catalogState?.message || "",
               mode: settingsPayload?.mockMode ? "mock" : "live"
             })}
           </div>
+          <div class="agentops-context-drawer">
+            ${renderAgentApprovalContextDrawer(focusSummary, threadState, decisionPivotContext, governancePivotContext)}
+            ${renderAgentRunArtifactContext(runArtifactContext)}
+            ${renderAgentExecutionProofContext(executionProofContext)}
+            ${renderAgentArtifactEvidenceDrillInContext(artifactEvidenceDrillInContext)}
+          </div>
         </div>
-      </details>
+      </div>
     </div>
   `;
 }

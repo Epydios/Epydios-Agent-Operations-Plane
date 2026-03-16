@@ -14,7 +14,7 @@ export function renderAgentWorkspaceState(target, options = {}) {
   }
   target.innerHTML = renderPanelStateMetric(
     options.tone || "info",
-    options.title || "Agent Workspace",
+    options.title || "AgentOps",
     options.message || "",
     options.detail || ""
   );

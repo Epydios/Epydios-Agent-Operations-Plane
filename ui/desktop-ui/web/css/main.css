@@ -5,9 +5,19 @@
 @import "./domains/homeops/dashboard.css";
 @import "./domains/agentops/workspace.css";
 @import "./domains/governanceops/approval-trace.css";
+@import "./domains/governanceops/panels.css";
+@import "./domains/auditops/panels.css";
+@import "./domains/evidenceops/panels.css";
+@import "./domains/complianceops/panels.css";
+@import "./domains/incidentops/panels.css";
 @import "./domains/identityops/panels.css";
+@import "./domains/guardrailops/panels.css";
 @import "./domains/policyops/panels.css";
 @import "./domains/runtimeops/panels.css";
+@import "./domains/platformops/panels.css";
+@import "./domains/networkops/panels.css";
+@import "./domains/developerops/panels.css";
+@import "./domains/settingsops/panels.css";
 
 :root {
   color-scheme: light;
@@ -182,6 +192,9 @@ body::before {
   gap: var(--panel-gap);
   position: relative;
   overflow: hidden;
+  width: 100%;
+  min-width: 0;
+  justify-self: stretch;
   transition:
     box-shadow var(--motion-normal) ease,
     border-color var(--motion-normal) ease,
@@ -1275,6 +1288,8 @@ select.filter-input:disabled {
 .stack {
   display: grid;
   gap: var(--space-3);
+  width: 100%;
+  min-width: 0;
 }
 
 .metric,

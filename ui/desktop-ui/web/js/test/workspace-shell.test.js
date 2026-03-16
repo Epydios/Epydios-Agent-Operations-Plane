@@ -1,7 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { normalizeWorkspaceView } from "../shell/layout/workspace.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const INDEX_HTML = fs.readFileSync(
+  path.resolve(__dirname, "../../index.html"),
+  "utf8"
+);
 
 const VIEW_IDS = [
   "homeops",
@@ -37,4 +47,9 @@ test("workspace shell keeps direct *Ops tokens stable", () => {
   assert.equal(normalizeWorkspaceView("homeops", "agentops", VIEW_IDS), "homeops");
   assert.equal(normalizeWorkspaceView("runtimeops", "homeops", VIEW_IDS), "runtimeops");
   assert.equal(normalizeWorkspaceView("settingsops", "homeops", VIEW_IDS), "settingsops");
+});
+
+test("workspace shell does not leak provider inventory or diagnostics toggle into SettingsOps", () => {
+  assert.doesNotMatch(INDEX_HTML, /Provider Contract Inventory/);
+  assert.doesNotMatch(INDEX_HTML, /id="settings-advanced-toggle"/);
 });

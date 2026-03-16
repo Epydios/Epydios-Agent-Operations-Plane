@@ -1,58 +1,141 @@
-import { escapeHTML } from "../../../views/common.js";
-import { summarizeHomeOpsTriage } from "../state.js";
+import { chipClassForStatus, escapeHTML } from "../../../views/common.js";
 
-export function renderHomeOpsTriage(target, snapshot) {
-  if (!(target instanceof HTMLElement)) {
-    return;
-  }
-  const triage = summarizeHomeOpsTriage(snapshot);
-  const approvalTone =
-    triage.pendingApprovals > 0 ? "chip chip-danger chip-compact" : "chip chip-ok chip-compact";
-  const runsTone =
-    triage.attentionRuns > 0 ? "chip chip-danger chip-compact" : "chip chip-ok chip-compact";
-  const auditTone =
-    triage.denyAuditEvents > 0 ? "chip chip-warn chip-compact" : "chip chip-ok chip-compact";
-  const terminalIssueCount = triage.terminalPolicyBlocked + triage.terminalFailed;
-  const terminalTone =
-    terminalIssueCount > 0 ? "chip chip-warn chip-compact" : "chip chip-ok chip-compact";
-
-  target.innerHTML = `
-    <article class="triage-card">
-      <div class="title">Pending Approvals</div>
-      <div class="triage-value">${escapeHTML(String(triage.pendingApprovals))}</div>
-      <div class="meta"><span class="${approvalTone}">expiring <=5m: ${escapeHTML(String(triage.expiringSoonApprovals))}</span></div>
-      <div class="triage-actions">
-        <button class="btn btn-secondary btn-small" type="button" data-triage-action="open-approvals-pending">Open Approval Queue</button>
+function renderCommandCard(card = {}) {
+  return `
+    <article class="metric homeops-command-card" data-homeops-card="${escapeHTML(card.id || "homeops")}">
+      <div class="title">${escapeHTML(card.title || "HomeOps")}</div>
+      <div class="meta">
+        <span class="${chipClassForStatus(card.tone || "unknown")} chip-compact">${escapeHTML(
+          String(card.tone || "unknown")
+        )}</span>
       </div>
-    </article>
-    <article class="triage-card">
-      <div class="title">Runs Requiring Attention</div>
-      <div class="triage-value">${escapeHTML(String(triage.attentionRuns))}</div>
-      <div class="meta"><span class="${runsTone}">latest=${escapeHTML(triage.latestAttentionRunId || "-")}</span></div>
-      <div class="triage-actions">
+      <div class="homeops-command-value">${escapeHTML(card.value || "-")}</div>
+      <div class="meta">${escapeHTML(card.summary || "-")}</div>
+      <div class="meta">${escapeHTML(card.meta || "-")}</div>
+      <div class="homeops-actions">
         <button
           class="btn btn-secondary btn-small"
           type="button"
-          data-triage-action="open-runs-attention"
-          data-triage-run-id="${escapeHTML(triage.latestAttentionRunId || "")}"
-        >Open Run List</button>
+          data-homeops-action="${escapeHTML(card.action || "open-domain")}"
+          ${card.view ? `data-homeops-view="${escapeHTML(card.view)}"` : ""}
+        >${escapeHTML(card.actionLabel || "Open")}</button>
       </div>
     </article>
-    <article class="triage-card">
-      <div class="title">Audit Denies</div>
-      <div class="triage-value">${escapeHTML(String(triage.denyAuditEvents))}</div>
-      <div class="meta"><span class="${auditTone}">current audit scope</span></div>
-      <div class="triage-actions">
-        <button class="btn btn-secondary btn-small" type="button" data-triage-action="open-audit-deny">Filter Deny Events</button>
+  `;
+}
+
+function renderAttentionItem(item = {}) {
+  return `
+    <article class="metric homeops-attention-card">
+      <div class="title">${escapeHTML(item.title || "Attention")}</div>
+      <div class="meta">
+        <span class="${chipClassForStatus(item.tone || "unknown")} chip-compact">${escapeHTML(
+          String(item.tone || "unknown")
+        )}</span>
+      </div>
+      <div class="homeops-attention-value">${escapeHTML(item.value || "0")}</div>
+      <div class="meta">${escapeHTML(item.detail || "-")}</div>
+      <div class="homeops-actions">
+        <button
+          class="btn btn-secondary btn-small"
+          type="button"
+          data-homeops-action="${escapeHTML(item.action || "open-domain")}"
+          ${item.view ? `data-homeops-view="${escapeHTML(item.view)}"` : ""}
+          ${item.runId ? `data-homeops-run-id="${escapeHTML(item.runId)}"` : ""}
+        >${escapeHTML(item.actionLabel || "Open")}</button>
       </div>
     </article>
-    <article class="triage-card">
-      <div class="title">Terminal Issues</div>
-      <div class="triage-value">${escapeHTML(String(terminalIssueCount))}</div>
-      <div class="meta"><span class="${terminalTone}">policy_blocked=${escapeHTML(String(triage.terminalPolicyBlocked))}; failed=${escapeHTML(String(triage.terminalFailed))}</span></div>
-      <div class="triage-actions">
-        <button class="btn btn-secondary btn-small" type="button" data-triage-action="open-terminal-issues">Open Terminal History</button>
+  `;
+}
+
+function renderSnapshotCard(item = {}) {
+  return `
+    <article class="metric homeops-summary-card" data-homeops-card="${escapeHTML(item.id || "identity-snapshot")}">
+      <div class="title">${escapeHTML(item.title || "Snapshot")}</div>
+      <div class="meta">
+        <span class="${chipClassForStatus(item.tone || "unknown")} chip-compact">${escapeHTML(
+          String(item.tone || "unknown")
+        )}</span>
       </div>
+      <div class="homeops-summary-value">${escapeHTML(item.value || "-")}</div>
+      <div class="meta">${escapeHTML(item.summary || "-")}</div>
+      <div class="meta">${escapeHTML(item.meta || "-")}</div>
     </article>
+  `;
+}
+
+function renderDomainPivot(pivot = {}) {
+  return `
+    <button
+      class="homeops-pivot-button"
+      type="button"
+      data-homeops-action="open-domain"
+      data-homeops-view="${escapeHTML(pivot.view || "homeops")}"
+    >
+      <span class="homeops-pivot-label">${escapeHTML(pivot.label || "HomeOps")}</span>
+      <span class="homeops-pivot-summary">${escapeHTML(pivot.summary || "-")}</span>
+    </button>
+  `;
+}
+
+export function renderHomeWorkspace(snapshot = {}) {
+  const commandCards = Array.isArray(snapshot?.commandDashboard?.cards)
+    ? snapshot.commandDashboard.cards
+    : [];
+  const identityCards = Array.isArray(snapshot?.identityAndScope?.cards)
+    ? snapshot.identityAndScope.cards
+    : [];
+  const attentionItems = Array.isArray(snapshot?.attentionQueue?.items)
+    ? snapshot.attentionQueue.items
+    : [];
+  const pivots = Array.isArray(snapshot?.domainPivots?.items) ? snapshot.domainPivots.items : [];
+
+  return `
+    <div class="homeops-workspace" data-domain-root="homeops">
+      <section class="homeops-board">
+        <div class="homeops-board-header">
+          <h3>Command Dashboard</h3>
+          <p class="homeops-board-lead">Bounded current-state posture across the owning domains.</p>
+        </div>
+        <div class="homeops-command-grid">
+          ${commandCards.map((card) => renderCommandCard(card)).join("")}
+        </div>
+      </section>
+      <section class="homeops-board">
+        <div class="homeops-board-header">
+          <h3>Attention Queue</h3>
+          <p class="homeops-board-lead">Next actions that should route into the owning domain surfaces.</p>
+        </div>
+        <div class="homeops-attention-grid">
+          ${attentionItems.map((item) => renderAttentionItem(item)).join("")}
+        </div>
+      </section>
+      <section class="homeops-board">
+        <div class="homeops-board-header">
+          <h3>Identity And Scope Snapshot</h3>
+          <p class="homeops-board-lead">Current acting identity, authority basis, and scope.</p>
+        </div>
+        <div class="homeops-summary-grid">
+          ${identityCards.map((item) => renderSnapshotCard(item)).join("")}
+        </div>
+        <div class="homeops-actions">
+          <button
+            class="btn btn-secondary btn-small"
+            type="button"
+            data-homeops-action="open-domain"
+            data-homeops-view="${escapeHTML(snapshot?.identityAndScope?.view || "identityops")}"
+          >${escapeHTML(snapshot?.identityAndScope?.actionLabel || "Open IdentityOps")}</button>
+        </div>
+      </section>
+      <section class="homeops-board">
+        <div class="homeops-board-header">
+          <h3>Domain Pivot Row</h3>
+          <p class="homeops-board-lead">Fast pivots into the already-built workspaces.</p>
+        </div>
+        <div class="homeops-pivot-grid">
+          ${pivots.map((pivot) => renderDomainPivot(pivot)).join("")}
+        </div>
+      </section>
+    </div>
   `;
 }

@@ -70,23 +70,51 @@ test("chat view renders parity fixture state from the native contract", async ()
     }
   );
 
-  assert.match(ui.chatContent.innerHTML, /Agent Workspace/);
-  assert.match(ui.chatContent.innerHTML, /Managed Codex Worker/);
-  assert.match(ui.chatContent.innerHTML, /Investigate checkout timeouts/);
-  assert.match(ui.chatContent.innerHTML, /Tool proposal generated for shell execution\./);
-  assert.match(ui.chatContent.innerHTML, /approval-1/);
-  assert.match(ui.chatContent.innerHTML, /proposal-1/);
-  assert.match(ui.chatContent.innerHTML, /Pending Decisions/);
-  assert.match(ui.chatContent.innerHTML, /Approve Proposal/);
-  assert.match(ui.chatContent.innerHTML, /Thread Overview/);
-  assert.match(ui.chatContent.innerHTML, /Agent Chat/);
-  assert.match(ui.chatContent.innerHTML, /Latest Reply/);
-  assert.match(ui.chatContent.innerHTML, /Resolve pending decisions first/);
-  assert.match(ui.chatContent.innerHTML, /Enterprise Governance Report/);
-  assert.match(ui.chatContent.innerHTML, /Copy Report/);
-  assert.match(ui.chatContent.innerHTML, /enterprise-default: Enterprise Default/);
-  assert.doesNotMatch(ui.chatContent.innerHTML, /Launch Worker/);
-  assert.doesNotMatch(ui.chatContent.innerHTML, /Refresh Reply/);
+  const html = ui.chatContent.innerHTML;
+
+  assert.match(html, /AgentOps/);
+  assert.match(html, /Managed Codex Worker/);
+  assert.match(html, /Investigate checkout timeouts/);
+  assert.match(html, /Tool proposal generated for shell execution\./);
+  assert.match(html, /approval-1/);
+  assert.match(html, /proposal-1/);
+  assert.match(html, /Pending Decisions/);
+  assert.match(html, /Approve Proposal/);
+  assert.match(html, /Thread Header/);
+  assert.match(html, /Transcript Workspace/);
+  assert.match(html, /Anchored Composer/);
+  assert.match(html, /Thread Title/);
+  assert.match(html, /Agent Profile/);
+  assert.match(html, /Execution Path/);
+  assert.match(html, /Thread Intent/);
+  assert.match(html, /Approval Context Drawer/);
+  assert.match(html, /Pinned Approval Review/);
+  assert.match(html, /Pin Approval Checkpoints/);
+  assert.match(html, /Pin Tool Proposals/);
+  assert.match(html, /Pin Governance Receipt/);
+  assert.match(html, /Pin Decision History/);
+  assert.match(html, /Run And Artifact Context/);
+  assert.match(html, /Execution Proof/);
+  assert.match(html, /Artifact And Evidence Drill-In/);
+  assert.match(html, /Pin Latest Tool Action/);
+  assert.match(html, /Pin Latest Evidence/);
+  assert.match(html, /Pin Managed Transcript/);
+  assert.match(html, /Latest Tool Action Drill-In/);
+  assert.match(html, /Latest Evidence Drill-In/);
+  assert.match(html, /Managed Transcript Anchor/);
+  assert.match(html, /Latest Tool Action/);
+  assert.match(html, /Latest Evidence/);
+  assert.match(html, /Latest Event/);
+  assert.match(html, /Latest Reply/);
+  assert.match(html, /Resolve pending decisions first/);
+  assert.match(html, /Enterprise Governance Report/);
+  assert.match(html, /Copy Report/);
+  assert.match(html, /enterprise-default: Enterprise Default/);
+  assert.ok(html.indexOf("Thread Header") < html.indexOf("Anchored Composer"));
+  assert.ok(html.indexOf("Anchored Composer") < html.indexOf("Transcript Workspace"));
+  assert.doesNotMatch(html, /Thread Overview/);
+  assert.doesNotMatch(html, /Launch Worker/);
+  assert.doesNotMatch(html, /Refresh Reply/);
 });
 
 test("chat view surfaces governed action proposals and linked run detail from the same thread", () => {
@@ -243,6 +271,21 @@ test("chat view surfaces governed action proposals and linked run detail from th
   assert.match(ui.chatContent.innerHTML, /grant\.trading\.supervisor/);
   assert.match(ui.chatContent.innerHTML, /aimxs-full/);
   assert.match(ui.chatContent.innerHTML, /Open Run Detail/);
+  assert.match(ui.chatContent.innerHTML, /Run And Artifact Context/);
+  assert.match(ui.chatContent.innerHTML, /Execution Proof/);
+  assert.match(ui.chatContent.innerHTML, /Artifact And Evidence Drill-In/);
+  assert.match(ui.chatContent.innerHTML, /Open Active Run/);
+  assert.match(ui.chatContent.innerHTML, /Pin Tool Proposals/);
+  assert.match(ui.chatContent.innerHTML, /Pin Governance Receipt/);
+  assert.match(ui.chatContent.innerHTML, /Pin Decision History/);
+  assert.doesNotMatch(ui.chatContent.innerHTML, /Pin Approval Checkpoints/);
+  assert.match(ui.chatContent.innerHTML, /Pin Latest Tool Action/);
+  assert.match(ui.chatContent.innerHTML, /Latest Tool Action Drill-In/);
+  assert.match(ui.chatContent.innerHTML, /session=session-governed-chat-1/);
+  assert.match(ui.chatContent.innerHTML, /run=run-governed-chat-1/);
+  assert.match(ui.chatContent.innerHTML, /Latest Tool Action/);
+  assert.match(ui.chatContent.innerHTML, /Latest Event/);
+  assert.match(ui.chatContent.innerHTML, /tool_proposal\.decided/);
   assert.match(ui.chatContent.innerHTML, /Governed Run Result/);
   assert.match(ui.chatContent.innerHTML, /Latest Policy Outcome/);
   assert.match(ui.chatContent.innerHTML, /operatorGate=policy-first/);
@@ -456,9 +499,8 @@ test("chat composer explains system instructions versus the turn prompt", () => 
   );
 
   assert.match(ui.chatContent.innerHTML, /System Instructions/);
-  assert.match(ui.chatContent.innerHTML, /durable guidance/i);
   assert.match(ui.chatContent.innerHTML, /Prompt/);
-  assert.match(ui.chatContent.innerHTML, /specific request/i);
+  assert.match(ui.chatContent.innerHTML, /Anchored Composer/);
 });
 
 test("latest policy outcome only reflects the newest turn", () => {

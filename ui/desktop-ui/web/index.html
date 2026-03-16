@@ -77,17 +77,31 @@
       <main id="workspace-layout" class="layout" data-shell-layout data-workspace-view="homeops">
       <section class="panel panel-dashboard" data-workspace-section="homeops">
         <div class="panel-header">
-          <h2>Dashboard</h2>
+          <div class="panel-heading">
+            <h2>HomeOps</h2>
+            <p class="panel-lead">Summary-first command center for the current operating posture and next actions.</p>
+          </div>
           <button id="refresh-button" class="btn btn-secondary">Refresh</button>
         </div>
-        <div class="dashboard-top-grid">
-          <article id="home-dashboard-auth" class="metric dashboard-auth-card"></article>
-          <div id="health-content" class="dashboard-health-grid"></div>
-        </div>
-        <div id="triage-content" class="triage-grid dashboard-triage-grid"></div>
+        <div id="homeops-content" class="stack"></div>
       </section>
 
-      <section class="panel panel-context" data-workspace-section="developerops">
+      <section class="panel panel-developerops" data-workspace-section="developerops">
+        <div class="panel-header">
+          <div class="panel-heading">
+            <h2>DeveloperOps</h2>
+            <p class="panel-lead">Internal-only diagnostics, payload inspection, and contract debugging for advanced users.</p>
+          </div>
+          <button
+            class="btn btn-secondary btn-small"
+            type="button"
+            data-advanced-toggle-section="operations"
+          >Show advanced details</button>
+        </div>
+        <div id="developerops-content" class="stack"></div>
+      </section>
+
+      <section class="panel panel-context" data-workspace-section="developerops" data-advanced-section="operations">
         <div class="panel-header">
           <h2 class="heading-inline">
             Workspace Context
@@ -98,12 +112,6 @@
               aria-label="Workspace context help"
             >?</button>
           </h2>
-          <button
-            id="operations-advanced-toggle"
-            class="btn btn-secondary btn-small"
-            type="button"
-            data-advanced-toggle-section="operations"
-          >Show advanced details</button>
         </div>
         <div class="context-grid">
           <label class="field">
@@ -137,107 +145,83 @@
         <div id="identity-content" class="stack"></div>
       </section>
 
-      <section class="panel panel-ops-placeholder" data-workspace-section="platformops" data-domain-root="platformops">
+      <section class="panel panel-platformops" data-workspace-section="platformops">
         <div class="panel-header">
           <div class="panel-heading">
             <h2>PlatformOps</h2>
           </div>
         </div>
-        <article class="metric ops-placeholder-card">
-          <div class="title">Structure Ready</div>
-          <div class="meta">PlatformOps will own environment, provider, bridge, and release posture.</div>
-        </article>
+        <div id="platformops-content" class="stack"></div>
       </section>
 
-      <section class="panel panel-ops-placeholder" data-workspace-section="networkops" data-domain-root="networkops">
+      <section class="panel panel-networkops" data-workspace-section="networkops">
         <div class="panel-header">
           <div class="panel-heading">
             <h2>NetworkOps</h2>
           </div>
         </div>
-        <article class="metric ops-placeholder-card">
-          <div class="title">Structure Ready</div>
-          <div class="meta">NetworkOps will own boundary path, trust, routing, and enterprise connectivity posture.</div>
-        </article>
+        <div id="networkops-content" class="stack"></div>
       </section>
 
-      <section class="panel panel-ops-placeholder" data-workspace-section="policyops" data-domain-root="policyops">
+      <section class="panel panel-policyops" data-workspace-section="policyops">
         <div class="panel-header">
           <div class="panel-heading">
             <h2>PolicyOps</h2>
           </div>
         </div>
-        <article class="metric ops-placeholder-card">
-          <div class="title">Structure Ready</div>
-          <div class="meta">PolicyOps will own decision semantics, pack posture, and provider contract meaning.</div>
-        </article>
+        <div id="policyops-content" class="stack"></div>
       </section>
 
-      <section class="panel panel-ops-placeholder" data-workspace-section="guardrailops" data-domain-root="guardrailops">
+      <section class="panel panel-guardrailops" data-workspace-section="guardrailops">
         <div class="panel-header">
           <div class="panel-heading">
             <h2>GuardrailOps</h2>
           </div>
         </div>
-        <article class="metric ops-placeholder-card">
-          <div class="title">Structure Ready</div>
-          <div class="meta">GuardrailOps will own non-bypassable execution constraints, kills, and containment posture.</div>
-        </article>
+        <div id="guardrailops-content" class="stack"></div>
       </section>
 
-      <section class="panel panel-ops-placeholder" data-workspace-section="governanceops" data-domain-root="governanceops">
+      <section class="panel panel-governanceops" data-workspace-section="governanceops">
         <div class="panel-header">
           <div class="panel-heading">
             <h2>GovernanceOps</h2>
           </div>
         </div>
-        <article class="metric ops-placeholder-card">
-          <div class="title">Structure Ready</div>
-          <div class="meta">GovernanceOps will own approvals, escalation, receipts, and exception workflow.</div>
-        </article>
+        <div id="governanceops-content" class="stack"></div>
       </section>
 
-      <section class="panel panel-ops-placeholder" data-workspace-section="complianceops" data-domain-root="complianceops">
+      <section class="panel panel-complianceops" data-workspace-section="complianceops">
         <div class="panel-header">
           <div class="panel-heading">
             <h2>ComplianceOps</h2>
           </div>
         </div>
-        <article class="metric ops-placeholder-card">
-          <div class="title">Structure Ready</div>
-          <div class="meta">ComplianceOps will own controls, attestations, retention, and coverage posture.</div>
-        </article>
+        <div id="complianceops-content" class="stack"></div>
       </section>
 
-      <section class="panel panel-ops-placeholder" data-workspace-section="auditops" data-domain-root="auditops">
+      <section class="panel panel-auditops" data-workspace-section="auditops">
         <div class="panel-header">
           <div class="panel-heading">
             <h2>AuditOps</h2>
           </div>
         </div>
-        <article class="metric ops-placeholder-card">
-          <div class="title">Structure Ready</div>
-          <div class="meta">AuditOps will own accountability records, investigation pivots, and export posture.</div>
-        </article>
+        <div id="auditops-content" class="stack"></div>
       </section>
 
-      <section class="panel panel-ops-placeholder" data-workspace-section="evidenceops" data-domain-root="evidenceops">
+      <section class="panel panel-evidenceops" data-workspace-section="evidenceops">
         <div class="panel-header">
           <div class="panel-heading">
             <h2>EvidenceOps</h2>
           </div>
         </div>
-        <article class="metric ops-placeholder-card">
-          <div class="title">Structure Ready</div>
-          <div class="meta">EvidenceOps will own bundles, artifacts, provenance, and proof packaging.</div>
-        </article>
+        <div id="evidenceops-content" class="stack"></div>
       </section>
 
       <section class="panel panel-settings" data-workspace-section="settingsops">
         <div class="panel-header">
           <div class="panel-heading">
-            <h2>Settings Control Plane</h2>
-            <p class="panel-lead">Manage routing defaults, provider contracts, storage, and diagnostics before changing runtime behavior.</p>
+            <h2>SettingsOps</h2>
+            <p class="panel-lead">Configure local desktop preferences, secure refs, and environment bindings without pulling other domains back into settings.</p>
           </div>
           <div class="filter-row">
             <select id="settings-agent-profile" class="filter-input"></select>
@@ -246,28 +230,13 @@
               <option value="light">theme:light</option>
               <option value="dark">theme:dark</option>
             </select>
-            <button
-              id="settings-advanced-toggle"
-              class="btn btn-secondary btn-small"
-              type="button"
-              data-advanced-toggle-section="settings"
-            >Show advanced details</button>
             <button id="settings-open-audit-events-button" class="btn btn-secondary" type="button">Open Audit Events</button>
           </div>
-        </div>
-        <div class="metric workflow-guide">
-          <div class="title">Settings Workflow</div>
-          <div class="meta">Use this workspace to change configuration deliberately and verify the resulting control-plane state.</div>
-          <ol class="workflow-guide-list">
-            <li>Select the active agent profile, then open the relevant settings subpanel.</li>
-            <li>Review configuration and diagnostics before applying a change.</li>
-            <li>Use Open Audit Events after changes to confirm the recorded control-plane trail.</li>
-          </ol>
         </div>
         <div id="settings-content" class="stack"></div>
       </section>
 
-      <section class="panel panel-governed-action panel-run-builder" data-workspace-section="developerops">
+      <section class="panel panel-governed-action panel-run-builder" data-workspace-section="developerops" data-advanced-section="operations">
         <div class="panel-header">
           <div class="panel-heading">
             <h2>Governed Action Request</h2>
@@ -412,7 +381,7 @@
         <pre id="governed-action-payload" class="monospace"></pre>
       </section>
 
-      <section class="panel panel-run-builder" data-workspace-section="developerops">
+      <section class="panel panel-run-builder" data-workspace-section="developerops" data-advanced-section="operations">
         <div class="panel-header">
           <h2 class="heading-inline">
             Run Builder
@@ -570,14 +539,6 @@
         <pre id="terminal-payload" class="monospace"></pre>
       </section>
 
-      <section class="panel panel-providers" data-workspace-section="settingsops">
-        <div class="panel-heading">
-          <h2>Provider Contract Inventory</h2>
-          <p class="panel-lead">Review registered extension providers, versions, endpoints, and capability coverage for the active scope.</p>
-        </div>
-        <div id="providers-content" class="stack"></div>
-      </section>
-
       <section class="panel panel-approvals agent-approvals-support" data-workspace-section="agentops" data-domain-root="governanceops-embedded">
         <div class="panel-header">
           <div class="panel-heading">
@@ -670,131 +631,97 @@
       <section class="panel panel-runs" data-workspace-section="runtimeops">
         <div class="panel-header">
           <div class="panel-heading">
-            <h2>History</h2>
-            <p class="panel-lead">Review past runs, evidence, and export-ready records without cluttering the active Agent workspace.</p>
+            <h2>RuntimeOps</h2>
+            <p class="panel-lead">Inspect live runtime posture first, then review the current governed run inventory without mixing in platform release surfaces.</p>
           </div>
-          <details class="details-shell history-filters-card" data-detail-key="history.filters">
-            <summary>History Filters and Scope</summary>
-            <div class="filter-row filter-row-data filter-row-runs">
-              <div class="filter-group filter-group-scope">
-                <span class="filter-group-label">Scope</span>
-                <input id="runs-runid-filter" class="filter-input filter-input-wide" type="text" placeholder="runId filter" />
-                <input id="runs-tenant-filter" class="filter-input" type="text" placeholder="tenant filter" />
-                <input id="runs-project-filter" class="filter-input" type="text" placeholder="project filter" />
-                <select id="runs-status-filter" class="filter-input">
-                  <option value="">status:any</option>
-                  <option value="COMPLETED">status:completed</option>
-                  <option value="FAILED">status:failed</option>
-                  <option value="POLICY_BLOCKED">status:policy_blocked</option>
-                  <option value="POLICY_EVALUATED">status:policy_evaluated</option>
-                  <option value="DESKTOP_VERIFIED">status:desktop_verified</option>
-                </select>
-                <select id="runs-decision-filter" class="filter-input">
-                  <option value="">decision:any</option>
-                  <option value="ALLOW">decision:allow</option>
-                  <option value="DENY">decision:deny</option>
-                </select>
+        </div>
+        <div id="runtimeops-content" class="stack"></div>
+        <details class="details-shell history-filters-card" data-detail-key="history.filters">
+          <summary>Run Inventory Filters and Scope</summary>
+          <div class="filter-row filter-row-data filter-row-runs">
+            <div class="filter-group filter-group-scope">
+              <span class="filter-group-label">Scope</span>
+              <input id="runs-runid-filter" class="filter-input filter-input-wide" type="text" placeholder="runId filter" />
+              <input id="runs-tenant-filter" class="filter-input" type="text" placeholder="tenant filter" />
+              <input id="runs-project-filter" class="filter-input" type="text" placeholder="project filter" />
+              <select id="runs-status-filter" class="filter-input">
+                <option value="">status:any</option>
+                <option value="COMPLETED">status:completed</option>
+                <option value="FAILED">status:failed</option>
+                <option value="POLICY_BLOCKED">status:policy_blocked</option>
+                <option value="POLICY_EVALUATED">status:policy_evaluated</option>
+                <option value="DESKTOP_VERIFIED">status:desktop_verified</option>
+              </select>
+              <select id="runs-decision-filter" class="filter-input">
+                <option value="">decision:any</option>
+                <option value="ALLOW">decision:allow</option>
+                <option value="DENY">decision:deny</option>
+              </select>
+            </div>
+            <div class="filter-group filter-group-time">
+              <span class="filter-group-label">Time + Order</span>
+              <select id="runs-time-range" class="filter-input">
+                <option value="">time:any</option>
+                <option value="1h">time:last-1h</option>
+                <option value="24h">time:last-24h</option>
+                <option value="7d">time:last-7d</option>
+                <option value="30d">time:last-30d</option>
+                <option value="custom">time:custom</option>
+              </select>
+              <select id="runs-sort" class="filter-input">
+                <option value="updated_desc">sort:updated-newest</option>
+                <option value="updated_asc">sort:updated-oldest</option>
+                <option value="created_desc">sort:created-newest</option>
+                <option value="status">sort:status</option>
+              </select>
+              <div class="filter-custom-time-range" data-time-filter-fields="runs" hidden aria-hidden="true">
+                <input id="runs-time-from" class="filter-input" type="datetime-local" aria-label="runs from time" />
+                <input id="runs-time-to" class="filter-input" type="datetime-local" aria-label="runs to time" />
               </div>
-              <div class="filter-group filter-group-time">
-                <span class="filter-group-label">Time + Order</span>
-                <select id="runs-time-range" class="filter-input">
-                  <option value="">time:any</option>
-                  <option value="1h">time:last-1h</option>
-                  <option value="24h">time:last-24h</option>
-                  <option value="7d">time:last-7d</option>
-                  <option value="30d">time:last-30d</option>
-                  <option value="custom">time:custom</option>
-                </select>
-                <select id="runs-sort" class="filter-input">
-                  <option value="updated_desc">sort:updated-newest</option>
-                  <option value="updated_asc">sort:updated-oldest</option>
-                  <option value="created_desc">sort:created-newest</option>
-                  <option value="status">sort:status</option>
-                </select>
-                <div class="filter-custom-time-range" data-time-filter-fields="runs" hidden aria-hidden="true">
-                  <input id="runs-time-from" class="filter-input" type="datetime-local" aria-label="runs from time" />
-                  <input id="runs-time-to" class="filter-input" type="datetime-local" aria-label="runs to time" />
+            </div>
+            <div class="filter-group filter-group-page">
+              <span class="filter-group-label">Pagination</span>
+              <input id="runs-limit-filter" class="filter-input filter-input-small" type="number" min="1" max="500" value="25" data-advanced-section="runs" />
+              <select id="runs-page-size" class="filter-input">
+                <option value="10">page:10</option>
+                <option value="25" selected>page:25</option>
+                <option value="50">page:50</option>
+                <option value="100">page:100</option>
+              </select>
+              <input id="runs-page" class="filter-input filter-input-small" type="number" min="1" value="1" />
+            </div>
+            <div class="filter-group filter-group-actions">
+              <span class="filter-group-label">Actions</span>
+              <div class="action-hierarchy">
+                <div class="action-group action-group-secondary">
+                  <button
+                    id="runs-advanced-toggle"
+                    class="btn btn-secondary btn-small"
+                    type="button"
+                    data-advanced-toggle-section="runs"
+                  >Show advanced details</button>
                 </div>
-              </div>
-              <div class="filter-group filter-group-page">
-                <span class="filter-group-label">Pagination</span>
-                <input id="runs-limit-filter" class="filter-input filter-input-small" type="number" min="1" max="500" value="25" data-advanced-section="runs" />
-                <select id="runs-page-size" class="filter-input">
-                  <option value="10">page:10</option>
-                  <option value="25" selected>page:25</option>
-                  <option value="50">page:50</option>
-                  <option value="100">page:100</option>
-                </select>
-                <input id="runs-page" class="filter-input filter-input-small" type="number" min="1" value="1" />
-              </div>
-              <div class="filter-group filter-group-actions">
-                <span class="filter-group-label">Actions</span>
-                <div class="action-hierarchy">
-                  <div class="action-group action-group-secondary">
-                    <button
-                      id="runs-advanced-toggle"
-                      class="btn btn-secondary btn-small"
-                      type="button"
-                      data-advanced-toggle-section="runs"
-                    >Show advanced details</button>
-                  </div>
-                  <div class="action-group action-group-primary">
-                    <button id="runs-apply-button" class="btn btn-primary">Apply</button>
-                  </div>
+                <div class="action-group action-group-primary">
+                  <button id="runs-apply-button" class="btn btn-primary">Apply</button>
                 </div>
               </div>
             </div>
-          </details>
-        </div>
-        <div class="metric workflow-guide">
-          <div class="title">History Workflow</div>
-          <div class="meta">Use this tab for past activity, evidence drill-in, JSON review, and folder guidance. Current approvals stay in Agent.</div>
-          <ol class="workflow-guide-list">
-            <li>Apply scope, status, and time filters to narrow the run set.</li>
-            <li>Select a run row and review summary, evidence, and raw JSON in that order.</li>
-            <li>Use the artifact access section in run detail to copy repo and non-repo storage roots plus the current run date bucket.</li>
-            <li>Use Incidents for packaging and handoff after you finish the evidence review.</li>
-          </ol>
-        </div>
-        <div class="guide-card-grid">
-          <article class="metric guide-card">
-            <div class="title">Artifact Organization</div>
-            <div class="meta">Use History to keep run evidence predictable. The working convention is date bucket first, then the specific run or incident package under that day.</div>
-            <ul class="quickstart-list">
-              <li>Put run-specific notes and screenshots under <code>history/YYYYMMDD/run-id/</code>.</li>
-              <li>Keep manual comparison captures in the readiness area when they are not specific to one runtime record.</li>
-              <li>Use the run detail Artifact Access section to copy the exact roots and suggested folders before leaving this tab.</li>
-            </ul>
-          </article>
-          <article class="metric guide-card">
-            <div class="title">Folder Convention</div>
-            <div class="guide-path-stack">
-              <div class="guide-path-line">
-                <span class="label">Run folder</span>
-                <code>EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/history/YYYYMMDD/run-id/</code>
-                <button class="btn btn-secondary btn-small" type="button" data-copy-text="EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/history/YYYYMMDD/run-id/" data-copy-feedback-target="history-folder-feedback">Copy Pattern</button>
-              </div>
-              <div class="guide-path-line">
-                <span class="label">Run screenshots</span>
-                <code>EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/history/YYYYMMDD/run-id/screenshots/</code>
-                <button class="btn btn-secondary btn-small" type="button" data-copy-text="EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/history/YYYYMMDD/run-id/screenshots/" data-copy-feedback-target="history-folder-feedback">Copy Pattern</button>
-              </div>
-              <div class="guide-path-line">
-                <span class="label">Incident package folder</span>
-                <code>EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/incidents/YYYYMMDD/run-id/</code>
-                <button class="btn btn-secondary btn-small" type="button" data-copy-text="EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/incidents/YYYYMMDD/run-id/" data-copy-feedback-target="history-folder-feedback">Copy Pattern</button>
-              </div>
-            </div>
-            <div id="history-folder-feedback" class="meta">Copy a pattern here when you need a quick folder template before selecting a specific run.</div>
-          </article>
-        </div>
+          </div>
+        </details>
         <div class="history-review-layout">
           <div id="runs-content" class="stack history-runs-list"></div>
           <div id="run-detail-content" class="stack history-run-detail"></div>
         </div>
       </section>
 
-      <section class="panel panel-audit" data-workspace-section="incidentops">
+      <section class="panel panel-audit panel-incidentops" data-workspace-section="incidentops">
+        <div class="panel-header">
+          <div class="panel-heading">
+            <h2>IncidentOps</h2>
+          </div>
+        </div>
+        <div id="incidentops-content" class="stack"></div>
+        <div data-legacy-incident-shell hidden aria-hidden="true">
         <div class="panel-header">
           <div class="panel-heading">
             <h2>Incident Coordination</h2>
@@ -994,6 +921,7 @@
           <pre id="audit-handoff-preview" class="monospace audit-handoff-preview" data-advanced-section="incidents">Audit or incident handoff preview appears here after a copy action.</pre>
           <div id="audit-content" class="stack"></div>
         </section>
+        </div>
       </section>
       </main>
     </div>

@@ -1,0 +1,156 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { renderSettingsOpsPage } from "../domains/settingsops/routes.js";
+
+test("settingsops renders bounded preferences, secure refs, environment, integration, and recovery boards", () => {
+  const ui = { settingsContent: { innerHTML: "" } };
+
+  renderSettingsOpsPage(ui, {
+    session: {
+      claims: {
+        tenant_id: "tenant-local",
+        project_id: "project-local"
+      }
+    },
+    settings: {
+      summary: {
+        tenantId: "tenant-local",
+        projectId: "project-local",
+        environmentId: "local"
+      },
+      integrations: {
+        modelRouting: "gateway_first",
+        gatewayProviderId: "litellm",
+        allowDirectProviderFallback: false,
+        selectedAgentProfileId: "openai",
+        gatewayTokenRef: "ref://projects/{projectId}/gateways/litellm/bearer-token",
+        agentProfiles: [
+          {
+            id: "openai",
+            label: "OpenAI",
+            provider: "openai_responses",
+            transport: "responses_api",
+            model: "gpt-5"
+          }
+        ]
+      },
+      endpoints: [
+        {
+          id: "integrationSettings",
+          state: "ready",
+          detail: "Runtime endpoint is reachable."
+        }
+      ],
+      theme: {
+        mode: "system"
+      },
+      realtime: {
+        mode: "polling",
+        pollIntervalMs: 5000
+      },
+      terminal: {
+        mode: "governed_exec",
+        restrictedHostMode: "enforced"
+      },
+      localSecureRefs: {
+        available: true,
+        service: "epydios.agentops.desktop.local-ref.v1",
+        indexPath: "/tmp/local-ref-vault/index.json",
+        exportPath: "/tmp/local-ref-vault/runtime-ref-values.generated.json",
+        storedCount: 2,
+        entries: [
+          {
+            ref: "ref://projects/{projectId}/providers/openai/api-key",
+            present: true,
+            updatedAt: "2026-03-09T12:00:00Z"
+          }
+        ]
+      },
+      aimxs: {
+        mode: "aimxs-full",
+        state: "active",
+        endpointRef: "ref://projects/{projectId}/providers/aimxs/https-endpoint",
+        bearerTokenRef: "ref://projects/{projectId}/providers/aimxs/bearer-token",
+        clientTlsCertRef: "ref://projects/{projectId}/providers/aimxs/client-tls-cert",
+        clientTlsKeyRef: "ref://projects/{projectId}/providers/aimxs/client-tls-key",
+        caCertRef: "ref://projects/{projectId}/providers/aimxs/provider-ca",
+        activation: {
+          available: true,
+          state: "active",
+          activeMode: "aimxs-full",
+          namespace: "epydios-system",
+          selectedProviderId: "aimxs-full",
+          selectedProviderName: "aimxs-full",
+          capabilities: ["policy.evaluate"],
+          enabledProviders: [],
+          secrets: {
+            bearerTokenSecret: { present: false },
+            clientTlsSecret: { present: false },
+            caSecret: { present: false }
+          }
+        }
+      },
+      diagnostics: {
+        providerContracts: []
+      }
+    },
+    viewState: {
+      localSecureRefEditor: {
+        selectedRef: "ref://projects/{projectId}/providers/openai/api-key",
+        status: "saved",
+        message: "Saved into the local secure store."
+      },
+      aimxsEditor: {
+        status: "clean",
+        message: "Draft ready."
+      }
+    },
+    editorState: {
+      projectId: "project-local",
+      scopeTenantId: "tenant-local",
+      scopeProjectId: "project-local",
+      status: "saved",
+      syncState: "loaded",
+      source: "runtime-endpoint",
+      savedAt: "2026-03-15T22:00:00Z",
+      appliedAt: "2026-03-15T22:05:00Z",
+      hasSavedOverride: true,
+      applied: true,
+      draft: {
+        selectedAgentProfileId: "openai",
+        modelRouting: "gateway_first",
+        gatewayProviderId: "litellm",
+        allowDirectProviderFallback: false,
+        profileTransport: "responses_api",
+        profileModel: "gpt-5",
+        profileEndpointRef: "ref://gateways/litellm/openai",
+        profileCredentialRef: "ref://projects/{projectId}/providers/openai/api-key",
+        profileCredentialScope: "project",
+        profileEnabled: true
+      }
+    }
+  });
+
+  const html = ui.settingsContent.innerHTML;
+  assert.match(html, /App Preferences Board/);
+  assert.match(html, /Secure Ref Board/);
+  assert.match(html, /Local Environment Board/);
+  assert.match(html, /Integration Settings Board/);
+  assert.match(html, /Settings Workflow Recovery/);
+  assert.match(html, /Project Integration Editor/);
+  assert.match(html, /Integration Sync Summary/);
+  assert.match(html, /Endpoint Inventory/);
+  assert.match(html, /data-settings-endpoint-id="integrationsettings"/);
+  assert.match(html, /Apply Saved/);
+  assert.match(html, /Save Draft/);
+  assert.match(html, /Open Audit Events/);
+  assert.match(html, /data-domain-root="settingsops"/);
+  assert.match(html, /data-settings-local-ref-action="save"/);
+  assert.match(html, /Activate AIMXS Mode/);
+  assert.doesNotMatch(html, /Open Diagnostics/);
+  assert.doesNotMatch(html, /reopen Configuration/i);
+  assert.doesNotMatch(html, /Current Identity \+ Authority/);
+  assert.doesNotMatch(html, /Current Policy Contract/);
+  assert.doesNotMatch(html, /Provider Contract Matrix/);
+  assert.doesNotMatch(html, /Local Demo Identity \+ Policy Overlay/);
+});

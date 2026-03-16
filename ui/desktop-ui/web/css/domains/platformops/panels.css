@@ -1,0 +1,111 @@
+.platformops-workspace {
+  display: grid;
+  gap: var(--space-4);
+  width: 100%;
+  min-width: 0;
+}
+
+.platformops-primary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(19rem, 100%), 1fr));
+  gap: var(--space-3);
+  width: 100%;
+  min-width: 0;
+}
+
+.platformops-card {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+  align-content: start;
+}
+
+.platformops-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.platformops-kv-list {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.platformops-row {
+  display: grid;
+  gap: var(--space-1);
+  padding-top: var(--space-2);
+  border-top: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
+}
+
+.platformops-row:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.platformops-row-label {
+  font-size: var(--font-size-2xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.platformops-row-value {
+  color: var(--ink);
+  min-width: 0;
+}
+
+.platformops-value-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.platformops-value-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0.2rem 0.45rem;
+  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--surface) 92%, var(--panel));
+  min-width: 0;
+}
+
+.platformops-value-key {
+  font-size: var(--font-size-2xs);
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.platformops-value-text {
+  font-size: var(--font-size-sm);
+  color: var(--ink);
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.platformops-value-text-code code {
+  font-size: var(--font-size-xs);
+}
+
+.platformops-empty {
+  color: var(--ink-soft);
+  font-size: var(--font-size-sm);
+}
+
+@media (min-width: 960px) and (max-width: 1339px) {
+  .platformops-primary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1340px) {
+  .platformops-primary-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
