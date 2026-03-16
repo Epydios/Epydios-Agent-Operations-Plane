@@ -41,8 +41,8 @@ import {
   saveValue
 } from "./shared/utils/storage.js";
 import {
-  renderHomeDashboard,
-  renderHomeDashboardError
+  renderHomeOpsEmptyState,
+  renderHomeOpsPage
 } from "./domains/homeops/routes.js";
 import { createEmptyHomeSnapshot } from "./domains/homeops/state.js";
 import {
@@ -51,17 +51,62 @@ import {
   renderAgentOpsPage
 } from "./domains/agentops/routes.js";
 import {
+  renderGovernanceOpsEmptyState,
+  renderGovernanceOpsPage
+} from "./domains/governanceops/routes.js";
+import {
+  renderGuardrailOpsEmptyState,
+  renderGuardrailOpsPage
+} from "./domains/guardrailops/routes.js";
+import {
+  renderAuditOpsEmptyState,
+  renderAuditOpsPage
+} from "./domains/auditops/routes.js";
+import {
+  renderEvidenceOpsEmptyState,
+  renderEvidenceOpsPage
+} from "./domains/evidenceops/routes.js";
+import { createEvidenceWorkspaceSnapshot } from "./domains/evidenceops/state.js";
+import {
+  renderComplianceOpsEmptyState,
+  renderComplianceOpsPage
+} from "./domains/complianceops/routes.js";
+import {
+  renderIncidentOpsEmptyState,
+  renderIncidentOpsPage
+} from "./domains/incidentops/routes.js";
+import { createIncidentOpsWorkspaceSnapshot } from "./domains/incidentops/state.js";
+import {
+  renderNetworkOpsEmptyState,
+  renderNetworkOpsPage
+} from "./domains/networkops/routes.js";
+import {
   renderIdentityOpsEmptyState,
   renderIdentityOpsPage,
   setIdentityAuthDisplay as setAuthDisplay
 } from "./domains/identityops/routes.js";
-import { renderProviders } from "./views/providers.js";
+import {
+  renderPlatformOpsEmptyState,
+  renderPlatformOpsPage
+} from "./domains/platformops/routes.js";
+import {
+  renderPolicyOpsEmptyState,
+  renderPolicyOpsPage
+} from "./domains/policyops/routes.js";
+import { createPolicyWorkspaceSnapshot } from "./domains/policyops/state.js";
+import {
+  renderDeveloperOpsEmptyState,
+  renderDeveloperOpsPage
+} from "./domains/developerops/routes.js";
 import {
   readRuntimeRunFilters as readRunFilters,
+  renderRuntimeOpsEmptyState,
+  renderRuntimeOpsPage,
   renderRuntimeRunDetail as renderRunDetail,
   renderRuntimeRunDetailError,
   renderRuntimeRuns as renderRuns
 } from "./domains/runtimeops/routes.js";
+import { createRuntimeWorkspaceSnapshot } from "./domains/runtimeops/state.js";
 import {
   readAuditFilters,
   renderAudit,
@@ -111,7 +156,7 @@ import {
   renderTerminalFeedback,
   renderTerminalHistory
 } from "./views/terminal.js";
-import { renderSettings } from "./views/settings.js";
+import { renderSettingsOpsEmptyState, renderSettingsOpsPage } from "./domains/settingsops/routes.js";
 import { buildChatTurnGovernanceReport, resolveChatGovernedExportSelection } from "./views/chat.js";
 import {
   closeManagedCodexWorkerSession,
@@ -156,17 +201,25 @@ const ui = {
   workspaceLayout: document.getElementById("workspace-layout"),
   chatContent: document.getElementById("chat-content"),
   identityContent: document.getElementById("identity-content"),
-  triageContent: document.getElementById("triage-content"),
+  governanceOpsContent: document.getElementById("governanceops-content"),
+  guardrailOpsContent: document.getElementById("guardrailops-content"),
+  auditOpsContent: document.getElementById("auditops-content"),
+  evidenceOpsContent: document.getElementById("evidenceops-content"),
+  complianceOpsContent: document.getElementById("complianceops-content"),
+  incidentOpsContent: document.getElementById("incidentops-content"),
+  networkOpsContent: document.getElementById("networkops-content"),
+  runtimeOpsContent: document.getElementById("runtimeops-content"),
+  platformOpsContent: document.getElementById("platformops-content"),
+  policyOpsContent: document.getElementById("policyops-content"),
+  homeOpsContent: document.getElementById("homeops-content"),
+  developerOpsContent: document.getElementById("developerops-content"),
   settingsContent: document.getElementById("settings-content"),
   settingsOpenAuditEventsButton: document.getElementById("settings-open-audit-events-button"),
   settingsThemeMode: document.getElementById("settings-theme-mode"),
   settingsAgentProfile: document.getElementById("settings-agent-profile"),
-  homeDashboardAuth: document.getElementById("home-dashboard-auth"),
   contextProjectSelect: document.getElementById("context-project-select"),
   contextAgentProfile: document.getElementById("context-agent-profile"),
   contextEndpointBadges: document.getElementById("context-endpoint-badges"),
-  healthContent: document.getElementById("health-content"),
-  providersContent: document.getElementById("providers-content"),
   approvalsFeedback: document.getElementById("approvals-feedback"),
   approvalsContent: document.getElementById("approvals-content"),
   approvalsDetailContent: document.getElementById("approvals-detail-content"),
@@ -353,8 +406,8 @@ const WORKSPACE_VIEW_IDS = new Set([
 ]);
 const WORKSPACE_VIEW_ID_LIST = Array.from(WORKSPACE_VIEW_IDS);
 const INCIDENT_SUBVIEW_IDS = new Set(["queue", "audit"]);
-const SETTINGS_SUBVIEW_IDS = new Set(["configuration", "diagnostics"]);
-const ADVANCED_SECTION_IDS = new Set(["operations", "runs", "approvals", "incidents", "settings"]);
+const SETTINGS_SUBVIEW_IDS = new Set(["configuration"]);
+const ADVANCED_SECTION_IDS = new Set(["operations", "runs", "approvals", "incidents"]);
 const INCIDENT_STATUS_TRANSITIONS = {
   drafted: [
     { to: "filed", label: "Mark Filed" }
@@ -482,6 +535,20 @@ let desktopGovernedExportCatalogState = {
   message: "",
   exportProfiles: null,
   orgAdminProfiles: null
+};
+let latestDeveloperOpsContext = {
+  session: null,
+  settings: null,
+  health: {},
+  providers: {},
+  runs: {},
+  projectScope: "",
+  selectedAgentProfileId: ""
+};
+let latestDeveloperOpsPreviews = {
+  governedAction: { input: {}, issues: [], payload: {} },
+  runBuilder: { input: {}, issues: [], payload: {} },
+  terminal: { input: {}, issues: [], payload: {} }
 };
 const CHAT_FOLLOW_RETRY_MS = 1250;
 const CHAT_FOLLOW_CONTINUE_MS = 160;
@@ -1517,9 +1584,6 @@ function applySettingsSubview(view) {
 
 function setSettingsSubview(view, persist = false) {
   settingsSubviewState = normalizeSettingsSubview(view, settingsSubviewState);
-  if (!isAdvancedSectionEnabled("settings") && settingsSubviewState === "diagnostics") {
-    settingsSubviewState = "configuration";
-  }
   const selected = applySettingsSubview(settingsSubviewState);
   if (persist) {
     saveValue(SETTINGS_SUBVIEW_PREF_KEY, selected);
@@ -1621,9 +1685,6 @@ function applyAdvancedState(root = document) {
   advancedSectionState = normalizeAdvancedSectionState(advancedSectionState);
   applyAdvancedToggleLabels(root);
   applyAdvancedVisibility(root);
-  if (!isAdvancedSectionEnabled("settings") && settingsSubviewState === "diagnostics") {
-    setSettingsSubview("configuration", true);
-  }
 }
 
 function setAdvancedSectionEnabled(sectionID, enabled, persist = false) {
@@ -2588,8 +2649,14 @@ function downloadGovernedText(text, fileName, mimeType = "text/plain;charset=utf
   return prepared;
 }
 
+const DEFAULT_AUDITOPS_HANDOFF_PREVIEW =
+  "Copy an audit or incident handoff to populate this preview. Review the text here before sharing it downstream.";
+let syncAuditOpsFeedbackState = () => {};
+let syncAuditOpsHandoffPreviewState = () => {};
+
 function renderAuditFilingFeedback(tone, message) {
   if (!(ui.auditFeedback instanceof HTMLElement)) {
+    syncAuditOpsFeedbackState(tone, message);
     return;
   }
   const normalizedTone = String(tone || "warn").trim().toLowerCase();
@@ -2610,6 +2677,7 @@ function renderAuditFilingFeedback(tone, message) {
           ? "Audit/Incident Action Needs Review"
           : "Audit And Incident Actions";
   ui.auditFeedback.innerHTML = renderPanelStateMetric(state, title, message || "");
+  syncAuditOpsFeedbackState(normalizedTone, message || "");
 }
 
 function requestTypedConfirmation(title, lines, acknowledgement) {
@@ -2817,6 +2885,7 @@ function pushIncidentHistory(entry) {
   store.upsertIncidentPackageHistoryEntry(normalized);
   persistIncidentHistory();
   renderIncidentHistoryPanel();
+  syncIncidentOpsSelectionAfterHistoryChange(normalized.id);
 }
 
 function clearIncidentHistoryQueue() {
@@ -2824,6 +2893,7 @@ function clearIncidentHistoryQueue() {
   incidentHistorySelection.clear();
   persistIncidentHistory();
   renderIncidentHistoryPanel();
+  syncIncidentOpsSelectionAfterHistoryChange("");
 }
 
 function clearDataPanels() {
@@ -2835,11 +2905,6 @@ function clearDataPanels() {
   if (ui.terminalHistoryStatusFilter) {
     ui.terminalHistoryStatusFilter.value = "";
   }
-  ui.providersContent.innerHTML = renderPanelStateMetric(
-    "empty",
-    "Extension Providers",
-    "No provider data loaded."
-  );
   renderAgentOpsEmptyState(ui, {
     tone: "info",
     title: "Agent Workspace",
@@ -2850,12 +2915,71 @@ function clearDataPanels() {
     title: "IdentityOps",
     message: "Identity state becomes available after configuration and runtime identity load."
   });
-  ui.settingsContent.innerHTML = renderPanelStateMetric(
-    "empty",
-    "Settings",
-    "No configuration data loaded.",
-    "Refresh the workspace. If settings should be present, verify scope and runtime endpoint availability."
-  );
+  renderGuardrailOpsEmptyState(ui, {
+    tone: "info",
+    title: "GuardrailOps",
+    message: "Guardrail posture becomes available after runtime, policy, and governance signals load."
+  });
+  renderAuditOpsEmptyState(ui, {
+    tone: "info",
+    title: "AuditOps",
+    message: "Audit posture becomes available after audit, run, approval, and decision trace signals load."
+  });
+  renderEvidenceOpsEmptyState(ui, {
+    tone: "info",
+    title: "EvidenceOps",
+    message: "Evidence posture becomes available after governed runs, artifacts, and linked proof material load."
+  });
+  renderComplianceOpsEmptyState(ui, {
+    tone: "info",
+    title: "ComplianceOps",
+    message: "Compliance posture becomes available after policy, governance, evidence, audit, and platform signals load."
+  });
+  renderIncidentOpsEmptyState(ui, {
+    tone: "info",
+    title: "IncidentOps",
+    message: "Incident posture becomes available after incident packages, linked runs, and audit anchors load."
+  });
+  renderNetworkOpsEmptyState(ui, {
+    tone: "info",
+    title: "NetworkOps",
+    message: "Network posture becomes available after boundary, endpoint, and trust signals load."
+  });
+  renderGovernanceOpsEmptyState(ui, {
+    tone: "info",
+    title: "GovernanceOps",
+    message: "Governance posture becomes available after approval, authority, and decision receipt signals load."
+  });
+  renderPlatformOpsEmptyState(ui, {
+    tone: "info",
+    title: "PlatformOps",
+    message: "Platform posture becomes available after environment, deployment, and dependency signals load."
+  });
+  renderPolicyOpsEmptyState(ui, {
+    tone: "info",
+    title: "PolicyOps",
+    message: "Policy semantics become available after policy contract, pack, and decision signals load."
+  });
+  latestDeveloperOpsContext = {
+    session: null,
+    settings: null,
+    health: {},
+    providers: {},
+    runs: {},
+    projectScope: "",
+    selectedAgentProfileId: ""
+  };
+  renderDeveloperOpsEmptyState(ui, {
+    tone: "info",
+    title: "DeveloperOps",
+    message: "Developer diagnostics become available after runtime, settings, and advanced preview signals load."
+  });
+  renderSettingsOpsEmptyState(ui, {
+    tone: "empty",
+    title: "SettingsOps",
+    message: "No configuration data loaded.",
+    detail: "Refresh the workspace. If settings should be present, verify scope and runtime endpoint availability."
+  });
   ui.approvalsFeedback.innerHTML = "";
   ui.approvalsContent.innerHTML = renderPanelStateMetric(
     "empty",
@@ -2904,11 +3028,12 @@ function clearDataPanels() {
     ui.auditFeedback.innerHTML = "";
   }
   if (ui.auditHandoffPreview) {
-    ui.auditHandoffPreview.textContent = "Copy an audit or incident handoff to populate this preview. Review the text here before sharing it downstream.";
+    ui.auditHandoffPreview.textContent = DEFAULT_AUDITOPS_HANDOFF_PREVIEW;
   }
+  syncAuditOpsHandoffPreviewState(DEFAULT_AUDITOPS_HANDOFF_PREVIEW, { render: false });
   renderIncidentHistoryPanel();
-  if (ui.triageContent) {
-    ui.triageContent.innerHTML = "";
+  if (ui.homeOpsContent) {
+    ui.homeOpsContent.innerHTML = "";
   }
   if (ui.contextAgentProfile) {
     ui.contextAgentProfile.textContent = "-";
@@ -2919,22 +3044,78 @@ function clearDataPanels() {
 }
 
 function renderPanelLoadingStates() {
-  if (ui.healthContent) {
-    ui.healthContent.innerHTML = renderPanelStateMetric(
+  if (ui.homeOpsContent) {
+    ui.homeOpsContent.innerHTML = renderPanelStateMetric(
       "loading",
-      "Platform Health",
-      "Loading runtime and pipeline status..."
-    );
-  }
-  if (ui.providersContent) {
-    ui.providersContent.innerHTML = renderPanelStateMetric(
-      "loading",
-      "Extension Providers",
-      "Loading provider contract and readiness data..."
+      "HomeOps",
+      "Loading command dashboard, attention queue, and domain pivots..."
     );
   }
   if (ui.runsContent) {
-    ui.runsContent.innerHTML = renderPanelStateMetric("loading", "History", "Loading run history...");
+    ui.runsContent.innerHTML = renderPanelStateMetric("loading", "Run Inventory", "Loading run inventory...");
+  }
+  if (ui.runtimeOpsContent) {
+    ui.runtimeOpsContent.innerHTML = renderPanelStateMetric(
+      "loading",
+      "RuntimeOps",
+      "Loading runtime health, queue posture, and run inventory signals..."
+    );
+  }
+  if (ui.platformOpsContent) {
+    ui.platformOpsContent.innerHTML = renderPanelStateMetric(
+      "loading",
+      "PlatformOps",
+      "Loading environment, deployment, and dependency posture..."
+    );
+  }
+  if (ui.networkOpsContent) {
+    ui.networkOpsContent.innerHTML = renderPanelStateMetric(
+      "loading",
+      "NetworkOps",
+      "Loading network boundary, endpoint reachability, and trust posture..."
+    );
+  }
+  if (ui.policyOpsContent) {
+    ui.policyOpsContent.innerHTML = renderPanelStateMetric(
+      "loading",
+      "PolicyOps",
+      "Loading policy contract, pack posture, and decision explanation..."
+    );
+  }
+  if (ui.governanceOpsContent) {
+    ui.governanceOpsContent.innerHTML = renderPanelStateMetric(
+      "loading",
+      "GovernanceOps",
+      "Loading approval queue, authority ladder, and decision receipt posture..."
+    );
+  }
+  if (ui.auditOpsContent) {
+    ui.auditOpsContent.innerHTML = renderPanelStateMetric(
+      "loading",
+      "AuditOps",
+      "Loading audit event, actor activity, and decision trace posture..."
+    );
+  }
+  if (ui.evidenceOpsContent) {
+    ui.evidenceOpsContent.innerHTML = renderPanelStateMetric(
+      "loading",
+      "EvidenceOps",
+      "Loading evidence bundles, provenance, and artifact access posture..."
+    );
+  }
+  if (ui.complianceOpsContent) {
+    ui.complianceOpsContent.innerHTML = renderPanelStateMetric(
+      "loading",
+      "ComplianceOps",
+      "Loading control coverage, obligation posture, and attestation readiness..."
+    );
+  }
+  if (ui.incidentOpsContent) {
+    ui.incidentOpsContent.innerHTML = renderPanelStateMetric(
+      "loading",
+      "IncidentOps",
+      "Loading incident queue, active package posture, and severity anchors..."
+    );
   }
   if (ui.approvalsContent) {
     ui.approvalsContent.innerHTML = renderPanelStateMetric("loading", "Pending Approvals", "Loading approvals...");
@@ -2943,17 +3124,24 @@ function renderPanelLoadingStates() {
     ui.auditContent.innerHTML = renderPanelStateMetric("loading", "Audit Events", "Loading audit events...");
   }
   if (ui.settingsContent) {
-    ui.settingsContent.innerHTML = renderPanelStateMetric(
-      "loading",
-      "Settings",
-      "Loading configuration and diagnostics..."
-    );
+    renderSettingsOpsEmptyState(ui, {
+      tone: "loading",
+      title: "SettingsOps",
+      message: "Loading app preferences, secure refs, and local environment bindings..."
+    });
   }
   if (ui.identityContent) {
     ui.identityContent.innerHTML = renderPanelStateMetric(
       "loading",
       "IdentityOps",
       "Loading effective identity, authority, scope, and grant state..."
+    );
+  }
+  if (ui.developerOpsContent) {
+    ui.developerOpsContent.innerHTML = renderPanelStateMetric(
+      "loading",
+      "DeveloperOps",
+      "Loading debug tools, payload previews, and contract diagnostics..."
     );
   }
 }
@@ -2983,7 +3171,7 @@ function shouldPauseBackgroundRefresh() {
     ui.runsContent,
     ui.approvalsContent,
     ui.auditContent,
-    ui.triageContent
+    ui.homeOpsContent
   ].some((root) => root instanceof HTMLElement && root.contains(activeElement));
 }
 
@@ -3011,7 +3199,9 @@ function refreshRunBuilderPreview(session) {
   const payload = buildRunCreatePayload(input, session);
   renderRunBuilderPolicyHints(ui, input, issues);
   renderRunBuilderPayload(ui, payload);
-  return { input, issues, payload };
+  latestDeveloperOpsPreviews.runBuilder = { input, issues, payload };
+  renderDeveloperOpsPanel();
+  return latestDeveloperOpsPreviews.runBuilder;
 }
 
 function refreshGovernedActionPreview(session) {
@@ -3021,7 +3211,9 @@ function refreshGovernedActionPreview(session) {
   const payload = buildGovernedActionRunPayload(input, session, demoGovernanceOverlay);
   renderGovernedActionPolicyHints(ui, input, issues);
   renderGovernedActionPayload(ui, payload);
-  return { input, issues, payload };
+  latestDeveloperOpsPreviews.governedAction = { input, issues, payload };
+  renderDeveloperOpsPanel();
+  return latestDeveloperOpsPreviews.governedAction;
 }
 
 function refreshTerminalPreview(session, choices) {
@@ -3038,7 +3230,37 @@ function refreshTerminalPreview(session, choices) {
   const payload = buildTerminalRequest(normalizedInput, session, choices, selectedAgentProfileId);
   renderTerminalPolicyHints(ui, choices, issues);
   renderTerminalPayload(ui, payload);
-  return { input: normalizedInput, issues, payload };
+  latestDeveloperOpsPreviews.terminal = { input: normalizedInput, issues, payload };
+  renderDeveloperOpsPanel();
+  return latestDeveloperOpsPreviews.terminal;
+}
+
+function renderDeveloperOpsPanel() {
+  if (!ui.developerOpsContent) {
+    return;
+  }
+  if (!latestDeveloperOpsContext?.settings) {
+    renderDeveloperOpsEmptyState(ui, {
+      tone: "info",
+      title: "DeveloperOps",
+      message: "Developer diagnostics become available after runtime, settings, and advanced preview signals load."
+    });
+    return;
+  }
+  renderDeveloperOpsPage(ui, {
+    ...latestDeveloperOpsContext,
+    projectScope: String(ui.contextProjectSelect?.value || latestDeveloperOpsContext.projectScope || "").trim(),
+    selectedAgentProfileId: String(
+      ui.settingsAgentProfile?.value || latestDeveloperOpsContext.selectedAgentProfileId || ""
+    )
+      .trim()
+      .toLowerCase(),
+    terminalHistory: store.getTerminalHistory(),
+    governedActionPreview: latestDeveloperOpsPreviews.governedAction,
+    runBuilderPreview: latestDeveloperOpsPreviews.runBuilder,
+    terminalPreview: latestDeveloperOpsPreviews.terminal,
+    advancedVisible: isAdvancedSectionEnabled("operations")
+  });
 }
 
 function buildTerminalHistoryEntry(input, payload, result, tone, message) {
@@ -3866,10 +4088,7 @@ async function main() {
       return;
     }
     const section = String(toggleNode.dataset.advancedToggleSection || "").trim().toLowerCase();
-    const nextEnabled = toggleAdvancedSection(section, true);
-    if (section === "settings" && nextEnabled && settingsSubviewState === "configuration") {
-      setSettingsSubview("diagnostics", true);
-    }
+    toggleAdvancedSection(section, true);
     focusElement(toggleNode, { scroll: false });
   });
   document.addEventListener("toggle", (event) => {
@@ -4036,47 +4255,340 @@ async function main() {
     }),
     configChanges: buildSettingsConfigChanges(configChangeHistory, { items: [] })
   };
-  const renderTriagePanel = (options = {}) => {
+  latestDeveloperOpsContext = {
+    session,
+    settings: latestSettingsSnapshot,
+    health: {},
+    providers: {},
+    runs: {},
+    projectScope: activeProjectScope(session),
+    selectedAgentProfileId: initialAgentID
+  };
+  let latestGovernanceOpsContext = {
+    settings: latestSettingsSnapshot,
+    approvals: {},
+    runs: {},
+    session,
+    orgAdminProfiles: null
+  };
+  let latestRuntimeOpsContext = {
+    health: {},
+    pipeline: {},
+    providers: {},
+    runs: {},
+    approvals: {},
+    runtimeIdentity: {},
+    runtimeSessions: {},
+    runtimeWorkerCapabilities: {}
+  };
+  let latestAuditOpsContext = {
+    audit: { items: [] },
+    filters: {},
+    actor: String(session?.claims?.sub || session?.claims?.email || session?.claims?.client_id || "").trim(),
+    runs: {},
+    approvals: {}
+  };
+  let latestEvidenceOpsContext = {
+    settings: latestSettingsSnapshot,
+    audit: { items: [] },
+    runs: {},
+    approvals: {},
+    thread: {}
+  };
+  let latestPolicyOpsContext = {
+    settings: latestSettingsSnapshot,
+    runs: {}
+  };
+  let latestIncidentOpsContext = {
+    incidentHistory: { items: [] },
+    runs: {},
+    approvals: {},
+    audit: { items: [] }
+  };
+  let governanceOpsViewState = {
+    selectedRunId: "",
+    feedback: null
+  };
+  let runtimeOpsViewState = {
+    selectedRunId: "",
+    selectedSessionId: "",
+    sessionReview: null,
+    sessionReviewMeta: null,
+    feedback: null
+  };
+  let auditOpsViewState = {
+    feedback: null,
+    handoffPreview: DEFAULT_AUDITOPS_HANDOFF_PREVIEW
+  };
+  let evidenceOpsViewState = {
+    feedback: null
+  };
+  let policyOpsViewState = {
+    feedback: null,
+    simulationRefreshedAt: ""
+  };
+  let incidentOpsViewState = {
+    selectedIncidentId: "",
+    feedback: null
+  };
+  const renderHomePanel = (options = {}) => {
     const snapshot = options.snapshot || triageSnapshot;
-    const terminalHistory = Array.isArray(options.terminalHistory)
-      ? options.terminalHistory
-      : store.getTerminalHistory();
-    const dashboardOptions = {
-      session: options.session || session,
-      snapshot,
-      terminalHistory
-    };
     if (options.snapshot) {
       triageSnapshot = options.snapshot;
     }
-    if (Object.prototype.hasOwnProperty.call(options, "health")) {
-      dashboardOptions.health = options.health;
-    }
-    if (Object.prototype.hasOwnProperty.call(options, "pipeline")) {
-      dashboardOptions.pipeline = options.pipeline;
-    }
-    renderHomeDashboard(ui, dashboardOptions);
+    renderHomeOpsPage(ui, snapshot);
   };
   const renderHomeErrorPanel = (message, options = {}) => {
-    const snapshot = options.snapshot || triageSnapshot;
-    const terminalHistory = Array.isArray(options.terminalHistory)
-      ? options.terminalHistory
-      : store.getTerminalHistory();
     if (options.snapshot) {
       triageSnapshot = options.snapshot;
     }
-    renderHomeDashboardError(ui, {
-      session: options.session || session,
-      snapshot,
-      terminalHistory,
+    renderHomeOpsEmptyState(ui, {
+      tone: "error",
+      title: "HomeOps",
       message
     });
   };
   const renderContextPanel = () => {
     renderContextBar(triageSnapshot, session, latestSettingsSnapshot);
   };
-  renderTriagePanel();
+  const renderGovernanceOpsPanel = (context = null) => {
+    if (context && typeof context === "object") {
+      latestGovernanceOpsContext = context;
+    }
+    renderGovernanceOpsPage(ui, {
+      ...latestGovernanceOpsContext,
+      viewState: governanceOpsViewState
+    });
+  };
+  const renderRuntimeOpsPanel = (context = null) => {
+    if (context && typeof context === "object") {
+      latestRuntimeOpsContext = context;
+    }
+    renderRuntimeOpsPage(ui, latestRuntimeOpsContext, session, {
+      viewState: runtimeOpsViewState
+    });
+  };
+  const renderAuditOpsPanel = (context = null) => {
+    if (context && typeof context === "object") {
+      latestAuditOpsContext = context;
+    }
+    renderAuditOpsPage(ui, {
+      ...latestAuditOpsContext,
+      incidentHistory: {
+        items: store.getIncidentPackageHistory()
+      },
+      selectedRunDetail: latestRunDetail,
+      viewState: auditOpsViewState
+    });
+  };
+  const renderEvidenceOpsPanel = (context = null) => {
+    if (context && typeof context === "object") {
+      latestEvidenceOpsContext = context;
+    }
+    renderEvidenceOpsPage(ui, {
+      ...latestEvidenceOpsContext,
+      incidentHistory: {
+        items: store.getIncidentPackageHistory()
+      },
+      viewState: evidenceOpsViewState
+    });
+  };
+  const renderPolicyOpsPanel = (context = null) => {
+    if (context && typeof context === "object") {
+      latestPolicyOpsContext = context;
+    }
+    renderPolicyOpsPage(ui, {
+      ...latestPolicyOpsContext,
+      viewState: policyOpsViewState
+    });
+  };
+  const renderIncidentOpsPanel = (context = null) => {
+    if (context && typeof context === "object") {
+      latestIncidentOpsContext = context;
+    }
+    renderIncidentOpsPage(ui, {
+      ...latestIncidentOpsContext,
+      incidentHistory: {
+        items: store.getIncidentPackageHistory()
+      },
+      viewState: incidentOpsViewState
+    });
+  };
+  const setGovernanceOpsFeedback = (tone, message) => {
+    governanceOpsViewState = {
+      ...governanceOpsViewState,
+      feedback: message
+        ? {
+            tone: String(tone || "info").trim().toLowerCase(),
+            message: String(message || "").trim()
+          }
+        : null
+    };
+    renderGovernanceOpsPanel();
+  };
+  const setGovernanceOpsSelection = (runID) => {
+    const normalizedRunID = String(runID || "").trim();
+    governanceOpsViewState = {
+      ...governanceOpsViewState,
+      selectedRunId:
+        governanceOpsViewState.selectedRunId && governanceOpsViewState.selectedRunId === normalizedRunID
+          ? ""
+          : normalizedRunID
+    };
+    renderGovernanceOpsPanel();
+  };
+  const setRuntimeOpsFeedback = (tone, message) => {
+    runtimeOpsViewState = {
+      ...runtimeOpsViewState,
+      feedback: message
+        ? {
+            tone: String(tone || "info").trim().toLowerCase(),
+            message: String(message || "").trim()
+          }
+        : null
+    };
+    renderRuntimeOpsPanel();
+  };
+  const setAuditOpsHandoffPreview = (text, options = {}) => {
+    const preview = String(text || "").trim() || DEFAULT_AUDITOPS_HANDOFF_PREVIEW;
+    if (ui.auditHandoffPreview instanceof HTMLElement) {
+      ui.auditHandoffPreview.textContent = preview;
+    }
+    auditOpsViewState = {
+      ...auditOpsViewState,
+      handoffPreview: preview
+    };
+    if (options.render !== false) {
+      renderAuditOpsPanel();
+    }
+  };
+  const setEvidenceOpsFeedback = (tone, message) => {
+    evidenceOpsViewState = {
+      ...evidenceOpsViewState,
+      feedback: message
+        ? {
+            tone: String(tone || "info").trim().toLowerCase(),
+            message: String(message || "").trim()
+          }
+        : null
+    };
+    renderEvidenceOpsPanel();
+  };
+  const setPolicyOpsFeedback = (tone, message) => {
+    policyOpsViewState = {
+      ...policyOpsViewState,
+      feedback: message
+        ? {
+            tone: String(tone || "info").trim().toLowerCase(),
+            message: String(message || "").trim()
+          }
+        : null
+    };
+    renderPolicyOpsPanel();
+  };
+  const setIncidentOpsFeedback = (tone, message) => {
+    incidentOpsViewState = {
+      ...incidentOpsViewState,
+      feedback: message
+        ? {
+            tone: String(tone || "info").trim().toLowerCase(),
+            message: String(message || "").trim()
+          }
+        : null
+    };
+    renderIncidentOpsPanel();
+  };
+  const setIncidentOpsSelection = (entryId) => {
+    const normalizedEntryId = String(entryId || "").trim();
+    incidentOpsViewState = {
+      ...incidentOpsViewState,
+      selectedIncidentId:
+        incidentOpsViewState.selectedIncidentId &&
+        incidentOpsViewState.selectedIncidentId === normalizedEntryId
+          ? ""
+          : normalizedEntryId
+    };
+    renderIncidentOpsPanel();
+  };
+  syncAuditOpsFeedbackState = (tone, message) => {
+    const normalizedMessage = String(message || "").trim();
+    auditOpsViewState = {
+      ...auditOpsViewState,
+      feedback: normalizedMessage
+        ? {
+            tone: String(tone || "info").trim().toLowerCase(),
+            message: normalizedMessage
+          }
+        : null
+    };
+    renderAuditOpsPanel();
+  };
+  syncAuditOpsHandoffPreviewState = setAuditOpsHandoffPreview;
+  const setRuntimeOpsSessionReviewState = (sessionId, sessionReview, sessionReviewMeta, options = {}) => {
+    runtimeOpsViewState = {
+      ...runtimeOpsViewState,
+      selectedSessionId: String(sessionId || runtimeOpsViewState.selectedSessionId || "").trim(),
+      sessionReview,
+      sessionReviewMeta
+    };
+    if (options.render !== false) {
+      renderRuntimeOpsPanel();
+    }
+  };
+  const loadRuntimeOpsSessionReview = async (sessionId = "", options = {}) => {
+    const resolvedSessionID = String(sessionId || runtimeOpsViewState.selectedSessionId || "").trim();
+    if (!resolvedSessionID) {
+      setRuntimeOpsSessionReviewState(
+        "",
+        null,
+        {
+          state: "idle",
+          tone: "neutral",
+          message: "Select a runtime session to inspect its bounded review and worker posture."
+        },
+        options
+      );
+      return null;
+    }
+    setRuntimeOpsSessionReviewState(
+      resolvedSessionID,
+      null,
+      {
+        state: "loading",
+        tone: "neutral",
+        message: `Loading runtime session review for ${resolvedSessionID}...`
+      },
+      options
+    );
+    const sessionReview = await loadNativeSessionView(api, resolvedSessionID, {
+      tailCount: 8,
+      waitSeconds: 1
+    });
+    const reviewStatus = String(sessionReview?.status || "").trim().toLowerCase();
+    const tone = reviewStatus === "error" ? "danger" : reviewStatus === "warn" ? "warn" : "ok";
+    setRuntimeOpsSessionReviewState(
+      resolvedSessionID,
+      sessionReview,
+      {
+        state: reviewStatus || "ready",
+        tone,
+        message: String(sessionReview?.message || "Native runtime session review is loaded.").trim()
+      },
+      options
+    );
+    if (options.focus) {
+      const reviewNode = ui.runtimeOpsContent?.querySelector(
+        "[data-runtimeops-panel='workspace-selected-session']"
+      );
+      if (reviewNode instanceof HTMLElement) {
+        focusRenderedRegion(reviewNode, { block: "center" });
+      }
+    }
+    return sessionReview;
+  };
+  renderHomePanel();
   renderContextPanel();
+  renderDeveloperOpsPanel();
   let refreshInFlight = false;
   let refreshQueued = false;
   let hasHydratedPanels = false;
@@ -4135,7 +4647,33 @@ async function main() {
         const approvalScope = readApprovalFilters(ui);
         persistListFilterStateFromUI();
 
-        const [health, pipeline, providers, runs, localSecureRefs, aimxsActivation, runtimeIdentity, policyPacksCatalog] = await Promise.all([
+        const runtimeSessionsPromise = api.listRuntimeSessions({ limit: 25 }).catch((error) => ({
+          source: "unavailable",
+          warning: `Runtime session list unavailable: ${error.message}`,
+          count: 0,
+          items: []
+        }));
+        const runtimeWorkerCapabilitiesPromise = api
+          .listRuntimeWorkerCapabilities({ clientSurface: "desktop" })
+          .catch((error) => ({
+            source: "unavailable",
+            warning: `Runtime worker-capability catalog unavailable: ${error.message}`,
+            count: 0,
+            items: []
+          }));
+
+        const [
+          health,
+          pipeline,
+          providers,
+          runs,
+          localSecureRefs,
+          aimxsActivation,
+          runtimeIdentity,
+          policyPacksCatalog,
+          runtimeSessions,
+          runtimeWorkerCapabilities
+        ] = await Promise.all([
           api.getHealth(),
           api.getPipelineStatus(),
           api.getProviders(),
@@ -4143,7 +4681,9 @@ async function main() {
           api.getLocalSecureRefs(),
           api.getAimxsActivation(),
           api.getRuntimeIdentity(),
-          api.listRuntimePolicyPacks({ clientSurface: "desktop" })
+          api.listRuntimePolicyPacks({ clientSurface: "desktop" }),
+          runtimeSessionsPromise,
+          runtimeWorkerCapabilitiesPromise
         ]);
         localSecureRefSnapshot = normalizeLocalSecureRefSnapshot(localSecureRefs);
         aimxsActivationSnapshot = normalizeAimxsActivationSnapshot(aimxsActivation);
@@ -4206,13 +4746,36 @@ async function main() {
           refreshOperatorChatGovernanceCatalogs(session),
           refreshDesktopGovernedExportCatalogs()
         ]);
-
+        const homeSnapshot = {
+          session,
+          settings: settingsWithConfigChanges,
+          health,
+          pipeline,
+          providers,
+          runs,
+          approvals,
+          audit,
+          incidentHistory: {
+            items: store.getIncidentPackageHistory()
+          }
+        };
         latestSettingsSnapshot = settingsWithConfigChanges;
-        triageSnapshot = { runs, approvals, audit };
+        latestDeveloperOpsContext = {
+          session,
+          settings: settingsWithConfigChanges,
+          health,
+          providers,
+          runs,
+          projectScope: projectID,
+          selectedAgentProfileId
+        };
+        triageSnapshot = homeSnapshot;
         latestAuditPayload = audit || { items: [] };
-        renderTriagePanel({ health, pipeline });
+        renderHomePanel({
+          snapshot: homeSnapshot
+        });
         renderContextPanel();
-        renderProviders(ui, providers);
+        renderDeveloperOpsPanel();
         renderAgentOpsPage(ui, settingsWithConfigChanges, {
           ...operatorChatState,
           agentProfileId:
@@ -4226,6 +4789,84 @@ async function main() {
               .toLowerCase()
         });
         renderIdentityOpsPage(ui, settingsWithConfigChanges, session);
+        renderGuardrailOpsPage(ui, {
+          settings: settingsWithConfigChanges,
+          runs,
+          approvals,
+          runtimeWorkerCapabilities,
+          exportProfiles: desktopGovernedExportCatalogState?.exportProfiles || null,
+          orgAdminProfiles: desktopGovernedExportCatalogState?.orgAdminProfiles || null
+        });
+        renderGovernanceOpsPanel({
+          settings: settingsWithConfigChanges,
+          approvals,
+          runs,
+          session,
+          orgAdminProfiles: desktopGovernedExportCatalogState?.orgAdminProfiles || null
+        });
+        renderAuditOpsPanel({
+          audit,
+          filters: auditScope,
+          actor: String(
+            session?.claims?.sub || session?.claims?.email || session?.claims?.client_id || ""
+          ).trim(),
+          runs,
+          approvals
+        });
+        renderEvidenceOpsPanel({
+          settings: settingsWithConfigChanges,
+          audit,
+          runs,
+          approvals,
+          thread: operatorChatState.thread
+        });
+        renderIncidentOpsPanel({
+          incidentHistory: {
+            items: store.getIncidentPackageHistory()
+          },
+          runs,
+          approvals,
+          audit
+        });
+        renderComplianceOpsPage(ui, {
+          settings: settingsWithConfigChanges,
+          runs,
+          approvals,
+          audit,
+          health,
+          pipeline,
+          providers,
+          aimxsActivation: aimxsActivationSnapshot,
+          exportProfiles: desktopGovernedExportCatalogState?.exportProfiles || null,
+          orgAdminProfiles: desktopGovernedExportCatalogState?.orgAdminProfiles || null
+        });
+        renderPlatformOpsPage(ui, {
+          health,
+          pipeline,
+          providers,
+          aimxsActivation: aimxsActivationSnapshot
+        });
+        renderNetworkOpsPage(ui, {
+          settings: settingsWithConfigChanges,
+          health,
+          providers,
+          runs,
+          runtimeWorkerCapabilities
+        });
+        renderPolicyOpsPanel({
+          settings: settingsWithConfigChanges,
+          runs
+        });
+        renderRuntimeOpsPanel({
+          health,
+          pipeline,
+          providers,
+          runs,
+          approvals,
+          runtimeIdentity,
+          runtimeSessions,
+          runtimeWorkerCapabilities
+        });
         const editorState = buildSettingsEditorState(
           activeProjectScope(session),
           settingsWithConfigChanges,
@@ -4250,22 +4891,28 @@ async function main() {
             selectedApprovalRunId = "";
           }
         }
-        renderSettings(ui, settingsWithConfigChanges, editorState, {
-          subview: settingsSubviewState,
-          aimxsEditor: aimxsEditorState,
-          demoGovernance: demoGovernanceEditorState,
-          localSecureRefEditor: localSecureRefEditorState,
-          agentTest: {
-            ...agentInvokeState,
-            agentProfileId:
-              String(
-                agentInvokeState.agentProfileId ||
-                  selectedAgentProfileId ||
-                  settingsWithConfigChanges?.integrations?.selectedAgentProfileId ||
-                  ""
-              )
-                .trim()
-                .toLowerCase()
+        renderSettingsOpsPage(ui, {
+          session,
+          settings: settingsWithConfigChanges,
+          editorState,
+          selectedAgentProfileId,
+          viewState: {
+            subview: settingsSubviewState,
+            aimxsEditor: aimxsEditorState,
+            demoGovernance: demoGovernanceEditorState,
+            localSecureRefEditor: localSecureRefEditorState,
+            agentTest: {
+              ...agentInvokeState,
+              agentProfileId:
+                String(
+                  agentInvokeState.agentProfileId ||
+                    selectedAgentProfileId ||
+                    settingsWithConfigChanges?.integrations?.selectedAgentProfileId ||
+                    ""
+                )
+                  .trim()
+                  .toLowerCase()
+            }
           }
         });
         setSettingsSubview(settingsSubviewState);
@@ -4300,6 +4947,46 @@ async function main() {
     } catch (error) {
       clearRefreshStatusLoadingTimer();
       renderHomeErrorPanel(`Refresh failed: ${error.message}`);
+      renderRuntimeOpsEmptyState(ui, {
+        tone: "error",
+        message: `RuntimeOps refresh failed: ${error.message}`
+      });
+      renderGuardrailOpsEmptyState(ui, {
+        tone: "error",
+        message: `GuardrailOps refresh failed: ${error.message}`
+      });
+      renderGovernanceOpsEmptyState(ui, {
+        tone: "error",
+        message: `GovernanceOps refresh failed: ${error.message}`
+      });
+      renderAuditOpsEmptyState(ui, {
+        tone: "error",
+        message: `AuditOps refresh failed: ${error.message}`
+      });
+      renderEvidenceOpsEmptyState(ui, {
+        tone: "error",
+        message: `EvidenceOps refresh failed: ${error.message}`
+      });
+      renderComplianceOpsEmptyState(ui, {
+        tone: "error",
+        message: `ComplianceOps refresh failed: ${error.message}`
+      });
+      renderIncidentOpsEmptyState(ui, {
+        tone: "error",
+        message: `IncidentOps refresh failed: ${error.message}`
+      });
+      renderPlatformOpsEmptyState(ui, {
+        tone: "error",
+        message: `PlatformOps refresh failed: ${error.message}`
+      });
+      renderNetworkOpsEmptyState(ui, {
+        tone: "error",
+        message: `NetworkOps refresh failed: ${error.message}`
+      });
+      renderPolicyOpsEmptyState(ui, {
+        tone: "error",
+        message: `PolicyOps refresh failed: ${error.message}`
+      });
       setRefreshStatus("error", "refresh failed");
     } finally {
       reconcileOperatorChatFollowLoop();
@@ -4401,6 +5088,501 @@ async function main() {
     };
   }
 
+  function getCurrentEvidenceOpsSnapshot() {
+    return createEvidenceWorkspaceSnapshot({
+      ...latestEvidenceOpsContext,
+      incidentHistory: {
+        items: store.getIncidentPackageHistory()
+      },
+      viewState: evidenceOpsViewState
+    });
+  }
+
+  function getCurrentPolicyOpsSnapshot() {
+    return createPolicyWorkspaceSnapshot({
+      ...latestPolicyOpsContext,
+      viewState: policyOpsViewState
+    });
+  }
+
+  function buildPolicyOpsDecisionExplanationPayload(snapshot = {}) {
+    return {
+      exportedAt: new Date().toISOString(),
+      source: "policyops",
+      board: "decision_explanation",
+      currentContract: snapshot?.currentContract || {},
+      decisionExplanation: snapshot?.decisionExplanation || {},
+      policyCoverage: snapshot?.policyCoverage || {},
+      stableReferences: snapshot?.stableReferences || {}
+    };
+  }
+
+  function buildPolicyOpsReviewFileName(prefix, token) {
+    const normalizedPrefix = String(prefix || "policy-review").trim() || "policy-review";
+    const normalizedToken =
+      String(token || "latest")
+        .trim()
+        .replace(/[^a-zA-Z0-9._-]+/g, "-") || "latest";
+    return `epydiosops-${normalizedPrefix}-${normalizedToken}.json`;
+  }
+
+  function buildPolicyOpsStableReferenceText(snapshot = {}) {
+    const refs = snapshot?.stableReferences || {};
+    return [
+      `provider=${String(snapshot?.currentContract?.providerLabel || "-").trim() || "-"}`,
+      `mode=${String(snapshot?.currentContract?.mode || "-").trim() || "-"}`,
+      `catalogSource=${String(snapshot?.currentContract?.catalogSource || "-").trim() || "-"}`,
+      `contractId=${String(refs.contractId || "-").trim() || "-"}`,
+      `runId=${String(refs.runId || "-").trim() || "-"}`,
+      `providerId=${String(refs.providerId || "-").trim() || "-"}`,
+      `packId=${String(refs.packId || "-").trim() || "-"}`,
+      `boundaryClass=${String(refs.boundaryClass || "-").trim() || "-"}`,
+      `riskTier=${String(refs.riskTier || "-").trim() || "-"}`,
+      `auditEventRef=${String(refs.auditEventRef || "-").trim() || "-"}`
+    ].join("\n");
+  }
+
+  function runPolicyOpsExportDecisionExplanation() {
+    const snapshot = getCurrentPolicyOpsSnapshot();
+    const board = snapshot?.decisionExplanation || {};
+    if (!board.available || !board.exportable) {
+      setPolicyOpsFeedback("warn", "No recorded policy decision is available yet, so decision explanation export was skipped.");
+      return false;
+    }
+    const payload = buildPolicyOpsDecisionExplanationPayload(snapshot);
+    const fileName = buildPolicyOpsReviewFileName(
+      "policy-decision-explanation",
+      board.runId || snapshot?.stableReferences?.contractId
+    );
+    const prepared = exportGovernedJson(
+      payload,
+      fileName,
+      buildDesktopGovernedExportOptions("audit_export", "downstream_review", "review")
+    );
+    setPolicyOpsFeedback(
+      "ok",
+      `Policy decision explanation JSON downloaded as ${fileName}.${describeGovernedExportDisposition(prepared)}${describeGovernedExportRedactions(prepared, "policy review")}`
+    );
+    return true;
+  }
+
+  async function runPolicyOpsCopyStableReferences() {
+    const snapshot = getCurrentPolicyOpsSnapshot();
+    const refs = snapshot?.stableReferences || {};
+    if (!refs.contractId && !refs.runId && !refs.providerId) {
+      setPolicyOpsFeedback("warn", "No stable policy references are available yet from the current PolicyOps snapshot.");
+      return false;
+    }
+    try {
+      await copyTextToClipboard(buildPolicyOpsStableReferenceText(snapshot));
+      setPolicyOpsFeedback("ok", "Stable policy references copied to the clipboard.");
+      return true;
+    } catch (error) {
+      setPolicyOpsFeedback("error", `Copy failed: ${error.message}`);
+      return false;
+    }
+  }
+
+  function runPolicyOpsRefreshSimulation() {
+    const snapshot = getCurrentPolicyOpsSnapshot();
+    const board = snapshot?.policySimulation || {};
+    if (!board.available || !board.refreshable) {
+      setPolicyOpsFeedback("warn", "No governed run replay is available yet, so bounded simulation refresh was skipped.");
+      return false;
+    }
+    policyOpsViewState = {
+      ...policyOpsViewState,
+      simulationRefreshedAt: new Date().toISOString()
+    };
+    renderPolicyOpsPanel();
+    setPolicyOpsFeedback(
+      "ok",
+      `Policy simulation refreshed from the latest governed run replay. Expected outcome=${String(board.expectedOutcome || "UNSET").trim() || "UNSET"}; blockers=${String(board.blockerCount || 0)}.`
+    );
+    return true;
+  }
+
+  function openPolicyOpsGovernance() {
+    const snapshot = getCurrentPolicyOpsSnapshot();
+    const runId = String(snapshot?.decisionExplanation?.runId || "").trim();
+    if (!runId) {
+      setPolicyOpsFeedback("warn", "No linked governance run is available from the current PolicyOps snapshot.");
+      return false;
+    }
+    governanceOpsViewState = {
+      ...governanceOpsViewState,
+      selectedRunId: runId
+    };
+    renderGovernanceOpsPanel();
+    setWorkspaceView("governanceops", true);
+    focusRenderedRegion(ui.governanceOpsContent, { scroll: false });
+    setPolicyOpsFeedback("info", `Opened linked governance context for ${runId}.`);
+    return true;
+  }
+
+  function getCurrentIncidentOpsSnapshot() {
+    return createIncidentOpsWorkspaceSnapshot({
+      ...latestIncidentOpsContext,
+      incidentHistory: {
+        items: store.getIncidentPackageHistory()
+      },
+      viewState: incidentOpsViewState
+    });
+  }
+
+  function getCurrentIncidentOpsEntry(entryId = "") {
+    const snapshot = getCurrentIncidentOpsSnapshot();
+    const resolvedEntryId =
+      String(entryId || "").trim() ||
+      String(snapshot?.selectedIncidentId || "").trim() ||
+      String(snapshot?.activeIncidentBoard?.entryId || "").trim();
+    if (!resolvedEntryId) {
+      return null;
+    }
+    return store.getIncidentPackageHistoryById(resolvedEntryId);
+  }
+
+  function syncIncidentOpsSelectionAfterHistoryChange(entryId = "") {
+    const items = store.getIncidentPackageHistory();
+    const candidateId = String(entryId || incidentOpsViewState.selectedIncidentId || "").trim();
+    const resolvedEntry =
+      items.find((item) => String(item?.id || "").trim() === candidateId) || items[0] || null;
+    incidentOpsViewState = {
+      ...incidentOpsViewState,
+      selectedIncidentId: String(resolvedEntry?.id || "").trim()
+    };
+    renderIncidentOpsPanel();
+  }
+
+  function buildEvidenceOpsBundleReviewPayload(snapshot = {}) {
+    return {
+      exportedAt: new Date().toISOString(),
+      source: "evidenceops",
+      board: "evidence_bundle_review",
+      bundle: snapshot?.evidenceBundleBoard || {}
+    };
+  }
+
+  function buildEvidenceOpsProvenanceReviewPayload(snapshot = {}) {
+    return {
+      exportedAt: new Date().toISOString(),
+      source: "evidenceops",
+      board: "provenance_review",
+      provenance: snapshot?.provenanceBoard || {}
+    };
+  }
+
+  function buildEvidenceOpsReviewFileName(prefix, token) {
+    const normalizedPrefix = String(prefix || "evidence-review").trim() || "evidence-review";
+    const normalizedToken =
+      String(token || "latest")
+        .trim()
+        .replace(/[^a-zA-Z0-9._-]+/g, "-") || "latest";
+    return `epydiosops-${normalizedPrefix}-${normalizedToken}.json`;
+  }
+
+  function runEvidenceOpsExportBundleReview() {
+    const snapshot = getCurrentEvidenceOpsSnapshot();
+    const board = snapshot?.evidenceBundleBoard || {};
+    if (!board.bundleCount) {
+      setEvidenceOpsFeedback("warn", "No evidence bundles are available yet, so bundle review export was skipped.");
+      return false;
+    }
+    const payload = buildEvidenceOpsBundleReviewPayload(snapshot);
+    const fileName = buildEvidenceOpsReviewFileName(
+      "evidence-bundle-review",
+      board.latestBundle?.bundleId || board.latestBundle?.runId
+    );
+    const prepared = exportGovernedJson(
+      payload,
+      fileName,
+      buildDesktopGovernedExportOptions("audit_export", "downstream_review", "review")
+    );
+    setEvidenceOpsFeedback(
+      "ok",
+      `Evidence bundle review JSON downloaded as ${fileName}.${describeGovernedExportDisposition(prepared)}${describeGovernedExportRedactions(prepared, "evidence review")}`
+    );
+    return true;
+  }
+
+  function runEvidenceOpsExportProvenanceReview() {
+    const snapshot = getCurrentEvidenceOpsSnapshot();
+    const board = snapshot?.provenanceBoard || {};
+    if (!board.artifactCount && !board.incidentPackageCount) {
+      setEvidenceOpsFeedback("warn", "No provenance material is available yet, so provenance review export was skipped.");
+      return false;
+    }
+    const payload = buildEvidenceOpsProvenanceReviewPayload(snapshot);
+    const fileName = buildEvidenceOpsReviewFileName(
+      "evidence-provenance-review",
+      board.latestArtifact?.artifactId || board.bundleId
+    );
+    const prepared = exportGovernedJson(
+      payload,
+      fileName,
+      buildDesktopGovernedExportOptions("audit_export", "downstream_review", "review")
+    );
+    setEvidenceOpsFeedback(
+      "ok",
+      `Evidence provenance review JSON downloaded as ${fileName}.${describeGovernedExportDisposition(prepared)}${describeGovernedExportRedactions(prepared, "evidence review")}`
+    );
+    return true;
+  }
+
+  async function runEvidenceOpsCopyPath(path, label = "Path") {
+    const normalizedPath = String(path || "").trim();
+    if (!normalizedPath) {
+      setEvidenceOpsFeedback("warn", `${label} is not available to copy yet.`);
+      return false;
+    }
+    try {
+      await copyTextToClipboard(normalizedPath);
+      setEvidenceOpsFeedback("ok", `${label} copied to the clipboard.`);
+      return true;
+    } catch (error) {
+      setEvidenceOpsFeedback("error", `Copy failed: ${error.message}`);
+      return false;
+    }
+  }
+
+  async function runEvidenceOpsOpenLinkedRun(runId = "") {
+    const snapshot = getCurrentEvidenceOpsSnapshot();
+    const resolvedRunId =
+      String(runId || "").trim() ||
+      String(snapshot?.artifactAccessBoard?.latestArtifact?.runId || "").trim() ||
+      String(snapshot?.evidenceBundleBoard?.latestBundle?.runId || "").trim();
+    if (!resolvedRunId) {
+      setEvidenceOpsFeedback("warn", "No linked run is available from the current evidence snapshot.");
+      return false;
+    }
+    await openRunDetail(resolvedRunId);
+    setEvidenceOpsFeedback("info", `Opened linked run detail for ${resolvedRunId}.`);
+    return true;
+  }
+
+  function runIncidentOpsDownloadPackage(entryId = "") {
+    const entry = getCurrentIncidentOpsEntry(entryId);
+    if (!entry?.payload) {
+      setIncidentOpsFeedback("warn", "No incident package payload is available from the current IncidentOps focus.");
+      return false;
+    }
+    const fallbackRunId = String(entry?.runId || "").trim();
+    const fallbackFileName = String(entry?.fileName || "").trim();
+    const fileName = fallbackFileName || buildIncidentPackageFileName(fallbackRunId, {}, new Date().toISOString());
+    const prepared = exportGovernedJson(
+      entry.payload,
+      fileName,
+      buildDesktopGovernedExportOptions("incident_export", "incident_response", "export")
+    );
+    setIncidentOpsFeedback(
+      "ok",
+      `Incident package JSON downloaded to ${fileName}. Review package metadata before external handoff.${describeGovernedExportDisposition(prepared)}${describeGovernedExportRedactions(prepared, "incident export")} ${buildIncidentEntryTraceabilitySummary(entry)}`
+    );
+    return true;
+  }
+
+  async function runIncidentOpsCopyHandoff(entryId = "") {
+    const entry = getCurrentIncidentOpsEntry(entryId);
+    const handoffText = String(entry?.handoffText || "").trim();
+    if (!handoffText) {
+      setIncidentOpsFeedback("warn", "The focused incident does not have a handoff summary yet.");
+      return false;
+    }
+    try {
+      const prepared = await copyGovernedText(
+        handoffText,
+        buildDesktopGovernedExportOptions("incident_handoff", "incident_response", "handoff")
+      );
+      setIncidentOpsFeedback(
+        "ok",
+        `Incident handoff summary copied for ${entry.packageId || entry.id}. Review the text before sending it downstream.${describeGovernedExportDisposition(prepared)}${describeGovernedExportRedactions(prepared, "incident handoff")} ${buildIncidentEntryTraceabilitySummary(entry)}`
+      );
+      return true;
+    } catch (error) {
+      setIncidentOpsFeedback("error", `Incident handoff summary copy failed: ${error.message}`);
+      return false;
+    }
+  }
+
+  async function runIncidentOpsOpenLinkedRun(entryId = "") {
+    const entry = getCurrentIncidentOpsEntry(entryId);
+    const runId = String(entry?.runId || "").trim();
+    if (!runId) {
+      setIncidentOpsFeedback("warn", "No linked run is available from the current IncidentOps focus.");
+      return false;
+    }
+    await openRunDetail(runId);
+    setIncidentOpsFeedback("info", `Opened linked run detail for ${runId}.`);
+    return true;
+  }
+
+  function runIncidentOpsTransitionStatus(nextStatus, entryId = "") {
+    const entry = getCurrentIncidentOpsEntry(entryId);
+    if (!entry) {
+      setIncidentOpsFeedback("warn", "IncidentOps could not resolve the focused incident entry.");
+      return false;
+    }
+    const currentStatus = normalizeIncidentFilingStatus(entry.filingStatus);
+    const targetStatus = normalizeIncidentFilingStatus(nextStatus);
+    if (!canTransitionIncidentStatus(currentStatus, targetStatus)) {
+      setIncidentOpsFeedback(
+        "warn",
+        `Status change blocked for ${entry.packageId || entry.id}: ${currentStatus} -> ${targetStatus}. Follow the bounded closure guidance before retrying.`
+      );
+      return false;
+    }
+    store.updateIncidentPackageHistoryEntry(entry.id, {
+      filingStatus: targetStatus,
+      filingUpdatedAt: new Date().toISOString()
+    });
+    persistIncidentHistory();
+    renderIncidentHistoryPanel();
+    syncIncidentOpsSelectionAfterHistoryChange(entry.id);
+    setIncidentOpsFeedback(
+      "ok",
+      `Incident status updated for ${entry.packageId || entry.id}: ${currentStatus} -> ${targetStatus}. Review closure posture before leaving IncidentOps.`
+    );
+    return true;
+  }
+
+  function runAuditOpsExportJson() {
+    const bundle = getCurrentAuditFilingBundle();
+    if (!Array.isArray(bundle?.items) || bundle.items.length === 0) {
+      renderAuditFilingFeedback("warn", "No audit rows match the current filters, so JSON export was skipped.");
+      return false;
+    }
+    const fileName = buildAuditExportFileName("json", bundle?.meta?.filters || {}, bundle?.meta?.generatedAt);
+    const prepared = exportGovernedJson(
+      bundle,
+      fileName,
+      buildDesktopGovernedExportOptions("audit_export", "downstream_review", "export")
+    );
+    setAuditOpsHandoffPreview(
+      prepareGovernedTextExport(
+        buildAuditHandoffText(bundle),
+        buildDesktopGovernedExportOptions("audit_export", "downstream_review", "handoff")
+      ).text,
+      { render: false }
+    );
+    renderAuditFilingFeedback(
+      "ok",
+      `Audit JSON exported to ${fileName}. rows=${bundle.items.length}. Review the handoff preview before sharing downstream.${describeGovernedExportDisposition(prepared)}${describeGovernedExportRedactions(prepared, "audit export")} ${buildAuditTraceabilitySummary(bundle, fileName)}`
+    );
+    return true;
+  }
+
+  function runAuditOpsExportCsv() {
+    const bundle = getCurrentAuditFilingBundle();
+    if (!Array.isArray(bundle?.items) || bundle.items.length === 0) {
+      renderAuditFilingFeedback("warn", "No audit rows match the current filters, so CSV export was skipped.");
+      return false;
+    }
+    const fileName = buildAuditExportFileName("csv", bundle?.meta?.filters || {}, bundle?.meta?.generatedAt);
+    const csv = buildAuditCsv(bundle.items);
+    const prepared = downloadGovernedText(
+      csv,
+      fileName,
+      "text/csv;charset=utf-8",
+      buildDesktopGovernedExportOptions("audit_export", "downstream_review", "export")
+    );
+    renderAuditFilingFeedback(
+      "ok",
+      `Audit CSV exported to ${fileName}. rows=${bundle.items.length}. Review scope and time window before sharing downstream.${describeGovernedExportDisposition(prepared)}${describeGovernedExportRedactions(prepared, "audit export")} ${buildAuditTraceabilitySummary(bundle, fileName)}`
+    );
+    return true;
+  }
+
+  async function runAuditOpsCopyHandoff() {
+    const bundle = getCurrentAuditFilingBundle();
+    if (!Array.isArray(bundle?.items) || bundle.items.length === 0) {
+      renderAuditFilingFeedback("warn", "No audit rows match the current filters, so handoff copy was skipped.");
+      return false;
+    }
+    const handoffText = buildAuditHandoffText(bundle);
+    try {
+      const prepared = await copyGovernedText(
+        handoffText,
+        buildDesktopGovernedExportOptions("audit_handoff", "downstream_review", "handoff")
+      );
+      setAuditOpsHandoffPreview(prepared.text, { render: false });
+      renderAuditFilingFeedback(
+        "ok",
+        `Copied handoff summary for ${bundle.items.length} audit rows to clipboard. Review the preview pane before sending it downstream.${describeGovernedExportDisposition(prepared)}${describeGovernedExportRedactions(prepared, "audit handoff")} ${buildAuditTraceabilitySummary(bundle)}`
+      );
+      return true;
+    } catch (error) {
+      renderAuditFilingFeedback("error", `Audit handoff copy failed: ${error.message}`);
+      return false;
+    }
+  }
+
+  function runAuditOpsExportIncidentPackage() {
+    const incidentPkg = getCurrentIncidentPackage();
+    const runId = String(incidentPkg?.run?.runId || "").trim();
+    if (!runId) {
+      renderAuditFilingFeedback("warn", "Select a run detail first, then export the incident package from Audit Events.");
+      return false;
+    }
+
+    const handoffText = buildIncidentPackageHandoffText(incidentPkg);
+    incidentPkg.handoff = {
+      text: handoffText
+    };
+    const fileName = buildIncidentPackageFileName(
+      runId,
+      incidentPkg?.audit?.meta?.filters || {},
+      incidentPkg?.meta?.generatedAt
+    );
+    const prepared = exportGovernedJson(
+      incidentPkg,
+      fileName,
+      buildDesktopGovernedExportOptions("incident_export", "incident_response", "export")
+    );
+    pushIncidentHistory(buildIncidentHistoryEntry(incidentPkg, fileName));
+    setAuditOpsHandoffPreview(
+      prepareGovernedTextExport(
+        handoffText,
+        buildDesktopGovernedExportOptions("incident_export", "incident_response", "handoff")
+      ).text,
+      { render: false }
+    );
+    const auditCount = Number(incidentPkg?.audit?.meta?.matchedCount || 0);
+    const approvalStatus = String(incidentPkg?.approval?.status || "UNAVAILABLE").trim().toUpperCase();
+    renderAuditFilingFeedback(
+      "ok",
+      `Incident package exported to ${fileName}. runId=${runId}; approval=${approvalStatus}; auditRows=${auditCount}. Review the handoff preview and queue status before downstream handoff.${describeGovernedExportDisposition(prepared)}${describeGovernedExportRedactions(prepared, "incident export")} ${buildIncidentTraceabilitySummary(incidentPkg, fileName)}`
+    );
+    return true;
+  }
+
+  async function runAuditOpsCopyLatestIncidentHandoff() {
+    const [latest] = store.getIncidentPackageHistory();
+    if (!latest) {
+      renderAuditFilingFeedback("warn", "Incident queue is empty, so there is no incident handoff summary to copy.");
+      return false;
+    }
+    const handoffText = String(latest?.handoffText || "").trim();
+    if (!handoffText) {
+      renderAuditFilingFeedback("warn", "Latest incident package does not have a handoff summary yet.");
+      return false;
+    }
+    try {
+      const prepared = await copyGovernedText(
+        handoffText,
+        buildDesktopGovernedExportOptions("incident_handoff", "incident_response", "handoff")
+      );
+      setAuditOpsHandoffPreview(prepared.text, { render: false });
+      renderAuditFilingFeedback(
+        "ok",
+        `Latest incident handoff summary copied for ${latest.packageId || latest.id}. Review the preview pane before sending it downstream.${describeGovernedExportDisposition(prepared)}${describeGovernedExportRedactions(prepared, "incident handoff")} ${buildIncidentEntryTraceabilitySummary(latest)}`
+      );
+      return true;
+    } catch (error) {
+      renderAuditFilingFeedback("error", `Incident handoff summary copy failed: ${error.message}`);
+      return false;
+    }
+  }
+
   function buildNativeApprovalRailItems(thread = {}) {
     const turns = Array.isArray(thread?.turns) ? thread.turns : [];
     const taskId = String(thread?.taskId || "").trim();
@@ -4485,6 +5667,10 @@ async function main() {
     if (!nextRunID) {
       return;
     }
+    runtimeOpsViewState = {
+      ...runtimeOpsViewState,
+      selectedRunId: nextRunID
+    };
     setWorkspaceView("runtimeops", true);
     ui.runDetailContent.dataset.selectedRunId = nextRunID;
     if (ui.terminalRunId) {
@@ -4542,6 +5728,243 @@ async function main() {
     }
 
     focusRenderedRegion(ui.runDetailContent);
+  }
+
+  function runtimeOpsActionSnapshot() {
+    return createRuntimeWorkspaceSnapshot(latestRuntimeOpsContext, session, {
+      viewState: runtimeOpsViewState
+    });
+  }
+
+  function runtimeOpsSessionRecordById(sessionID = "") {
+    const normalizedSessionID = String(sessionID || "").trim();
+    const items = Array.isArray(latestRuntimeOpsContext?.runtimeSessions?.items)
+      ? latestRuntimeOpsContext.runtimeSessions.items
+      : [];
+    if (!normalizedSessionID) {
+      return null;
+    }
+    return (
+      items.find((item) => String(item?.sessionId || "").trim() === normalizedSessionID) || null
+    );
+  }
+
+  function runtimeOpsWorkerCapabilityForSession(sessionRecord = {}) {
+    const items = Array.isArray(latestRuntimeOpsContext?.runtimeWorkerCapabilities?.items)
+      ? latestRuntimeOpsContext.runtimeWorkerCapabilities.items
+      : [];
+    const selectedAdapterId = String(sessionRecord?.selectedWorkerAdapterId || "").trim().toLowerCase();
+    const selectedProvider = String(sessionRecord?.selectedWorkerProvider || "").trim().toLowerCase();
+    const managed = items.filter(
+      (item) => String(item?.workerType || "").trim().toLowerCase() === "managed_agent"
+    );
+    if (selectedAdapterId) {
+      const byAdapter = managed.find(
+        (item) => String(item?.adapterId || "").trim().toLowerCase() === selectedAdapterId
+      );
+      if (byAdapter) {
+        return byAdapter;
+      }
+    }
+    if (selectedProvider) {
+      const byProvider = managed.find(
+        (item) => String(item?.provider || "").trim().toLowerCase() === selectedProvider
+      );
+      if (byProvider) {
+        return byProvider;
+      }
+    }
+    return (
+      managed.find((item) => String(item?.adapterId || "").trim().toLowerCase() === "codex") ||
+      managed[0] ||
+      items[0] ||
+      null
+    );
+  }
+
+  function buildRuntimeOpsScopeMeta(sessionRecord = {}) {
+    return {
+      tenantId:
+        String(sessionRecord?.tenantId || "").trim() ||
+        String(session?.claims?.tenant_id || "").trim(),
+      projectId:
+        String(sessionRecord?.projectId || "").trim() ||
+        String(session?.claims?.project_id || "").trim()
+    };
+  }
+
+  async function submitRuntimeOpsCloseSession(sessionID = "") {
+    const snapshot = runtimeOpsActionSnapshot();
+    const resolvedSessionID = String(sessionID || snapshot?.actionReview?.session?.sessionId || "").trim();
+    const sessionRecord = runtimeOpsSessionRecordById(resolvedSessionID);
+    if (!resolvedSessionID || !sessionRecord) {
+      setRuntimeOpsFeedback("warn", "No live runtime session is available to close.");
+      return true;
+    }
+    const scopeMeta = buildRuntimeOpsScopeMeta(sessionRecord);
+    runtimeOpsViewState = {
+      ...runtimeOpsViewState,
+      selectedSessionId: resolvedSessionID
+    };
+    setRuntimeOpsFeedback("info", `Closing runtime session ${resolvedSessionID}...`);
+    try {
+      const result = await api.closeRuntimeSession(resolvedSessionID, {
+        meta: {
+          tenantId: scopeMeta.tenantId,
+          projectId: scopeMeta.projectId,
+          requestId: `req-runtimeops-close-${Date.now()}`
+        },
+        status: "CANCELLED",
+        reason: "Runtime session closed from RuntimeOps."
+      });
+      if (result?.applied === false) {
+        setRuntimeOpsFeedback("warn", result.warning || "Runtime session close was not applied.");
+      } else {
+        setRuntimeOpsFeedback("ok", `Runtime session ${resolvedSessionID} closed.`);
+      }
+      await refresh();
+      await loadRuntimeOpsSessionReview(resolvedSessionID);
+    } catch (error) {
+      setRuntimeOpsFeedback("error", `Runtime session close failed: ${error.message}`);
+    }
+    return true;
+  }
+
+  async function submitRuntimeOpsAttachWorker(sessionID = "") {
+    const snapshot = runtimeOpsActionSnapshot();
+    const resolvedSessionID = String(sessionID || snapshot?.actionReview?.session?.sessionId || "").trim();
+    const sessionRecord = runtimeOpsSessionRecordById(resolvedSessionID);
+    if (!resolvedSessionID || !sessionRecord) {
+      setRuntimeOpsFeedback("warn", "No live runtime session is available for worker attachment.");
+      return true;
+    }
+    if (String(sessionRecord?.selectedWorkerId || "").trim()) {
+      setRuntimeOpsFeedback(
+        "warn",
+        `Session ${resolvedSessionID} already has an attached worker. Use Heartbeat or Reattach instead.`
+      );
+      return true;
+    }
+    const capability = runtimeOpsWorkerCapabilityForSession(sessionRecord);
+    if (!capability) {
+      setRuntimeOpsFeedback("warn", "No runtime worker capability is available for attachment.");
+      return true;
+    }
+    const scopeMeta = buildRuntimeOpsScopeMeta(sessionRecord);
+    runtimeOpsViewState = {
+      ...runtimeOpsViewState,
+      selectedSessionId: resolvedSessionID
+    };
+    setRuntimeOpsFeedback(
+      "info",
+      `Attaching ${String(capability.label || capability.adapterId || "worker").trim()} to ${resolvedSessionID}...`
+    );
+    try {
+      await api.attachRuntimeSessionWorker(resolvedSessionID, {
+        meta: {
+          tenantId: scopeMeta.tenantId,
+          projectId: scopeMeta.projectId,
+          requestId: `req-runtimeops-attach-${Date.now()}`
+        },
+        workerType: String(capability.workerType || "").trim(),
+        adapterId: String(capability.adapterId || "").trim(),
+        source: "desktop-ui.runtimeops.worker.attach",
+        routing: "runtimeops",
+        agentProfileId:
+          String(capability.adapterId || "").trim().toLowerCase() === "codex"
+            ? "codex"
+            : "",
+        provider: String(capability.provider || "").trim(),
+        transport: String(capability.transport || "").trim(),
+        model: String(capability.model || "").trim(),
+        targetEnvironment: Array.isArray(capability.targetEnvironments)
+          ? String(capability.targetEnvironments[0] || "").trim()
+          : "",
+        capabilities: Array.isArray(capability.capabilities) ? capability.capabilities : [],
+        annotations: {
+          surface: "runtimeops",
+          action: "attach_worker"
+        }
+      });
+      setRuntimeOpsFeedback(
+        "ok",
+        `Worker attached to ${resolvedSessionID} from RuntimeOps.`
+      );
+      await refresh();
+      await loadRuntimeOpsSessionReview(resolvedSessionID);
+    } catch (error) {
+      setRuntimeOpsFeedback("error", `Worker attach failed: ${error.message}`);
+    }
+    return true;
+  }
+
+  async function submitRuntimeOpsWorkerEvent(actionType = "", sessionID = "", workerID = "") {
+    const snapshot = runtimeOpsActionSnapshot();
+    const resolvedSessionID = String(sessionID || snapshot?.actionReview?.session?.sessionId || "").trim();
+    const resolvedWorkerID = String(workerID || snapshot?.actionReview?.worker?.workerId || "").trim();
+    const sessionRecord = runtimeOpsSessionRecordById(resolvedSessionID);
+    if (!resolvedSessionID || !resolvedWorkerID || !sessionRecord) {
+      setRuntimeOpsFeedback("warn", "A live worker selection is required before submitting a runtime worker event.");
+      return true;
+    }
+    const normalizedAction = String(actionType || "").trim().toLowerCase();
+    const scopeMeta = buildRuntimeOpsScopeMeta(sessionRecord);
+    const eventType = normalizedAction === "reattach" ? "worker.bridge.started" : "worker.heartbeat";
+    const summary =
+      normalizedAction === "reattach"
+        ? "Managed worker bridge reasserted from RuntimeOps."
+        : "Managed worker heartbeat recorded from RuntimeOps.";
+    runtimeOpsViewState = {
+      ...runtimeOpsViewState,
+      selectedSessionId: resolvedSessionID
+    };
+    setRuntimeOpsFeedback(
+      "info",
+      `${normalizedAction === "reattach" ? "Reasserting" : "Recording"} worker state for ${resolvedWorkerID}...`
+    );
+    try {
+      await api.createRuntimeSessionWorkerEvent(resolvedSessionID, resolvedWorkerID, {
+        meta: {
+          tenantId: scopeMeta.tenantId,
+          projectId: scopeMeta.projectId,
+          requestId: `req-runtimeops-worker-event-${Date.now()}`
+        },
+        eventType,
+        status: "RUNNING",
+        severity: "info",
+        summary,
+        payload: {
+          stage: normalizedAction || "heartbeat",
+          surface: "runtimeops"
+        }
+      });
+      setRuntimeOpsFeedback(
+        "ok",
+        `${normalizedAction === "reattach" ? "Worker bridge reasserted" : "Worker heartbeat recorded"} for ${resolvedWorkerID}.`
+      );
+      await refresh();
+      await loadRuntimeOpsSessionReview(resolvedSessionID);
+    } catch (error) {
+      setRuntimeOpsFeedback("error", `Worker event failed: ${error.message}`);
+    }
+    return true;
+  }
+
+  function focusAgentDetailByKey(rawDetailKey) {
+    const detailKey = String(rawDetailKey || "").trim();
+    if (!detailKey || !(ui.chatContent instanceof HTMLElement)) {
+      return false;
+    }
+    const detailNode = Array.from(ui.chatContent.querySelectorAll("details[data-detail-key]") || []).find((node) => {
+      return node instanceof HTMLDetailsElement && String(node.dataset.detailKey || "").trim() === detailKey;
+    });
+    if (!(detailNode instanceof HTMLDetailsElement)) {
+      return false;
+    }
+    detailNode.open = true;
+    detailsOpenState[detailKey] = true;
+    saveJSON(DETAILS_OPEN_STATE_KEY, detailsOpenState);
+    return focusRenderedRegion(detailNode, { block: "center" });
   }
 
   function openApprovalDetail(runID) {
@@ -4606,6 +6029,100 @@ async function main() {
     return true;
   }
 
+  function governanceApprovalRecordByRunID(runID) {
+    const normalizedRunID = String(runID || "").trim();
+    if (!normalizedRunID) {
+      return null;
+    }
+    const approvalItems = Array.isArray(latestGovernanceOpsContext?.approvals?.items)
+      ? latestGovernanceOpsContext.approvals.items
+      : [];
+    return (
+      approvalItems.find((item) => String(item?.runId || "").trim() === normalizedRunID) ||
+      store.getApprovalByRunID(normalizedRunID) ||
+      null
+    );
+  }
+
+  function governanceRunRecordByRunID(runID) {
+    const normalizedRunID = String(runID || "").trim();
+    if (!normalizedRunID) {
+      return null;
+    }
+    const runItems = Array.isArray(latestGovernanceOpsContext?.runs?.items)
+      ? latestGovernanceOpsContext.runs.items
+      : [];
+    return (
+      runItems.find((item) => String(item?.runId || "").trim() === normalizedRunID) ||
+      store.getRunById(normalizedRunID) ||
+      null
+    );
+  }
+
+  function buildGovernanceReceiptSnapshot(runID, options = {}) {
+    const normalizedRunID = String(runID || governanceOpsViewState.selectedRunId || "").trim();
+    if (!normalizedRunID) {
+      return "";
+    }
+    const approval = governanceApprovalRecordByRunID(normalizedRunID) || {};
+    const run = governanceRunRecordByRunID(normalizedRunID) || {};
+    const requestedAction = String(options.requestedAction || "").trim().toUpperCase();
+    const reason = String(options.reason || approval?.reason || "").trim();
+    const capabilities = Array.isArray(approval?.requestedCapabilities) ? approval.requestedCapabilities : [];
+    const lines = [
+      "Governance receipt snapshot",
+      `runId=${normalizedRunID}`,
+      `approvalId=${String(approval?.approvalId || "-").trim() || "-"}`,
+      `requestId=${String(run?.requestId || approval?.requestId || "-").trim() || "-"}`,
+      `status=${String(approval?.status || "-").trim() || "-"}`,
+      `decision=${String(run?.policyDecision || "-").trim() || "-"}`,
+      `provider=${String(run?.selectedPolicyProvider || run?.policyResponse?.source || "-").trim() || "-"}`,
+      `tenant=${String(approval?.tenantId || run?.tenantId || "-").trim() || "-"}`,
+      `project=${String(approval?.projectId || run?.projectId || "-").trim() || "-"}`,
+      `tier=${String(approval?.tier || "-").trim() || "-"}`,
+      `profile=${String(approval?.targetExecutionProfile || "-").trim() || "-"}`,
+      `grantTokenPresent=${run?.policyGrantTokenPresent ? "yes" : "no"}`,
+      `evidenceBundle=${String(run?.evidenceBundleResponse?.status || run?.evidenceBundleStatus || "-").trim() || "-"}`,
+      `evidenceRecord=${String(run?.evidenceRecordResponse?.status || run?.evidenceRecordStatus || "-").trim() || "-"}`,
+      `createdAt=${String(approval?.createdAt || "-").trim() || "-"}`,
+      `reviewedAt=${String(approval?.reviewedAt || "-").trim() || "-"}`,
+      `expiresAt=${String(approval?.expiresAt || "-").trim() || "-"}`,
+      `reason=${reason || "-"}`
+    ];
+    if (requestedAction) {
+      lines.push(`requestedAction=${requestedAction}`);
+    }
+    if (capabilities.length > 0) {
+      lines.push(`requestedCapabilities=${capabilities.join(", ")}`);
+    }
+    return lines.join("\n");
+  }
+
+  async function copyGovernanceReceiptSnapshot(runID, options = {}) {
+    const payload = buildGovernanceReceiptSnapshot(runID, options);
+    if (!payload) {
+      if (options.report !== false) {
+        setGovernanceOpsFeedback("warn", "No governance receipt snapshot is available for the selected run.");
+      }
+      return false;
+    }
+    try {
+      await copyTextToClipboard(payload);
+      if (options.report !== false) {
+        setGovernanceOpsFeedback(
+          "ok",
+          `Governance receipt snapshot copied for runId=${String(runID || governanceOpsViewState.selectedRunId || "").trim()}.`
+        );
+      }
+      return true;
+    } catch (error) {
+      if (options.report !== false) {
+        setGovernanceOpsFeedback("error", `Copy failed: ${error.message}`);
+      }
+      return false;
+    }
+  }
+
   async function submitApprovalDecisionFromContainer(container, decisionNode) {
     const runID =
       decisionNode instanceof HTMLElement
@@ -4657,6 +6174,100 @@ async function main() {
     } catch (error) {
       renderApprovalFeedback(ui, "error", error.message);
     }
+    return true;
+  }
+
+  async function submitGovernanceOpsDecisionFromContainer(container, decisionNode) {
+    const runID =
+      decisionNode instanceof HTMLElement
+        ? String(decisionNode.dataset.governanceopsDecisionRunId || "").trim()
+        : "";
+    const decision =
+      decisionNode instanceof HTMLElement
+        ? String(decisionNode.dataset.governanceopsDecision || "").trim().toUpperCase()
+        : "";
+    if (!runID || !decision) {
+      return false;
+    }
+    const reasonInput =
+      container instanceof HTMLElement ? container.querySelector("[data-governanceops-decision-reason]") : null;
+    const reason =
+      reasonInput instanceof HTMLInputElement ? String(reasonInput.value || "").trim() : "";
+    if (!reason) {
+      setGovernanceOpsFeedback("warn", "Decision reason is required before approve or deny.");
+      return true;
+    }
+    const approvalScope = readApprovalFilters(ui);
+    const approvalRecord = governanceApprovalRecordByRunID(runID) || {};
+    const decisionScope = formatScopeLabel(approvalRecord?.tenantId, approvalRecord?.projectId);
+    const submittedAt = new Date().toISOString();
+    governanceOpsViewState = {
+      ...governanceOpsViewState,
+      selectedRunId: runID
+    };
+    try {
+      const result = await api.submitApprovalDecision(runID, decision, {
+        ttlSeconds: approvalScope.ttlSeconds,
+        reason
+      });
+      if (result?.applied === false) {
+        setGovernanceOpsFeedback(
+          "warn",
+          `${result.warning || "No approval endpoint available."} scope=${decisionScope}; source=governanceops; submittedAt=${submittedAt}`
+        );
+      } else {
+        setGovernanceOpsFeedback(
+          "ok",
+          `runId=${runID}; decision=${decision}; status=${result.status || "updated"}; scope=${decisionScope}; source=governanceops; submittedAt=${submittedAt}`
+        );
+      }
+      await refresh();
+    } catch (error) {
+      setGovernanceOpsFeedback("error", error.message);
+    }
+    return true;
+  }
+
+  async function submitGovernanceOpsRoutingAction(container, actionNode) {
+    const runID =
+      actionNode instanceof HTMLElement
+        ? String(actionNode.dataset.governanceopsRoutingRunId || "").trim()
+        : "";
+    const routeAction =
+      actionNode instanceof HTMLElement
+        ? String(actionNode.dataset.governanceopsRoutingAction || "").trim().toUpperCase()
+        : "";
+    if (!runID || !routeAction) {
+      return false;
+    }
+    const reasonInput =
+      container instanceof HTMLElement ? container.querySelector("[data-governanceops-decision-reason]") : null;
+    const reason =
+      reasonInput instanceof HTMLInputElement ? String(reasonInput.value || "").trim() : "";
+    if (!reason) {
+      setGovernanceOpsFeedback(
+        "warn",
+        `Decision reason is required before ${routeAction === "ESCALATE" ? "escalating" : "deferring"}.`
+      );
+      return true;
+    }
+    governanceOpsViewState = {
+      ...governanceOpsViewState,
+      selectedRunId: runID
+    };
+    const copied = await copyGovernanceReceiptSnapshot(runID, {
+      requestedAction: routeAction,
+      reason,
+      report: false
+    });
+    if (!copied) {
+      setGovernanceOpsFeedback("error", `Failed to prepare the ${routeAction.toLowerCase()} handoff packet.`);
+      return true;
+    }
+    setGovernanceOpsFeedback(
+      "warn",
+      `${routeAction === "ESCALATE" ? "Escalation" : "Deferral"} packet copied for runId=${runID}. Runtime approval endpoints currently expose approve/deny only, so no runtime state change was applied.`
+    );
     return true;
   }
 
@@ -5013,23 +6624,24 @@ async function main() {
     }
 
     setWorkspaceView("settingsops", true);
-    setAdvancedSectionEnabled("settings", true, true);
-    setSettingsSubview("diagnostics", true);
     await refresh();
     if (focusSettingsEndpointRow(endpointID)) {
+      return;
+    }
+    const integrationBoard = document.getElementById("settingsops-integration-board");
+    if (focusRenderedRegion(integrationBoard, { scroll: true })) {
       return;
     }
     ui.settingsContent?.scrollIntoView({ behavior: "smooth", block: "start" });
     focusRenderedRegion(ui.settingsContent, { scroll: false });
   });
   ui.settingsOpenAuditEventsButton?.addEventListener("click", async () => {
-    setWorkspaceView("incidentops", true);
-    setIncidentSubview("audit", true);
+    setWorkspaceView("auditops", true);
     if (ui.auditPage) {
       ui.auditPage.value = "1";
     }
     await refresh();
-    focusRenderedRegion(ui.auditContent);
+    focusRenderedRegion(ui.auditOpsContent || ui.auditContent);
   });
   ui.settingsThemeMode?.addEventListener("change", () => {
     const mode = normalizeThemeMode(ui.settingsThemeMode?.value, "system");
@@ -5942,6 +7554,24 @@ async function main() {
       return;
     }
 
+    if (action === "focus-agent-detail") {
+      const detailKey = String(actionNode.dataset.chatDetailKey || "").trim();
+      if (!detailKey) {
+        return;
+      }
+      const focused = focusAgentDetailByKey(detailKey);
+      if (!focused) {
+        operatorChatState = {
+          ...operatorChatState,
+          ...draft,
+          status: "warn",
+          message: "That active-turn detail is no longer available in the current AgentOps view."
+        };
+        await refresh();
+      }
+      return;
+    }
+
     if (action === "approve-tool-proposal" || action === "deny-tool-proposal") {
       const sessionId = String(actionNode.dataset.chatSessionId || "").trim();
       const proposalId = String(actionNode.dataset.chatProposalId || "").trim();
@@ -6197,10 +7827,9 @@ async function main() {
       if (ui.auditPage) {
         ui.auditPage.value = "1";
       }
-      setWorkspaceView("incidentops", true);
-      setIncidentSubview("audit", true);
+      setWorkspaceView("auditops", true);
       await refresh();
-      focusRenderedRegion(ui.auditContent);
+      focusRenderedRegion(ui.auditOpsContent || ui.auditContent);
       return;
     }
     const demoGovernanceActionNode = target.closest("[data-settings-demo-governance-action]");
@@ -6798,7 +8427,7 @@ async function main() {
       const scope = resolveIntegrationScope(getSession(), projectID);
       const now = new Date().toISOString();
       let appliedMessage =
-        "Saved draft applied to active runtime choices for this project scope. Open Diagnostics to verify endpoint state and traceability.";
+        "Saved draft applied to active runtime choices for this project scope. Review Integration Settings Board to verify endpoint state and traceability.";
       let appliedWarnings = [];
       let appliedAt = now;
       let savedAt = String(entry?.savedAt || now).trim();
@@ -6818,14 +8447,14 @@ async function main() {
           appliedAt = String(result?.updatedAt || now).trim() || now;
           savedAt = appliedAt;
           appliedMessage =
-            "Saved draft applied via runtime endpoint and activated for this project scope. Open Diagnostics and Audit Events to verify the recorded change.";
+            "Saved draft applied via runtime endpoint and activated for this project scope. Review Integration Settings Board and Audit Events to verify the recorded change.";
           runtimeIntegrationSyncStateByProject[key] = "loaded";
         } else if (result?.source === "endpoint-unavailable") {
           appliedMessage =
-            "Runtime integration settings endpoint is unavailable; applied local fallback for this project scope. Open Diagnostics, verify the integrationSettings endpoint row, then retry Apply Saved before relying on the change.";
+            "Runtime integration settings endpoint is unavailable; applied local fallback for this project scope. Review the integrationSettings endpoint row in Integration Settings Board, then retry Apply Saved before relying on the change.";
           appliedWarnings = [
             "Runtime state may still differ from the local fallback until the integrationSettings endpoint returns to ready or available.",
-            `Retry Apply Saved after Diagnostics is clean, then open Audit Events for ${String(scope.projectId || projectID || "project:any")} to confirm the recorded runtime trail.`
+            `Retry Apply Saved after the endpoint is ready, then open Audit Events for ${String(scope.projectId || projectID || "project:any")} to confirm the recorded runtime trail.`
           ];
           runtimeIntegrationSyncStateByProject[key] = "endpoint-unavailable";
         }
@@ -6834,7 +8463,7 @@ async function main() {
           "Tenant/project scope is unavailable. Local fallback was updated only. Choose the intended project in the context bar, then save and apply again before relying on the change.";
         appliedWarnings = [
           "A runtime endpoint write cannot be verified until both tenant and project scope are present.",
-          "After scope is restored, reopen Configuration, confirm the project scope chip, then rerun Save Draft and Apply Saved."
+          "After scope is restored, review Integration Settings Board, confirm the project scope chip, then rerun Save Draft and Apply Saved."
         ];
       }
 
@@ -6925,12 +8554,12 @@ async function main() {
           source = "runtime-endpoint";
           syncedAt = String(result?.updatedAt || now).trim() || now;
           statusMessage =
-            "Project override reset to baseline defaults via runtime endpoint. Open Diagnostics and Audit Events to confirm the new baseline.";
+            "Project override reset to baseline defaults via runtime endpoint. Review Integration Settings Board and Audit Events to confirm the new baseline.";
           runtimeIntegrationSyncStateByProject[key] = "loaded";
         } else if (result?.source === "endpoint-unavailable") {
           runtimeIntegrationSyncStateByProject[key] = "endpoint-unavailable";
           statusMessage =
-            "Runtime integration settings endpoint is unavailable; baseline defaults were applied locally only. Open Diagnostics, verify the integrationSettings endpoint row, then retry Reset Project Override before relying on this reset.";
+            "Runtime integration settings endpoint is unavailable; baseline defaults were applied locally only. Review the integrationSettings endpoint row in Integration Settings Board, then retry Reset Project Override before relying on this reset.";
           resetWarnings = [
             "Local baseline values can drift from runtime state until the integrationSettings endpoint is healthy again.",
             `After endpoint recovery, rerun Reset Project Override and inspect Audit Events for ${String(scope.projectId || projectID || "project:any")}.`
@@ -6941,7 +8570,7 @@ async function main() {
           "Tenant/project scope is unavailable. Baseline defaults were applied locally only. Re-establish scope from the context bar, then retry the reset before relying on it.";
         resetWarnings = [
           "Scope must be restored before a runtime-backed reset can be confirmed.",
-          "After scope is restored, reopen Configuration, confirm project scope, rerun the reset, then verify Diagnostics and Audit Events."
+          "After scope is restored, review Integration Settings Board, confirm project scope, rerun the reset, then verify Audit Events."
         ];
       }
 
@@ -7019,7 +8648,7 @@ async function main() {
           `${origin}: ${message}`
         )
       );
-      renderTriagePanel();
+      renderHomePanel();
       return;
     }
 
@@ -7031,14 +8660,14 @@ async function main() {
         pushTerminalHistory(
           buildTerminalHistoryEntry(input, payload, result, "warn", `${origin}: ${warning}`)
         );
-        renderTriagePanel();
+        renderHomePanel();
       } else {
         const okMessage = "Terminal command request was queued.";
         renderTerminalFeedback(ui, "ok", okMessage, result);
         pushTerminalHistory(
           buildTerminalHistoryEntry(input, payload, result, "ok", `${origin}: ${okMessage}`)
         );
-        renderTriagePanel();
+        renderHomePanel();
       }
 
       if (payload?.scope?.tenantId) {
@@ -7073,7 +8702,7 @@ async function main() {
           `${origin}: ${message}`
         )
       );
-      renderTriagePanel();
+      renderHomePanel();
     }
   }
 
@@ -7214,17 +8843,267 @@ async function main() {
     }
     await submitApprovalDecisionFromContainer(ui.approvalReviewModalContent, decisionNode);
   });
-  ui.triageContent?.addEventListener("click", async (event) => {
+  ui.governanceOpsContent?.addEventListener("click", async (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) {
       return;
     }
-    const actionNode = target.closest("[data-triage-action]");
+    const selectNode = target.closest("[data-governanceops-select-run-id]");
+    const selectedRunID =
+      selectNode instanceof HTMLElement
+        ? String(selectNode.dataset.governanceopsSelectRunId || "").trim()
+        : "";
+    if (selectedRunID) {
+      setGovernanceOpsSelection(selectedRunID);
+      focusRenderedRegion(ui.governanceOpsContent, { scroll: false });
+      return;
+    }
+    const openRunNode = target.closest("[data-governanceops-open-run-id]");
+    const openRunID =
+      openRunNode instanceof HTMLElement
+        ? String(openRunNode.dataset.governanceopsOpenRunId || "").trim()
+        : "";
+    if (openRunID) {
+      await openRunDetail(openRunID, { fromApproval: true });
+      return;
+    }
+    const openViewNode = target.closest("[data-governanceops-open-view]");
+    const workspaceView =
+      openViewNode instanceof HTMLElement
+        ? String(openViewNode.dataset.governanceopsOpenView || "").trim().toLowerCase()
+        : "";
+    if (workspaceView) {
+      setWorkspaceView(workspaceView, true);
+      return;
+    }
+    const copyReceiptNode = target.closest("[data-governanceops-copy-receipt-run-id]");
+    const copyReceiptRunID =
+      copyReceiptNode instanceof HTMLElement
+        ? String(copyReceiptNode.dataset.governanceopsCopyReceiptRunId || "").trim()
+        : "";
+    if (copyReceiptRunID) {
+      governanceOpsViewState = {
+        ...governanceOpsViewState,
+        selectedRunId: copyReceiptRunID
+      };
+      await copyGovernanceReceiptSnapshot(copyReceiptRunID);
+      return;
+    }
+    const routingNode = target.closest("[data-governanceops-routing-run-id]");
+    if (routingNode instanceof HTMLElement) {
+      await submitGovernanceOpsRoutingAction(ui.governanceOpsContent, routingNode);
+      return;
+    }
+    const decisionNode = target.closest("[data-governanceops-decision-run-id]");
+    if (decisionNode instanceof HTMLElement) {
+      await submitGovernanceOpsDecisionFromContainer(ui.governanceOpsContent, decisionNode);
+    }
+  });
+  ui.auditOpsContent?.addEventListener("click", async (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    const actionNode = target.closest("[data-auditops-action]");
     if (!(actionNode instanceof HTMLElement)) {
       return;
     }
-    const action = String(actionNode.dataset.triageAction || "").trim();
+    const action = String(actionNode.dataset.auditopsAction || "").trim().toLowerCase();
     if (!action) {
+      return;
+    }
+    if (action === "export-json") {
+      runAuditOpsExportJson();
+      return;
+    }
+    if (action === "export-csv") {
+      runAuditOpsExportCsv();
+      return;
+    }
+    if (action === "copy-handoff") {
+      await runAuditOpsCopyHandoff();
+      return;
+    }
+    if (action === "export-incident-package") {
+      runAuditOpsExportIncidentPackage();
+      return;
+    }
+    if (action === "open-incidentops") {
+      setWorkspaceView("incidentops", true);
+      focusRenderedRegion(ui.incidentOpsContent, { scroll: false });
+      return;
+    }
+    if (action === "copy-latest-handoff") {
+      await runAuditOpsCopyLatestIncidentHandoff();
+    }
+  });
+  ui.evidenceOpsContent?.addEventListener("click", async (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    const copyPathNode = target.closest("[data-evidenceops-copy-path]");
+    if (copyPathNode instanceof HTMLElement) {
+      await runEvidenceOpsCopyPath(
+        String(copyPathNode.dataset.evidenceopsCopyPath || "").trim(),
+        String(copyPathNode.dataset.evidenceopsCopyPathLabel || "Path").trim()
+      );
+      return;
+    }
+    const actionNode = target.closest("[data-evidenceops-action]");
+    if (!(actionNode instanceof HTMLElement)) {
+      return;
+    }
+    const action = String(actionNode.dataset.evidenceopsAction || "").trim().toLowerCase();
+    if (!action) {
+      return;
+    }
+    if (action === "download-bundle-json") {
+      runEvidenceOpsExportBundleReview();
+      return;
+    }
+    if (action === "download-provenance-json") {
+      runEvidenceOpsExportProvenanceReview();
+      return;
+    }
+    if (action === "copy-latest-uri") {
+      const snapshot = getCurrentEvidenceOpsSnapshot();
+      await runEvidenceOpsCopyPath(
+        String(snapshot?.artifactAccessBoard?.latestArtifact?.uri || "").trim(),
+        "Latest artifact URI"
+      );
+      return;
+    }
+    if (action === "copy-suggested-run-folder") {
+      const snapshot = getCurrentEvidenceOpsSnapshot();
+      await runEvidenceOpsCopyPath(
+        String(snapshot?.artifactAccessBoard?.suggestedRunFolderPath || "").trim(),
+        "Suggested run folder"
+      );
+      return;
+    }
+    if (action === "open-bundle-run" || action === "open-artifact-run") {
+      await runEvidenceOpsOpenLinkedRun();
+      return;
+    }
+    if (action === "open-auditops") {
+      setWorkspaceView("auditops", true);
+      focusRenderedRegion(ui.auditOpsContent, { scroll: false });
+      return;
+    }
+    if (action === "open-incidentops") {
+      setWorkspaceView("incidentops", true);
+      focusRenderedRegion(ui.incidentOpsContent, { scroll: false });
+    }
+  });
+  ui.policyOpsContent?.addEventListener("click", async (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    const actionNode = target.closest("[data-policyops-action]");
+    if (!(actionNode instanceof HTMLElement)) {
+      return;
+    }
+    const action = String(actionNode.dataset.policyopsAction || "").trim().toLowerCase();
+    if (!action) {
+      return;
+    }
+    if (action === "export-decision-explanation") {
+      runPolicyOpsExportDecisionExplanation();
+      return;
+    }
+    if (action === "copy-stable-policy-references") {
+      await runPolicyOpsCopyStableReferences();
+      return;
+    }
+    if (action === "refresh-bounded-simulation") {
+      runPolicyOpsRefreshSimulation();
+      return;
+    }
+    if (action === "open-linked-governance") {
+      openPolicyOpsGovernance();
+      return;
+    }
+    if (action === "open-auditops") {
+      setWorkspaceView("auditops", true);
+      focusRenderedRegion(ui.auditOpsContent || ui.auditContent, { scroll: false });
+      return;
+    }
+    if (action === "open-evidenceops") {
+      setWorkspaceView("evidenceops", true);
+      focusRenderedRegion(ui.evidenceOpsContent, { scroll: false });
+      return;
+    }
+    if (action === "open-complianceops") {
+      setWorkspaceView("complianceops", true);
+      focusRenderedRegion(ui.complianceOpsContent, { scroll: false });
+    }
+  });
+  ui.incidentOpsContent?.addEventListener("click", async (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    const actionNode = target.closest("[data-incidentops-action]");
+    if (!(actionNode instanceof HTMLElement)) {
+      return;
+    }
+    const action = String(actionNode.dataset.incidentopsAction || "").trim().toLowerCase();
+    const entryId = String(actionNode.dataset.incidentopsEntryId || "").trim();
+    const nextStatus = String(actionNode.dataset.incidentopsNextStatus || "").trim();
+    if (!action) {
+      return;
+    }
+    if (action === "focus-incident") {
+      setIncidentOpsSelection(entryId);
+      return;
+    }
+    if (action === "download-incident-json") {
+      runIncidentOpsDownloadPackage(entryId);
+      return;
+    }
+    if (action === "copy-handoff-summary") {
+      await runIncidentOpsCopyHandoff(entryId);
+      return;
+    }
+    if (action === "open-linked-run") {
+      await runIncidentOpsOpenLinkedRun(entryId);
+      return;
+    }
+    if (action === "transition-incident-status") {
+      runIncidentOpsTransitionStatus(nextStatus, entryId);
+      return;
+    }
+    if (action === "open-auditops") {
+      setWorkspaceView("auditops", true);
+      focusRenderedRegion(ui.auditOpsContent || ui.auditContent, { scroll: false });
+      return;
+    }
+    if (action === "open-evidenceops") {
+      setWorkspaceView("evidenceops", true);
+      focusRenderedRegion(ui.evidenceOpsContent, { scroll: false });
+    }
+  });
+  ui.homeOpsContent?.addEventListener("click", async (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    const actionNode = target.closest("[data-homeops-action]");
+    if (!(actionNode instanceof HTMLElement)) {
+      return;
+    }
+    const action = String(actionNode.dataset.homeopsAction || "").trim();
+    if (!action) {
+      return;
+    }
+
+    if (action === "open-domain") {
+      const view = String(actionNode.dataset.homeopsView || "").trim();
+      if (view) {
+        setWorkspaceView(view, true);
+      }
       return;
     }
 
@@ -7237,14 +9116,14 @@ async function main() {
         ui.approvalsPage.value = "1";
       }
       await refresh();
-      setWorkspaceView("agentops", true);
-      ui.approvalsContent?.scrollIntoView({ behavior: "smooth", block: "start" });
-      focusRenderedRegion(ui.approvalsContent, { scroll: false });
+      setWorkspaceView("governanceops", true);
+      ui.governanceOpsContent?.scrollIntoView({ behavior: "smooth", block: "start" });
+      focusRenderedRegion(ui.governanceOpsContent, { scroll: false });
       return;
     }
 
     if (action === "open-runs-attention") {
-      const runID = String(actionNode.dataset.triageRunId || "").trim();
+      const runID = String(actionNode.dataset.homeopsRunId || "").trim();
       if (ui.runsSort) {
         ui.runsSort.value = "updated_desc";
       }
@@ -7261,27 +9140,24 @@ async function main() {
       return;
     }
 
+    if (action === "open-incidentops-active") {
+      await refresh();
+      setWorkspaceView("incidentops", true);
+      ui.incidentOpsContent?.scrollIntoView({ behavior: "smooth", block: "start" });
+      focusRenderedRegion(ui.incidentOpsContent, { scroll: false });
+      return;
+    }
+
     if (action === "open-audit-deny") {
       ui.auditDecisionFilter.value = "DENY";
       if (ui.auditPage) {
         ui.auditPage.value = "1";
       }
+      setWorkspaceView("auditops", true);
       await refresh();
-      setWorkspaceView("incidentops", true);
-      setIncidentSubview("audit", true);
-      ui.auditContent?.scrollIntoView({ behavior: "smooth", block: "start" });
-      focusRenderedRegion(ui.auditContent, { scroll: false });
+      (ui.auditOpsContent || ui.auditContent)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      focusRenderedRegion(ui.auditOpsContent || ui.auditContent, { scroll: false });
       return;
-    }
-
-    if (action === "open-terminal-issues") {
-      if (ui.terminalHistoryStatusFilter) {
-        ui.terminalHistoryStatusFilter.value = "POLICY_BLOCKED";
-      }
-      renderTerminalHistoryPanel();
-      setWorkspaceView("homeops", true);
-      ui.terminalHistory?.scrollIntoView({ behavior: "smooth", block: "start" });
-      focusRenderedRegion(ui.terminalHistory, { scroll: false });
     }
   });
 
@@ -7389,101 +9265,16 @@ async function main() {
     refresh().catch(() => {});
   });
   ui.auditExportJsonButton?.addEventListener("click", () => {
-    const bundle = getCurrentAuditFilingBundle();
-    if (!Array.isArray(bundle?.items) || bundle.items.length === 0) {
-      renderAuditFilingFeedback("warn", "No audit rows match the current filters, so JSON export was skipped.");
-      return;
-    }
-    const fileName = buildAuditExportFileName("json", bundle?.meta?.filters || {}, bundle?.meta?.generatedAt);
-    const prepared = exportGovernedJson(bundle, fileName, buildDesktopGovernedExportOptions("audit_export", "downstream_review", "export"));
-    if (ui.auditHandoffPreview instanceof HTMLElement) {
-      ui.auditHandoffPreview.textContent = prepareGovernedTextExport(
-        buildAuditHandoffText(bundle),
-        buildDesktopGovernedExportOptions("audit_export", "downstream_review", "handoff")
-      ).text;
-    }
-    renderAuditFilingFeedback(
-      "ok",
-      `Audit JSON exported to ${fileName}. rows=${bundle.items.length}. Review the handoff preview before sharing downstream.${describeGovernedExportDisposition(prepared)}${describeGovernedExportRedactions(prepared, "audit export")} ${buildAuditTraceabilitySummary(bundle, fileName)}`
-    );
+    runAuditOpsExportJson();
   });
   ui.auditExportCsvButton?.addEventListener("click", () => {
-    const bundle = getCurrentAuditFilingBundle();
-    if (!Array.isArray(bundle?.items) || bundle.items.length === 0) {
-      renderAuditFilingFeedback("warn", "No audit rows match the current filters, so CSV export was skipped.");
-      return;
-    }
-    const fileName = buildAuditExportFileName("csv", bundle?.meta?.filters || {}, bundle?.meta?.generatedAt);
-    const csv = buildAuditCsv(bundle.items);
-    const prepared = downloadGovernedText(
-      csv,
-      fileName,
-      "text/csv;charset=utf-8",
-      buildDesktopGovernedExportOptions("audit_export", "downstream_review", "export")
-    );
-    renderAuditFilingFeedback(
-      "ok",
-      `Audit CSV exported to ${fileName}. rows=${bundle.items.length}. Review scope and time window before sharing downstream.${describeGovernedExportDisposition(prepared)}${describeGovernedExportRedactions(prepared, "audit export")} ${buildAuditTraceabilitySummary(bundle, fileName)}`
-    );
+    runAuditOpsExportCsv();
   });
   ui.auditCopyHandoffButton?.addEventListener("click", async () => {
-    const bundle = getCurrentAuditFilingBundle();
-    if (!Array.isArray(bundle?.items) || bundle.items.length === 0) {
-      renderAuditFilingFeedback("warn", "No audit rows match the current filters, so handoff copy was skipped.");
-      return;
-    }
-    const handoffText = buildAuditHandoffText(bundle);
-    try {
-      const prepared = await copyGovernedText(
-        handoffText,
-        buildDesktopGovernedExportOptions("audit_handoff", "downstream_review", "handoff")
-      );
-      if (ui.auditHandoffPreview instanceof HTMLElement) {
-        ui.auditHandoffPreview.textContent = prepared.text;
-      }
-      renderAuditFilingFeedback(
-        "ok",
-        `Copied handoff summary for ${bundle.items.length} audit rows to clipboard. Review the preview pane before sending it downstream.${describeGovernedExportDisposition(prepared)}${describeGovernedExportRedactions(prepared, "audit handoff")} ${buildAuditTraceabilitySummary(bundle)}`
-      );
-    } catch (error) {
-      renderAuditFilingFeedback("error", `Audit handoff copy failed: ${error.message}`);
-    }
+    await runAuditOpsCopyHandoff();
   });
   ui.auditExportIncidentButton?.addEventListener("click", () => {
-    const incidentPkg = getCurrentIncidentPackage();
-    const runId = String(incidentPkg?.run?.runId || "").trim();
-    if (!runId) {
-      renderAuditFilingFeedback("warn", "Select a run detail first, then export the incident package from Audit Events.");
-      return;
-    }
-
-    const handoffText = buildIncidentPackageHandoffText(incidentPkg);
-    incidentPkg.handoff = {
-      text: handoffText
-    };
-    const fileName = buildIncidentPackageFileName(
-      runId,
-      incidentPkg?.audit?.meta?.filters || {},
-      incidentPkg?.meta?.generatedAt
-    );
-    const prepared = exportGovernedJson(
-      incidentPkg,
-      fileName,
-      buildDesktopGovernedExportOptions("incident_export", "incident_response", "export")
-    );
-    pushIncidentHistory(buildIncidentHistoryEntry(incidentPkg, fileName));
-    if (ui.auditHandoffPreview instanceof HTMLElement) {
-      ui.auditHandoffPreview.textContent = prepareGovernedTextExport(
-        handoffText,
-        buildDesktopGovernedExportOptions("incident_export", "incident_response", "handoff")
-      ).text;
-    }
-    const auditCount = Number(incidentPkg?.audit?.meta?.matchedCount || 0);
-    const approvalStatus = String(incidentPkg?.approval?.status || "UNAVAILABLE").trim().toUpperCase();
-    renderAuditFilingFeedback(
-      "ok",
-      `Incident package exported to ${fileName}. runId=${runId}; approval=${approvalStatus}; auditRows=${auditCount}. Review the handoff preview and queue status before downstream handoff.${describeGovernedExportDisposition(prepared)}${describeGovernedExportRedactions(prepared, "incident export")} ${buildIncidentTraceabilitySummary(incidentPkg, fileName)}`
-    );
+    runAuditOpsExportIncidentPackage();
   });
   ui.auditContent?.addEventListener("click", async (event) => {
     const target = event.target;
@@ -7590,31 +9381,7 @@ async function main() {
     renderAuditFilingFeedback("info", "Incident selection cleared. Choose queue rows again before running bulk actions or selected export.");
   });
   ui.incidentHistoryCopyLatestButton?.addEventListener("click", async () => {
-    const [latest] = store.getIncidentPackageHistory();
-    if (!latest) {
-      renderAuditFilingFeedback("warn", "Incident queue is empty, so there is no incident handoff summary to copy.");
-      return;
-    }
-    const handoffText = String(latest?.handoffText || "").trim();
-    if (!handoffText) {
-      renderAuditFilingFeedback("warn", "Latest incident package does not have a handoff summary yet.");
-      return;
-    }
-    try {
-      const prepared = await copyGovernedText(
-        handoffText,
-        buildDesktopGovernedExportOptions("incident_handoff", "incident_response", "handoff")
-      );
-      if (ui.auditHandoffPreview instanceof HTMLElement) {
-        ui.auditHandoffPreview.textContent = prepared.text;
-      }
-      renderAuditFilingFeedback(
-        "ok",
-        `Latest incident handoff summary copied for ${latest.packageId || latest.id}. Review the preview pane before sending it downstream.${describeGovernedExportDisposition(prepared)}${describeGovernedExportRedactions(prepared, "incident handoff")} ${buildIncidentEntryTraceabilitySummary(latest)}`
-      );
-    } catch (error) {
-      renderAuditFilingFeedback("error", `Incident handoff summary copy failed: ${error.message}`);
-    }
+    await runAuditOpsCopyLatestIncidentHandoff();
   });
   ui.incidentHistoryClearButton?.addEventListener("click", () => {
     const totalCount = store.getIncidentPackageHistory().length;
@@ -7730,9 +9497,7 @@ async function main() {
           handoffText,
           buildDesktopGovernedExportOptions("incident_handoff", "incident_response", "handoff")
         );
-        if (ui.auditHandoffPreview instanceof HTMLElement) {
-          ui.auditHandoffPreview.textContent = prepared.text;
-        }
+        setAuditOpsHandoffPreview(prepared.text, { render: false });
         renderAuditFilingFeedback(
           "ok",
           `Incident handoff summary copied for ${entry.packageId || entry.id}. Review the preview pane before sending it downstream.${describeGovernedExportDisposition(prepared)}${describeGovernedExportRedactions(prepared, "incident handoff")} ${buildIncidentEntryTraceabilitySummary(entry)}`
@@ -7761,9 +9526,8 @@ async function main() {
       return;
     }
     if (action === "open-audit") {
-      setWorkspaceView("incidentops", true);
-      setIncidentSubview("audit", true);
-      focusRenderedRegion(ui.auditContent, { scroll: false });
+      setWorkspaceView("auditops", true);
+      focusRenderedRegion(ui.auditOpsContent || ui.auditContent, { scroll: false });
       return;
     }
     if (action === "show-needs-closure") {
@@ -7927,6 +9691,50 @@ async function main() {
     setWorkspaceView("agentops", true);
     openApprovalDetail(openApprovalRunID);
   });
+  ui.runtimeOpsContent.addEventListener("click", async (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    const openRunNode = target.closest("[data-runtimeops-open-run-id]");
+    if (openRunNode instanceof HTMLElement) {
+      const runID = String(openRunNode.dataset.runtimeopsOpenRunId || "").trim();
+      if (runID) {
+        await openRunDetail(runID);
+      }
+      return;
+    }
+    const reviewSessionNode = target.closest("[data-runtimeops-review-session-id]");
+    if (reviewSessionNode instanceof HTMLElement) {
+      await loadRuntimeOpsSessionReview(
+        String(reviewSessionNode.dataset.runtimeopsReviewSessionId || "").trim(),
+        { focus: true }
+      );
+      return;
+    }
+    const closeSessionNode = target.closest("[data-runtimeops-close-session-id]");
+    if (closeSessionNode instanceof HTMLElement) {
+      await submitRuntimeOpsCloseSession(
+        String(closeSessionNode.dataset.runtimeopsCloseSessionId || "").trim()
+      );
+      return;
+    }
+    const attachNode = target.closest("[data-runtimeops-attach-session-id]");
+    if (attachNode instanceof HTMLElement) {
+      await submitRuntimeOpsAttachWorker(
+        String(attachNode.dataset.runtimeopsAttachSessionId || "").trim()
+      );
+      return;
+    }
+    const workerEventNode = target.closest("[data-runtimeops-worker-event-session-id]");
+    if (workerEventNode instanceof HTMLElement) {
+      await submitRuntimeOpsWorkerEvent(
+        String(workerEventNode.dataset.runtimeopsWorkerEventType || "").trim(),
+        String(workerEventNode.dataset.runtimeopsWorkerEventSessionId || "").trim(),
+        String(workerEventNode.dataset.runtimeopsWorkerEventWorkerId || "").trim()
+      );
+    }
+  });
 
   const stopRefreshLoop = startRealtimeRefreshLoop(getRuntimeChoices(), refreshStatusOnly);
   window.addEventListener("beforeunload", stopRefreshLoop, { once: true });
@@ -7941,10 +9749,9 @@ async function main() {
 }
 
 main().catch((error) => {
-  renderHomeDashboardError(ui, {
-    session: getSession(),
-    snapshot: createEmptyHomeSnapshot(),
-    terminalHistory: [],
+  renderHomeOpsEmptyState(ui, {
+    tone: "error",
+    title: "HomeOps",
     message: `Bootstrap failed: ${error.message}`
   });
 });

@@ -1,0 +1,144 @@
+.evidenceops-workspace {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.evidenceops-card {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.evidenceops-feedback-panel .metric {
+  border: 1px solid var(--line);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--primary-bg) 10%, var(--surface)), color-mix(in srgb, var(--panel) 74%, var(--surface))),
+    var(--surface-raised);
+}
+
+.evidenceops-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.evidenceops-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.evidenceops-kv-list {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.evidenceops-row {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-top: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
+}
+
+.evidenceops-row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.evidenceops-row-label {
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.evidenceops-row-value {
+  min-width: 0;
+}
+
+.evidenceops-value-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.evidenceops-value-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.32rem 0.55rem;
+  border: 1px solid color-mix(in srgb, var(--line) 76%, transparent);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--surface) 88%, var(--panel-tint));
+  min-width: 0;
+}
+
+.evidenceops-value-key {
+  font-size: var(--font-size-2xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.evidenceops-value-text {
+  font-size: var(--font-size-sm);
+  color: var(--ink);
+  min-width: 0;
+}
+
+.evidenceops-value-text-code code {
+  font-family: var(--font-family-mono);
+  font-size: 0.82em;
+}
+
+.evidenceops-subsection {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.evidenceops-subtitle {
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.evidenceops-empty {
+  color: var(--ink-soft);
+}
+
+.evidenceops-access-grid {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.evidenceops-access-card {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+  border-radius: var(--radius-2);
+  background: color-mix(in srgb, var(--surface) 92%, var(--panel-tint));
+}
+
+.evidenceops-access-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.evidenceops-access-path {
+  margin: 0;
+  padding: var(--space-2);
+  overflow-x: auto;
+  border-radius: var(--radius-1);
+  background: color-mix(in srgb, var(--secondary-bg) 68%, transparent);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+  line-height: 1.35;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

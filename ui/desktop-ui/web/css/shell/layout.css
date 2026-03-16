@@ -10,20 +10,31 @@
 }
 
 .layout {
-  width: auto;
+  width: 100%;
   margin: 0;
   padding: 0;
   display: grid;
   gap: var(--layout-gap);
   grid-template-columns: repeat(12, 1fr);
+  min-width: 0;
+  justify-self: stretch;
 }
 
 .workspace-panel {
+  width: 100%;
   grid-column: 1 / -1;
   display: grid;
   gap: var(--layout-gap);
   grid-template-columns: repeat(12, 1fr);
   align-content: start;
+  min-width: 0;
+  justify-self: stretch;
+}
+
+.layout > [data-workspace-section] {
+  grid-column: span 12;
+  min-width: 0;
+  justify-self: stretch;
 }
 
 .workspace-panel[hidden] {
@@ -42,6 +53,16 @@
 .panel-approvals,
 .panel-runs,
 .panel-audit,
+.panel-developerops,
+.panel-platformops,
+.panel-networkops,
+.panel-policyops,
+.panel-guardrailops,
+.panel-governanceops,
+.panel-complianceops,
+.panel-auditops,
+.panel-evidenceops,
+.panel-incidentops,
 .panel-ops-placeholder {
   grid-column: span 12;
 }
@@ -94,6 +115,10 @@
     grid-column: span 12;
   }
 
+  .layout[data-workspace-view="developerops"] .panel-developerops {
+    grid-column: span 12;
+  }
+
   .layout[data-workspace-view="developerops"] .panel-governed-action {
     grid-column: span 12;
   }
@@ -138,6 +163,10 @@
   }
 
   .layout[data-workspace-view="developerops"] .panel-context {
+    grid-column: span 12;
+  }
+
+  .layout[data-workspace-view="developerops"] .panel-developerops {
     grid-column: span 12;
   }
 

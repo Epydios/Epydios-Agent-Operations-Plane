@@ -93,6 +93,20 @@ function readStringArray(value) {
     : [];
 }
 
+function uniqueCountFromItems(items = [], key) {
+  const values = new Set();
+  for (const item of Array.isArray(items) ? items : []) {
+    for (const value of readStringArray(item?.[key])) {
+      values.add(value);
+    }
+  }
+  return values.size;
+}
+
+function countItemsMissingList(items = [], key) {
+  return (Array.isArray(items) ? items : []).filter((item) => readStringArray(item?.[key]).length === 0).length;
+}
+
 export function derivePolicyRichness(run) {
   const requestPayload = readObject(run?.requestPayload);
   const requestMeta = readObject(requestPayload.meta);
@@ -247,4 +261,162 @@ export function derivePolicyOutcomePresentation(run, policyRichness = {}) {
 
 export function chipClassForPolicyEffect(outcome = {}) {
   return `${chipClassForStatus(outcome?.decision || "")} chip-compact`;
+}
+
+function latestTimestampValue(run) {
+  const raw = String(run?.updatedAt || run?.createdAt || run?.startedAt || "").trim();
+  const parsed = raw ? Date.parse(raw) : Number.NaN;
+  return Number.isFinite(parsed) ? parsed : -1;
+}
+
+function selectLatestPolicyRun(items = []) {
+  const values = Array.isArray(items) ? items.filter((item) => item && typeof item === "object") : [];
+  const ranked = values
+    .map((run) => ({
+      run,
+      richness: derivePolicyRichness(run),
+      timestamp: latestTimestampValue(run)
+    }))
+    .filter(
+      ({ run, richness }) =>
+        richness.isGovernedAction ||
+        Boolean(String(run?.policyDecision || "").trim()) ||
+        Boolean(String(run?.selectedPolicyProvider || "").trim())
+    )
+    .sort((left, right) => right.timestamp - left.timestamp);
+  return ranked[0] || null;
+}
+
+export function createPolicyWorkspaceSnapshot(context = {}) {
+  const settings = context?.settings && typeof context.settings === "object" ? context.settings : {};
+  const runs = context?.runs && typeof context.runs === "object" ? context.runs : {};
+  const viewState = context?.viewState && typeof context.viewState === "object" ? context.viewState : {};
+  const { runtimeIdentity, policyCatalog, policyCatalogItems } = createPolicySettingsSnapshot(settings);
+  const latestPolicyRun = selectLatestPolicyRun(runs.items || []);
+  const decisionRichness = latestPolicyRun ? latestPolicyRun.richness : null;
+  const decisionOutcome =
+    latestPolicyRun && decisionRichness
+      ? derivePolicyOutcomePresentation(latestPolicyRun.run, decisionRichness)
+      : null;
+  const activePack = policyCatalogItems[0] || {};
+  const feedbackMessage = String(viewState?.feedback?.message || "").trim();
+  const simulationRefreshedAt = String(viewState?.simulationRefreshedAt || "").trim();
+  const stableReferences = {
+    contractId: String(decisionRichness?.contractId || "").trim(),
+    runId: String(latestPolicyRun?.run?.runId || "").trim(),
+    providerId: String(
+      decisionRichness?.providerId || latestPolicyRun?.run?.selectedPolicyProvider || ""
+    ).trim(),
+    packId: String(activePack?.packId || "").trim(),
+    boundaryClass: String(decisionRichness?.boundaryClass || "").trim(),
+    riskTier: String(decisionRichness?.riskTier || "").trim(),
+    auditEventRef: String(decisionRichness?.auditEventRef || "").trim()
+  };
+
+  return {
+    feedback: feedbackMessage
+      ? {
+          tone: String(viewState?.feedback?.tone || "info").trim().toLowerCase(),
+          message: feedbackMessage
+        }
+      : null,
+    stableReferences,
+    settings,
+    runtimeIdentity,
+    policyCatalog,
+    policyCatalogItems,
+    currentContract: {
+      providerLabel: policyProviderLabel(settings),
+      mode: String(settings?.aimxs?.mode || "").trim(),
+      catalogSource: summarizePolicyDataSource(policyCatalog?.source || "unknown"),
+      packCount: policyCatalog?.count || policyCatalogItems.length || 0,
+      policyMatrixRequired: Boolean(runtimeIdentity?.policyMatrixRequired),
+      policyRuleCount: runtimeIdentity?.policyRuleCount || 0
+    },
+    decisionExplanation: {
+      available: Boolean(latestPolicyRun),
+      runId: String(latestPolicyRun?.run?.runId || "").trim(),
+      updatedAt: String(latestPolicyRun?.run?.updatedAt || "").trim(),
+      selectedPolicyProvider: String(latestPolicyRun?.run?.selectedPolicyProvider || "").trim(),
+      activePackId: String(activePack?.packId || "").trim(),
+      activePackLabel: String(activePack?.label || "").trim(),
+      exportable: Boolean(latestPolicyRun && decisionRichness && decisionOutcome),
+      outcome: decisionOutcome,
+      richness: decisionRichness
+    },
+    policyCoverage: {
+      available: (policyCatalog?.count || policyCatalogItems.length || 0) > 0 || Boolean(latestPolicyRun),
+      packCount: policyCatalog?.count || policyCatalogItems.length || 0,
+      roleBundleCount: uniqueCountFromItems(policyCatalogItems, "roleBundles"),
+      decisionSurfaceCount: uniqueCountFromItems(policyCatalogItems, "decisionSurfaces"),
+      boundaryRequirementCount: uniqueCountFromItems(policyCatalogItems, "boundaryRequirements"),
+      packsMissingRoleBundles: countItemsMissingList(policyCatalogItems, "roleBundles"),
+      packsMissingDecisionSurfaces: countItemsMissingList(policyCatalogItems, "decisionSurfaces"),
+      packsMissingBoundaryRequirements: countItemsMissingList(policyCatalogItems, "boundaryRequirements"),
+      latestDecisionCaptured: Boolean(decisionRichness?.decision),
+      latestContractCaptured: Boolean(decisionRichness?.contractId),
+      latestRationaleCaptured: Boolean(decisionRichness?.firstReason),
+      latestEvidenceCaptured: Boolean(decisionRichness?.evidenceRefCount),
+      gapCount:
+        countItemsMissingList(policyCatalogItems, "roleBundles") +
+        countItemsMissingList(policyCatalogItems, "decisionSurfaces") +
+        countItemsMissingList(policyCatalogItems, "boundaryRequirements") +
+        (decisionRichness?.decision ? 0 : 1) +
+        (decisionRichness?.contractId ? 0 : 1) +
+        (decisionRichness?.firstReason ? 0 : 1),
+      tone:
+        (policyCatalog?.count || policyCatalogItems.length || 0) === 0 && !latestPolicyRun
+          ? "neutral"
+          : (policyCatalog?.count || policyCatalogItems.length || 0) === 0
+          ? "warn"
+          : countItemsMissingList(policyCatalogItems, "roleBundles") +
+                countItemsMissingList(policyCatalogItems, "decisionSurfaces") +
+                countItemsMissingList(policyCatalogItems, "boundaryRequirements") >
+              0
+            ? "warn"
+            : "ok"
+    },
+    policySimulation: {
+      available: Boolean(latestPolicyRun && decisionRichness),
+      refreshable: Boolean(latestPolicyRun && decisionRichness),
+      lastRefreshedAt: simulationRefreshedAt,
+      source: latestPolicyRun ? "latest governed run replay" : "-",
+      decision: String(decisionRichness?.decision || "").trim().toUpperCase(),
+      providerLabel: displayPolicyProviderLabel(
+        decisionRichness?.providerId || latestPolicyRun?.run?.selectedPolicyProvider || policyProviderLabel(settings)
+      ),
+      activePackId: String(activePack?.packId || "").trim(),
+      activePackLabel: String(activePack?.label || "").trim(),
+      environment: String(decisionRichness?.environment || "").trim(),
+      riskTier: String(decisionRichness?.riskTier || "").trim(),
+      boundaryClass: String(decisionRichness?.boundaryClass || "").trim(),
+      requiredGrantCount: Array.isArray(decisionRichness?.requiredGrants) ? decisionRichness.requiredGrants.length : 0,
+      operatorApprovalRequired: decisionRichness?.operatorApprovalRequired === true,
+      evidenceReadiness: String(decisionRichness?.evidenceReadiness || "").trim(),
+      blockerCount:
+        (Array.isArray(decisionRichness?.requiredGrants) ? decisionRichness.requiredGrants.length : 0) +
+        (decisionRichness?.operatorApprovalRequired === true ? 1 : 0) +
+        (String(decisionRichness?.evidenceReadiness || "").trim().toLowerCase() === "complete" ? 0 : 1),
+      expectedOutcome:
+        String(decisionRichness?.decision || "").trim().toUpperCase() || "UNSET",
+      nextAction:
+        String(decisionRichness?.decision || "").trim().toUpperCase() === "ALLOW"
+          ? "Execution may proceed under the current policy contract."
+          : String(decisionRichness?.decision || "").trim().toUpperCase() === "DEFER"
+            ? "Resolve the remaining approval, grant, or evidence blockers before execution."
+            : String(decisionRichness?.decision || "").trim().toUpperCase() === "DENY"
+              ? "Adjust the request or policy inputs before retrying."
+              : "No bounded simulation can be derived from the current policy inputs.",
+      tone:
+        !latestPolicyRun || !decisionRichness
+          ? "neutral"
+          : String(decisionRichness?.decision || "").trim().toUpperCase() === "ALLOW"
+            ? "ok"
+            : String(decisionRichness?.decision || "").trim().toUpperCase() === "DEFER"
+              ? "warn"
+              : String(decisionRichness?.decision || "").trim().toUpperCase() === "DENY"
+                ? "danger"
+                : "neutral"
+    }
+  };
 }

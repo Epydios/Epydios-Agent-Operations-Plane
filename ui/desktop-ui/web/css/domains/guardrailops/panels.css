@@ -1,0 +1,90 @@
+.guardrailops-workspace {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.guardrailops-primary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-3);
+}
+
+.guardrailops-card-wide {
+  grid-column: 1 / -1;
+}
+
+.guardrailops-card {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.guardrailops-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.guardrailops-kv-list {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.guardrailops-row {
+  display: grid;
+  gap: var(--space-1);
+  padding-top: var(--space-2);
+  border-top: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
+}
+
+.guardrailops-row:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.guardrailops-row-label {
+  font-size: var(--font-size-2xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.guardrailops-row-value {
+  color: var(--ink);
+}
+
+.guardrailops-value-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.guardrailops-value-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0.2rem 0.45rem;
+  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--surface) 92%, var(--panel));
+}
+
+.guardrailops-value-key {
+  font-size: var(--font-size-2xs);
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.guardrailops-value-text {
+  font-size: var(--font-size-sm);
+  color: var(--ink);
+}
+
+.guardrailops-value-text-code code {
+  font-size: var(--font-size-xs);
+}
+
+.guardrailops-empty {
+  color: var(--ink-soft);
+  font-size: var(--font-size-sm);
+}

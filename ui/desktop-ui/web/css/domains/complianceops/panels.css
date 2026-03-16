@@ -1,0 +1,117 @@
+.complianceops-workspace {
+  display: grid;
+  gap: 1rem;
+}
+
+.complianceops-card {
+  border: 1px solid var(--line);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--ok) 8%, var(--surface)), color-mix(in srgb, var(--panel) 78%, var(--surface))),
+    var(--surface-raised);
+  box-shadow: var(--shadow-1), var(--shadow-inset);
+}
+
+.complianceops-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.65rem;
+}
+
+.complianceops-kv-list {
+  display: grid;
+  gap: 0.7rem;
+  margin-top: 0.85rem;
+}
+
+.complianceops-row {
+  display: grid;
+  grid-template-columns: minmax(9rem, 11rem) minmax(0, 1fr);
+  gap: 0.8rem;
+  align-items: start;
+  padding-top: 0.65rem;
+  border-top: 1px solid rgba(159, 183, 192, 0.35);
+}
+
+.complianceops-row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.complianceops-row-label {
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.complianceops-row-value {
+  min-width: 0;
+}
+
+.complianceops-value-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: flex-start;
+}
+
+.complianceops-value-pill {
+  display: inline-flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0.34rem 0.58rem;
+  border: 1px solid rgba(159, 183, 192, 0.55);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 86%, var(--panel));
+  box-shadow: var(--shadow-inset);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.complianceops-value-key {
+  font-size: var(--font-size-2xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.complianceops-value-text {
+  font-size: var(--font-size-sm);
+  color: var(--ink);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.complianceops-value-text-code code {
+  font-size: var(--font-size-xs);
+}
+
+.complianceops-empty {
+  font-size: var(--font-size-sm);
+  color: var(--ink-soft);
+}
+
+.complianceops-subsection {
+  margin-top: 0.9rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid rgba(159, 183, 192, 0.35);
+}
+
+.complianceops-subtitle {
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin-bottom: 0.55rem;
+}
+
+@media (max-width: 900px) {
+  .complianceops-row {
+    grid-template-columns: 1fr;
+  }
+}

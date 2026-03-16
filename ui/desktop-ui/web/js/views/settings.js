@@ -484,7 +484,7 @@ function renderSettingsWorkflowPanel(settings, editorState, selectedSubview) {
   `;
 }
 
-function detectLocalPlatform() {
+export function detectLocalPlatform() {
   const fromUAData = Array.isArray(navigator?.userAgentData?.platform)
     ? navigator.userAgentData.platform.join(" ")
     : String(navigator?.userAgentData?.platform || "");
@@ -503,7 +503,7 @@ function detectLocalPlatform() {
   return "unknown";
 }
 
-function resolveLocalStoragePaths(platform) {
+export function resolveLocalStoragePaths(platform) {
   if (platform === "windows") {
     const base = "%AppData%\\Epydios\\AgentOpsDesktop";
     return {
@@ -537,7 +537,7 @@ function resolveLocalStoragePaths(platform) {
   };
 }
 
-function resolveRetentionDays(settings) {
+export function resolveRetentionDays(settings) {
   const storage = settings?.storage || {};
   const retention = storage.retentionDays || {};
   const toNumber = (value, fallback) => {
@@ -623,7 +623,7 @@ function chipClassForIntegrationSource(value) {
   return "chip chip-neutral";
 }
 
-function renderIntegrationSyncStatus(settings, editorState) {
+export function renderIntegrationSyncStatus(settings, editorState, options = {}) {
   const endpoints = Array.isArray(settings?.endpoints) ? settings.endpoints : [];
   const integrationEndpoint =
     endpoints.find((item) => String(item?.id || "").trim().toLowerCase() === "integrationsettings") || {};
@@ -638,14 +638,14 @@ function renderIntegrationSyncStatus(settings, editorState) {
   const scopeProject = String(editorState?.scopeProjectId || editorState?.projectId || "").trim() || "-";
   const recoveryDetail =
     syncState === "scope-unavailable"
-      ? "Recovery: choose a project from the workspace context bar, then reopen Configuration and retry save/apply."
+      ? "Recovery: choose a project from the workspace context bar, review Integration Settings Board, then retry save/apply."
       : syncState === "endpoint-unavailable" || endpointState === "error" || endpointState === "unknown"
-        ? "Recovery: verify the integrationSettings endpoint row below, then retry the change and confirm the resulting Audit Events record."
+        ? "Recovery: verify the integrationSettings endpoint row in Integration Settings Board, then retry the change and confirm the resulting Audit Events record."
         : "";
 
   return `
     <div class="metric settings-metric settings-metric-sync settings-int-sync-status">
-      <div class="title">Integration Sync Status</div>
+      <div class="title">${escapeHTML(String(options.title || "Integration Sync Status"))}</div>
       <div class="meta">
         syncState=<span id="settings-int-sync-state" class="${chipClassForSyncState(syncState)}">${escapeHTML(syncState)}</span>
       </div>
@@ -695,7 +695,7 @@ function renderEditorFeedback(editorState) {
   return lines.join("");
 }
 
-function renderIntegrationEditor(settings, editorState) {
+export function renderIntegrationEditor(settings, editorState, options = {}) {
   const integrations = settings?.integrations || {};
   const profiles = Array.isArray(integrations.agentProfiles) ? integrations.agentProfiles : [];
   const contracts = Array.isArray(integrations.providerContracts) ? integrations.providerContracts : [];
@@ -772,7 +772,7 @@ function renderIntegrationEditor(settings, editorState) {
 
   return `
     <div class="metric settings-metric settings-metric-editor" data-settings-int-project-id="${escapeHTML(projectID)}">
-      <div class="title">Project Integration Editor</div>
+      <div class="title">${escapeHTML(String(options.title || "Project Integration Editor"))}</div>
       <div class="meta">projectScope=${escapeHTML(projectID)}; reference-only values only (ref://).</div>
       <div class="settings-editor-grid">
         <label class="field">
@@ -992,7 +992,7 @@ function collectKnownLocalSecureRefs(settings) {
   return items;
 }
 
-function renderLocalSecureRefPanel(settings, editorState = {}) {
+export function renderLocalSecureRefPanel(settings, editorState = {}, options = {}) {
   const vault = settings?.localSecureRefs || {};
   const storedEntries = Array.isArray(vault.entries) ? vault.entries : [];
   const storedByRef = new Map(
@@ -1023,6 +1023,7 @@ function renderLocalSecureRefPanel(settings, editorState = {}) {
   const statusChipClass = chipClassForEditorStatus(status);
   const statusMessage = String(editorState?.message || vault.message || "").trim() || "Store concrete local values here; project settings continue to save only ref:// pointers.";
   const helperDisabled = vault.available ? "" : "disabled";
+  const title = String(options?.title || "Secure Local Credential Capture").trim() || "Secure Local Credential Capture";
   const optionRows = knownItems
     .map(
       (item) =>
@@ -1052,7 +1053,7 @@ function renderLocalSecureRefPanel(settings, editorState = {}) {
 
   return `
     <div class="metric settings-metric settings-metric-local-secure-refs">
-      <div class="title">Secure Local Credential Capture</div>
+      <div class="title">${escapeHTML(title)}</div>
       <div class="meta">Concrete values stay outside the repo and outside the project settings draft. Use this only for the local Mac operator path.</div>
       <div class="meta">Restart terminal 1 after changes if you need the local runtime to pick up updated ref resolution.</div>
       <div class="settings-editor-grid">
@@ -1094,19 +1095,21 @@ function renderLocalSecureRefPanel(settings, editorState = {}) {
         <div class="meta">exportPath=<code>${escapeHTML(vault.exportPath || "-")}</code></div>
         ${vault.lastExportedAt ? `<div class="meta">lastExportedAt=${escapeHTML(String(vault.lastExportedAt))}</div>` : ""}
       </div>
-      <table class="data-table settings-table">
-        <caption class="sr-only">Known and stored local secure ref bindings for the current settings contract.</caption>
-        <thead>
-          <tr>
-            <th scope="col">Purpose</th>
-            <th scope="col">Type</th>
-            <th scope="col">Ref</th>
-            <th scope="col">Stored</th>
-            <th scope="col">Updated</th>
-          </tr>
-        </thead>
-        <tbody>${tableRows}</tbody>
-      </table>
+      <div class="settings-local-ref-table-shell">
+        <table class="data-table settings-table">
+          <caption class="sr-only">Known and stored local secure ref bindings for the current settings contract.</caption>
+          <thead>
+            <tr>
+              <th scope="col">Purpose</th>
+              <th scope="col">Type</th>
+              <th scope="col">Ref</th>
+              <th scope="col">Stored</th>
+              <th scope="col">Updated</th>
+            </tr>
+          </thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+      </div>
     </div>
   `;
 }

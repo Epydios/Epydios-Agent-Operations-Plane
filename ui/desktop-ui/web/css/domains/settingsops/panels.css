@@ -1,0 +1,178 @@
+.settingsops-board-grid {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.settingsops-card {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.settingsops-card-environment {
+  gap: var(--space-5);
+}
+
+.settingsops-card-wide {
+  grid-column: 1 / -1;
+}
+
+.settingsops-chip-row,
+.settingsops-inline-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.settingsops-kv-list {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.settingsops-row {
+  display: grid;
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+
+.settingsops-row:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.settingsops-row-label {
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.settingsops-row-value {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.settingsops-value-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.settingsops-value-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid color-mix(in srgb, var(--line-strong) 70%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 86%, var(--secondary-bg));
+}
+
+.settingsops-value-key {
+  font-size: var(--font-size-2xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.settingsops-value-text-code code {
+  font-size: var(--font-size-xs);
+}
+
+.settingsops-empty,
+.settingsops-note {
+  color: var(--ink-soft);
+}
+
+.settingsops-region > .settings-metric,
+.settingsops-aimxs-shell > .settings-metric {
+  margin: 0;
+  min-width: 0;
+}
+
+.settingsops-region > .settings-metric .title,
+.settingsops-aimxs-shell > .settings-metric .title {
+  font-size: 1rem;
+}
+
+.settingsops-environment-grid {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.settingsops-integration-grid {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.settingsops-recovery-list {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+}
+
+.settingsops-recovery-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: start;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+
+.settingsops-recovery-item:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.settingsops-action-row {
+  justify-content: flex-start;
+  gap: var(--space-2);
+}
+
+.settingsops-region .settings-local-ref-table-shell {
+  max-height: 24rem;
+  overflow: auto;
+  border-radius: var(--radius-2);
+}
+
+.settingsops-region .settings-metric-local-secure-refs .settings-table {
+  table-layout: fixed;
+}
+
+.settingsops-region .settings-metric-local-secure-refs .settings-table :is(th, td) {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.settingsops-region .settings-metric-local-secure-refs .settings-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+@media (min-width: 1100px) {
+  .settingsops-board-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .settingsops-card-environment {
+    grid-column: 1 / -1;
+  }
+
+  .settingsops-environment-grid {
+    grid-template-columns: minmax(18rem, 0.95fr) minmax(24rem, 1.05fr);
+    align-items: start;
+  }
+
+  .settingsops-integration-grid {
+    grid-template-columns: minmax(20rem, 0.85fr) minmax(16rem, 1.15fr);
+    align-items: start;
+  }
+}

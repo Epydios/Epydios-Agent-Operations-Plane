@@ -1,95 +1,159 @@
-.agent-chat-shell {
+.agentops-workspace {
   gap: var(--space-4);
 }
 
-.agent-panel-heading {
+.agentops-panel-heading {
   margin-bottom: 0;
 }
 
-.agent-top-grid,
-.agent-chat-heading-grid,
-.agent-chat-state-grid {
+.agentops-thread-header,
+.agentops-transcript-workspace,
+.agentops-anchored-composer,
+.agentops-reply-spotlight,
+.agentops-transcript-context {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.agentops-thread-summary,
+.agentops-thread-heading,
+.agentops-thread-fields,
+.agentops-transcript-summary-grid,
+.agentops-composer-grid,
+.agentops-prompt-field,
+.agentops-transcript-layout,
+.agentops-context-drawer {
   display: grid;
   gap: var(--space-3);
 }
 
-.agent-top-section {
-  display: grid;
-  gap: var(--space-3);
+.agentops-transcript-layout,
+.agentops-transcript-main,
+.agentops-context-drawer,
+.agentops-context-panel {
+  min-width: 0;
 }
 
-.agent-top-grid {
-  grid-template-columns: minmax(0, 1fr);
-  align-items: stretch;
+.agentops-thread-heading {
+  gap: var(--space-1);
 }
 
-.agent-chat-composer,
-.agent-chat-side-panel {
+.agentops-thread-heading .title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.agentops-thread-fields {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: start;
+}
+
+.agentops-thread-fields > .field,
+.agentops-composer-grid > .field-wide {
+  grid-column: auto;
+  min-width: 0;
+}
+
+.agentops-transcript-summary-grid > *,
+.agentops-thread-fields > * {
+  min-width: 0;
+}
+
+.agentops-reply-spotlight,
+.agentops-transcript-context {
   align-content: start;
 }
 
-.agent-chat-side-panel {
-  gap: var(--space-3);
-}
-
-.agent-chat-side-panel .policy-outcome-banner {
-  margin-top: var(--space-3);
+.agentops-transcript-context .policy-outcome-banner {
+  margin-top: var(--space-1);
   border-width: 2px;
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
 }
 
-.agent-chat-side-panel .policy-outcome-banner .title {
+.agentops-transcript-context .policy-outcome-banner .title {
   font-size: 1rem;
 }
 
-.agent-chat-composer .settings-agent-test-textarea {
+.agentops-reply-box {
+  min-height: 10rem;
+  background: color-mix(in srgb, var(--surface) 82%, var(--primary-bg));
+}
+
+.agentops-context-drawer {
+  align-content: start;
+}
+
+.agentops-context-panel {
+  background: color-mix(in srgb, var(--surface) 88%, var(--panel));
+}
+
+.agentops-proof-grid,
+.agentops-proof-row {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.agentops-drillin-stack {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.agentops-proof-row {
+  padding: var(--space-2);
+  border: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
+  border-radius: var(--radius-2);
+  background: color-mix(in srgb, var(--surface) 92%, var(--panel));
+}
+
+.agentops-proof-label {
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+}
+
+.agentops-drillin-shell {
+  background: color-mix(in srgb, var(--surface) 92%, var(--panel));
+}
+
+.agentops-drillin-shell > summary {
+  font-weight: 700;
+}
+
+.agentops-transcript-feed {
+  display: grid;
+  gap: var(--space-3);
+  max-height: min(52rem, 68vh);
+  overflow: auto;
+  padding-right: var(--space-1);
+}
+
+.agentops-anchored-composer {
+  background: color-mix(in srgb, var(--surface) 90%, var(--panel));
+  box-shadow: var(--shadow-1), var(--shadow-inset);
+}
+
+.agentops-composer-grid .settings-agent-test-textarea {
   min-height: 7.5rem;
 }
 
 #chat-system-prompt.settings-agent-test-textarea {
-  min-height: 6rem;
+  min-height: 7rem;
 }
 
 #chat-prompt.settings-agent-test-textarea {
   min-height: 12rem;
 }
 
-.agent-chat-prompt-field {
-  display: grid;
-  gap: var(--space-2);
+.agentops-composer-actions {
+  margin-top: var(--space-1);
 }
 
-.agent-composer-actions {
-  margin-top: var(--space-2);
-}
-
-.agent-chat-clear-action {
+.agentops-clear-action {
   margin-left: auto;
-}
-
-.agent-chat-reply-panel {
-  display: grid;
-  gap: var(--space-2);
-  padding-top: var(--space-3);
-  border-top: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
-}
-
-.agent-chat-reply-box {
-  min-height: 10rem;
-  background: color-mix(in srgb, var(--surface) 82%, var(--primary-bg));
-}
-
-.agent-top-grid > *,
-.agent-top-grid .metric {
-  min-width: 0;
-}
-
-.agent-top-grid > .metric {
-  height: 100%;
-}
-
-.agent-support-stack {
-  gap: var(--space-3);
 }
 
 .agent-thread-history-card > summary {
@@ -112,22 +176,6 @@
   max-height: 22rem;
   overflow: auto;
   padding-right: var(--space-1);
-}
-
-.agent-chat-heading-grid {
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-}
-
-.agent-chat-heading-grid .field {
-  grid-column: auto;
-}
-
-.agent-chat-state-grid {
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-}
-
-.agent-chat-state-grid > * {
-  min-width: 0;
 }
 
 .chat-turns-stack {
@@ -189,34 +237,39 @@
   color: var(--ink-soft);
 }
 
-@media (min-width: 720px) {
-  .agent-top-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
 @media (min-width: 960px) {
-  .agent-chat-heading-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+  .agentops-transcript-layout {
+    grid-template-columns: minmax(0, 1.45fr) minmax(20rem, 0.72fr);
+    align-items: start;
   }
 
-  .agent-chat-state-grid {
+  .agentops-context-drawer {
+    position: sticky;
+    top: var(--space-3);
+  }
+
+  .agentops-transcript-summary-grid,
+  .agentops-composer-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-@media (min-width: 1080px) {
-  .chat-history-layout {
-    grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
-  }
-
-  .chat-history-layout > .settings-metric-chat-history {
-    grid-column: 1;
+@media (max-width: 1180px) {
+  .agentops-thread-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-@media (min-width: 1180px) {
-  .agent-top-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+@media (max-width: 959px) {
+  .agentops-thread-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .agentops-context-drawer {
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  }
+
+  .agentops-composer-grid {
+    grid-template-columns: 1fr;
   }
 }

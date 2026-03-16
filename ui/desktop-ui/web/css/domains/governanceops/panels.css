@@ -1,0 +1,124 @@
+.governanceops-workspace {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.governanceops-feedback-shell {
+  display: grid;
+}
+
+.governanceops-primary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--space-3);
+}
+
+.governanceops-card {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.governanceops-card-wide {
+  grid-column: 1 / -1;
+}
+
+.governanceops-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.governanceops-kv-list {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.governanceops-row {
+  display: grid;
+  gap: var(--space-1);
+  padding-top: var(--space-2);
+  border-top: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
+}
+
+.governanceops-row:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.governanceops-row-label {
+  font-size: var(--font-size-2xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.governanceops-row-value {
+  color: var(--ink);
+}
+
+.governanceops-value-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.governanceops-value-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0.2rem 0.45rem;
+  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--surface) 92%, var(--panel));
+}
+
+.governanceops-value-key {
+  font-size: var(--font-size-2xs);
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.governanceops-value-text {
+  font-size: var(--font-size-sm);
+  color: var(--ink);
+}
+
+.governanceops-value-text-code code {
+  font-size: var(--font-size-xs);
+}
+
+.governanceops-empty {
+  color: var(--ink-soft);
+  font-size: var(--font-size-sm);
+}
+
+.governanceops-queue-list {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.governanceops-queue-card {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+  border-radius: var(--radius-2);
+  background: color-mix(in srgb, var(--surface) 94%, var(--panel));
+}
+
+.governanceops-action-layout {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.governanceops-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.governanceops-reason-field {
+  display: grid;
+  gap: var(--space-1);
+}

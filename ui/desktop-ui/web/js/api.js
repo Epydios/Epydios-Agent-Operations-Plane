@@ -2987,6 +2987,7 @@ export class AgentOpsApi {
         selectedAgentProfileId: selectedAgentProfileID || String(agentProfiles[0]?.id || "")
       },
       realtime: deepClone(choices?.realtime || {}),
+      storage: deepClone(choices?.storage || {}),
       terminal: deepClone(choices?.terminal || {}),
       theme: {
         mode: themeMode || "system"

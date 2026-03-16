@@ -188,10 +188,13 @@ try:
     )
     wait_until(
         session_id,
-        "const s=document.getElementById('context-project-select');"
-        "return !!s && s.options.length > 0;",
+        """
+const s = document.getElementById('context-project-select');
+if (!s) return false;
+return Array.from(s.options).some((opt) => String(opt.value || '').trim() !== '');
+""",
         timeout=30,
-        label="project options",
+        label="non-empty project options",
     )
 
     exec_js(
@@ -224,6 +227,37 @@ if (!select) return [];
 return Array.from(select.options).map((opt) => String(opt.value || "")).filter(Boolean);
 """,
     )
+    if not isinstance(project_values, list) or len(project_values) == 0:
+        auth_status = exec_js(
+            session_id,
+            "return String(document.getElementById('auth-status')?.textContent || '').trim();",
+        )
+        if auth_status != "Authenticated":
+            click_button(session_id, "login-button")
+            wait_until(
+                session_id,
+                "return String(document.getElementById('auth-status')?.textContent || '').trim() === 'Authenticated';",
+                timeout=10,
+                label="auth before stress project selection",
+            )
+            wait_until(
+                session_id,
+                """
+const select = document.getElementById("context-project-select");
+if (!select) return false;
+return Array.from(select.options).some((opt) => String(opt.value || "").trim() !== "");
+""",
+                timeout=20,
+                label="project options after login",
+            )
+            project_values = exec_js(
+                session_id,
+                """
+const select = document.getElementById("context-project-select");
+if (!select) return [];
+return Array.from(select.options).map((opt) => String(opt.value || "")).filter(Boolean);
+""",
+            )
     if not isinstance(project_values, list) or len(project_values) == 0:
         raise RuntimeError("No non-empty project values are available in context selector.")
 
@@ -276,7 +310,7 @@ return Array.from(select.options).map((opt) => String(opt.value || "").trim().to
         time.sleep(0.35)
     wait_until(
         session_id,
-        "return !!document.getElementById('triage-content') && !!document.getElementById('runs-content');",
+        "return !!document.getElementById('homeops-content') && !!document.getElementById('runs-content');",
         timeout=20,
         label="post-refresh render",
     )
@@ -284,7 +318,7 @@ return Array.from(select.options).map((opt) => String(opt.value || "").trim().to
     triage_actions = [
         ("open-approvals-pending", "return document.getElementById('approvals-status-filter')?.value === 'PENDING';"),
         ("open-audit-deny", "return document.getElementById('audit-decision-filter')?.value === 'DENY';"),
-        ("open-terminal-issues", "return document.getElementById('terminal-history-status-filter')?.value === 'POLICY_BLOCKED';"),
+        ("open-incidentops-active", "return !!document.querySelector('#incidentops-content [data-domain-root=\"incidentops\"]');"),
         ("open-runs-attention", "return document.getElementById('runs-sort')?.value === 'updated_desc';"),
     ]
     for action, check_script in triage_actions:
@@ -292,7 +326,11 @@ return Array.from(select.options).map((opt) => String(opt.value || "").trim().to
             session_id,
             """
 const action = arguments[0];
-const btn = document.querySelector(`[data-triage-action="${action}"]`);
+const homeTab = document.querySelector('[data-workspace-tab="homeops"]');
+if (homeTab) {
+  homeTab.click();
+}
+const btn = document.querySelector(`[data-homeops-action="${action}"]`);
 if (!btn) return false;
 btn.click();
 return true;
@@ -391,11 +429,12 @@ return !text.includes('Select a run to view detail.');
         wait_until(
             session_id,
             """
-const feedback = String(document.getElementById('audit-feedback')?.textContent || '');
-return feedback.includes('Exported incident package');
+const expectedCount = arguments[0];
+return document.querySelectorAll('[data-incident-history-entry-id]').length >= expectedCount;
 """,
+            [index],
             timeout=20,
-            label=f"incident export feedback {index}",
+            label=f"incident export queue growth {index}",
         )
         summary["incidentExports"] += 1
         time.sleep(0.25)
@@ -461,7 +500,7 @@ return { missing, themeMode, incidentCount };
     print(
         "V-M14-UI-028 PASS: browser stress completed with "
         f"{summary['projectSwitches']} project switches, {summary['themeChanges']} theme flips, "
-        f"{summary['triageClicks']} triage actions, {summary['refreshClicks']} refreshes, "
+        f"{summary['triageClicks']} HomeOps actions, {summary['refreshClicks']} refreshes, "
         f"{summary['runBuilderSubmits']} run submit, {summary['terminalSubmits']} terminal submit, "
         f"{summary['incidentExports']} incident exports."
     )

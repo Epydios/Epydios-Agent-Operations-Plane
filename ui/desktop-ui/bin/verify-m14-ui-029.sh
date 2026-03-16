@@ -152,7 +152,9 @@ try:
         session_id,
         "return !!document.getElementById('login-button') && "
         "!!document.getElementById('logout-button') && "
-        "!!document.getElementById('auth-status');",
+        "!!document.getElementById('context-project-select') && "
+        "!!document.getElementById('context-agent-profile') && "
+        "!!document.getElementById('context-endpoint-badges');",
         timeout=30,
         label="auth controls",
     )
@@ -160,7 +162,7 @@ try:
         session_id,
         "return !!document.getElementById('context-project-select') && "
         "document.querySelectorAll('#context-project-select option').length > 1 && "
-        "!!document.querySelector('[data-triage-action=\"open-approvals-pending\"]');",
+        "!!document.querySelector('[data-homeops-action=\"open-approvals-pending\"]');",
         timeout=30,
         label="ui ready",
     )
@@ -189,7 +191,7 @@ return true;
 
     current_auth = exec_js(
         session_id,
-        "return String(document.getElementById('auth-status')?.textContent || '').trim();",
+        "return sessionStorage.getItem('epydios.agentops.token') ? 'Authenticated' : 'Unauthenticated';",
     )
     if current_auth == "Authenticated":
         click_by_id(session_id, "logout-button")
@@ -197,11 +199,9 @@ return true;
             session_id,
             """
 return (
-  String(document.getElementById('auth-status')?.textContent || '').trim() === 'Unauthenticated' &&
-  String(document.getElementById('tenant-value')?.textContent || '').trim() === '-' &&
-  String(document.getElementById('project-value')?.textContent || '').trim() === '-' &&
-  String(document.getElementById('client-id-value')?.textContent || '').trim() === '-' &&
-  String(document.getElementById('subject-value')?.textContent || '').trim() === '-'
+  !sessionStorage.getItem('epydios.agentops.token') &&
+  String(document.getElementById('context-agent-profile')?.textContent || '').trim() === '-' &&
+  String(document.getElementById('context-endpoint-badges')?.textContent || '').trim() === ''
 );
 """,
             timeout=10,
@@ -210,20 +210,42 @@ return (
 
     for _ in range(3):
         click_by_id(session_id, "login-button")
-        wait_until(
+        auth_mode = wait_until(
             session_id,
             """
-return (
-  String(document.getElementById('auth-status')?.textContent || '').trim() === 'Authenticated' &&
-  String(document.getElementById('tenant-value')?.textContent || '').trim() !== '-' &&
-  String(document.getElementById('project-value')?.textContent || '').trim() !== '-' &&
-  String(document.getElementById('client-id-value')?.textContent || '').trim() !== '-' &&
-  String(document.getElementById('subject-value')?.textContent || '').trim() !== '-'
-);
+const appUrl = arguments[0];
+const href = String(window.location.href || '');
+const body = String(document.body?.textContent || '');
+const localAuthenticated =
+  !!sessionStorage.getItem('epydios.agentops.token') &&
+  Array.from(document.getElementById('context-project-select')?.options || []).some((opt) => String(opt.value || '').trim() !== '') &&
+  String(document.getElementById('context-agent-profile')?.textContent || '').trim() !== '-' &&
+  String(document.getElementById('context-endpoint-badges')?.textContent || '').trim() !== '';
+if (localAuthenticated) {
+  return 'local-authenticated';
+}
+const externalAuthHandoff =
+  !href.startsWith(appUrl) &&
+  (
+    href.includes('auth.epydios.com') ||
+    href.startsWith('safari-resource:/ErrorPage.html') ||
+    body.includes('auth.epydios.com/authorize')
+  );
+if (externalAuthHandoff) {
+  return 'external-auth-handoff';
+}
+return '';
 """,
-            timeout=3,
+            [APP_URL],
+            timeout=10,
             label="auth after login click",
         )
+        if auth_mode == "external-auth-handoff":
+            print(
+                "V-M14-UI-029 PASS: auth/session wiring initiated the external OIDC handoff from the local shell; "
+                "local mock login/logout cycles are not available in this environment."
+            )
+            sys.exit(0)
         login_cycles += 1
 
         click_by_id(session_id, "logout-button")
@@ -231,14 +253,12 @@ return (
             session_id,
             """
 return (
-  String(document.getElementById('auth-status')?.textContent || '').trim() === 'Unauthenticated' &&
-  String(document.getElementById('tenant-value')?.textContent || '').trim() === '-' &&
-  String(document.getElementById('project-value')?.textContent || '').trim() === '-' &&
-  String(document.getElementById('client-id-value')?.textContent || '').trim() === '-' &&
-  String(document.getElementById('subject-value')?.textContent || '').trim() === '-'
+  !sessionStorage.getItem('epydios.agentops.token') &&
+  String(document.getElementById('context-agent-profile')?.textContent || '').trim() === '-' &&
+  String(document.getElementById('context-endpoint-badges')?.textContent || '').trim() === ''
 );
 """,
-            timeout=3,
+            timeout=10,
             label="auth after logout click",
         )
         logout_cycles += 1

@@ -1,30 +1,24 @@
-import { renderIdentityAuthSummaryCard as renderAuthSummaryCard } from "../identityops/routes.js";
-import { renderRuntimeHealthCards, renderRuntimeHealthError } from "../runtimeops/routes.js";
-import { renderHomeOpsTriage } from "./panels/dashboard.js";
-import { createEmptyHomeSnapshot } from "./state.js";
+import { renderPanelStateMetric } from "../../views/common.js";
+import { renderHomeWorkspace } from "./panels/dashboard.js";
+import { createHomeWorkspaceSnapshot } from "./state.js";
 
-function normalizeHomeSnapshot(snapshot, terminalHistory) {
-  return {
-    ...(snapshot && typeof snapshot === "object" ? snapshot : createEmptyHomeSnapshot()),
-    terminalHistory: Array.isArray(terminalHistory) ? terminalHistory : []
-  };
-}
-
-export function renderHomeDashboard(ui, options = {}) {
-  const snapshot = normalizeHomeSnapshot(options.snapshot, options.terminalHistory);
-  renderAuthSummaryCard(ui.homeDashboardAuth, options.session || {});
-  renderHomeOpsTriage(ui.triageContent, snapshot);
-  if (
-    Object.prototype.hasOwnProperty.call(options, "health") ||
-    Object.prototype.hasOwnProperty.call(options, "pipeline")
-  ) {
-    renderRuntimeHealthCards(ui.healthContent, options.health || {}, options.pipeline || {});
+export function renderHomeOpsPage(ui, context = {}) {
+  if (!ui?.homeOpsContent) {
+    return;
   }
+  ui.homeOpsContent.innerHTML = renderHomeWorkspace(createHomeWorkspaceSnapshot(context));
 }
 
-export function renderHomeDashboardError(ui, options = {}) {
-  const snapshot = normalizeHomeSnapshot(options.snapshot, options.terminalHistory);
-  renderAuthSummaryCard(ui.homeDashboardAuth, options.session || {});
-  renderHomeOpsTriage(ui.triageContent, snapshot);
-  renderRuntimeHealthError(ui.healthContent, options.message || "Unable to load home dashboard.");
+export function renderHomeOpsEmptyState(ui, options = {}) {
+  if (!ui?.homeOpsContent) {
+    return;
+  }
+  ui.homeOpsContent.innerHTML = renderPanelStateMetric(
+    options.tone || "info",
+    options.title || "HomeOps",
+    options.message ||
+      "HomeOps command posture becomes available after runtime, platform, policy, governance, audit, and incident anchors load.",
+    options.detail ||
+      "Refresh the workspace. If HomeOps should already be populated, verify the current domain anchors before widening Home."
+  );
 }
