@@ -1,4 +1,5 @@
 import { escapeHTML } from "../../../views/common.js";
+import { renderAimxsIdentityPostureBlock } from "../../../shared/components/aimxs-identity-posture.js";
 import { createIdentityWorkspaceSnapshot } from "../state.js";
 import { renderEffectiveIdentityBoard } from "./auth-summary.js";
 import { renderAuthorityBoard } from "./authority.js";
@@ -241,6 +242,18 @@ function renderDelegationOverrideBoard(snapshot) {
       <div class="identityops-kv-list">
         ${renderKeyValueRows(rows)}
       </div>
+    </article>
+  `;
+}
+
+function renderAimxsIdentityPostureBoard(snapshot) {
+  return `
+    <article class="metric identityops-card identityops-card-wide" data-domain-root="identityops" data-identityops-panel="aimxs-identity-posture">
+      <div class="metric-title-row">
+        <div class="title">AIMXS Identity And Posture</div>
+        <span class="chip chip-ok chip-compact">primary</span>
+      </div>
+      ${renderAimxsIdentityPostureBlock(snapshot.aimxsIdentityPosture)}
     </article>
   `;
 }
@@ -822,6 +835,7 @@ export function renderIdentityWorkspace(settings = {}, session = {}) {
         ${renderGrantEntitlementBoard(settings, session)}
       </div>
       <div class="identityops-secondary-grid">
+        ${renderAimxsIdentityPostureBoard(snapshot)}
         ${renderIdentityNetworkBoard(snapshot)}
         ${renderDelegationOverrideBoard(snapshot)}
         ${renderTraceabilityBoard(snapshot)}

@@ -284,7 +284,18 @@ test("runtimeops page renders the first inspect-only runtime boards", () => {
   assert.match(ui.runtimeOpsContent.innerHTML, /Live Sessions/);
   assert.match(ui.runtimeOpsContent.innerHTML, /Worker Fleet/);
   assert.match(ui.runtimeOpsContent.innerHTML, /Provider Routing/);
+  assert.match(ui.runtimeOpsContent.innerHTML, /AIMXS Route And Boundary Echo/);
   assert.match(ui.runtimeOpsContent.innerHTML, /Identity Application/);
+  assert.match(ui.runtimeOpsContent.innerHTML, /AIMXS Identity And Posture Echo/);
+  assert.match(ui.runtimeOpsContent.innerHTML, /runtime session identity/);
+  assert.match(ui.runtimeOpsContent.innerHTML, /Route And Provider Chain/);
+  assert.match(ui.runtimeOpsContent.innerHTML, /Current Boundary/);
+  assert.match(ui.runtimeOpsContent.innerHTML, /approval-bound runtime continuation/);
+  assert.match(ui.runtimeOpsContent.innerHTML, /Current Posture/);
+  assert.match(ui.runtimeOpsContent.innerHTML, /selected session/);
+  assert.match(ui.runtimeOpsContent.innerHTML, /Target Posture/);
+  assert.match(ui.runtimeOpsContent.innerHTML, /approved continuation required|stable governed session/);
+  assert.match(ui.runtimeOpsContent.innerHTML, /Allowed Or Blocked/);
   assert.match(ui.runtimeOpsContent.innerHTML, /Run Inventory/);
   assert.match(ui.runtimeOpsContent.innerHTML, /Runtime API reachable\./);
   assert.match(ui.runtimeOpsContent.innerHTML, /One provider is degraded\./);
@@ -307,6 +318,8 @@ test("runtimeops page renders the first inspect-only runtime boards", () => {
   assert.match(ui.runtimeOpsContent.innerHTML, /runtimeops\.attach/);
   assert.match(ui.runtimeOpsContent.innerHTML, /tenant-demo/);
   assert.match(ui.runtimeOpsContent.innerHTML, /project-core/);
+  assert.match(ui.runtimeOpsContent.innerHTML, /tenant-demo \/ project-core/);
+  assert.match(ui.runtimeOpsContent.innerHTML, /pending proposals/);
   assert.match(ui.runtimeOpsContent.innerHTML, /runtime-endpoint/);
   assert.match(ui.runtimeOpsContent.innerHTML, /runtime-session-endpoint/);
   assert.match(ui.runtimeOpsContent.innerHTML, /run-20260314-003/);

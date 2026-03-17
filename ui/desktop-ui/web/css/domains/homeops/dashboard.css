@@ -25,6 +25,7 @@
 }
 
 .homeops-command-grid,
+.homeops-aimxs-grid,
 .homeops-attention-grid,
 .homeops-summary-grid {
   display: grid;
@@ -33,6 +34,7 @@
 }
 
 .homeops-command-card,
+.homeops-aimxs-card,
 .homeops-attention-card,
 .homeops-summary-card {
   display: grid;
@@ -40,6 +42,7 @@
 }
 
 .homeops-command-value,
+.homeops-aimxs-value,
 .homeops-attention-value,
 .homeops-summary-value {
   font-family: var(--font-family-display);
@@ -50,6 +53,12 @@
 }
 
 .homeops-summary-value {
+  font-size: 1.35rem;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.homeops-aimxs-value {
   font-size: 1.35rem;
   line-height: 1.15;
   overflow-wrap: anywhere;

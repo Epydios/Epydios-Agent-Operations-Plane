@@ -1,4 +1,5 @@
 import { escapeHTML, formatTime, renderPanelStateMetric } from "../../../views/common.js";
+import { renderAimxsDecisionBindingSpine } from "../../../shared/components/aimxs-decision-binding-spine.js";
 import { createIncidentOpsWorkspaceSnapshot } from "../state.js";
 
 function chipClassForTone(value) {
@@ -193,6 +194,22 @@ function renderIncidentQueueBoard(snapshot) {
         <div class="incidentops-subtitle">Recent Queue</div>
         ${renderQueueList(board.recentItems)}
       </div>
+    </article>
+  `;
+}
+
+function renderAimxsDecisionBindingSpineBoard(snapshot) {
+  const board = snapshot.aimxsDecisionBindingSpine;
+  if (!board?.available) {
+    return "";
+  }
+  return `
+    <article class="metric incidentops-card" data-domain-root="incidentops" data-incidentops-panel="aimxs-decision-binding-spine">
+      <div class="metric-title-row">
+        <div class="title">AIMXS Decision-Binding Spine</div>
+        <span class="chip chip-neutral chip-compact">correlated</span>
+      </div>
+      ${renderAimxsDecisionBindingSpine(board)}
     </article>
   `;
 }
@@ -438,6 +455,7 @@ export function renderIncidentWorkspace(context = {}) {
   return `
     <section class="incidentops-workspace stack" data-domain-root="incidentops">
       ${renderFeedbackPanel(snapshot)}
+      ${renderAimxsDecisionBindingSpineBoard(snapshot)}
       ${renderIncidentQueueBoard(snapshot)}
       ${renderActiveIncidentBoard(snapshot)}
       ${renderSeverityBoard(snapshot)}

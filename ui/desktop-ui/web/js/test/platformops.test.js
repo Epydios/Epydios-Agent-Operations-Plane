@@ -104,6 +104,7 @@ test("platformops page renders the first inspect-only platform boards", () => {
   assert.match(ui.platformOpsContent.innerHTML, /Dependency Readiness/);
   assert.match(ui.platformOpsContent.innerHTML, /Provider Registration/);
   assert.match(ui.platformOpsContent.innerHTML, /AIMXS Bridge Readiness/);
+  assert.match(ui.platformOpsContent.innerHTML, /AIMXS Route And Boundary/);
   assert.match(ui.platformOpsContent.innerHTML, /Release Readiness/);
   assert.match(ui.platformOpsContent.innerHTML, /Support Posture/);
   assert.match(ui.platformOpsContent.innerHTML, /desktop-local/);
@@ -123,6 +124,10 @@ test("platformops page renders the first inspect-only platform boards", () => {
   assert.match(ui.platformOpsContent.innerHTML, /Provider CA rotation due soon\./);
   assert.match(ui.platformOpsContent.innerHTML, /Runtime API reachable\./);
   assert.match(ui.platformOpsContent.innerHTML, /One provider is degraded\./);
+  assert.match(ui.platformOpsContent.innerHTML, /primary platform surface/);
+  assert.match(ui.platformOpsContent.innerHTML, /Route And Provider Chain/);
+  assert.match(ui.platformOpsContent.innerHTML, /deployment target/);
+  assert.match(ui.platformOpsContent.innerHTML, /Allowed Or Constrained/);
   assert.match(ui.platformOpsContent.innerHTML, /Admin Change Queue/);
   assert.match(ui.platformOpsContent.innerHTML, /Promotion Draft/);
   assert.match(ui.platformOpsContent.innerHTML, /Environment And Deployment Scope/);

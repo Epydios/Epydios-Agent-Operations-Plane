@@ -1,3 +1,8 @@
+import {
+  createAimxsRouteBoundaryField,
+  createAimxsRouteBoundaryModel
+} from "../../shared/aimxs/route-boundary.js";
+
 function normalizeString(value, fallback = "") {
   const normalized = String(value || "").trim();
   return normalized || fallback;
@@ -284,7 +289,7 @@ export function createPlatformWorkspaceSnapshot(context = {}) {
   const selectedAdminQueueItem =
     adminQueueItems.find((item) => item.id === selectedAdminChangeId) || adminQueueItems[0] || null;
 
-  return {
+  const snapshot = {
     environmentOverview: {
       surface: "desktop-local",
       namespace: normalizeString(aimxsActivation.namespace, "epydios-system"),
@@ -432,4 +437,77 @@ export function createPlatformWorkspaceSnapshot(context = {}) {
       }
     }
   };
+  snapshot.aimxsRouteBoundary = buildPlatformAimxsRouteBoundary(snapshot);
+  return snapshot;
+}
+
+function buildPlatformAimxsRouteBoundary(snapshot = {}) {
+  const environment = snapshot?.environmentOverview || {};
+  const bridge = snapshot?.aimxsBridgeReadiness || {};
+  const release = snapshot?.releaseReadiness || {};
+  const support = snapshot?.supportPosture || {};
+  const scope = snapshot?.admin?.currentScope || {};
+  const bounded =
+    Number(release?.deploymentIssueCount || 0) === 0 &&
+    Number(support?.supportSignalCount || 0) === 0 &&
+    Number(bridge?.secretMissingCount || 0) === 0 &&
+    normalizeString(bridge?.state).toLowerCase() === "active";
+
+  return createAimxsRouteBoundaryModel({
+    summary:
+      "This primary AIMXS view shows which deployment route is currently live on the platform surface and why the release boundary is still allowed or constrained.",
+    surfaceLabel: "primary platform surface",
+    routeFields: [
+      createAimxsRouteBoundaryField("surface", environment?.surface, true),
+      createAimxsRouteBoundaryField("environment", release?.environment, true),
+      createAimxsRouteBoundaryField("mode", bridge?.activeMode, true),
+      createAimxsRouteBoundaryField("provider", bridge?.selectedProviderId, true),
+      createAimxsRouteBoundaryField("deployment target", scope?.deploymentTarget, true),
+      createAimxsRouteBoundaryField("namespace", environment?.namespace, true)
+    ].filter(Boolean),
+    currentBoundary: {
+      title: "Current Route",
+      badge: bounded ? "current" : "watch",
+      tone: bounded ? "ok" : "warn",
+      note: "Current route is derived from AIMXS bridge readiness and the active platform deployment surface.",
+      fields: [
+        createAimxsRouteBoundaryField("bridge state", bridge?.state),
+        createAimxsRouteBoundaryField("route posture", bridge?.available ? "bridge available" : "bridge unavailable"),
+        createAimxsRouteBoundaryField("selected ready", bridge?.selectedProviderReady ? "yes" : "no"),
+        createAimxsRouteBoundaryField("enabled providers", String(bridge?.enabledProviderCount || 0)),
+        createAimxsRouteBoundaryField("enabled ready", String(bridge?.enabledReadyCount || 0)),
+        createAimxsRouteBoundaryField("provider warnings", String(bridge?.warningCount || 0))
+      ].filter(Boolean)
+    },
+    routePosture: {
+      title: "Boundary Posture",
+      badge: bounded ? "bounded" : "constrained",
+      tone: bounded ? "ok" : "warn",
+      note:
+        "Platform boundaries stay bounded by pipeline status, provider readiness, and AIMXS secret posture before any deployment change can proceed.",
+      fields: [
+        createAimxsRouteBoundaryField("pipeline", release?.pipelineStatus),
+        createAimxsRouteBoundaryField("deployment issues", String(release?.deploymentIssueCount || 0)),
+        createAimxsRouteBoundaryField("provider degraded", String(release?.providerDegradedCount || 0)),
+        createAimxsRouteBoundaryField("secret missing", String(bridge?.secretMissingCount || 0)),
+        createAimxsRouteBoundaryField("support signals", String(support?.supportSignalCount || 0)),
+        createAimxsRouteBoundaryField("staging gate", release?.latestStagingGate, true),
+        createAimxsRouteBoundaryField("prod gate", release?.latestProdGate, true)
+      ].filter(Boolean)
+    },
+    rationale: {
+      title: "Allowed Or Constrained",
+      badge: bounded ? "allowed" : "constrained",
+      tone: bounded ? "ok" : "warn",
+      note:
+        normalizeString(support?.firstWarning, "") ||
+        "Use provider, runtime, and policy details below to see why the current platform route is or is not ready for the next governed release step.",
+      fields: [
+        createAimxsRouteBoundaryField("runtime detail", support?.runtimeDetail),
+        createAimxsRouteBoundaryField("provider detail", support?.providersDetail),
+        createAimxsRouteBoundaryField("policy detail", support?.policyDetail),
+        createAimxsRouteBoundaryField("active warning", support?.firstWarning)
+      ].filter(Boolean)
+    }
+  });
 }

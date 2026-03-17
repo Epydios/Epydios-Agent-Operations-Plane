@@ -4,6 +4,7 @@ import {
   buildAuditHandoffText,
   getFilteredAuditEvents
 } from "../../views/audit.js";
+import { createAimxsLegibilityModel } from "../../shared/aimxs/legibility.js";
 
 function normalizeString(value, fallback = "") {
   const normalized = String(value || "").trim();
@@ -133,6 +134,78 @@ function summarizeApproval(approval = {}) {
   };
 }
 
+function normalizeAdminTraceItem(item = {}) {
+  const current = item && typeof item === "object" ? item : {};
+  const decision = current?.decision && typeof current.decision === "object" ? current.decision : {};
+  const execution = current?.execution && typeof current.execution === "object" ? current.execution : {};
+  const receipt = current?.receipt && typeof current.receipt === "object" ? current.receipt : {};
+  const rollback = current?.rollback && typeof current.rollback === "object" ? current.rollback : {};
+  return {
+    id: normalizeString(current?.id),
+    ownerDomain: normalizeString(current?.ownerDomain, "unknown").toLowerCase(),
+    kind: normalizeString(current?.kind),
+    status: normalizeString(current?.status).toLowerCase(),
+    requestedAction: normalizeString(current?.requestedAction),
+    subjectId: normalizeString(current?.subjectId),
+    targetScope: normalizeString(current?.targetScope),
+    reason: normalizeString(current?.reason),
+    summary: normalizeString(current?.summary),
+    simulationSummary: normalizeString(current?.simulationSummary),
+    createdAt: normalizeString(current?.createdAt),
+    simulatedAt: normalizeString(current?.simulatedAt),
+    routedAt: normalizeString(current?.routedAt),
+    updatedAt: normalizeString(current?.updatedAt),
+    decision: {
+      decisionId: normalizeString(decision?.decisionId),
+      status: normalizeString(decision?.status).toLowerCase(),
+      reason: normalizeString(decision?.reason),
+      decidedAt: normalizeString(decision?.decidedAt),
+      approvalReceiptId: normalizeString(decision?.approvalReceiptId),
+      actorRef: normalizeString(decision?.actorRef)
+    },
+    execution: {
+      executionId: normalizeString(execution?.executionId),
+      executedAt: normalizeString(execution?.executedAt),
+      status: normalizeString(execution?.status).toLowerCase(),
+      summary: normalizeString(execution?.summary),
+      actorRef: normalizeString(execution?.actorRef)
+    },
+    receipt: {
+      receiptId: normalizeString(receipt?.receiptId),
+      issuedAt: normalizeString(receipt?.issuedAt),
+      summary: normalizeString(receipt?.summary),
+      stableRef: normalizeString(receipt?.stableRef),
+      approvalReceiptId: normalizeString(receipt?.approvalReceiptId),
+      executionId: normalizeString(receipt?.executionId)
+    },
+    recovery: {
+      recoveryId: normalizeString(rollback?.rollbackId),
+      action: normalizeString(rollback?.action),
+      status: normalizeString(rollback?.status).toLowerCase(),
+      recordedAt: normalizeString(rollback?.rolledBackAt),
+      summary: normalizeString(rollback?.summary),
+      stableRef: normalizeString(rollback?.stableRef),
+      reason: normalizeString(rollback?.reason),
+      approvalReceiptId: normalizeString(rollback?.approvalReceiptId),
+      adminReceiptId: normalizeString(rollback?.adminReceiptId),
+      executionId: normalizeString(rollback?.executionId)
+    }
+  };
+}
+
+function adminTraceTone(items = [], latest = {}) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return "neutral";
+  }
+  if (normalizeString(latest?.recovery?.recoveryId)) {
+    return "ok";
+  }
+  if (normalizeString(latest?.receipt?.receiptId) && normalizeString(latest?.decision?.approvalReceiptId)) {
+    return "ok";
+  }
+  return "warn";
+}
+
 export function createAuditWorkspaceSnapshot(context = {}) {
   const audit = context?.audit && typeof context.audit === "object" ? context.audit : {};
   const filters = context?.filters && typeof context.filters === "object" ? context.filters : {};
@@ -159,10 +232,22 @@ export function createAuditWorkspaceSnapshot(context = {}) {
   const investigationItems = incidentHistory
     .map((item) => normalizeIncidentEntry(item))
     .filter((item) => item.id || item.packageId);
+  const adminTraceItems = (Array.isArray(context?.adminQueueItems) ? context.adminQueueItems : [])
+    .map((item) => normalizeAdminTraceItem(item))
+    .filter((item) => item.id);
   const incidentCounts = countIncidentStatuses(investigationItems);
   const latestInvestigation = normalizeIncidentEntry(
     pickLatest(investigationItems, ["generatedAt", "filingUpdatedAt"])
   );
+  const latestAdminTrace = pickLatest(adminTraceItems, [
+    "updatedAt",
+    "recovery.recordedAt",
+    "receipt.issuedAt",
+    "execution.executedAt",
+    "decision.decidedAt",
+    "simulatedAt",
+    "createdAt"
+  ]);
   const recentInvestigations = investigationItems
     .slice()
     .sort((a, b) => parseTime(b?.generatedAt || b?.filingUpdatedAt) - parseTime(a?.generatedAt || a?.filingUpdatedAt))
@@ -181,6 +266,15 @@ export function createAuditWorkspaceSnapshot(context = {}) {
     }));
   const feedbackMessage = normalizeString(viewState?.feedback?.message);
   const handoffPreview = normalizeString(viewState?.handoffPreview);
+  const adminOwnerMix = summarizeTopValues(adminTraceItems, "ownerDomain");
+  const adminSimulatedCount = adminTraceItems.filter(
+    (item) => normalizeString(item?.simulatedAt) || normalizeString(item?.simulationSummary)
+  ).length;
+  const adminDecisionCount = adminTraceItems.filter((item) => normalizeString(item?.decision?.decisionId)).length;
+  const adminExecutionCount = adminTraceItems.filter(
+    (item) => normalizeString(item?.execution?.executionId) || normalizeString(item?.receipt?.receiptId)
+  ).length;
+  const adminRecoveryCount = adminTraceItems.filter((item) => normalizeString(item?.recovery?.recoveryId)).length;
 
   return {
     feedback: feedbackMessage
@@ -189,6 +283,10 @@ export function createAuditWorkspaceSnapshot(context = {}) {
           message: feedbackMessage
         }
       : null,
+    aimxsDecisionBindingSpine:
+      context?.aimxsDecisionBindingSpine && typeof context.aimxsDecisionBindingSpine === "object"
+        ? context.aimxsDecisionBindingSpine
+        : { available: false },
     handoffPreview,
     auditEventBoard: {
       source: normalizeString(bundle?.meta?.source, normalizeString(audit?.source, "unknown")),
@@ -256,6 +354,38 @@ export function createAuditWorkspaceSnapshot(context = {}) {
           : decisionItems.length > 0
             ? "ok"
             : "neutral"
+    },
+    adminLifecycleBoard: {
+      totalCount: adminTraceItems.length,
+      simulatedCount: adminSimulatedCount,
+      decisionCount: adminDecisionCount,
+      executionCount: adminExecutionCount,
+      recoveryCount: adminRecoveryCount,
+      ownerMix: adminOwnerMix,
+      latestItem: latestAdminTrace,
+      aimxsLegibility: createAimxsLegibilityModel({
+        requestRef: normalizeString(latestAdminTrace?.id),
+        actorRef: normalizeString(latestAdminTrace?.decision?.actorRef),
+        subjectRef: normalizeString(latestAdminTrace?.subjectId),
+        authorityRef: normalizeString(latestAdminTrace?.ownerDomain),
+        grantRef: normalizeString(latestAdminTrace?.decision?.approvalReceiptId),
+        posture: normalizeString(latestAdminTrace?.status),
+        scopeRef: normalizeString(latestAdminTrace?.targetScope),
+        previewRef: normalizeString(latestAdminTrace?.simulatedAt),
+        previewSummary: normalizeString(latestAdminTrace?.simulationSummary),
+        decisionRef: normalizeString(latestAdminTrace?.decision?.decisionId),
+        decisionStatus: normalizeString(latestAdminTrace?.decision?.status || latestAdminTrace?.status),
+        approvalReceiptRef: normalizeString(latestAdminTrace?.decision?.approvalReceiptId),
+        executionRef: normalizeString(latestAdminTrace?.execution?.executionId),
+        executionStatus: normalizeString(latestAdminTrace?.execution?.status),
+        receiptRef: normalizeString(latestAdminTrace?.receipt?.receiptId),
+        stableRef: normalizeString(latestAdminTrace?.receipt?.stableRef),
+        recoveryRef: normalizeString(latestAdminTrace?.recovery?.recoveryId),
+        recoveryAction: normalizeString(latestAdminTrace?.recovery?.action),
+        recoveryStableRef: normalizeString(latestAdminTrace?.recovery?.stableRef),
+        summary: normalizeString(latestAdminTrace?.summary)
+      }),
+      tone: adminTraceTone(adminTraceItems, latestAdminTrace)
     },
     exportBoard: {
       source: normalizeString(bundle?.meta?.source, normalizeString(audit?.source, "unknown")),

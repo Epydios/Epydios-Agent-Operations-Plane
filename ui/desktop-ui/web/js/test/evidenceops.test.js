@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { renderEvidenceOpsEmptyState, renderEvidenceOpsPage } from "../domains/evidenceops/routes.js";
+import { createAimxsDecisionBindingSpine } from "../shared/aimxs/decision-binding.js";
 
 test("evidenceops page renders bounded bundle, provenance, and artifact access boards", () => {
   const ui = { evidenceOpsContent: { innerHTML: "" } };
@@ -132,6 +133,46 @@ test("evidenceops page renders bounded bundle, provenance, and artifact access b
         }
       ]
     },
+    adminQueueItems: [
+      {
+        id: "policy-change-aa10-001",
+        ownerDomain: "policyops",
+        kind: "policy",
+        status: "rolled_back",
+        requestedAction: "load read_only_review",
+        subjectId: "read_only_review",
+        targetScope: "tenant-demo / workspace",
+        reason: "Traceability proof.",
+        summary: "Load read_only_review for tenant-demo / workspace @ aimxs-policy-provider",
+        simulationSummary: "Preview only before live activation.",
+        simulatedAt: "2026-03-15T01:58:00Z",
+        decision: {
+          decisionId: "admin-decision-aa10-002",
+          status: "approved",
+          approvalReceiptId: "approval-receipt-aa10-002",
+          decidedAt: "2026-03-15T01:59:00Z"
+        },
+        execution: {
+          executionId: "admin-execution-aa10-002",
+          executedAt: "2026-03-15T02:00:00Z",
+          status: "applied"
+        },
+        receipt: {
+          receiptId: "admin-receipt-aa10-002",
+          issuedAt: "2026-03-15T02:00:00Z",
+          stableRef: "policy-change-aa10-001/admin-receipt-aa10-002"
+        },
+        rollback: {
+          rollbackId: "admin-rollback-aa10-002",
+          action: "rollback",
+          status: "rolled_back",
+          rolledBackAt: "2026-03-15T02:01:00Z",
+          stableRef: "policy-change-aa10-001/admin-rollback-aa10-002"
+        },
+        updatedAt: "2026-03-15T02:01:00Z",
+        createdAt: "2026-03-15T01:57:30Z"
+      }
+    ],
     incidentHistory: {
       items: [
         {
@@ -188,7 +229,34 @@ test("evidenceops page renders bounded bundle, provenance, and artifact access b
         tone: "ok",
         message: "Evidence bundle review JSON downloaded as epydiosops-evidence-bundle-review-bundle-governed-001.json."
       }
-    }
+    },
+    aimxsDecisionBindingSpine: createAimxsDecisionBindingSpine({
+      activeDomain: "evidenceops",
+      sourceLabel: "correlated run",
+      correlationRef: "run-20260315-001",
+      runId: "run-20260315-001",
+      approvalId: "approval-20260315-001",
+      actorRef: "demo.operator",
+      subjectRef: "task-20260315-001",
+      authorityRef: "codex",
+      authorityBasis: "bearer_token_jwt",
+      scopeRef: "tenant-demo / project-core",
+      providerRef: "aimxs-policy-provider",
+      routeRef: "managed_codex_worker",
+      boundaryRef: "agentops_gateway",
+      grantRef: "policy_grant_token",
+      decisionStatus: "ALLOW",
+      receiptRef: "approval-receipt-aa10-002",
+      stableRef: "policy-change-aa10-001/admin-receipt-aa10-002",
+      bundleId: "bundle-governed-001",
+      recordId: "evidence-run-001",
+      replayRef: "run-20260315-001",
+      sessionRef: "session-20260315-001",
+      taskRef: "task-20260315-001",
+      evidenceRefs: ["evidence://finance/transfer/001", "evidence://finance/transfer/002"],
+      auditRefs: ["approval.decision.recorded@2026-03-15T01:59:00Z"],
+      summary: "Evidence anchors for the correlated governed run."
+    })
   });
 
   assert.match(ui.evidenceOpsContent.innerHTML, /data-domain-root="evidenceops"/);
@@ -196,11 +264,26 @@ test("evidenceops page renders bounded bundle, provenance, and artifact access b
   assert.match(ui.evidenceOpsContent.innerHTML, /Evidence bundle review JSON downloaded/);
   assert.match(ui.evidenceOpsContent.innerHTML, /Evidence Bundle Board/);
   assert.match(ui.evidenceOpsContent.innerHTML, /Provenance Board/);
+  assert.match(ui.evidenceOpsContent.innerHTML, /Admin Change Provenance/);
+  assert.match(ui.evidenceOpsContent.innerHTML, /AIMXS Lifecycle Ribbon/);
+  assert.match(ui.evidenceOpsContent.innerHTML, /AIMXS Decision-Binding Spine/);
+  assert.match(ui.evidenceOpsContent.innerHTML, /Authority Chain/);
+  assert.match(ui.evidenceOpsContent.innerHTML, /Grant Chain/);
+  assert.match(ui.evidenceOpsContent.innerHTML, /Receipt Chain/);
+  assert.match(ui.evidenceOpsContent.innerHTML, /Replay Chain/);
+  assert.match(ui.evidenceOpsContent.innerHTML, /Evidence Chain/);
+  assert.match(ui.evidenceOpsContent.innerHTML, /data-aimxs-spine-action="open-workspace"/);
+  assert.match(ui.evidenceOpsContent.innerHTML, /Decision Binding Contract/);
+  assert.match(ui.evidenceOpsContent.innerHTML, /Stable Or Replay Refs/);
   assert.match(ui.evidenceOpsContent.innerHTML, /Artifact Access Board/);
   assert.match(ui.evidenceOpsContent.innerHTML, /Retention Board/);
   assert.match(ui.evidenceOpsContent.innerHTML, /Evidence To Control Mapping Board/);
   assert.match(ui.evidenceOpsContent.innerHTML, /bundle-governed-001/);
   assert.match(ui.evidenceOpsContent.innerHTML, /approval-20260315-001/);
+  assert.match(ui.evidenceOpsContent.innerHTML, /policy-change-aa10-001/);
+  assert.match(ui.evidenceOpsContent.innerHTML, /approval-receipt-aa10-002/);
+  assert.match(ui.evidenceOpsContent.innerHTML, /admin-receipt-aa10-002/);
+  assert.match(ui.evidenceOpsContent.innerHTML, /admin-rollback-aa10-002/);
   assert.match(ui.evidenceOpsContent.innerHTML, /audit-endpoint/);
   assert.match(ui.evidenceOpsContent.innerHTML, /task-20260315-001/);
   assert.match(ui.evidenceOpsContent.innerHTML, /evidence-thread-001/);

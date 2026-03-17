@@ -17,6 +17,10 @@
   grid-column: 1 / -1;
 }
 
+.runtimeops-card-wide {
+  grid-column: 1 / -1;
+}
+
 .runtimeops-card {
   display: grid;
   gap: var(--space-3);

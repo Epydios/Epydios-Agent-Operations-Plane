@@ -1,4 +1,5 @@
 import { chipClassForStatus, escapeHTML, renderPanelStateMetric } from "../../../views/common.js";
+import { renderAimxsRouteBoundaryBlock } from "../../../shared/components/aimxs-route-boundary.js";
 import { createPlatformWorkspaceSnapshot } from "../state.js";
 
 function chipClassForTone(value) {
@@ -283,6 +284,18 @@ function renderAimxsBridgeReadinessBoard(snapshot) {
         <span class="chip chip-neutral chip-compact">warnings=${escapeHTML(String(board.warningCount))}</span>
       </div>
       <div class="platformops-kv-list">${renderKeyValueRows(rows)}</div>
+    </article>
+  `;
+}
+
+function renderAimxsRouteBoundaryBoard(snapshot) {
+  return `
+    <article class="metric platformops-card platformops-card-wide" data-domain-root="platformops" data-platformops-panel="aimxs-route-boundary">
+      <div class="metric-title-row">
+        <div class="title">AIMXS Route And Boundary</div>
+        <span class="chip chip-neutral chip-compact">primary</span>
+      </div>
+      ${renderAimxsRouteBoundaryBlock(snapshot.aimxsRouteBoundary)}
     </article>
   `;
 }
@@ -931,6 +944,7 @@ export function renderPlatformWorkspace(context = {}) {
         ${renderDependencyReadinessBoard(snapshot)}
         ${renderProviderRegistrationBoard(snapshot)}
         ${renderAimxsBridgeReadinessBoard(snapshot)}
+        ${renderAimxsRouteBoundaryBoard(snapshot)}
         ${renderReleaseReadinessBoard(snapshot)}
         ${renderSupportPostureBoard(snapshot)}
       </div>

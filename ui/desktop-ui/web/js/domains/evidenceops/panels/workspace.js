@@ -4,6 +4,8 @@ import {
   formatTime,
   renderPanelStateMetric
 } from "../../../views/common.js";
+import { renderAimxsLegibilityBlock } from "../../../shared/components/aimxs-legibility.js";
+import { renderAimxsDecisionBindingSpine } from "../../../shared/components/aimxs-decision-binding-spine.js";
 import { createEvidenceWorkspaceSnapshot } from "../state.js";
 
 function chipClassForTone(value) {
@@ -267,6 +269,92 @@ function renderProvenanceBoard(snapshot) {
   `;
 }
 
+function renderAimxsDecisionBindingSpineBoard(snapshot) {
+  const board = snapshot.aimxsDecisionBindingSpine;
+  if (!board?.available) {
+    return "";
+  }
+  return `
+    <article class="metric evidenceops-card" data-domain-root="evidenceops" data-evidenceops-panel="aimxs-decision-binding-spine">
+      <div class="metric-title-row">
+        <div class="title">AIMXS Decision-Binding Spine</div>
+        <span class="chip chip-neutral chip-compact">correlated</span>
+      </div>
+      ${renderAimxsDecisionBindingSpine(board)}
+    </article>
+  `;
+}
+
+function renderAdminChangeProvenanceBoard(snapshot) {
+  const board = snapshot.adminChangeProvenanceBoard;
+  const latest = board.latestTrace || {};
+  const rows = [
+    {
+      label: "Coverage",
+      value: renderValuePills([
+        { label: "traces", value: String(board.totalCount) },
+        { label: "full lifecycle", value: String(board.fullLifecycleCount) },
+        { label: "stable refs", value: String(board.stableRefCount) }
+      ])
+    },
+    {
+      label: "Latest Admin Change",
+      value: renderValuePills([
+        { label: "change", value: latest.id, code: true },
+        { label: "owner", value: latest.ownerDomain, code: true },
+        { label: "action", value: latest.requestedAction },
+        { label: "status", value: latest.status }
+      ])
+    },
+    {
+      label: "Proposal And Simulation",
+      value: renderValuePills([
+        { label: "subject", value: latest.subjectId, code: true },
+        { label: "scope", value: latest.targetScope, code: true },
+        { label: "simulated", value: latest.simulatedAt ? formatTime(latest.simulatedAt) : "-" },
+        { label: "summary", value: latest.simulationSummary || latest.summary }
+      ])
+    },
+    {
+      label: "Decision And Execution",
+      value: renderValuePills([
+        { label: "decision", value: latest.decision?.decisionId, code: true },
+        { label: "approval", value: latest.decision?.approvalReceiptId, code: true },
+        { label: "execution", value: latest.execution?.executionId, code: true },
+        { label: "receipt", value: latest.receipt?.receiptId, code: true }
+      ])
+    },
+    {
+      label: "Recovery And Stable Refs",
+      value: renderValuePills([
+        { label: "recovery", value: latest.recovery?.recoveryId, code: true },
+        { label: "action", value: latest.recovery?.action },
+        { label: "receipt ref", value: latest.receipt?.stableRef, code: true },
+        { label: "recovery ref", value: latest.recovery?.stableRef, code: true }
+      ])
+    },
+    {
+      label: "Top Owners",
+      value: renderValuePills((board.ownerMix || []).map((item) => ({ label: item.value, value: String(item.count), code: true })))
+    }
+  ];
+  return `
+    <article class="metric evidenceops-card" data-domain-root="evidenceops" data-evidenceops-panel="admin-change-provenance-board">
+      <div class="metric-title-row">
+        <div class="title">Admin Change Provenance</div>
+        <span class="${chipClassForTone(board.tone)}">${escapeHTML(board.tone)}</span>
+      </div>
+      <div class="evidenceops-chip-row">
+        <span class="chip chip-neutral chip-compact">traces=${escapeHTML(String(board.totalCount))}</span>
+        <span class="chip chip-neutral chip-compact">full=${escapeHTML(String(board.fullLifecycleCount))}</span>
+        <span class="chip chip-neutral chip-compact">stableRefs=${escapeHTML(String(board.stableRefCount))}</span>
+      </div>
+      <div class="evidenceops-kv-list">${renderKeyValueRows(rows)}</div>
+      ${renderAimxsLegibilityBlock(board.aimxsLegibility)}
+    </article>
+  `;
+}
+
 function renderArtifactAccessBoard(snapshot) {
   const board = snapshot.artifactAccessBoard;
   const rows = [
@@ -464,8 +552,10 @@ export function renderEvidenceWorkspace(context = {}) {
   return `
     <div class="stack evidenceops-workspace" data-domain-root="evidenceops">
       ${renderFeedbackPanel(snapshot)}
+      ${renderAimxsDecisionBindingSpineBoard(snapshot)}
       ${renderEvidenceBundleBoard(snapshot)}
       ${renderProvenanceBoard(snapshot)}
+      ${renderAdminChangeProvenanceBoard(snapshot)}
       ${renderArtifactAccessBoard(snapshot)}
       ${renderRetentionBoard(snapshot)}
       ${renderControlMappingBoard(snapshot)}

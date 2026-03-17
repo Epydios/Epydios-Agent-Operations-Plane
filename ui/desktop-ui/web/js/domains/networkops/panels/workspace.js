@@ -3,6 +3,7 @@ import {
   escapeHTML,
   renderPanelStateMetric
 } from "../../../views/common.js";
+import { renderAimxsRouteBoundaryBlock } from "../../../shared/components/aimxs-route-boundary.js";
 import { createNetworkWorkspaceSnapshot } from "../state.js";
 
 function chipClassForTone(value) {
@@ -912,6 +913,18 @@ function renderTopologyBoard(snapshot) {
   `;
 }
 
+function renderAimxsRouteBoundaryBoard(snapshot) {
+  return `
+    <article class="metric networkops-card networkops-card-wide" data-domain-root="networkops" data-networkops-panel="aimxs-route-boundary">
+      <div class="metric-title-row">
+        <div class="title">AIMXS Route And Boundary</div>
+        <span class="chip chip-neutral chip-compact">primary</span>
+      </div>
+      ${renderAimxsRouteBoundaryBlock(snapshot.aimxsRouteBoundary)}
+    </article>
+  `;
+}
+
 export function renderNetworkWorkspace(context = {}) {
   const snapshot = createNetworkWorkspaceSnapshot(context);
   return `
@@ -931,6 +944,7 @@ export function renderNetworkWorkspace(context = {}) {
         ${renderTrustAndCertificateBoard(snapshot)}
       </div>
       <div class="networkops-secondary-grid">
+        ${renderAimxsRouteBoundaryBoard(snapshot)}
         ${renderIngressEgressBoard(snapshot)}
         ${renderTopologyBoard(snapshot)}
       </div>

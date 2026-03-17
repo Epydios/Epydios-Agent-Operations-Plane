@@ -1,4 +1,5 @@
 import { chipClassForStatus, escapeHTML, renderPanelStateMetric } from "../../../views/common.js";
+import { renderAimxsIdentityPostureBlock } from "../../../shared/components/aimxs-identity-posture.js";
 import { createGuardrailWorkspaceSnapshot } from "../state.js";
 
 function chipClassForTone(value) {
@@ -156,6 +157,18 @@ function renderGuardrailPostureBoard(snapshot) {
         <span class="chip chip-neutral chip-compact">approvals=${escapeHTML(String(board.pendingApprovalCount || 0))}</span>
       </div>
       <div class="guardrailops-kv-list">${renderKeyValueRows(rows)}</div>
+    </article>
+  `;
+}
+
+function renderAimxsIdentityPostureBoard(snapshot) {
+  return `
+    <article class="metric guardrailops-card guardrailops-card-wide" data-domain-root="guardrailops" data-guardrailops-panel="aimxs-identity-posture">
+      <div class="metric-title-row">
+        <div class="title">AIMXS Identity And Posture</div>
+        <span class="chip chip-ok chip-compact">primary</span>
+      </div>
+      ${renderAimxsIdentityPostureBlock(snapshot.aimxsIdentityPosture)}
     </article>
   `;
 }
@@ -968,6 +981,7 @@ export function renderGuardrailWorkspace(context = {}) {
       ${renderOperationalFeedback(snapshot)}
       <div class="guardrailops-primary-grid">
         ${renderGuardrailPostureBoard(snapshot)}
+        ${renderAimxsIdentityPostureBoard(snapshot)}
         ${renderSandboxCapabilityBoard(snapshot)}
         ${renderQuotaAndTimeoutBoard(snapshot)}
         ${renderKillSwitchBoard(snapshot)}

@@ -186,6 +186,15 @@ test("identityops page renders inspect-first boards plus bounded admin recovery 
   assert.match(ui.identityContent.innerHTML, /demo\.operator/);
   assert.match(ui.identityContent.innerHTML, /runtime\.run\.create/);
   assert.match(ui.identityContent.innerHTML, /staging/);
+  assert.match(ui.identityContent.innerHTML, /AIMXS Identity And Posture/);
+  assert.match(ui.identityContent.innerHTML, /runtime-bound subject/);
+  assert.match(ui.identityContent.innerHTML, /authority tier|current authority/);
+  assert.match(ui.identityContent.innerHTML, /governance-backed claims/);
+  assert.match(ui.identityContent.innerHTML, /Current Posture/);
+  assert.match(ui.identityContent.innerHTML, /governance-backed identity/);
+  assert.match(ui.identityContent.innerHTML, /Target Posture/);
+  assert.match(ui.identityContent.innerHTML, /authority tier transition|grant or delegation transition/);
+  assert.match(ui.identityContent.innerHTML, /Allowed Or Blocked/);
   assert.match(ui.identityContent.innerHTML, /IdentityOps Admin/);
   assert.match(ui.identityContent.innerHTML, /Identity admin draft feedback is visible\./);
   assert.match(ui.identityContent.innerHTML, /Admin Change Queue/);

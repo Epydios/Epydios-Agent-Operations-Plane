@@ -109,6 +109,7 @@ test("networkops page renders bounded boundary, endpoint, trust, posture, and to
   assert.match(ui.networkOpsContent.innerHTML, /Trust And Certificate Board/);
   assert.match(ui.networkOpsContent.innerHTML, /Egress And Ingress Posture Board/);
   assert.match(ui.networkOpsContent.innerHTML, /Connectivity Topology Board/);
+  assert.match(ui.networkOpsContent.innerHTML, /AIMXS Route And Boundary/);
   assert.match(ui.networkOpsContent.innerHTML, /gateway_first/);
   assert.match(ui.networkOpsContent.innerHTML, /litellm/);
   assert.match(ui.networkOpsContent.innerHTML, /routes=6/);
@@ -131,6 +132,10 @@ test("networkops page renders bounded boundary, endpoint, trust, posture, and to
   assert.match(ui.networkOpsContent.innerHTML, /MTLSAndBearerTokenSecret/);
   assert.match(ui.networkOpsContent.innerHTML, /secrets missing=1/);
   assert.match(ui.networkOpsContent.innerHTML, /Provider CA rotation due soon\./);
+  assert.match(ui.networkOpsContent.innerHTML, /primary network surface/);
+  assert.match(ui.networkOpsContent.innerHTML, /Later bounded network control remains closed\./);
+  assert.match(ui.networkOpsContent.innerHTML, /Current Boundary/);
+  assert.match(ui.networkOpsContent.innerHTML, /policy route/);
 });
 
 test("networkops empty state renders without loaded network posture", () => {

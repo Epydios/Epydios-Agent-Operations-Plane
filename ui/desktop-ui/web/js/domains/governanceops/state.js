@@ -2,6 +2,7 @@ import {
   chipClassForStatus,
   displayPolicyProviderLabel
 } from "../../views/common.js";
+import { createAimxsLegibilityModel } from "../../shared/aimxs/legibility.js";
 
 function normalizeString(value, fallback = "") {
   const normalized = String(value || "").trim();
@@ -247,6 +248,25 @@ function summarizeAdminProposalReview(adminQueueItems = [], viewState = {}) {
     routedAt: selectedItem.routedAt,
     decision: selectedItem.decision,
     receipt: selectedItem.receipt,
+    aimxsLegibility: createAimxsLegibilityModel({
+      requestRef: selectedItem.changeId,
+      actorRef: selectedItem.decision.actorRef,
+      subjectRef: selectedItem.subjectId,
+      authorityRef: `${selectedItem.ownerDomain}-admin`,
+      grantRef: selectedItem.decision.approvalReceiptId,
+      posture: selectedItem.status,
+      scopeRef: selectedItem.targetScope,
+      routeRef: `${selectedItem.ownerDomain}-governance`,
+      boundaryRef: selectedItem.kind,
+      previewRef: selectedItem.routedAt || selectedItem.updatedAt,
+      previewSummary: selectedItem.simulationSummary,
+      decisionRef: selectedItem.decision.decisionId,
+      decisionStatus: selectedItem.decision.status || selectedItem.status,
+      approvalReceiptRef: selectedItem.decision.approvalReceiptId,
+      receiptRef: selectedItem.receipt.receiptId,
+      stableRef: selectedItem.receipt.stableRef,
+      summary: selectedItem.summary
+    }),
     canApproveDeny: actionable,
     canRoute: actionable,
     canCopyReceipt: selectedItem.decision.approvalReceiptId !== "-",
@@ -760,6 +780,10 @@ export function createGovernanceWorkspaceSnapshot(context = {}) {
   const nowValue = context?.now || new Date();
 
   return {
+    aimxsDecisionBindingSpine:
+      context?.aimxsDecisionBindingSpine && typeof context.aimxsDecisionBindingSpine === "object"
+        ? context.aimxsDecisionBindingSpine
+        : { available: false },
     operationalFeedback: summarizeOperationalFeedback(viewState),
     adminProposalReview: summarizeAdminProposalReview(context?.adminQueueItems, viewState),
     actionReview: summarizeActionReview(approvals, runs, nowValue, viewState),

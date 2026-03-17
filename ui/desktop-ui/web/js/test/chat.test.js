@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { buildChatTurnGovernanceReport, renderChat } from "../views/chat.js";
+import { createAimxsDecisionBindingSpine } from "../shared/aimxs/decision-binding.js";
 import { loadM19ParityFixture, buildChatThreadFromParityFixture } from "./m19-parity-fixture.js";
 
 test("chat view renders parity fixture state from the native contract", async () => {
@@ -66,7 +67,32 @@ test("chat view renders parity fixture state from the native contract", async ()
       agentProfileId: "codex",
       executionMode: "managed_codex_worker",
       status: "ready",
-      message: "Loaded parity fixture state."
+      message: "Loaded parity fixture state.",
+      aimxsDecisionBindingSpine: createAimxsDecisionBindingSpine({
+        activeDomain: "agentops",
+        sourceLabel: "correlated run",
+        correlationRef: "run-parity-001",
+        runId: "run-parity-001",
+        approvalId: "approval-1",
+        actorRef: "demo.operator",
+        subjectRef: "task-parity-001",
+        authorityRef: "codex",
+        authorityBasis: "bearer_token_jwt",
+        scopeRef: "tenant-demo / project-demo",
+        providerRef: "enterprise-default",
+        routeRef: "managed_codex_worker",
+        boundaryRef: "agentops_gateway",
+        grantRef: "approval-1",
+        decisionStatus: "PENDING",
+        receiptRef: "approval-receipt-parity-001",
+        stableRef: "stable://run-parity-001",
+        replayRef: "run-parity-001",
+        sessionRef: "session-parity-001",
+        taskRef: "task-parity-001",
+        evidenceRefs: ["evidence://thread/parity/001"],
+        auditRefs: ["approval.reviewed@2026-03-10T14:00:00Z"],
+        summary: "Correlated AIMXS drill-in for the active thread."
+      })
     }
   );
 
@@ -87,7 +113,22 @@ test("chat view renders parity fixture state from the native contract", async ()
   assert.match(html, /Agent Profile/);
   assert.match(html, /Execution Path/);
   assert.match(html, /Thread Intent/);
+  assert.match(html, /AIMXS Thread Flow/);
+  assert.match(html, /Current stage:/);
+  assert.match(html, /Next Truthful Action/);
+  assert.match(html, /Review 2 approval checkpoints/);
   assert.match(html, /Approval Context Drawer/);
+  assert.match(html, /AIMXS Decision Binding/);
+  assert.match(html, /Correlated AIMXS Drill-In/);
+  assert.match(html, /AIMXS Lifecycle Ribbon/);
+  assert.match(html, /Authority Chain/);
+  assert.match(html, /Grant Chain/);
+  assert.match(html, /Receipt Chain/);
+  assert.match(html, /Replay Chain/);
+  assert.match(html, /Evidence Chain/);
+  assert.match(html, /data-aimxs-spine-action="open-workspace"/);
+  assert.match(html, /Decision Binding Contract/);
+  assert.match(html, /Stable Or Replay Refs/);
   assert.match(html, /Pinned Approval Review/);
   assert.match(html, /Pin Approval Checkpoints/);
   assert.match(html, /Pin Tool Proposals/);
@@ -99,6 +140,7 @@ test("chat view renders parity fixture state from the native contract", async ()
   assert.match(html, /Pin Latest Tool Action/);
   assert.match(html, /Pin Latest Evidence/);
   assert.match(html, /Pin Managed Transcript/);
+  assert.match(html, /replay ref/i);
   assert.match(html, /Latest Tool Action Drill-In/);
   assert.match(html, /Latest Evidence Drill-In/);
   assert.match(html, /Managed Transcript Anchor/);
