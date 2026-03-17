@@ -71,15 +71,18 @@ import {
   renderComplianceOpsEmptyState,
   renderComplianceOpsPage
 } from "./domains/complianceops/routes.js";
+import { createComplianceWorkspaceSnapshot } from "./domains/complianceops/state.js";
 import {
   renderIncidentOpsEmptyState,
   renderIncidentOpsPage
 } from "./domains/incidentops/routes.js";
 import { createIncidentOpsWorkspaceSnapshot } from "./domains/incidentops/state.js";
+import { buildTimestampToken } from "./domains/incidentops/tokens.js";
 import {
   renderNetworkOpsEmptyState,
   renderNetworkOpsPage
 } from "./domains/networkops/routes.js";
+import { createNetworkWorkspaceSnapshot } from "./domains/networkops/state.js";
 import {
   renderIdentityOpsEmptyState,
   renderIdentityOpsPage,
@@ -2488,13 +2491,6 @@ function safeFileToken(value, fallback = "any") {
   return cleaned || fallback;
 }
 
-function buildTimestampToken(value = new Date().toISOString()) {
-  return String(value || new Date().toISOString())
-    .trim()
-    .replace(/[-:]/g, "")
-    .replace(/\.\d+Z$/, "Z");
-}
-
 function buildAuditFileSuffix(filters, generatedAt = new Date().toISOString()) {
   const tenant = safeFileToken(filters?.tenant, "tenant-any");
   const project = safeFileToken(filters?.project, "project-any");
@@ -2879,6 +2875,8 @@ function persistIncidentHistory() {
     items: store.getIncidentPackageHistory()
   });
 }
+
+let syncIncidentOpsSelectionAfterHistoryChange = () => {};
 
 function pushIncidentHistory(entry) {
   const normalized = normalizeIncidentHistoryEntry(entry);
@@ -4264,6 +4262,18 @@ async function main() {
     projectScope: activeProjectScope(session),
     selectedAgentProfileId: initialAgentID
   };
+  let latestIdentityOpsContext = {
+    settings: latestSettingsSnapshot,
+    session
+  };
+  let latestGuardrailOpsContext = {
+    settings: latestSettingsSnapshot,
+    runs: {},
+    approvals: {},
+    runtimeWorkerCapabilities: {},
+    exportProfiles: null,
+    orgAdminProfiles: null
+  };
   let latestGovernanceOpsContext = {
     settings: latestSettingsSnapshot,
     approvals: {},
@@ -4280,6 +4290,12 @@ async function main() {
     runtimeIdentity: {},
     runtimeSessions: {},
     runtimeWorkerCapabilities: {}
+  };
+  let latestPlatformOpsContext = {
+    health: {},
+    pipeline: {},
+    providers: {},
+    aimxsActivation: {}
   };
   let latestAuditOpsContext = {
     audit: { items: [] },
@@ -4305,8 +4321,22 @@ async function main() {
     approvals: {},
     audit: { items: [] }
   };
+  let latestComplianceOpsContext = {
+    settings: latestSettingsSnapshot,
+    runs: {},
+    approvals: {},
+    audit: { items: [] }
+  };
+  let latestNetworkOpsContext = {
+    settings: latestSettingsSnapshot,
+    health: {},
+    providers: {},
+    runs: {},
+    runtimeWorkerCapabilities: {}
+  };
   let governanceOpsViewState = {
     selectedRunId: "",
+    selectedAdminChangeId: "",
     feedback: null
   };
   let runtimeOpsViewState = {
@@ -4315,6 +4345,35 @@ async function main() {
     sessionReview: null,
     sessionReviewMeta: null,
     feedback: null
+  };
+  let platformOpsViewState = {
+    feedback: null,
+    selectedAdminChangeId: "",
+    recoveryReason: "",
+    promotionDraft: {
+      changeKind: "promote",
+      environment: "",
+      deploymentTarget: "",
+      releaseRef: "",
+      reason: ""
+    },
+    queueItems: [],
+    latestSimulation: null
+  };
+  let guardrailOpsViewState = {
+    feedback: null,
+    selectedAdminChangeId: "",
+    recoveryReason: "",
+    guardrailDraft: {
+      changeKind: "tighten",
+      targetScope: "",
+      executionProfile: "",
+      safetyBoundary: "",
+      proposedState: "approval_required",
+      reason: ""
+    },
+    queueItems: [],
+    latestSimulation: null
   };
   let auditOpsViewState = {
     feedback: null,
@@ -4325,11 +4384,82 @@ async function main() {
   };
   let policyOpsViewState = {
     feedback: null,
-    simulationRefreshedAt: ""
+    simulationRefreshedAt: "",
+    selectedAdminChangeId: "",
+    recoveryReason: "",
+    adminDraft: {
+      changeKind: "load",
+      packId: "",
+      providerId: "",
+      targetScope: "",
+      reason: ""
+    },
+    queueItems: [],
+    latestSimulation: null
+  };
+  let complianceOpsViewState = {
+    feedback: null,
+    selectedAdminChangeId: "",
+    recoveryReason: "",
+    adminDraft: {
+      changeKind: "attestation",
+      subjectId: "",
+      targetScope: "",
+      controlBoundary: "",
+      reason: ""
+    },
+    queueItems: [],
+    latestSimulation: null
+  };
+  let networkOpsViewState = {
+    feedback: null,
+    selectedAdminChangeId: "",
+    recoveryReason: "",
+    adminDraft: {
+      changeKind: "probe",
+      boundaryPathId: "",
+      targetScope: "",
+      targetEndpointId: "",
+      reason: ""
+    },
+    queueItems: [],
+    latestSimulation: null
   };
   let incidentOpsViewState = {
     selectedIncidentId: "",
     feedback: null
+  };
+  let identityOpsViewState = {
+    feedback: null,
+    selectedAdminChangeId: "",
+    recoveryReason: "",
+    authorityDraft: {
+      subjectId: "",
+      targetScope: "",
+      authorityTier: "workspace_operator",
+      reason: ""
+    },
+    grantDraft: {
+      subjectId: "",
+      targetScope: "",
+      changeKind: "issue",
+      grantKey: "",
+      delegationMode: "governed",
+      reason: ""
+    },
+    queueItems: [],
+    latestSimulation: null
+  };
+  syncIncidentOpsSelectionAfterHistoryChange = function syncIncidentOpsSelectionAfterHistoryChangeBound(entryId = "") {
+    const items = store.getIncidentPackageHistory();
+    const candidateId = String(entryId || incidentOpsViewState.selectedIncidentId || "").trim();
+    const resolvedEntry =
+      items.find((item) => String(item?.id || "").trim() === candidateId) || items[0] || null;
+    incidentOpsViewState = {
+      ...incidentOpsViewState,
+      selectedIncidentId: String(resolvedEntry?.id || "").trim()
+    };
+    renderIncidentOpsPanel();
   };
   const renderHomePanel = (options = {}) => {
     const snapshot = options.snapshot || triageSnapshot;
@@ -4351,12 +4481,50 @@ async function main() {
   const renderContextPanel = () => {
     renderContextBar(triageSnapshot, session, latestSettingsSnapshot);
   };
+  const renderIdentityOpsPanel = (context = null) => {
+    if (context && typeof context === "object") {
+      latestIdentityOpsContext = context;
+    }
+    const settingsPayload =
+      latestIdentityOpsContext?.settings && typeof latestIdentityOpsContext.settings === "object"
+        ? latestIdentityOpsContext.settings
+        : latestSettingsSnapshot;
+    const sessionPayload =
+      latestIdentityOpsContext?.session && typeof latestIdentityOpsContext.session === "object"
+        ? latestIdentityOpsContext.session
+        : session;
+    renderIdentityOpsPage(
+      ui,
+      {
+        ...settingsPayload,
+        viewState: identityOpsViewState
+      },
+      sessionPayload
+    );
+  };
+  const renderGuardrailOpsPanel = (context = null) => {
+    if (context && typeof context === "object") {
+      latestGuardrailOpsContext = context;
+    }
+    renderGuardrailOpsPage(ui, {
+      ...latestGuardrailOpsContext,
+      viewState: guardrailOpsViewState
+    });
+  };
   const renderGovernanceOpsPanel = (context = null) => {
     if (context && typeof context === "object") {
       latestGovernanceOpsContext = context;
     }
     renderGovernanceOpsPage(ui, {
       ...latestGovernanceOpsContext,
+      adminQueueItems: [
+        ...(Array.isArray(identityOpsViewState.queueItems) ? identityOpsViewState.queueItems : []),
+        ...(Array.isArray(platformOpsViewState.queueItems) ? platformOpsViewState.queueItems : []),
+        ...(Array.isArray(guardrailOpsViewState.queueItems) ? guardrailOpsViewState.queueItems : []),
+        ...(Array.isArray(policyOpsViewState.queueItems) ? policyOpsViewState.queueItems : []),
+        ...(Array.isArray(complianceOpsViewState.queueItems) ? complianceOpsViewState.queueItems : []),
+        ...(Array.isArray(networkOpsViewState.queueItems) ? networkOpsViewState.queueItems : [])
+      ],
       viewState: governanceOpsViewState
     });
   };
@@ -4366,6 +4534,15 @@ async function main() {
     }
     renderRuntimeOpsPage(ui, latestRuntimeOpsContext, session, {
       viewState: runtimeOpsViewState
+    });
+  };
+  const renderPlatformOpsPanel = (context = null) => {
+    if (context && typeof context === "object") {
+      latestPlatformOpsContext = context;
+    }
+    renderPlatformOpsPage(ui, {
+      ...latestPlatformOpsContext,
+      viewState: platformOpsViewState
     });
   };
   const renderAuditOpsPanel = (context = null) => {
@@ -4391,6 +4568,24 @@ async function main() {
         items: store.getIncidentPackageHistory()
       },
       viewState: evidenceOpsViewState
+    });
+  };
+  const renderComplianceOpsPanel = (context = null) => {
+    if (context && typeof context === "object") {
+      latestComplianceOpsContext = context;
+    }
+    renderComplianceOpsPage(ui, {
+      ...latestComplianceOpsContext,
+      viewState: complianceOpsViewState
+    });
+  };
+  const renderNetworkOpsPanel = (context = null) => {
+    if (context && typeof context === "object") {
+      latestNetworkOpsContext = context;
+    }
+    renderNetworkOpsPage(ui, {
+      ...latestNetworkOpsContext,
+      viewState: networkOpsViewState
     });
   };
   const renderPolicyOpsPanel = (context = null) => {
@@ -4436,6 +4631,2126 @@ async function main() {
           : normalizedRunID
     };
     renderGovernanceOpsPanel();
+  };
+  const setGovernanceOpsAdminSelection = (changeId) => {
+    const normalizedChangeId = String(changeId || "").trim();
+    governanceOpsViewState = {
+      ...governanceOpsViewState,
+      selectedAdminChangeId: normalizedChangeId
+    };
+    renderGovernanceOpsPanel();
+  };
+  const setComplianceOpsFeedback = (tone, message) => {
+    complianceOpsViewState = {
+      ...complianceOpsViewState,
+      feedback: message
+        ? {
+            tone: String(tone || "info").trim().toLowerCase(),
+            message: String(message || "").trim()
+          }
+        : null
+    };
+    renderComplianceOpsPanel();
+  };
+  const setComplianceOpsRecoveryReason = (value) => {
+    complianceOpsViewState = {
+      ...complianceOpsViewState,
+      recoveryReason: String(value || "").trimStart()
+    };
+  };
+  const complianceOpsActorRef = () =>
+    String(session?.claims?.sub || session?.claims?.email || session?.claims?.client_id || "").trim() ||
+    "compliance-operator";
+  const networkOpsActorRef = () =>
+    String(session?.claims?.sub || session?.claims?.email || session?.claims?.client_id || "").trim() ||
+    "network-operator";
+  const setIdentityOpsFeedback = (tone, message) => {
+    identityOpsViewState = {
+      ...identityOpsViewState,
+      feedback: message
+        ? {
+            tone: String(tone || "info").trim().toLowerCase(),
+            message: String(message || "").trim()
+          }
+        : null
+    };
+    renderIdentityOpsPanel();
+  };
+  const setIdentityOpsRecoveryReason = (value) => {
+    identityOpsViewState = {
+      ...identityOpsViewState,
+      recoveryReason: String(value || "").trimStart()
+    };
+  };
+  const identityOpsActorRef = () => {
+    const claims =
+      latestIdentityOpsContext?.session?.claims && typeof latestIdentityOpsContext.session.claims === "object"
+        ? latestIdentityOpsContext.session.claims
+        : session?.claims && typeof session.claims === "object"
+          ? session.claims
+          : {};
+    return (
+      String(claims?.sub || claims?.email || claims?.client_id || "").trim() ||
+      "identity-admin"
+    );
+  };
+  const getIdentityOpsDefaults = () => {
+    const settingsPayload =
+      latestIdentityOpsContext?.settings && typeof latestIdentityOpsContext.settings === "object"
+        ? latestIdentityOpsContext.settings
+        : latestSettingsSnapshot;
+    const runtimeIdentity =
+      settingsPayload?.identity && typeof settingsPayload.identity === "object" ? settingsPayload.identity : {};
+    const identity =
+      runtimeIdentity?.identity && typeof runtimeIdentity.identity === "object" ? runtimeIdentity.identity : {};
+    const claims =
+      latestIdentityOpsContext?.session?.claims && typeof latestIdentityOpsContext.session.claims === "object"
+        ? latestIdentityOpsContext.session.claims
+        : session?.claims && typeof session.claims === "object"
+          ? session.claims
+          : {};
+    const tenantIds = Array.isArray(identity?.tenantIds)
+      ? identity.tenantIds.map((item) => String(item || "").trim()).filter(Boolean)
+      : [];
+    const projectIds = Array.isArray(identity?.projectIds)
+      ? identity.projectIds.map((item) => String(item || "").trim()).filter(Boolean)
+      : [];
+    const subject = String(identity?.subject || claims?.sub || claims?.email || identity?.clientId || claims?.client_id || "").trim();
+    const targetScope =
+      [tenantIds[0], projectIds[0]].filter(Boolean).join(" / ") ||
+      String(settingsPayload?.environment || "").trim() ||
+      "workspace";
+    return {
+      subjectId: subject,
+      targetScope
+    };
+  };
+  const normalizeIdentityOpsDraft = (kind, draft = null) => {
+    const defaults = getIdentityOpsDefaults();
+    const input = draft && typeof draft === "object" ? draft : {};
+    if (String(kind || "").trim().toLowerCase() === "grant") {
+      return {
+        subjectId: String(input.subjectId || defaults.subjectId || "").trim(),
+        targetScope: String(input.targetScope || defaults.targetScope || "").trim(),
+        changeKind: String(input.changeKind || "issue").trim().toLowerCase() || "issue",
+        grantKey: String(input.grantKey || "").trim(),
+        delegationMode: String(input.delegationMode || "governed").trim().toLowerCase() || "governed",
+        reason: String(input.reason || "").trim()
+      };
+    }
+    return {
+      subjectId: String(input.subjectId || defaults.subjectId || "").trim(),
+      targetScope: String(input.targetScope || defaults.targetScope || "").trim(),
+      authorityTier: String(input.authorityTier || "workspace_operator").trim() || "workspace_operator",
+      reason: String(input.reason || "").trim()
+    };
+  };
+  const getIdentityOpsDraft = (kind) => {
+    const normalizedKind = String(kind || "").trim().toLowerCase();
+    return normalizedKind === "grant"
+      ? normalizeIdentityOpsDraft("grant", identityOpsViewState.grantDraft)
+      : normalizeIdentityOpsDraft("authority", identityOpsViewState.authorityDraft);
+  };
+  const setIdentityOpsDraft = (kind, draft, options = {}) => {
+    const normalizedKind = String(kind || "").trim().toLowerCase() === "grant" ? "grant" : "authority";
+    const nextDraft = normalizeIdentityOpsDraft(normalizedKind, draft);
+    identityOpsViewState = {
+      ...identityOpsViewState,
+      [normalizedKind === "grant" ? "grantDraft" : "authorityDraft"]: nextDraft,
+      latestSimulation:
+        identityOpsViewState.latestSimulation?.kind === normalizedKind && options.keepSimulation !== true
+          ? null
+          : identityOpsViewState.latestSimulation,
+      feedback: options.clearFeedback === true ? null : identityOpsViewState.feedback
+    };
+  };
+  const updateIdentityOpsDraftField = (kind, field, value) => {
+    const normalizedKind = String(kind || "").trim().toLowerCase() === "grant" ? "grant" : "authority";
+    const currentDraft = getIdentityOpsDraft(normalizedKind);
+    const nextValue = String(value || "").trim();
+    setIdentityOpsDraft(
+      normalizedKind,
+      {
+        ...currentDraft,
+        [field]: nextValue
+      },
+      {
+        clearFeedback: true
+      }
+    );
+  };
+  const findIdentityOpsQueueItem = (changeId) => {
+    const normalizedChangeId = String(changeId || "").trim();
+    if (!normalizedChangeId) {
+      return null;
+    }
+    return (
+      (Array.isArray(identityOpsViewState.queueItems) ? identityOpsViewState.queueItems : []).find(
+        (item) => String(item?.id || "").trim() === normalizedChangeId
+      ) || null
+    );
+  };
+  const upsertIdentityOpsQueueItem = (nextItem) => {
+    const item = nextItem && typeof nextItem === "object" ? nextItem : null;
+    const changeId = String(item?.id || "").trim();
+    if (!changeId) {
+      return null;
+    }
+    const existingItems = Array.isArray(identityOpsViewState.queueItems) ? identityOpsViewState.queueItems : [];
+    const nextItems = [];
+    let replaced = false;
+    existingItems.forEach((entry) => {
+      const entryId = String(entry?.id || "").trim();
+      if (entryId === changeId) {
+        nextItems.push({
+          ...entry,
+          ...item
+        });
+        replaced = true;
+        return;
+      }
+      nextItems.push(entry);
+    });
+    if (!replaced) {
+      nextItems.unshift(item);
+    }
+    identityOpsViewState = {
+      ...identityOpsViewState,
+      queueItems: nextItems
+    };
+    return nextItems.find((entry) => String(entry?.id || "").trim() === changeId) || null;
+  };
+  const getIdentityOpsSelectedQueueItemForKind = (kind) => {
+    const selectedItem = findIdentityOpsQueueItem(identityOpsViewState.selectedAdminChangeId);
+    return selectedItem && String(selectedItem.kind || "").trim().toLowerCase() === String(kind || "").trim().toLowerCase()
+      ? selectedItem
+      : null;
+  };
+  const buildIdentityOpsQueueItem = (kind, draft, options = {}) => {
+    const normalizedKind = String(kind || "").trim().toLowerCase() === "grant" ? "grant" : "authority";
+    const nextDraft = normalizeIdentityOpsDraft(normalizedKind, draft);
+    const selectedItem = getIdentityOpsSelectedQueueItemForKind(normalizedKind);
+    const existingId = String(options.id || selectedItem?.id || "").trim();
+    const changeId =
+      existingId ||
+      `${normalizedKind}-change-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    const requestedAction =
+      normalizedKind === "grant"
+        ? `${nextDraft.changeKind} ${nextDraft.grantKey || "grant"}`
+        : `set ${nextDraft.authorityTier || "authority"}`;
+    const summary =
+      normalizedKind === "grant"
+        ? `${nextDraft.changeKind || "issue"} ${nextDraft.grantKey || "grant"} for ${nextDraft.subjectId || "subject"} @ ${nextDraft.targetScope || "scope"}`
+        : `${nextDraft.authorityTier || "authority"} for ${nextDraft.subjectId || "subject"} @ ${nextDraft.targetScope || "scope"}`;
+    return {
+      id: changeId,
+      kind: normalizedKind,
+      label: normalizedKind === "grant" ? "Grant And Delegation Draft" : "Authority Change Draft",
+      requestedAction,
+      subjectId: nextDraft.subjectId,
+      targetScope: nextDraft.targetScope,
+      status: String(options.status || selectedItem?.status || "draft").trim().toLowerCase(),
+      reason: nextDraft.reason,
+      summary,
+      simulationSummary: String(options.simulationSummary || selectedItem?.simulationSummary || "").trim(),
+      createdAt: String(options.createdAt || selectedItem?.createdAt || new Date().toISOString()).trim(),
+      simulatedAt: String(options.simulatedAt || selectedItem?.simulatedAt || "").trim(),
+      updatedAt: String(options.updatedAt || new Date().toISOString()).trim(),
+      routedAt: String(options.routedAt || selectedItem?.routedAt || "").trim(),
+      decision:
+        options.decision === null
+          ? null
+          : options.decision || (selectedItem?.decision && typeof selectedItem.decision === "object" ? selectedItem.decision : null),
+      execution:
+        options.execution === null
+          ? null
+          : options.execution || (selectedItem?.execution && typeof selectedItem.execution === "object" ? selectedItem.execution : null),
+      receipt:
+        options.receipt === null
+          ? null
+          : options.receipt || (selectedItem?.receipt && typeof selectedItem.receipt === "object" ? selectedItem.receipt : null),
+      rollback:
+        options.rollback === null
+          ? null
+          : options.rollback || (selectedItem?.rollback && typeof selectedItem.rollback === "object" ? selectedItem.rollback : null)
+    };
+  };
+  const validateIdentityOpsDraft = (kind, draft) => {
+    const normalizedKind = String(kind || "").trim().toLowerCase() === "grant" ? "grant" : "authority";
+    const nextDraft = normalizeIdentityOpsDraft(normalizedKind, draft);
+    if (!nextDraft.subjectId) {
+      return "Subject is required before saving an identity admin proposal.";
+    }
+    if (!nextDraft.targetScope) {
+      return "Target scope is required before saving an identity admin proposal.";
+    }
+    if (!nextDraft.reason) {
+      return "Reason is required before saving an identity admin proposal.";
+    }
+    if (normalizedKind === "grant" && !nextDraft.grantKey) {
+      return "Grant key is required before saving a grant or delegation proposal.";
+    }
+    return "";
+  };
+  const buildIdentityOpsSimulation = (item, draft) => {
+    const normalizedItem = item && typeof item === "object" ? item : {};
+    const normalizedKind = String(normalizedItem.kind || "").trim().toLowerCase() === "grant" ? "grant" : "authority";
+    const nextDraft = normalizeIdentityOpsDraft(normalizedKind, draft);
+    const defaults = getIdentityOpsDefaults();
+    const settingsPayload =
+      latestIdentityOpsContext?.settings && typeof latestIdentityOpsContext.settings === "object"
+        ? latestIdentityOpsContext.settings
+        : latestSettingsSnapshot;
+    const runtimeIdentity =
+      settingsPayload?.identity && typeof settingsPayload.identity === "object" ? settingsPayload.identity : {};
+    const touchesActiveSubject = nextDraft.subjectId && nextDraft.subjectId === defaults.subjectId;
+    const touchesActiveScope = nextDraft.targetScope && nextDraft.targetScope === defaults.targetScope;
+    const changeIsRevoke = normalizedKind === "grant" && nextDraft.changeKind === "revoke";
+    const tone = touchesActiveSubject || touchesActiveScope || changeIsRevoke ? "warn" : "info";
+    const findings = [
+      "Execution is blocked in this slice. Governance approval is required before any live identity mutation can occur."
+    ];
+    if (touchesActiveSubject) {
+      findings.push("This proposal targets the currently active governed identity.");
+    }
+    if (touchesActiveScope) {
+      findings.push("This proposal touches the current tenant/project scope.");
+    }
+    if (changeIsRevoke) {
+      findings.push("Revoke proposals may remove currently visible permissions from the active posture.");
+    }
+    return {
+      changeId: String(normalizedItem.id || "").trim(),
+      kind: normalizedKind,
+      tone,
+      title: normalizedKind === "grant" ? "Grant and delegation simulation" : "Authority change simulation",
+      summary:
+        normalizedKind === "grant"
+          ? `Preview only. This ${nextDraft.changeKind} proposal requires GovernanceOps approval before a grant or delegation change can execute.`
+          : "Preview only. This authority proposal requires GovernanceOps approval before a live authority mutation can execute.",
+      updatedAt: new Date().toISOString(),
+      facts: [
+        { label: "subject", value: nextDraft.subjectId, code: true },
+        { label: "target", value: nextDraft.targetScope, code: true },
+        {
+          label: normalizedKind === "grant" ? "grant" : "authority",
+          value: normalizedKind === "grant" ? nextDraft.grantKey : nextDraft.authorityTier,
+          code: true
+        },
+        {
+          label: normalizedKind === "grant" ? "change" : "policy rules",
+          value: normalizedKind === "grant" ? nextDraft.changeKind : String(runtimeIdentity?.policyRuleCount || 0)
+        },
+        { label: "trace runs", value: String(settingsPayload?.identityTraceability?.runCount || 0) },
+        { label: "trace approvals", value: String(settingsPayload?.identityTraceability?.approvalCount || 0) }
+      ],
+      findings
+    };
+  };
+  const buildIdentityOpsGovernanceReceiptText = (item) => {
+    const queueItem = item && typeof item === "object" ? item : {};
+    const decision = queueItem?.decision && typeof queueItem.decision === "object" ? queueItem.decision : {};
+    return [
+      "EpydiosOps Governance Decision Receipt",
+      `admin_change_request_id=${String(queueItem.id || "").trim()}`,
+      `admin_change_kind=${String(queueItem.kind || "").trim()}`,
+      `requested_action=${String(queueItem.requestedAction || "").trim()}`,
+      `subject_id=${String(queueItem.subjectId || "").trim()}`,
+      `target_scope=${String(queueItem.targetScope || "").trim()}`,
+      `decision=${String(decision.status || "").trim()}`,
+      `decision_id=${String(decision.decisionId || "").trim()}`,
+      `approval_receipt_id=${String(decision.approvalReceiptId || "").trim()}`,
+      `decided_at=${String(decision.decidedAt || "").trim()}`,
+      `actor_ref=${String(decision.actorRef || "").trim()}`,
+      `reason=${String(decision.reason || "").trim()}`
+    ].join("\n");
+  };
+  const buildIdentityOpsAdminReceiptText = (item) => {
+    const queueItem = item && typeof item === "object" ? item : {};
+    const decision = queueItem?.decision && typeof queueItem.decision === "object" ? queueItem.decision : {};
+    const execution = queueItem?.execution && typeof queueItem.execution === "object" ? queueItem.execution : {};
+    const receipt = queueItem?.receipt && typeof queueItem.receipt === "object" ? queueItem.receipt : {};
+    return [
+      "EpydiosOps IdentityOps Admin Change Receipt",
+      `admin_change_request_id=${String(queueItem.id || "").trim()}`,
+      `admin_change_receipt_id=${String(receipt.receiptId || "").trim()}`,
+      `admin_change_execution_id=${String(execution.executionId || "").trim()}`,
+      `approval_receipt_id=${String(receipt.approvalReceiptId || decision.approvalReceiptId || "").trim()}`,
+      `stable_ref=${String(receipt.stableRef || "").trim()}`,
+      `status=${String(queueItem.status || "").trim()}`,
+      `requested_action=${String(queueItem.requestedAction || "").trim()}`,
+      `subject_id=${String(queueItem.subjectId || "").trim()}`,
+      `target_scope=${String(queueItem.targetScope || "").trim()}`,
+      `executed_at=${String(execution.executedAt || "").trim()}`,
+      `issued_at=${String(receipt.issuedAt || "").trim()}`,
+      `actor_ref=${String(execution.actorRef || "").trim()}`,
+      `summary=${String(receipt.summary || execution.summary || queueItem.summary || "").trim()}`
+    ].join("\n");
+  };
+  const buildIdentityOpsRollbackReceiptText = (item) => {
+    const queueItem = item && typeof item === "object" ? item : {};
+    const rollback = queueItem?.rollback && typeof queueItem.rollback === "object" ? queueItem.rollback : {};
+    const receipt = queueItem?.receipt && typeof queueItem.receipt === "object" ? queueItem.receipt : {};
+    const execution = queueItem?.execution && typeof queueItem.execution === "object" ? queueItem.execution : {};
+    const decision = queueItem?.decision && typeof queueItem.decision === "object" ? queueItem.decision : {};
+    return [
+      "EpydiosOps IdentityOps Recovery Receipt",
+      `admin_change_request_id=${String(queueItem.id || "").trim()}`,
+      `admin_change_kind=${String(queueItem.kind || "").trim()}`,
+      `admin_change_rollback_id=${String(rollback.rollbackId || "").trim()}`,
+      `action=${String(rollback.action || "").trim()}`,
+      `status=${String(rollback.status || "").trim()}`,
+      `approval_receipt_id=${String(rollback.approvalReceiptId || decision.approvalReceiptId || "").trim()}`,
+      `admin_change_receipt_id=${String(rollback.adminReceiptId || receipt.receiptId || "").trim()}`,
+      `execution_id=${String(rollback.executionId || execution.executionId || "").trim()}`,
+      `stable_ref=${String(rollback.stableRef || "").trim()}`,
+      `rolled_back_at=${String(rollback.rolledBackAt || "").trim()}`,
+      `actor_ref=${String(rollback.actorRef || "").trim()}`,
+      `reason=${String(rollback.reason || "").trim()}`,
+      `summary=${String(rollback.summary || "").trim()}`
+    ].join("\n");
+  };
+  const buildPlatformOpsGovernanceReceiptText = (item) => {
+    const queueItem = item && typeof item === "object" ? item : {};
+    const decision = queueItem?.decision && typeof queueItem.decision === "object" ? queueItem.decision : {};
+    return [
+      "EpydiosOps Platform Governance Receipt",
+      `owner_domain=platformops`,
+      `admin_change_request_id=${String(queueItem.id || "").trim()}`,
+      `admin_change_kind=${String(queueItem.kind || "platform").trim()}`,
+      `requested_action=${String(queueItem.requestedAction || "").trim()}`,
+      `release_ref=${String(queueItem.releaseRef || queueItem.subjectId || "").trim()}`,
+      `environment=${String(queueItem.environment || "").trim()}`,
+      `deployment_target=${String(queueItem.deploymentTarget || "").trim()}`,
+      `target_scope=${String(queueItem.targetScope || "").trim()}`,
+      `decision=${String(decision.status || "").trim()}`,
+      `decision_id=${String(decision.decisionId || "").trim()}`,
+      `approval_receipt_id=${String(decision.approvalReceiptId || "").trim()}`,
+      `decided_at=${String(decision.decidedAt || "").trim()}`,
+      `actor_ref=${String(decision.actorRef || "").trim()}`,
+      `reason=${String(decision.reason || "").trim()}`
+    ].join("\n");
+  };
+  const buildPlatformOpsAdminReceiptText = (item) => {
+    const queueItem = item && typeof item === "object" ? item : {};
+    const decision = queueItem?.decision && typeof queueItem.decision === "object" ? queueItem.decision : {};
+    const execution = queueItem?.execution && typeof queueItem.execution === "object" ? queueItem.execution : {};
+    const receipt = queueItem?.receipt && typeof queueItem.receipt === "object" ? queueItem.receipt : {};
+    return [
+      "EpydiosOps Platform Admin Receipt",
+      `owner_domain=platformops`,
+      `admin_change_request_id=${String(queueItem.id || "").trim()}`,
+      `admin_change_kind=${String(queueItem.kind || "platform").trim()}`,
+      `requested_action=${String(queueItem.requestedAction || "").trim()}`,
+      `release_ref=${String(queueItem.releaseRef || queueItem.subjectId || "").trim()}`,
+      `environment=${String(queueItem.environment || "").trim()}`,
+      `deployment_target=${String(queueItem.deploymentTarget || "").trim()}`,
+      `approval_receipt_id=${String(receipt.approvalReceiptId || decision.approvalReceiptId || "").trim()}`,
+      `execution_id=${String(execution.executionId || "").trim()}`,
+      `executed_at=${String(execution.executedAt || "").trim()}`,
+      `execution_status=${String(execution.status || "").trim()}`,
+      `receipt_id=${String(receipt.receiptId || "").trim()}`,
+      `issued_at=${String(receipt.issuedAt || "").trim()}`,
+      `stable_ref=${String(receipt.stableRef || "").trim()}`,
+      `summary=${String(receipt.summary || execution.summary || queueItem.summary || "").trim()}`
+    ].join("\n");
+  };
+  const buildPlatformOpsRollbackReceiptText = (item) => {
+    const queueItem = item && typeof item === "object" ? item : {};
+    const rollback = queueItem?.rollback && typeof queueItem.rollback === "object" ? queueItem.rollback : {};
+    const receipt = queueItem?.receipt && typeof queueItem.receipt === "object" ? queueItem.receipt : {};
+    const execution = queueItem?.execution && typeof queueItem.execution === "object" ? queueItem.execution : {};
+    const decision = queueItem?.decision && typeof queueItem.decision === "object" ? queueItem.decision : {};
+    return [
+      "EpydiosOps Platform Recovery Receipt",
+      `owner_domain=platformops`,
+      `admin_change_request_id=${String(queueItem.id || "").trim()}`,
+      `admin_change_kind=${String(queueItem.kind || "platform").trim()}`,
+      `requested_action=${String(queueItem.requestedAction || "").trim()}`,
+      `release_ref=${String(queueItem.releaseRef || queueItem.subjectId || "").trim()}`,
+      `environment=${String(queueItem.environment || "").trim()}`,
+      `deployment_target=${String(queueItem.deploymentTarget || "").trim()}`,
+      `rollback_id=${String(rollback.rollbackId || "").trim()}`,
+      `action=${String(rollback.action || "").trim()}`,
+      `status=${String(rollback.status || "").trim()}`,
+      `approval_receipt_id=${String(rollback.approvalReceiptId || decision.approvalReceiptId || "").trim()}`,
+      `admin_change_receipt_id=${String(rollback.adminReceiptId || receipt.receiptId || "").trim()}`,
+      `execution_id=${String(rollback.executionId || execution.executionId || "").trim()}`,
+      `stable_ref=${String(rollback.stableRef || "").trim()}`,
+      `rolled_back_at=${String(rollback.rolledBackAt || "").trim()}`,
+      `actor_ref=${String(rollback.actorRef || "").trim()}`,
+      `reason=${String(rollback.reason || "").trim()}`,
+      `summary=${String(rollback.summary || "").trim()}`
+    ].join("\n");
+  };
+  const buildGuardrailOpsGovernanceReceiptText = (item) => {
+    const queueItem = item && typeof item === "object" ? item : {};
+    const decision = queueItem?.decision && typeof queueItem.decision === "object" ? queueItem.decision : {};
+    return [
+      "EpydiosOps Guardrail Governance Receipt",
+      "owner_domain=guardrailops",
+      `admin_change_request_id=${String(queueItem.id || "").trim()}`,
+      `admin_change_kind=${String(queueItem.kind || "guardrail").trim()}`,
+      `requested_action=${String(queueItem.requestedAction || "").trim()}`,
+      `execution_profile=${String(queueItem.executionProfile || queueItem.subjectId || "").trim()}`,
+      `safety_boundary=${String(queueItem.safetyBoundary || "").trim()}`,
+      `proposed_state=${String(queueItem.proposedState || "").trim()}`,
+      `target_scope=${String(queueItem.targetScope || "").trim()}`,
+      `decision=${String(decision.status || "").trim()}`,
+      `decision_id=${String(decision.decisionId || "").trim()}`,
+      `approval_receipt_id=${String(decision.approvalReceiptId || "").trim()}`,
+      `decided_at=${String(decision.decidedAt || "").trim()}`,
+      `actor_ref=${String(decision.actorRef || "").trim()}`,
+      `reason=${String(decision.reason || "").trim()}`
+    ].join("\n");
+  };
+  const buildGuardrailOpsAdminReceiptText = (item) => {
+    const queueItem = item && typeof item === "object" ? item : {};
+    const decision = queueItem?.decision && typeof queueItem.decision === "object" ? queueItem.decision : {};
+    const execution = queueItem?.execution && typeof queueItem.execution === "object" ? queueItem.execution : {};
+    const receipt = queueItem?.receipt && typeof queueItem.receipt === "object" ? queueItem.receipt : {};
+    return [
+      "EpydiosOps Guardrail Admin Receipt",
+      "owner_domain=guardrailops",
+      `admin_change_request_id=${String(queueItem.id || "").trim()}`,
+      `admin_change_kind=${String(queueItem.kind || "guardrail").trim()}`,
+      `requested_action=${String(queueItem.requestedAction || "").trim()}`,
+      `execution_profile=${String(queueItem.executionProfile || queueItem.subjectId || "").trim()}`,
+      `safety_boundary=${String(queueItem.safetyBoundary || "").trim()}`,
+      `proposed_state=${String(queueItem.proposedState || "").trim()}`,
+      `target_scope=${String(queueItem.targetScope || "").trim()}`,
+      `approval_receipt_id=${String(receipt.approvalReceiptId || decision.approvalReceiptId || "").trim()}`,
+      `execution_id=${String(execution.executionId || "").trim()}`,
+      `executed_at=${String(execution.executedAt || "").trim()}`,
+      `execution_status=${String(execution.status || "").trim()}`,
+      `receipt_id=${String(receipt.receiptId || "").trim()}`,
+      `issued_at=${String(receipt.issuedAt || "").trim()}`,
+      `stable_ref=${String(receipt.stableRef || "").trim()}`,
+      `summary=${String(receipt.summary || execution.summary || queueItem.summary || "").trim()}`
+    ].join("\n");
+  };
+  const buildPolicyOpsGovernanceReceiptText = (item) => {
+    const queueItem = item && typeof item === "object" ? item : {};
+    const decision = queueItem?.decision && typeof queueItem.decision === "object" ? queueItem.decision : {};
+    return [
+      "EpydiosOps Policy Governance Receipt",
+      "owner_domain=policyops",
+      `admin_change_request_id=${String(queueItem.id || "").trim()}`,
+      `admin_change_kind=${String(queueItem.kind || "policy").trim()}`,
+      `requested_action=${String(queueItem.requestedAction || "").trim()}`,
+      `change_kind=${String(queueItem.changeKind || "").trim()}`,
+      `pack_id=${String(queueItem.packId || queueItem.subjectId || "").trim()}`,
+      `provider_id=${String(queueItem.providerId || "").trim()}`,
+      `target_scope=${String(queueItem.targetScope || "").trim()}`,
+      `decision=${String(decision.status || "").trim()}`,
+      `decision_id=${String(decision.decisionId || "").trim()}`,
+      `approval_receipt_id=${String(decision.approvalReceiptId || "").trim()}`,
+      `decided_at=${String(decision.decidedAt || "").trim()}`,
+      `actor_ref=${String(decision.actorRef || "").trim()}`,
+      `reason=${String(decision.reason || "").trim()}`
+    ].join("\n");
+  };
+  const buildPolicyOpsAdminReceiptText = (item) => {
+    const queueItem = item && typeof item === "object" ? item : {};
+    const decision = queueItem?.decision && typeof queueItem.decision === "object" ? queueItem.decision : {};
+    const execution = queueItem?.execution && typeof queueItem.execution === "object" ? queueItem.execution : {};
+    const receipt = queueItem?.receipt && typeof queueItem.receipt === "object" ? queueItem.receipt : {};
+    return [
+      "EpydiosOps Policy Admin Receipt",
+      "owner_domain=policyops",
+      `admin_change_request_id=${String(queueItem.id || "").trim()}`,
+      `admin_change_kind=${String(queueItem.kind || "policy").trim()}`,
+      `requested_action=${String(queueItem.requestedAction || "").trim()}`,
+      `change_kind=${String(queueItem.changeKind || "").trim()}`,
+      `pack_id=${String(queueItem.packId || queueItem.subjectId || "").trim()}`,
+      `provider_id=${String(queueItem.providerId || "").trim()}`,
+      `target_scope=${String(queueItem.targetScope || "").trim()}`,
+      `approval_receipt_id=${String(receipt.approvalReceiptId || decision.approvalReceiptId || "").trim()}`,
+      `execution_id=${String(execution.executionId || "").trim()}`,
+      `executed_at=${String(execution.executedAt || "").trim()}`,
+      `execution_status=${String(execution.status || "").trim()}`,
+      `receipt_id=${String(receipt.receiptId || "").trim()}`,
+      `issued_at=${String(receipt.issuedAt || "").trim()}`,
+      `stable_ref=${String(receipt.stableRef || "").trim()}`,
+      `summary=${String(receipt.summary || execution.summary || queueItem.summary || "").trim()}`
+    ].join("\n");
+  };
+  const buildPolicyOpsRollbackReceiptText = (item) => {
+    const queueItem = item && typeof item === "object" ? item : {};
+    const rollback = queueItem?.rollback && typeof queueItem.rollback === "object" ? queueItem.rollback : {};
+    const receipt = queueItem?.receipt && typeof queueItem.receipt === "object" ? queueItem.receipt : {};
+    const execution = queueItem?.execution && typeof queueItem.execution === "object" ? queueItem.execution : {};
+    const decision = queueItem?.decision && typeof queueItem.decision === "object" ? queueItem.decision : {};
+    return [
+      "EpydiosOps Policy Rollback Receipt",
+      "owner_domain=policyops",
+      `admin_change_request_id=${String(queueItem.id || "").trim()}`,
+      `admin_change_kind=${String(queueItem.kind || "policy").trim()}`,
+      `requested_action=${String(queueItem.requestedAction || "").trim()}`,
+      `change_kind=${String(queueItem.changeKind || "").trim()}`,
+      `pack_id=${String(queueItem.packId || queueItem.subjectId || "").trim()}`,
+      `provider_id=${String(queueItem.providerId || "").trim()}`,
+      `target_scope=${String(queueItem.targetScope || "").trim()}`,
+      `approval_receipt_id=${String(rollback.approvalReceiptId || receipt.approvalReceiptId || decision.approvalReceiptId || "").trim()}`,
+      `admin_receipt_id=${String(rollback.adminReceiptId || receipt.receiptId || "").trim()}`,
+      `execution_id=${String(rollback.executionId || execution.executionId || "").trim()}`,
+      `rollback_id=${String(rollback.rollbackId || "").trim()}`,
+      `rolled_back_at=${String(rollback.rolledBackAt || "").trim()}`,
+      `rollback_status=${String(rollback.status || "").trim()}`,
+      `stable_ref=${String(rollback.stableRef || "").trim()}`,
+      `reason=${String(rollback.reason || "").trim()}`,
+      `summary=${String(rollback.summary || "").trim()}`
+    ].join("\n");
+  };
+  const buildComplianceOpsGovernanceReceiptText = (item) => {
+    const queueItem = item && typeof item === "object" ? item : {};
+    const decision = queueItem?.decision && typeof queueItem.decision === "object" ? queueItem.decision : {};
+    return [
+      "EpydiosOps Compliance Governance Receipt",
+      "owner_domain=complianceops",
+      `admin_change_request_id=${String(queueItem.id || "").trim()}`,
+      `admin_change_kind=${String(queueItem.kind || "compliance").trim()}`,
+      `requested_action=${String(queueItem.requestedAction || "").trim()}`,
+      `change_kind=${String(queueItem.changeKind || "").trim()}`,
+      `proposal=${String(queueItem.subjectId || "").trim()}`,
+      `target_scope=${String(queueItem.targetScope || "").trim()}`,
+      `control_boundary=${String(queueItem.controlBoundary || "").trim()}`,
+      `decision=${String(decision.status || "").trim()}`,
+      `decision_id=${String(decision.decisionId || "").trim()}`,
+      `approval_receipt_id=${String(decision.approvalReceiptId || "").trim()}`,
+      `decided_at=${String(decision.decidedAt || "").trim()}`,
+      `actor_ref=${String(decision.actorRef || "").trim()}`,
+      `reason=${String(decision.reason || "").trim()}`
+    ].join("\n");
+  };
+  const buildComplianceOpsAdminReceiptText = (item) => {
+    const queueItem = item && typeof item === "object" ? item : {};
+    const decision = queueItem?.decision && typeof queueItem.decision === "object" ? queueItem.decision : {};
+    const execution = queueItem?.execution && typeof queueItem.execution === "object" ? queueItem.execution : {};
+    const receipt = queueItem?.receipt && typeof queueItem.receipt === "object" ? queueItem.receipt : {};
+    return [
+      "EpydiosOps Compliance Admin Receipt",
+      "owner_domain=complianceops",
+      `admin_change_request_id=${String(queueItem.id || "").trim()}`,
+      `admin_change_kind=${String(queueItem.kind || "compliance").trim()}`,
+      `requested_action=${String(queueItem.requestedAction || "").trim()}`,
+      `change_kind=${String(queueItem.changeKind || "").trim()}`,
+      `proposal=${String(queueItem.subjectId || "").trim()}`,
+      `target_scope=${String(queueItem.targetScope || "").trim()}`,
+      `control_boundary=${String(queueItem.controlBoundary || "").trim()}`,
+      `approval_receipt_id=${String(receipt.approvalReceiptId || decision.approvalReceiptId || "").trim()}`,
+      `execution_id=${String(execution.executionId || "").trim()}`,
+      `executed_at=${String(execution.executedAt || "").trim()}`,
+      `execution_status=${String(execution.status || "").trim()}`,
+      `receipt_id=${String(receipt.receiptId || "").trim()}`,
+      `issued_at=${String(receipt.issuedAt || "").trim()}`,
+      `stable_ref=${String(receipt.stableRef || "").trim()}`,
+      `summary=${String(receipt.summary || execution.summary || queueItem.summary || "").trim()}`
+    ].join("\n");
+  };
+  const buildComplianceOpsRecoveryReceiptText = (item) => {
+    const queueItem = item && typeof item === "object" ? item : {};
+    const rollback = queueItem?.rollback && typeof queueItem.rollback === "object" ? queueItem.rollback : {};
+    const receipt = queueItem?.receipt && typeof queueItem.receipt === "object" ? queueItem.receipt : {};
+    const execution = queueItem?.execution && typeof queueItem.execution === "object" ? queueItem.execution : {};
+    const decision = queueItem?.decision && typeof queueItem.decision === "object" ? queueItem.decision : {};
+    return [
+      "EpydiosOps Compliance Recovery Receipt",
+      "owner_domain=complianceops",
+      `admin_change_request_id=${String(queueItem.id || "").trim()}`,
+      `admin_change_kind=${String(queueItem.kind || "compliance").trim()}`,
+      `requested_action=${String(queueItem.requestedAction || "").trim()}`,
+      `change_kind=${String(queueItem.changeKind || "").trim()}`,
+      `proposal=${String(queueItem.subjectId || "").trim()}`,
+      `target_scope=${String(queueItem.targetScope || "").trim()}`,
+      `control_boundary=${String(queueItem.controlBoundary || "").trim()}`,
+      `recovery_id=${String(rollback.rollbackId || "").trim()}`,
+      `action=${String(rollback.action || "").trim()}`,
+      `status=${String(rollback.status || "").trim()}`,
+      `approval_receipt_id=${String(rollback.approvalReceiptId || decision.approvalReceiptId || "").trim()}`,
+      `admin_receipt_id=${String(rollback.adminReceiptId || receipt.receiptId || "").trim()}`,
+      `execution_id=${String(rollback.executionId || execution.executionId || "").trim()}`,
+      `stable_ref=${String(rollback.stableRef || "").trim()}`,
+      `recorded_at=${String(rollback.rolledBackAt || "").trim()}`,
+      `actor_ref=${String(rollback.actorRef || "").trim()}`,
+      `reason=${String(rollback.reason || "").trim()}`,
+      `summary=${String(rollback.summary || "").trim()}`
+    ].join("\n");
+  };
+  const buildGuardrailOpsRollbackReceiptText = (item) => {
+    const queueItem = item && typeof item === "object" ? item : {};
+    const rollback = queueItem?.rollback && typeof queueItem.rollback === "object" ? queueItem.rollback : {};
+    const receipt = queueItem?.receipt && typeof queueItem.receipt === "object" ? queueItem.receipt : {};
+    const execution = queueItem?.execution && typeof queueItem.execution === "object" ? queueItem.execution : {};
+    const decision = queueItem?.decision && typeof queueItem.decision === "object" ? queueItem.decision : {};
+    return [
+      "EpydiosOps Guardrail Recovery Receipt",
+      "owner_domain=guardrailops",
+      `admin_change_request_id=${String(queueItem.id || "").trim()}`,
+      `admin_change_kind=${String(queueItem.kind || "guardrail").trim()}`,
+      `requested_action=${String(queueItem.requestedAction || "").trim()}`,
+      `execution_profile=${String(queueItem.executionProfile || queueItem.subjectId || "").trim()}`,
+      `safety_boundary=${String(queueItem.safetyBoundary || "").trim()}`,
+      `proposed_state=${String(queueItem.proposedState || "").trim()}`,
+      `target_scope=${String(queueItem.targetScope || "").trim()}`,
+      `rollback_id=${String(rollback.rollbackId || "").trim()}`,
+      `action=${String(rollback.action || "").trim()}`,
+      `status=${String(rollback.status || "").trim()}`,
+      `approval_receipt_id=${String(rollback.approvalReceiptId || decision.approvalReceiptId || "").trim()}`,
+      `admin_change_receipt_id=${String(rollback.adminReceiptId || receipt.receiptId || "").trim()}`,
+      `execution_id=${String(rollback.executionId || execution.executionId || "").trim()}`,
+      `stable_ref=${String(rollback.stableRef || "").trim()}`,
+      `rolled_back_at=${String(rollback.rolledBackAt || "").trim()}`,
+      `actor_ref=${String(rollback.actorRef || "").trim()}`,
+      `reason=${String(rollback.reason || "").trim()}`,
+      `summary=${String(rollback.summary || "").trim()}`
+    ].join("\n");
+  };
+  const loadIdentityOpsQueueItemIntoDraft = (changeId) => {
+    const item = findIdentityOpsQueueItem(changeId);
+    if (!item) {
+      setIdentityOpsFeedback("warn", "The selected identity admin proposal is no longer available.");
+      return false;
+    }
+    identityOpsViewState = {
+      ...identityOpsViewState,
+      selectedAdminChangeId: String(item.id || "").trim(),
+      recoveryReason: "",
+      latestSimulation:
+        String(identityOpsViewState.latestSimulation?.changeId || "").trim() === String(item.id || "").trim()
+          ? identityOpsViewState.latestSimulation
+          : null,
+      authorityDraft:
+        String(item.kind || "").trim().toLowerCase() === "authority"
+          ? normalizeIdentityOpsDraft("authority", {
+              subjectId: item.subjectId,
+              targetScope: item.targetScope,
+              authorityTier: String(item.requestedAction || "").replace(/^set\s+/i, ""),
+              reason: item.reason
+            })
+          : identityOpsViewState.authorityDraft,
+      grantDraft:
+        String(item.kind || "").trim().toLowerCase() === "grant"
+          ? normalizeIdentityOpsDraft("grant", {
+              subjectId: item.subjectId,
+              targetScope: item.targetScope,
+              changeKind: item.requestedAction.split(" ")[0] || "issue",
+              grantKey: item.requestedAction.split(" ").slice(1).join(" ").trim(),
+              reason: item.reason
+            })
+          : identityOpsViewState.grantDraft,
+      feedback: {
+        tone: "info",
+        message: `Loaded queued identity proposal ${String(item.id || "").trim()} into the active draft editor.`
+      }
+    };
+    renderIdentityOpsPanel();
+    return true;
+  };
+  const saveIdentityOpsDraft = (kind, options = {}) => {
+    const normalizedKind = String(kind || "").trim().toLowerCase() === "grant" ? "grant" : "authority";
+    const draft = getIdentityOpsDraft(normalizedKind);
+    const validationError = validateIdentityOpsDraft(normalizedKind, draft);
+    if (validationError) {
+      setIdentityOpsFeedback("warn", validationError);
+      return null;
+    }
+    const queueItem = buildIdentityOpsQueueItem(normalizedKind, draft, {
+      status: options.status || "draft",
+      simulationSummary: options.simulationSummary || "",
+      routedAt: options.routedAt || ""
+    });
+    upsertIdentityOpsQueueItem(queueItem);
+    identityOpsViewState = {
+      ...identityOpsViewState,
+      selectedAdminChangeId: String(queueItem.id || "").trim(),
+      latestSimulation: options.keepSimulation === true ? identityOpsViewState.latestSimulation : null,
+      feedback: {
+        tone: "ok",
+        message: `${normalizedKind === "grant" ? "Grant/delegation" : "Authority"} draft saved as ${String(queueItem.id || "").trim()}.`
+      }
+    };
+    renderIdentityOpsPanel();
+    return queueItem;
+  };
+  const simulateIdentityOpsDraft = (kind, changeId = "") => {
+    const normalizedKind = String(kind || "").trim().toLowerCase() === "grant" ? "grant" : "authority";
+    const queueSource = changeId ? findIdentityOpsQueueItem(changeId) : getIdentityOpsSelectedQueueItemForKind(normalizedKind);
+    if (queueSource) {
+      loadIdentityOpsQueueItemIntoDraft(queueSource.id);
+    }
+    const draft = getIdentityOpsDraft(normalizedKind);
+    const validationError = validateIdentityOpsDraft(normalizedKind, draft);
+    if (validationError) {
+      setIdentityOpsFeedback("warn", validationError);
+      return null;
+    }
+    const queueItem = buildIdentityOpsQueueItem(normalizedKind, draft, {
+      id: queueSource?.id || "",
+      status: "simulated"
+    });
+    const simulation = buildIdentityOpsSimulation(queueItem, draft);
+    upsertIdentityOpsQueueItem({
+      ...queueItem,
+      status: "simulated",
+      simulationSummary: simulation.summary,
+      simulatedAt: simulation.updatedAt
+    });
+    identityOpsViewState = {
+      ...identityOpsViewState,
+      selectedAdminChangeId: String(queueItem.id || "").trim(),
+      latestSimulation: simulation,
+      feedback: {
+        tone: simulation.tone,
+        message: `${normalizedKind === "grant" ? "Grant/delegation" : "Authority"} simulation is ready for ${String(queueItem.id || "").trim()}.`
+      }
+    };
+    renderIdentityOpsPanel();
+    return simulation;
+  };
+  const routeIdentityOpsDraftToGovernance = (kind, changeId = "") => {
+    const normalizedKind = String(kind || "").trim().toLowerCase() === "grant" ? "grant" : "authority";
+    const selectedQueueItem = changeId ? findIdentityOpsQueueItem(changeId) : getIdentityOpsSelectedQueueItemForKind(normalizedKind);
+    const simulation = identityOpsViewState.latestSimulation;
+    const matchingSimulation =
+      simulation &&
+      String(simulation.kind || "").trim().toLowerCase() === normalizedKind &&
+      String(simulation.changeId || "").trim() &&
+      (!selectedQueueItem || String(simulation.changeId || "").trim() === String(selectedQueueItem.id || "").trim());
+    if (!matchingSimulation) {
+      setIdentityOpsFeedback(
+        "warn",
+        "Run a bounded simulation for the active identity admin proposal before routing it to GovernanceOps."
+      );
+      return false;
+    }
+    const queueItem =
+      selectedQueueItem ||
+      buildIdentityOpsQueueItem(normalizedKind, getIdentityOpsDraft(normalizedKind), {
+        status: "simulated",
+        simulationSummary: simulation.summary
+      });
+    upsertIdentityOpsQueueItem({
+      ...queueItem,
+      status: "routed",
+      simulationSummary: simulation.summary,
+      routedAt: new Date().toISOString(),
+      decision: null,
+      execution: null,
+      receipt: null,
+      rollback: null
+    });
+    identityOpsViewState = {
+      ...identityOpsViewState,
+      selectedAdminChangeId: String(queueItem.id || "").trim(),
+      feedback: {
+        tone: "warn",
+        message: `Identity admin proposal ${String(queueItem.id || "").trim()} routed to GovernanceOps. Apply remains blocked until an explicit governance approval lands.`
+      }
+    };
+    governanceOpsViewState = {
+      ...governanceOpsViewState,
+      selectedAdminChangeId: String(queueItem.id || "").trim()
+    };
+    setGovernanceOpsFeedback(
+      "warn",
+      `Identity admin proposal routed from IdentityOps: changeId=${String(queueItem.id || "").trim()}; action=${String(queueItem.requestedAction || "").trim()}; subject=${String(queueItem.subjectId || "").trim()}; target=${String(queueItem.targetScope || "").trim()}. Governance approval is now required before apply can proceed.`
+    );
+    renderIdentityOpsPanel();
+    setWorkspaceView("governanceops", true);
+    return true;
+  };
+  const openIdentityOpsGovernanceView = () => {
+    setWorkspaceView("governanceops", true);
+  };
+  const openIdentityOpsAdminQueueItem = (changeId) => {
+    const queueItem = findIdentityOpsQueueItem(changeId);
+    if (!queueItem) {
+      setIdentityOpsFeedback("warn", "The selected identity admin proposal is no longer available.");
+      return false;
+    }
+    identityOpsViewState = {
+      ...identityOpsViewState,
+      selectedAdminChangeId: String(queueItem.id || "").trim()
+    };
+    renderIdentityOpsPanel();
+    setWorkspaceView("identityops", true);
+    return true;
+  };
+  const applyApprovedIdentityOpsChange = (changeId) => {
+    const queueItem = findIdentityOpsQueueItem(changeId);
+    if (!queueItem) {
+      setIdentityOpsFeedback("warn", "The selected identity admin proposal is no longer available.");
+      return false;
+    }
+    const decision = queueItem?.decision && typeof queueItem.decision === "object" ? queueItem.decision : null;
+    if (String(queueItem.status || "").trim().toLowerCase() !== "approved" || !String(decision?.approvalReceiptId || "").trim()) {
+      setIdentityOpsFeedback("warn", "Apply is only available after GovernanceOps records an explicit approved decision receipt.");
+      return false;
+    }
+    const actorRef = identityOpsActorRef();
+    const executedAt = new Date().toISOString();
+    const executionId = `admin-execution-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    const receiptId = `admin-receipt-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    const executionSummary = `Applied ${String(queueItem.requestedAction || "").trim()} for ${String(queueItem.subjectId || "").trim()} at ${String(queueItem.targetScope || "").trim()}.`;
+    const receipt = {
+      receiptId,
+      issuedAt: executedAt,
+      summary: executionSummary,
+      stableRef: `${String(queueItem.id || "").trim()}/${receiptId}`,
+      approvalReceiptId: String(decision.approvalReceiptId || "").trim(),
+      executionId
+    };
+    upsertIdentityOpsQueueItem({
+      ...queueItem,
+      status: "applied",
+      updatedAt: executedAt,
+      execution: {
+        executionId,
+        executedAt,
+        status: "applied",
+        summary: executionSummary,
+        actorRef
+      },
+      receipt
+    });
+    identityOpsViewState = {
+      ...identityOpsViewState,
+      selectedAdminChangeId: String(queueItem.id || "").trim(),
+      feedback: {
+        tone: "ok",
+        message: `Approved identity admin change ${String(queueItem.id || "").trim()} applied. Admin receipt ${receiptId} is now available.`
+      }
+    };
+    setGovernanceOpsFeedback(
+      "ok",
+      `Identity admin change ${String(queueItem.id || "").trim()} applied from IdentityOps. Receipt ${receiptId} is now linked to approval receipt ${String(decision.approvalReceiptId || "").trim()}.`
+    );
+    renderIdentityOpsPanel();
+    return true;
+  };
+  const applyIdentityOpsRecoveryAction = (changeId, action) => {
+    const queueItem = findIdentityOpsQueueItem(changeId);
+    const normalizedAction = String(action || "").trim().toLowerCase();
+    if (!queueItem) {
+      setIdentityOpsFeedback("warn", "The selected identity admin proposal is no longer available.");
+      return false;
+    }
+    if (String(queueItem.status || "").trim().toLowerCase() !== "applied" || !String(queueItem?.receipt?.receiptId || "").trim()) {
+      setIdentityOpsFeedback("warn", "Rollback or expiry is only available after an approved change has been applied and receipted.");
+      return false;
+    }
+    if (String(queueItem?.rollback?.rollbackId || "").trim()) {
+      setIdentityOpsFeedback("warn", `Recovery has already been recorded for identity admin change ${String(queueItem.id || "").trim()}.`);
+      return false;
+    }
+    if (normalizedAction === "expiry" && String(queueItem.kind || "").trim().toLowerCase() !== "grant") {
+      setIdentityOpsFeedback("warn", "Expiry is only available for applied grant changes.");
+      return false;
+    }
+    if (normalizedAction !== "rollback" && normalizedAction !== "expiry") {
+      setIdentityOpsFeedback("warn", "Unsupported recovery action for the selected identity admin proposal.");
+      return false;
+    }
+    const reason = String(identityOpsViewState.recoveryReason || "").trim();
+    if (!reason) {
+      setIdentityOpsFeedback("warn", "Rollback or expiry reason is required before recovery can execute.");
+      return false;
+    }
+    const actorRef = identityOpsActorRef();
+    const rolledBackAt = new Date().toISOString();
+    const rollbackId = `admin-rollback-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    const nextStatus = normalizedAction === "expiry" ? "expired" : "rolled_back";
+    const summary =
+      normalizedAction === "expiry"
+        ? `Expired ${String(queueItem.requestedAction || "").trim()} for ${String(queueItem.subjectId || "").trim()} at ${String(queueItem.targetScope || "").trim()}.`
+        : `Rolled back ${String(queueItem.requestedAction || "").trim()} for ${String(queueItem.subjectId || "").trim()} at ${String(queueItem.targetScope || "").trim()}.`;
+    const rollback = {
+      rollbackId,
+      action: normalizedAction,
+      status: nextStatus,
+      rolledBackAt,
+      summary,
+      stableRef: `${String(queueItem.id || "").trim()}/${rollbackId}`,
+      reason,
+      actorRef,
+      approvalReceiptId: String(queueItem?.decision?.approvalReceiptId || "").trim(),
+      adminReceiptId: String(queueItem?.receipt?.receiptId || "").trim(),
+      executionId: String(queueItem?.execution?.executionId || "").trim()
+    };
+    upsertIdentityOpsQueueItem({
+      ...queueItem,
+      status: nextStatus,
+      updatedAt: rolledBackAt,
+      rollback
+    });
+    identityOpsViewState = {
+      ...identityOpsViewState,
+      selectedAdminChangeId: String(queueItem.id || "").trim(),
+      recoveryReason: "",
+      feedback: {
+        tone: "ok",
+        message: `${normalizedAction === "expiry" ? "Expiry" : "Rollback"} recorded for identity admin change ${String(queueItem.id || "").trim()}. Recovery receipt ${rollbackId} is now available.`
+      }
+    };
+    setGovernanceOpsFeedback(
+      "warn",
+      `IdentityOps recorded ${normalizedAction === "expiry" ? "expiry" : "rollback"} for admin change ${String(queueItem.id || "").trim()}. Recovery record ${rollbackId} is linked to approval receipt ${String(rollback.approvalReceiptId || "").trim()}.`
+    );
+    renderIdentityOpsPanel();
+    return true;
+  };
+  const copyIdentityOpsGovernanceReceipt = async (changeId) => {
+    const queueItem = findIdentityOpsQueueItem(changeId);
+    if (!queueItem || !String(queueItem?.decision?.approvalReceiptId || "").trim()) {
+      setIdentityOpsFeedback("warn", "No governance decision receipt is available for the selected identity admin change.");
+      return false;
+    }
+    await copyTextToClipboard(buildIdentityOpsGovernanceReceiptText(queueItem));
+    setIdentityOpsFeedback("ok", `Governance decision receipt copied for identity admin change ${String(queueItem.id || "").trim()}.`);
+    return true;
+  };
+  const copyIdentityOpsAdminReceipt = async (changeId) => {
+    const queueItem = findIdentityOpsQueueItem(changeId);
+    if (!queueItem || !String(queueItem?.receipt?.receiptId || "").trim()) {
+      setIdentityOpsFeedback("warn", "No admin change receipt is available for the selected identity admin change.");
+      return false;
+    }
+    await copyTextToClipboard(buildIdentityOpsAdminReceiptText(queueItem));
+    setIdentityOpsFeedback("ok", `Admin change receipt copied for identity admin change ${String(queueItem.id || "").trim()}.`);
+    return true;
+  };
+  const copyIdentityOpsRollbackReceipt = async (changeId) => {
+    const queueItem = findIdentityOpsQueueItem(changeId);
+    if (!queueItem || !String(queueItem?.rollback?.rollbackId || "").trim()) {
+      setIdentityOpsFeedback("warn", "No rollback or expiry receipt is available for the selected identity admin change.");
+      return false;
+    }
+    await copyTextToClipboard(buildIdentityOpsRollbackReceiptText(queueItem));
+    setIdentityOpsFeedback("ok", `Rollback/expiry receipt copied for identity admin change ${String(queueItem.id || "").trim()}.`);
+    return true;
+  };
+  const setPlatformOpsFeedback = (tone, message) => {
+    platformOpsViewState = {
+      ...platformOpsViewState,
+      feedback: message
+        ? {
+            tone: String(tone || "info").trim().toLowerCase(),
+            message: String(message || "").trim()
+          }
+        : null
+    };
+    renderPlatformOpsPanel();
+  };
+  const setPlatformOpsRecoveryReason = (value) => {
+    platformOpsViewState = {
+      ...platformOpsViewState,
+      recoveryReason: String(value || "").trimStart()
+    };
+  };
+  const platformOpsActorRef = () =>
+    String(session?.claims?.sub || session?.claims?.email || session?.claims?.client_id || "").trim() ||
+    "platform-operator";
+  const getPlatformOpsDefaults = () => {
+    const pipeline = latestPlatformOpsContext?.pipeline && typeof latestPlatformOpsContext.pipeline === "object"
+      ? latestPlatformOpsContext.pipeline
+      : {};
+    const aimxsActivation =
+      latestPlatformOpsContext?.aimxsActivation && typeof latestPlatformOpsContext.aimxsActivation === "object"
+        ? latestPlatformOpsContext.aimxsActivation
+        : {};
+    const environment = String(pipeline.environment || "").trim() || "local";
+    const deploymentTarget =
+      String(aimxsActivation.selectedProviderId || aimxsActivation.activeMode || "").trim() || "desktop-local";
+    const releaseRef =
+      environment === "prod"
+        ? String(pipeline.latestProdGate || pipeline.latestStagingGate || "").trim()
+        : String(pipeline.latestStagingGate || pipeline.latestProdGate || "").trim();
+    return {
+      changeKind: "promote",
+      environment,
+      deploymentTarget,
+      releaseRef
+    };
+  };
+  const normalizePlatformOpsDraft = (draft = null) => {
+    const defaults = getPlatformOpsDefaults();
+    const input = draft && typeof draft === "object" ? draft : {};
+    const changeKind = String(input.changeKind || defaults.changeKind || "promote").trim().toLowerCase();
+    return {
+      changeKind: changeKind === "rollback" ? "rollback" : "promote",
+      environment: String(input.environment || defaults.environment || "").trim() || "local",
+      deploymentTarget: String(input.deploymentTarget || defaults.deploymentTarget || "").trim() || "desktop-local",
+      releaseRef: String(input.releaseRef || defaults.releaseRef || "").trim(),
+      reason: String(input.reason || "").trim()
+    };
+  };
+  const updatePlatformOpsDraftField = (field, value) => {
+    const nextDraft = normalizePlatformOpsDraft({
+      ...platformOpsViewState.promotionDraft,
+      [field]: String(value || "").trim()
+    });
+    platformOpsViewState = {
+      ...platformOpsViewState,
+      promotionDraft: nextDraft,
+      latestSimulation: null,
+      feedback: null
+    };
+    renderPlatformOpsPanel();
+  };
+  const findPlatformOpsQueueItem = (changeId) => {
+    const normalizedChangeId = String(changeId || "").trim();
+    if (!normalizedChangeId) {
+      return null;
+    }
+    return (
+      (Array.isArray(platformOpsViewState.queueItems) ? platformOpsViewState.queueItems : []).find(
+        (item) => String(item?.id || "").trim() === normalizedChangeId
+      ) || null
+    );
+  };
+  const upsertPlatformOpsQueueItem = (nextItem) => {
+    const item = nextItem && typeof nextItem === "object" ? nextItem : null;
+    const changeId = String(item?.id || "").trim();
+    if (!changeId) {
+      return null;
+    }
+    const existingItems = Array.isArray(platformOpsViewState.queueItems) ? platformOpsViewState.queueItems : [];
+    const nextItems = [];
+    let replaced = false;
+    existingItems.forEach((entry) => {
+      const entryId = String(entry?.id || "").trim();
+      if (entryId === changeId) {
+        nextItems.push({
+          ...entry,
+          ...item
+        });
+        replaced = true;
+        return;
+      }
+      nextItems.push(entry);
+    });
+    if (!replaced) {
+      nextItems.unshift(item);
+    }
+    platformOpsViewState = {
+      ...platformOpsViewState,
+      queueItems: nextItems
+    };
+    return nextItems.find((entry) => String(entry?.id || "").trim() === changeId) || null;
+  };
+  const buildPlatformOpsQueueItem = (draft, options = {}) => {
+    const nextDraft = normalizePlatformOpsDraft(draft);
+    const selectedItem = findPlatformOpsQueueItem(platformOpsViewState.selectedAdminChangeId);
+    const existingId = String(options.id || selectedItem?.id || "").trim();
+    const changeId =
+      existingId || `platform-change-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    const requestedAction = `${nextDraft.changeKind} ${nextDraft.releaseRef || "release"}`.trim();
+    return {
+      id: changeId,
+      ownerDomain: "platformops",
+      kind: "platform",
+      label: "Promotion Draft",
+      requestedAction,
+      subjectId: nextDraft.releaseRef,
+      subjectLabel: "release",
+      targetScope: `${nextDraft.environment} / ${nextDraft.deploymentTarget}`.trim(),
+      targetLabel: "target",
+      environment: nextDraft.environment,
+      deploymentTarget: nextDraft.deploymentTarget,
+      releaseRef: nextDraft.releaseRef,
+      status: String(options.status || selectedItem?.status || "draft").trim().toLowerCase(),
+      reason: nextDraft.reason,
+      summary:
+        `${nextDraft.changeKind === "rollback" ? "Rollback" : "Promote"} ${nextDraft.releaseRef || "release"} to ${nextDraft.environment} / ${nextDraft.deploymentTarget}`,
+      simulationSummary: String(options.simulationSummary || selectedItem?.simulationSummary || "").trim(),
+      createdAt: String(options.createdAt || selectedItem?.createdAt || new Date().toISOString()).trim(),
+      simulatedAt: String(options.simulatedAt || selectedItem?.simulatedAt || "").trim(),
+      updatedAt: String(options.updatedAt || new Date().toISOString()).trim(),
+      routedAt: String(options.routedAt || selectedItem?.routedAt || "").trim(),
+      decision:
+        options.decision === null
+          ? null
+          : options.decision || (selectedItem?.decision && typeof selectedItem.decision === "object" ? selectedItem.decision : null),
+      execution:
+        options.execution === null
+          ? null
+          : options.execution || (selectedItem?.execution && typeof selectedItem.execution === "object" ? selectedItem.execution : null),
+      receipt:
+        options.receipt === null
+          ? null
+          : options.receipt || (selectedItem?.receipt && typeof selectedItem.receipt === "object" ? selectedItem.receipt : null),
+      rollback:
+        options.rollback === null
+          ? null
+          : options.rollback || (selectedItem?.rollback && typeof selectedItem.rollback === "object" ? selectedItem.rollback : null)
+    };
+  };
+  const validatePlatformOpsDraft = (draft) => {
+    const nextDraft = normalizePlatformOpsDraft(draft);
+    if (!nextDraft.environment) {
+      return "Environment is required before saving a platform admin proposal.";
+    }
+    if (!nextDraft.deploymentTarget) {
+      return "Deployment target is required before saving a platform admin proposal.";
+    }
+    if (!nextDraft.releaseRef) {
+      return "Release ref is required before saving a platform admin proposal.";
+    }
+    if (!nextDraft.reason) {
+      return "Reason is required before saving a platform admin proposal.";
+    }
+    return "";
+  };
+  const buildPlatformOpsSimulation = (item, draft) => {
+    const queueItem = item && typeof item === "object" ? item : {};
+    const nextDraft = normalizePlatformOpsDraft(draft);
+    const health = latestPlatformOpsContext?.health && typeof latestPlatformOpsContext.health === "object"
+      ? latestPlatformOpsContext.health
+      : {};
+    const pipeline = latestPlatformOpsContext?.pipeline && typeof latestPlatformOpsContext.pipeline === "object"
+      ? latestPlatformOpsContext.pipeline
+      : {};
+    const providers = latestPlatformOpsContext?.providers && typeof latestPlatformOpsContext.providers === "object"
+      ? latestPlatformOpsContext.providers
+      : {};
+    const aimxsActivation =
+      latestPlatformOpsContext?.aimxsActivation && typeof latestPlatformOpsContext.aimxsActivation === "object"
+        ? latestPlatformOpsContext.aimxsActivation
+        : {};
+    const providerItems = Array.isArray(providers.items) ? providers.items : [];
+    const degradedProviderCount = providerItems.filter((entry) => entry?.probed === true && entry?.ready !== true).length;
+    const secretEntries = Object.values(
+      aimxsActivation?.secrets && typeof aimxsActivation.secrets === "object" ? aimxsActivation.secrets : {}
+    );
+    const secretMissingCount = secretEntries.filter((entry) => !entry?.present).length;
+    const warnings = Array.isArray(aimxsActivation.warnings) ? aimxsActivation.warnings : [];
+    const deploymentIssueCount = [
+      health.runtime?.status,
+      health.providers?.status,
+      health.policy?.status
+    ].filter((status) => String(status || "").trim().toLowerCase() !== "ok").length;
+    const findings = [
+      "Execution remains blocked until GovernanceOps records an explicit approved decision receipt for this platform proposal."
+    ];
+    if (String(pipeline.status || "").trim().toLowerCase() !== "pass") {
+      findings.push("Pipeline posture is not fully green for the current environment.");
+    }
+    if (deploymentIssueCount > 0) {
+      findings.push("At least one platform health surface is not currently green.");
+    }
+    if (degradedProviderCount > 0) {
+      findings.push("One or more provider registrations remain degraded.");
+    }
+    if (secretMissingCount > 0) {
+      findings.push("AIMXS activation still has missing secret posture.");
+    }
+    if (warnings.length > 0) {
+      findings.push(warnings[0]);
+    }
+    const tone =
+      deploymentIssueCount > 0 ||
+      degradedProviderCount > 0 ||
+      secretMissingCount > 0 ||
+      warnings.length > 0 ||
+      String(pipeline.status || "").trim().toLowerCase() !== "pass"
+        ? "warn"
+        : "info";
+    return {
+      changeId: String(queueItem.id || "").trim(),
+      kind: "platform",
+      tone,
+      title: "Platform admin dry-run",
+      summary:
+        nextDraft.changeKind === "rollback"
+          ? "Preview only. This rollback proposal requires GovernanceOps approval before any platform recovery action can execute."
+          : "Preview only. This promotion proposal requires GovernanceOps approval before any live platform change can execute.",
+      updatedAt: new Date().toISOString(),
+      facts: [
+        { label: "release", value: nextDraft.releaseRef, code: true },
+        { label: "environment", value: nextDraft.environment },
+        { label: "deployment", value: nextDraft.deploymentTarget, code: true },
+        { label: "pipeline", value: String(pipeline.status || "").trim() || "unknown" },
+        { label: "issues", value: String(deploymentIssueCount) },
+        { label: "degraded providers", value: String(degradedProviderCount) },
+        { label: "secrets missing", value: String(secretMissingCount) },
+        { label: "warnings", value: String(warnings.length) }
+      ],
+      findings
+    };
+  };
+  const loadPlatformOpsQueueItemIntoDraft = (changeId) => {
+    const item = findPlatformOpsQueueItem(changeId);
+    if (!item) {
+      setPlatformOpsFeedback("warn", "The selected platform admin proposal is no longer available.");
+      return false;
+    }
+    platformOpsViewState = {
+      ...platformOpsViewState,
+      selectedAdminChangeId: String(item.id || "").trim(),
+      recoveryReason: "",
+      promotionDraft: normalizePlatformOpsDraft({
+        changeKind: String(item.requestedAction || "").trim().toLowerCase().startsWith("rollback") ? "rollback" : "promote",
+        environment: item.environment,
+        deploymentTarget: item.deploymentTarget,
+        releaseRef: item.releaseRef || item.subjectId,
+        reason: item.reason
+      }),
+      latestSimulation:
+        String(platformOpsViewState.latestSimulation?.changeId || "").trim() === String(item.id || "").trim()
+          ? platformOpsViewState.latestSimulation
+          : null,
+      feedback: {
+        tone: "info",
+        message: `Loaded queued platform proposal ${String(item.id || "").trim()} into the active draft editor.`
+      }
+    };
+    renderPlatformOpsPanel();
+    return true;
+  };
+  const savePlatformOpsDraft = () => {
+    const draft = normalizePlatformOpsDraft(platformOpsViewState.promotionDraft);
+    const validationError = validatePlatformOpsDraft(draft);
+    if (validationError) {
+      setPlatformOpsFeedback("warn", validationError);
+      return null;
+    }
+    const queueItem = buildPlatformOpsQueueItem(draft, { status: "draft" });
+    upsertPlatformOpsQueueItem(queueItem);
+    platformOpsViewState = {
+      ...platformOpsViewState,
+      selectedAdminChangeId: String(queueItem.id || "").trim(),
+      latestSimulation: null,
+      feedback: {
+        tone: "ok",
+        message: `Platform draft saved as ${String(queueItem.id || "").trim()}.`
+      }
+    };
+    renderPlatformOpsPanel();
+    return queueItem;
+  };
+  const simulatePlatformOpsDraft = (changeId = "") => {
+    const selectedQueueItem = changeId ? findPlatformOpsQueueItem(changeId) : null;
+    if (selectedQueueItem) {
+      loadPlatformOpsQueueItemIntoDraft(selectedQueueItem.id);
+    }
+    const draft = normalizePlatformOpsDraft(platformOpsViewState.promotionDraft);
+    const validationError = validatePlatformOpsDraft(draft);
+    if (validationError) {
+      setPlatformOpsFeedback("warn", validationError);
+      return null;
+    }
+    const queueItem = buildPlatformOpsQueueItem(draft, {
+      id: selectedQueueItem?.id || String(platformOpsViewState.selectedAdminChangeId || "").trim(),
+      status: "simulated"
+    });
+    const simulation = buildPlatformOpsSimulation(queueItem, draft);
+    upsertPlatformOpsQueueItem({
+      ...queueItem,
+      status: "simulated",
+      simulationSummary: simulation.summary,
+      simulatedAt: simulation.updatedAt
+    });
+    platformOpsViewState = {
+      ...platformOpsViewState,
+      selectedAdminChangeId: String(queueItem.id || "").trim(),
+      latestSimulation: simulation,
+      feedback: {
+        tone: simulation.tone,
+        message: `Platform dry-run is ready for ${String(queueItem.id || "").trim()}.`
+      }
+    };
+    renderPlatformOpsPanel();
+    return simulation;
+  };
+  const routePlatformOpsDraftToGovernance = (changeId = "") => {
+    const selectedQueueItem = changeId ? findPlatformOpsQueueItem(changeId) : null;
+    const simulation = platformOpsViewState.latestSimulation;
+    const matchingSimulation =
+      simulation &&
+      String(simulation.kind || "").trim().toLowerCase() === "platform" &&
+      String(simulation.changeId || "").trim() &&
+      (!selectedQueueItem || String(simulation.changeId || "").trim() === String(selectedQueueItem.id || "").trim());
+    if (!matchingSimulation) {
+      setPlatformOpsFeedback("warn", "Run a bounded dry-run for the active platform admin proposal before routing it to GovernanceOps.");
+      return false;
+    }
+    const queueItem =
+      selectedQueueItem ||
+      buildPlatformOpsQueueItem(platformOpsViewState.promotionDraft, {
+        id: String(platformOpsViewState.selectedAdminChangeId || "").trim(),
+        status: "simulated",
+        simulationSummary: simulation.summary
+      });
+    upsertPlatformOpsQueueItem({
+      ...queueItem,
+      status: "routed",
+      simulationSummary: simulation.summary,
+      routedAt: new Date().toISOString(),
+      decision: null,
+      execution: null,
+      receipt: null,
+      rollback: null
+    });
+    platformOpsViewState = {
+      ...platformOpsViewState,
+      selectedAdminChangeId: String(queueItem.id || "").trim(),
+      feedback: {
+        tone: "warn",
+        message: `Platform admin proposal ${String(queueItem.id || "").trim()} routed to GovernanceOps. Apply remains blocked until an explicit governance approval lands.`
+      }
+    };
+    governanceOpsViewState = {
+      ...governanceOpsViewState,
+      selectedAdminChangeId: String(queueItem.id || "").trim()
+    };
+    setGovernanceOpsFeedback(
+      "warn",
+      `Platform admin proposal routed from PlatformOps: changeId=${String(queueItem.id || "").trim()}; action=${String(queueItem.requestedAction || "").trim()}; release=${String(queueItem.releaseRef || "").trim()}; target=${String(queueItem.targetScope || "").trim()}. Governance approval is now required before apply can proceed.`
+    );
+    renderPlatformOpsPanel();
+    setWorkspaceView("governanceops", true);
+    return true;
+  };
+  const openPlatformOpsGovernanceView = () => {
+    setWorkspaceView("governanceops", true);
+  };
+  const openPlatformOpsAdminQueueItem = (changeId) => {
+    const queueItem = findPlatformOpsQueueItem(changeId);
+    if (!queueItem) {
+      setPlatformOpsFeedback("warn", "The selected platform admin proposal is no longer available.");
+      return false;
+    }
+    loadPlatformOpsQueueItemIntoDraft(changeId);
+    setWorkspaceView("platformops", true);
+    return true;
+  };
+  const applyApprovedPlatformOpsChange = (changeId) => {
+    const queueItem = findPlatformOpsQueueItem(changeId);
+    if (!queueItem) {
+      setPlatformOpsFeedback("warn", "The selected platform admin proposal is no longer available.");
+      return false;
+    }
+    const decision = queueItem?.decision && typeof queueItem.decision === "object" ? queueItem.decision : null;
+    if (String(queueItem.status || "").trim().toLowerCase() !== "approved" || !String(decision?.approvalReceiptId || "").trim()) {
+      setPlatformOpsFeedback("warn", "Apply is only available after GovernanceOps records an explicit approved decision receipt.");
+      return false;
+    }
+    if (String(queueItem?.receipt?.receiptId || "").trim()) {
+      setPlatformOpsFeedback("warn", `Platform admin change ${String(queueItem.id || "").trim()} already has an admin receipt.`);
+      return false;
+    }
+    const actorRef = platformOpsActorRef();
+    const executedAt = new Date().toISOString();
+    const executionId = `admin-execution-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    const receiptId = `admin-receipt-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    const executionSummary = `${String(queueItem.requestedAction || "").trim()} applied for ${String(queueItem.targetScope || "").trim()} using ${String(queueItem.releaseRef || queueItem.subjectId || "").trim()}.`;
+    const receipt = {
+      receiptId,
+      issuedAt: executedAt,
+      summary: executionSummary,
+      stableRef: `${String(queueItem.id || "").trim()}/${receiptId}`,
+      approvalReceiptId: String(decision.approvalReceiptId || "").trim(),
+      executionId
+    };
+    upsertPlatformOpsQueueItem({
+      ...queueItem,
+      status: "applied",
+      updatedAt: executedAt,
+      execution: {
+        executionId,
+        executedAt,
+        status: "applied",
+        summary: executionSummary,
+        actorRef
+      },
+      receipt
+    });
+    platformOpsViewState = {
+      ...platformOpsViewState,
+      selectedAdminChangeId: String(queueItem.id || "").trim(),
+      feedback: {
+        tone: "ok",
+        message: `Approved platform admin change ${String(queueItem.id || "").trim()} applied. Admin receipt ${receiptId} is now available.`
+      }
+    };
+    governanceOpsViewState = {
+      ...governanceOpsViewState,
+      selectedAdminChangeId: String(queueItem.id || "").trim()
+    };
+    setGovernanceOpsFeedback(
+      "ok",
+      `Platform admin change ${String(queueItem.id || "").trim()} applied from PlatformOps. Receipt ${receiptId} is now linked to approval receipt ${String(decision.approvalReceiptId || "").trim()}.`
+    );
+    renderPlatformOpsPanel();
+    return true;
+  };
+  const applyPlatformOpsRecoveryAction = (changeId, action) => {
+    const queueItem = findPlatformOpsQueueItem(changeId);
+    const normalizedAction = String(action || "").trim().toLowerCase();
+    if (!queueItem) {
+      setPlatformOpsFeedback("warn", "The selected platform admin proposal is no longer available.");
+      return false;
+    }
+    if (String(queueItem.status || "").trim().toLowerCase() !== "applied" || !String(queueItem?.receipt?.receiptId || "").trim()) {
+      setPlatformOpsFeedback("warn", "Rollback is only available after an approved platform change has been applied and receipted.");
+      return false;
+    }
+    if (String(queueItem?.rollback?.rollbackId || "").trim()) {
+      setPlatformOpsFeedback("warn", `Recovery has already been recorded for platform admin change ${String(queueItem.id || "").trim()}.`);
+      return false;
+    }
+    if (normalizedAction !== "rollback") {
+      setPlatformOpsFeedback("warn", "Unsupported recovery action for the selected platform admin proposal.");
+      return false;
+    }
+    const reason = String(platformOpsViewState.recoveryReason || "").trim();
+    if (!reason) {
+      setPlatformOpsFeedback("warn", "Rollback reason is required before platform recovery can execute.");
+      return false;
+    }
+    const actorRef = platformOpsActorRef();
+    const rolledBackAt = new Date().toISOString();
+    const rollbackId = `admin-rollback-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    const rollback = {
+      rollbackId,
+      action: "rollback",
+      status: "rolled_back",
+      rolledBackAt,
+      summary: `Rolled back ${String(queueItem.requestedAction || "").trim()} for ${String(queueItem.targetScope || "").trim()} using ${String(queueItem.releaseRef || queueItem.subjectId || "").trim()}.`,
+      stableRef: `${String(queueItem.id || "").trim()}/${rollbackId}`,
+      reason,
+      actorRef,
+      approvalReceiptId: String(queueItem?.decision?.approvalReceiptId || "").trim(),
+      adminReceiptId: String(queueItem?.receipt?.receiptId || "").trim(),
+      executionId: String(queueItem?.execution?.executionId || "").trim()
+    };
+    upsertPlatformOpsQueueItem({
+      ...queueItem,
+      status: "rolled_back",
+      updatedAt: rolledBackAt,
+      rollback
+    });
+    platformOpsViewState = {
+      ...platformOpsViewState,
+      selectedAdminChangeId: String(queueItem.id || "").trim(),
+      recoveryReason: "",
+      feedback: {
+        tone: "ok",
+        message: `Rollback recorded for platform admin change ${String(queueItem.id || "").trim()}. Recovery receipt ${rollbackId} is now available.`
+      }
+    };
+    setGovernanceOpsFeedback(
+      "warn",
+      `PlatformOps recorded rollback for admin change ${String(queueItem.id || "").trim()}. Recovery record ${rollbackId} is linked to approval receipt ${String(rollback.approvalReceiptId || "").trim()}.`
+    );
+    renderPlatformOpsPanel();
+    return true;
+  };
+  const copyPlatformOpsGovernanceReceipt = async (changeId) => {
+    const queueItem = findPlatformOpsQueueItem(changeId);
+    if (!queueItem || !String(queueItem?.decision?.approvalReceiptId || "").trim()) {
+      setPlatformOpsFeedback("warn", "No governance decision receipt is available for the selected platform admin change.");
+      return false;
+    }
+    await copyTextToClipboard(buildPlatformOpsGovernanceReceiptText(queueItem));
+    setPlatformOpsFeedback("ok", `Governance decision receipt copied for platform admin change ${String(queueItem.id || "").trim()}.`);
+    return true;
+  };
+  const copyPlatformOpsAdminReceipt = async (changeId) => {
+    const queueItem = findPlatformOpsQueueItem(changeId);
+    if (!queueItem || !String(queueItem?.receipt?.receiptId || "").trim()) {
+      setPlatformOpsFeedback("warn", "No admin change receipt is available for the selected platform admin change.");
+      return false;
+    }
+    await copyTextToClipboard(buildPlatformOpsAdminReceiptText(queueItem));
+    setPlatformOpsFeedback("ok", `Admin change receipt copied for platform admin change ${String(queueItem.id || "").trim()}.`);
+    return true;
+  };
+  const copyPlatformOpsRollbackReceipt = async (changeId) => {
+    const queueItem = findPlatformOpsQueueItem(changeId);
+    if (!queueItem || !String(queueItem?.rollback?.rollbackId || "").trim()) {
+      setPlatformOpsFeedback("warn", "No rollback receipt is available for the selected platform admin change.");
+      return false;
+    }
+    await copyTextToClipboard(buildPlatformOpsRollbackReceiptText(queueItem));
+    setPlatformOpsFeedback("ok", `Rollback receipt copied for platform admin change ${String(queueItem.id || "").trim()}.`);
+    return true;
+  };
+  const setGuardrailOpsFeedback = (tone, message) => {
+    guardrailOpsViewState = {
+      ...guardrailOpsViewState,
+      feedback: message
+        ? {
+            tone: String(tone || "info").trim().toLowerCase(),
+            message: String(message || "").trim()
+          }
+        : null
+    };
+    renderGuardrailOpsPanel();
+  };
+  const setGuardrailOpsRecoveryReason = (value) => {
+    guardrailOpsViewState = {
+      ...guardrailOpsViewState,
+      recoveryReason: String(value || "").trimStart()
+    };
+  };
+  const guardrailOpsActorRef = () =>
+    String(session?.claims?.sub || session?.claims?.email || session?.claims?.client_id || "").trim() ||
+    "guardrail-operator";
+  const getGuardrailOpsDefaults = () => {
+    const settingsPayload =
+      latestGuardrailOpsContext?.settings && typeof latestGuardrailOpsContext.settings === "object"
+        ? latestGuardrailOpsContext.settings
+        : latestSettingsSnapshot;
+    const latestRun =
+      Array.isArray(latestGuardrailOpsContext?.runs?.items) ? latestGuardrailOpsContext.runs.items[0] : null;
+    const targetScope =
+      [
+        String(latestRun?.tenantId || latestRun?.requestPayload?.meta?.tenantId || "").trim(),
+        String(latestRun?.projectId || latestRun?.requestPayload?.meta?.projectId || "").trim()
+      ]
+        .filter(Boolean)
+        .join(" / ") ||
+      String(settingsPayload?.environment || "").trim() ||
+      "workspace";
+    const policyCatalogItems = Array.isArray(settingsPayload?.policyCatalog?.items)
+      ? settingsPayload.policyCatalog.items
+      : [];
+    const firstBoundary =
+      policyCatalogItems
+        .flatMap((item) => (Array.isArray(item?.boundaryRequirements) ? item.boundaryRequirements : []))
+        .map((item) => String(item || "").trim())
+        .find(Boolean) || "tenant_project_scope";
+    const latestExecutionProfile =
+      String(
+        latestGuardrailOpsContext?.approvals?.items?.[0]?.targetExecutionProfile ||
+          latestRun?.requestPayload?.desktop?.targetExecutionProfile ||
+          ""
+      ).trim() || "managed_codex_worker";
+    return {
+      changeKind: "tighten",
+      targetScope,
+      executionProfile: latestExecutionProfile,
+      safetyBoundary: firstBoundary,
+      proposedState: "approval_required",
+      reason: ""
+    };
+  };
+  const normalizeGuardrailOpsDraft = (draft = null) => {
+    const defaults = getGuardrailOpsDefaults();
+    const input = draft && typeof draft === "object" ? draft : {};
+    return {
+      changeKind: String(input.changeKind || defaults.changeKind || "tighten").trim().toLowerCase() || "tighten",
+      targetScope: String(input.targetScope || defaults.targetScope || "workspace").trim() || "workspace",
+      executionProfile:
+        String(input.executionProfile || defaults.executionProfile || "managed_codex_worker").trim() ||
+        "managed_codex_worker",
+      safetyBoundary:
+        String(input.safetyBoundary || defaults.safetyBoundary || "tenant_project_scope").trim() ||
+        "tenant_project_scope",
+      proposedState:
+        String(input.proposedState || defaults.proposedState || "approval_required").trim() || "approval_required",
+      reason: String(input.reason || "").trim()
+    };
+  };
+  const updateGuardrailOpsDraftField = (field, value) => {
+    const nextDraft = normalizeGuardrailOpsDraft({
+      ...guardrailOpsViewState.guardrailDraft,
+      [field]: String(value || "").trim()
+    });
+    guardrailOpsViewState = {
+      ...guardrailOpsViewState,
+      guardrailDraft: nextDraft,
+      latestSimulation: null,
+      feedback: null
+    };
+    renderGuardrailOpsPanel();
+  };
+  const findGuardrailOpsQueueItem = (changeId) => {
+    const normalizedChangeId = String(changeId || "").trim();
+    if (!normalizedChangeId) {
+      return null;
+    }
+    return (
+      (Array.isArray(guardrailOpsViewState.queueItems) ? guardrailOpsViewState.queueItems : []).find(
+        (item) => String(item?.id || "").trim() === normalizedChangeId
+      ) || null
+    );
+  };
+  const upsertGuardrailOpsQueueItem = (nextItem) => {
+    const item = nextItem && typeof nextItem === "object" ? nextItem : null;
+    const changeId = String(item?.id || "").trim();
+    if (!changeId) {
+      return null;
+    }
+    const existingItems = Array.isArray(guardrailOpsViewState.queueItems) ? guardrailOpsViewState.queueItems : [];
+    const nextItems = [];
+    let replaced = false;
+    existingItems.forEach((entry) => {
+      const entryId = String(entry?.id || "").trim();
+      if (entryId === changeId) {
+        nextItems.push({
+          ...entry,
+          ...item
+        });
+        replaced = true;
+        return;
+      }
+      nextItems.push(entry);
+    });
+    if (!replaced) {
+      nextItems.unshift(item);
+    }
+    guardrailOpsViewState = {
+      ...guardrailOpsViewState,
+      queueItems: nextItems
+    };
+    return nextItems.find((entry) => String(entry?.id || "").trim() === changeId) || null;
+  };
+  const buildGuardrailOpsQueueItem = (draft, options = {}) => {
+    const nextDraft = normalizeGuardrailOpsDraft(draft);
+    const selectedItem = findGuardrailOpsQueueItem(guardrailOpsViewState.selectedAdminChangeId);
+    const existingId = String(options.id || selectedItem?.id || "").trim();
+    const changeId =
+      existingId || `guardrail-change-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    const requestedAction = `${nextDraft.changeKind} ${nextDraft.proposedState}`.trim();
+    return {
+      id: changeId,
+      ownerDomain: "guardrailops",
+      kind: "guardrail",
+      label: "Guardrail Change Draft",
+      requestedAction,
+      subjectId: nextDraft.executionProfile,
+      subjectLabel: "profile",
+      targetScope: nextDraft.targetScope,
+      targetLabel: "scope",
+      changeKind: nextDraft.changeKind,
+      executionProfile: nextDraft.executionProfile,
+      safetyBoundary: nextDraft.safetyBoundary,
+      proposedState: nextDraft.proposedState,
+      status: String(options.status || selectedItem?.status || "draft").trim().toLowerCase(),
+      reason: nextDraft.reason,
+      summary: `${nextDraft.changeKind} ${nextDraft.proposedState} for ${nextDraft.targetScope} @ ${nextDraft.executionProfile}`,
+      simulationSummary: String(options.simulationSummary || selectedItem?.simulationSummary || "").trim(),
+      createdAt: String(options.createdAt || selectedItem?.createdAt || new Date().toISOString()).trim(),
+      simulatedAt: String(options.simulatedAt || selectedItem?.simulatedAt || "").trim(),
+      updatedAt: String(options.updatedAt || new Date().toISOString()).trim(),
+      routedAt: String(options.routedAt || selectedItem?.routedAt || "").trim(),
+      decision:
+        options.decision === null
+          ? null
+          : options.decision || (selectedItem?.decision && typeof selectedItem.decision === "object" ? selectedItem.decision : null),
+      execution:
+        options.execution === null
+          ? null
+          : options.execution ||
+            (selectedItem?.execution && typeof selectedItem.execution === "object" ? selectedItem.execution : null),
+      receipt:
+        options.receipt === null
+          ? null
+          : options.receipt || (selectedItem?.receipt && typeof selectedItem.receipt === "object" ? selectedItem.receipt : null),
+      rollback:
+        options.rollback === null
+          ? null
+          : options.rollback || (selectedItem?.rollback && typeof selectedItem.rollback === "object" ? selectedItem.rollback : null)
+    };
+  };
+  const validateGuardrailOpsDraft = (draft) => {
+    const nextDraft = normalizeGuardrailOpsDraft(draft);
+    if (!nextDraft.targetScope) {
+      return "Target scope is required before saving a guardrail admin proposal.";
+    }
+    if (!nextDraft.executionProfile) {
+      return "Execution profile is required before saving a guardrail admin proposal.";
+    }
+    if (!nextDraft.safetyBoundary) {
+      return "Safety boundary is required before saving a guardrail admin proposal.";
+    }
+    if (!nextDraft.proposedState) {
+      return "Proposed state is required before saving a guardrail admin proposal.";
+    }
+    if (!nextDraft.reason) {
+      return "Reason is required before saving a guardrail admin proposal.";
+    }
+    return "";
+  };
+  const buildGuardrailOpsSimulation = (item, draft) => {
+    const queueItem = item && typeof item === "object" ? item : {};
+    const nextDraft = normalizeGuardrailOpsDraft(draft);
+    const settingsPayload =
+      latestGuardrailOpsContext?.settings && typeof latestGuardrailOpsContext.settings === "object"
+        ? latestGuardrailOpsContext.settings
+        : latestSettingsSnapshot;
+    const approvals = Array.isArray(latestGuardrailOpsContext?.approvals?.items)
+      ? latestGuardrailOpsContext.approvals.items
+      : [];
+    const pendingApprovalCount = approvals.filter((entry) => String(entry?.status || "").trim().toLowerCase() === "pending").length;
+    const policyCatalogItems = Array.isArray(settingsPayload?.policyCatalog?.items)
+      ? settingsPayload.policyCatalog.items
+      : [];
+    const boundaryRequirements = [
+      ...new Set(
+        policyCatalogItems.flatMap((entry) =>
+          Array.isArray(entry?.boundaryRequirements)
+            ? entry.boundaryRequirements.map((item) => String(item || "").trim()).filter(Boolean)
+            : []
+        )
+      )
+    ];
+    const restrictedHostMode = String(settingsPayload?.terminal?.restrictedHostMode || "").trim().toLowerCase() || "blocked";
+    const terminalMode = String(settingsPayload?.terminal?.mode || "").trim().toLowerCase() || "interactive_sandbox_only";
+    const orgAdminItems = Array.isArray(latestGuardrailOpsContext?.orgAdminProfiles?.items)
+      ? latestGuardrailOpsContext.orgAdminProfiles.items
+      : [];
+    const breakGlassGateCount = orgAdminItems.reduce(
+      (count, entry) =>
+        count +
+        (Array.isArray(entry?.enforcementProfiles)
+          ? entry.enforcementProfiles.filter((profile) => String(profile?.category || "").trim().toLowerCase() === "break_glass").length
+          : 0),
+      0
+    );
+    const findings = [
+      "Execution remains blocked in this slice. GovernanceOps approval is required before any live guardrail change can execute."
+    ];
+    if (pendingApprovalCount > 0) {
+      findings.push("Existing pending approvals mean guardrail changes will land on an already constrained execution surface.");
+    }
+    if (restrictedHostMode === "blocked") {
+      findings.push("Restricted host posture remains blocked for the current desktop surface.");
+    }
+    if (boundaryRequirements.includes("governed_export_redaction")) {
+      findings.push("Governed export redaction remains a required boundary for the current policy posture.");
+    }
+    if (breakGlassGateCount > 0) {
+      findings.push("Break-glass controls remain present and should be reviewed before relaxing any posture.");
+    }
+    return {
+      changeId: String(queueItem.id || "").trim(),
+      kind: "guardrail",
+      tone:
+        pendingApprovalCount > 0 ||
+        restrictedHostMode === "blocked" ||
+        breakGlassGateCount > 0 ||
+        terminalMode === "read_only"
+          ? "warn"
+          : "info",
+      title: "Guardrail admin dry-run",
+      summary: `Preview only. This ${nextDraft.changeKind} guardrail proposal requires GovernanceOps approval before any live guardrail change can execute.`,
+      updatedAt: new Date().toISOString(),
+      facts: [
+        { label: "scope", value: nextDraft.targetScope, code: true },
+        { label: "profile", value: nextDraft.executionProfile, code: true },
+        { label: "boundary", value: nextDraft.safetyBoundary, code: true },
+        { label: "state", value: nextDraft.proposedState, code: true },
+        { label: "pending approvals", value: String(pendingApprovalCount) },
+        { label: "break-glass gates", value: String(breakGlassGateCount) },
+        { label: "terminal", value: terminalMode },
+        { label: "restricted host", value: restrictedHostMode }
+      ],
+      findings
+    };
+  };
+  const loadGuardrailOpsQueueItemIntoDraft = (changeId) => {
+    const item = findGuardrailOpsQueueItem(changeId);
+    if (!item) {
+      setGuardrailOpsFeedback("warn", "The selected guardrail admin proposal is no longer available.");
+      return false;
+    }
+    guardrailOpsViewState = {
+      ...guardrailOpsViewState,
+      selectedAdminChangeId: String(item.id || "").trim(),
+      recoveryReason: "",
+      guardrailDraft: normalizeGuardrailOpsDraft({
+        changeKind: item.changeKind,
+        targetScope: item.targetScope,
+        executionProfile: item.executionProfile || item.subjectId,
+        safetyBoundary: item.safetyBoundary,
+        proposedState: item.proposedState,
+        reason: item.reason
+      }),
+      latestSimulation:
+        String(guardrailOpsViewState.latestSimulation?.changeId || "").trim() === String(item.id || "").trim()
+          ? guardrailOpsViewState.latestSimulation
+          : null,
+      feedback: {
+        tone: "info",
+        message: `Loaded queued guardrail proposal ${String(item.id || "").trim()} into the active draft editor.`
+      }
+    };
+    renderGuardrailOpsPanel();
+    return true;
+  };
+  const saveGuardrailOpsDraft = () => {
+    const draft = normalizeGuardrailOpsDraft(guardrailOpsViewState.guardrailDraft);
+    const validationError = validateGuardrailOpsDraft(draft);
+    if (validationError) {
+      setGuardrailOpsFeedback("warn", validationError);
+      return null;
+    }
+    const queueItem = buildGuardrailOpsQueueItem(draft, { status: "draft" });
+    upsertGuardrailOpsQueueItem(queueItem);
+    guardrailOpsViewState = {
+      ...guardrailOpsViewState,
+      selectedAdminChangeId: String(queueItem.id || "").trim(),
+      latestSimulation: null,
+      feedback: {
+        tone: "ok",
+        message: `Guardrail draft saved as ${String(queueItem.id || "").trim()}.`
+      }
+    };
+    renderGuardrailOpsPanel();
+    return queueItem;
+  };
+  const simulateGuardrailOpsDraft = (changeId = "") => {
+    const selectedQueueItem = changeId ? findGuardrailOpsQueueItem(changeId) : null;
+    if (selectedQueueItem) {
+      loadGuardrailOpsQueueItemIntoDraft(selectedQueueItem.id);
+    }
+    const draft = normalizeGuardrailOpsDraft(guardrailOpsViewState.guardrailDraft);
+    const validationError = validateGuardrailOpsDraft(draft);
+    if (validationError) {
+      setGuardrailOpsFeedback("warn", validationError);
+      return null;
+    }
+    const queueItem = buildGuardrailOpsQueueItem(draft, {
+      id: selectedQueueItem?.id || String(guardrailOpsViewState.selectedAdminChangeId || "").trim(),
+      status: "simulated"
+    });
+    const simulation = buildGuardrailOpsSimulation(queueItem, draft);
+    upsertGuardrailOpsQueueItem({
+      ...queueItem,
+      status: "simulated",
+      simulationSummary: simulation.summary,
+      simulatedAt: simulation.updatedAt
+    });
+    guardrailOpsViewState = {
+      ...guardrailOpsViewState,
+      selectedAdminChangeId: String(queueItem.id || "").trim(),
+      latestSimulation: simulation,
+      feedback: {
+        tone: simulation.tone,
+        message: `Guardrail dry-run is ready for ${String(queueItem.id || "").trim()}.`
+      }
+    };
+    renderGuardrailOpsPanel();
+    return simulation;
+  };
+  const routeGuardrailOpsDraftToGovernance = (changeId = "") => {
+    const selectedQueueItem = changeId ? findGuardrailOpsQueueItem(changeId) : null;
+    const simulation = guardrailOpsViewState.latestSimulation;
+    const matchingSimulation =
+      simulation &&
+      String(simulation.kind || "").trim().toLowerCase() === "guardrail" &&
+      String(simulation.changeId || "").trim() &&
+      (!selectedQueueItem || String(simulation.changeId || "").trim() === String(selectedQueueItem.id || "").trim());
+    if (!matchingSimulation) {
+      setGuardrailOpsFeedback("warn", "Run a bounded dry-run for the active guardrail admin proposal before routing it to GovernanceOps.");
+      return false;
+    }
+    const queueItem =
+      selectedQueueItem ||
+      buildGuardrailOpsQueueItem(guardrailOpsViewState.guardrailDraft, {
+        id: String(guardrailOpsViewState.selectedAdminChangeId || "").trim(),
+        status: "simulated",
+        simulationSummary: simulation.summary
+      });
+    upsertGuardrailOpsQueueItem({
+      ...queueItem,
+      status: "routed",
+      simulationSummary: simulation.summary,
+      routedAt: new Date().toISOString(),
+      decision: null,
+      execution: null,
+      receipt: null,
+      rollback: null
+    });
+    guardrailOpsViewState = {
+      ...guardrailOpsViewState,
+      selectedAdminChangeId: String(queueItem.id || "").trim(),
+      feedback: {
+        tone: "warn",
+        message: `Guardrail admin proposal ${String(queueItem.id || "").trim()} routed to GovernanceOps. Apply remains blocked until an explicit governance approval lands.`
+      }
+    };
+    governanceOpsViewState = {
+      ...governanceOpsViewState,
+      selectedAdminChangeId: String(queueItem.id || "").trim()
+    };
+    setGovernanceOpsFeedback(
+      "warn",
+      `Guardrail admin proposal routed from GuardrailOps: changeId=${String(queueItem.id || "").trim()}; action=${String(queueItem.requestedAction || "").trim()}; profile=${String(queueItem.subjectId || "").trim()}; scope=${String(queueItem.targetScope || "").trim()}. Governance approval is now required before apply can proceed.`
+    );
+    renderGuardrailOpsPanel();
+    setWorkspaceView("governanceops", true);
+    return true;
+  };
+  const openGuardrailOpsGovernanceView = () => {
+    setWorkspaceView("governanceops", true);
+  };
+  const openGuardrailOpsAdminQueueItem = (changeId) => {
+    const queueItem = findGuardrailOpsQueueItem(changeId);
+    if (!queueItem) {
+      setGuardrailOpsFeedback("warn", "The selected guardrail admin proposal is no longer available.");
+      return false;
+    }
+    loadGuardrailOpsQueueItemIntoDraft(changeId);
+    setWorkspaceView("guardrailops", true);
+    return true;
+  };
+  const applyApprovedGuardrailOpsChange = (changeId) => {
+    const queueItem = findGuardrailOpsQueueItem(changeId);
+    if (!queueItem) {
+      setGuardrailOpsFeedback("warn", "The selected guardrail admin proposal is no longer available.");
+      return false;
+    }
+    const decision = queueItem?.decision && typeof queueItem.decision === "object" ? queueItem.decision : null;
+    if (String(queueItem.status || "").trim().toLowerCase() !== "approved" || !String(decision?.approvalReceiptId || "").trim()) {
+      setGuardrailOpsFeedback("warn", "Apply is only available after GovernanceOps records an explicit approved decision receipt.");
+      return false;
+    }
+    if (String(queueItem?.receipt?.receiptId || "").trim()) {
+      setGuardrailOpsFeedback("warn", `Guardrail admin change ${String(queueItem.id || "").trim()} already has an admin receipt.`);
+      return false;
+    }
+    const actorRef = guardrailOpsActorRef();
+    const executedAt = new Date().toISOString();
+    const executionId = `admin-execution-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    const receiptId = `admin-receipt-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    const executionSummary = `${String(queueItem.requestedAction || "").trim()} applied for ${String(queueItem.targetScope || "").trim()} on ${String(queueItem.executionProfile || queueItem.subjectId || "").trim()}.`;
+    const receipt = {
+      receiptId,
+      issuedAt: executedAt,
+      summary: executionSummary,
+      stableRef: `${String(queueItem.id || "").trim()}/${receiptId}`,
+      approvalReceiptId: String(decision.approvalReceiptId || "").trim(),
+      executionId
+    };
+    upsertGuardrailOpsQueueItem({
+      ...queueItem,
+      status: "applied",
+      updatedAt: executedAt,
+      execution: {
+        executionId,
+        executedAt,
+        status: "applied",
+        summary: executionSummary,
+        actorRef
+      },
+      receipt
+    });
+    guardrailOpsViewState = {
+      ...guardrailOpsViewState,
+      selectedAdminChangeId: String(queueItem.id || "").trim(),
+      recoveryReason: "",
+      feedback: {
+        tone: "ok",
+        message: `Approved guardrail admin change ${String(queueItem.id || "").trim()} applied. Admin receipt ${receiptId} is now available.`
+      }
+    };
+    governanceOpsViewState = {
+      ...governanceOpsViewState,
+      selectedAdminChangeId: String(queueItem.id || "").trim()
+    };
+    setGovernanceOpsFeedback(
+      "ok",
+      `Guardrail admin change ${String(queueItem.id || "").trim()} applied from GuardrailOps. Receipt ${receiptId} is now linked to approval receipt ${String(decision.approvalReceiptId || "").trim()}.`
+    );
+    renderGuardrailOpsPanel();
+    return true;
+  };
+  const applyGuardrailOpsRecoveryAction = (changeId, action) => {
+    const queueItem = findGuardrailOpsQueueItem(changeId);
+    const normalizedAction = String(action || "").trim().toLowerCase();
+    if (!queueItem) {
+      setGuardrailOpsFeedback("warn", "The selected guardrail admin proposal is no longer available.");
+      return false;
+    }
+    if (String(queueItem.status || "").trim().toLowerCase() !== "applied" || !String(queueItem?.receipt?.receiptId || "").trim()) {
+      setGuardrailOpsFeedback("warn", "Rollback is only available after an approved guardrail change has been applied and receipted.");
+      return false;
+    }
+    if (String(queueItem?.rollback?.rollbackId || "").trim()) {
+      setGuardrailOpsFeedback("warn", `Recovery has already been recorded for guardrail admin change ${String(queueItem.id || "").trim()}.`);
+      return false;
+    }
+    if (normalizedAction !== "rollback") {
+      setGuardrailOpsFeedback("warn", "Unsupported recovery action for the selected guardrail admin proposal.");
+      return false;
+    }
+    const reason = String(guardrailOpsViewState.recoveryReason || "").trim();
+    if (!reason) {
+      setGuardrailOpsFeedback("warn", "Rollback reason is required before guardrail recovery can execute.");
+      return false;
+    }
+    const actorRef = guardrailOpsActorRef();
+    const rolledBackAt = new Date().toISOString();
+    const rollbackId = `admin-rollback-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    const rollback = {
+      rollbackId,
+      action: "rollback",
+      status: "rolled_back",
+      rolledBackAt,
+      summary: `Rolled back ${String(queueItem.requestedAction || "").trim()} for ${String(queueItem.targetScope || "").trim()} on ${String(queueItem.executionProfile || queueItem.subjectId || "").trim()}.`,
+      stableRef: `${String(queueItem.id || "").trim()}/${rollbackId}`,
+      reason,
+      actorRef,
+      approvalReceiptId: String(queueItem?.decision?.approvalReceiptId || "").trim(),
+      adminReceiptId: String(queueItem?.receipt?.receiptId || "").trim(),
+      executionId: String(queueItem?.execution?.executionId || "").trim()
+    };
+    upsertGuardrailOpsQueueItem({
+      ...queueItem,
+      status: "rolled_back",
+      updatedAt: rolledBackAt,
+      rollback
+    });
+    guardrailOpsViewState = {
+      ...guardrailOpsViewState,
+      selectedAdminChangeId: String(queueItem.id || "").trim(),
+      recoveryReason: "",
+      feedback: {
+        tone: "ok",
+        message: `Rollback recorded for guardrail admin change ${String(queueItem.id || "").trim()}. Recovery receipt ${rollbackId} is now available.`
+      }
+    };
+    setGovernanceOpsFeedback(
+      "warn",
+      `GuardrailOps recorded rollback for admin change ${String(queueItem.id || "").trim()}. Recovery record ${rollbackId} is linked to approval receipt ${String(rollback.approvalReceiptId || "").trim()}.`
+    );
+    renderGuardrailOpsPanel();
+    return true;
+  };
+  const copyGuardrailOpsGovernanceReceipt = async (changeId) => {
+    const queueItem = findGuardrailOpsQueueItem(changeId);
+    if (!queueItem || !String(queueItem?.decision?.approvalReceiptId || "").trim()) {
+      setGuardrailOpsFeedback("warn", "No governance decision receipt is available for the selected guardrail admin change.");
+      return false;
+    }
+    await copyTextToClipboard(buildGuardrailOpsGovernanceReceiptText(queueItem));
+    setGuardrailOpsFeedback("ok", `Governance decision receipt copied for guardrail admin change ${String(queueItem.id || "").trim()}.`);
+    return true;
+  };
+  const copyGuardrailOpsAdminReceipt = async (changeId) => {
+    const queueItem = findGuardrailOpsQueueItem(changeId);
+    if (!queueItem || !String(queueItem?.receipt?.receiptId || "").trim()) {
+      setGuardrailOpsFeedback("warn", "No admin change receipt is available for the selected guardrail admin change.");
+      return false;
+    }
+    await copyTextToClipboard(buildGuardrailOpsAdminReceiptText(queueItem));
+    setGuardrailOpsFeedback("ok", `Admin change receipt copied for guardrail admin change ${String(queueItem.id || "").trim()}.`);
+    return true;
+  };
+  const copyGuardrailOpsRollbackReceipt = async (changeId) => {
+    const queueItem = findGuardrailOpsQueueItem(changeId);
+    if (!queueItem || !String(queueItem?.rollback?.rollbackId || "").trim()) {
+      setGuardrailOpsFeedback("warn", "No rollback receipt is available for the selected guardrail admin change.");
+      return false;
+    }
+    await copyTextToClipboard(buildGuardrailOpsRollbackReceiptText(queueItem));
+    setGuardrailOpsFeedback("ok", `Rollback receipt copied for guardrail admin change ${String(queueItem.id || "").trim()}.`);
+    return true;
   };
   const setRuntimeOpsFeedback = (tone, message) => {
     runtimeOpsViewState = {
@@ -4485,6 +6800,12 @@ async function main() {
         : null
     };
     renderPolicyOpsPanel();
+  };
+  const setPolicyOpsRecoveryReason = (value) => {
+    policyOpsViewState = {
+      ...policyOpsViewState,
+      recoveryReason: String(value || "").trimStart()
+    };
   };
   const setIncidentOpsFeedback = (tone, message) => {
     incidentOpsViewState = {
@@ -4788,8 +7109,11 @@ async function main() {
               .trim()
               .toLowerCase()
         });
-        renderIdentityOpsPage(ui, settingsWithConfigChanges, session);
-        renderGuardrailOpsPage(ui, {
+        renderIdentityOpsPanel({
+          settings: settingsWithConfigChanges,
+          session
+        });
+        renderGuardrailOpsPanel({
           settings: settingsWithConfigChanges,
           runs,
           approvals,
@@ -4828,7 +7152,7 @@ async function main() {
           approvals,
           audit
         });
-        renderComplianceOpsPage(ui, {
+        renderComplianceOpsPanel({
           settings: settingsWithConfigChanges,
           runs,
           approvals,
@@ -4840,13 +7164,13 @@ async function main() {
           exportProfiles: desktopGovernedExportCatalogState?.exportProfiles || null,
           orgAdminProfiles: desktopGovernedExportCatalogState?.orgAdminProfiles || null
         });
-        renderPlatformOpsPage(ui, {
+        renderPlatformOpsPanel({
           health,
           pipeline,
           providers,
           aimxsActivation: aimxsActivationSnapshot
         });
-        renderNetworkOpsPage(ui, {
+        renderNetworkOpsPanel({
           settings: settingsWithConfigChanges,
           health,
           providers,
@@ -5053,7 +7377,7 @@ async function main() {
       currentSession?.claims?.sub || currentSession?.claims?.email || currentSession?.claims?.client_id || ""
     ).trim();
     const generatedAt = new Date().toISOString();
-    const packageId = `incident-${generatedAt.replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z")}-${safeFileToken(runId, "run-none")}`;
+    const packageId = `incident-${buildTimestampToken(generatedAt)}-${safeFileToken(runId, "run-none")}`;
     const approvalStatus = String(approvalRecord?.status || "").trim().toUpperCase();
 
     return {
@@ -5220,6 +7544,1693 @@ async function main() {
     return true;
   }
 
+  const policyOpsActorRef = () =>
+    String(session?.claims?.sub || session?.claims?.email || session?.claims?.client_id || "").trim() ||
+    "policy-operator";
+
+  const normalizePolicyOpsAdminDraft = (draft = {}) => {
+    const snapshot = getCurrentPolicyOpsSnapshot();
+    const input = draft && typeof draft === "object" ? draft : {};
+    const providerOptions = Array.isArray(snapshot?.admin?.currentScope?.providerOptions)
+      ? snapshot.admin.currentScope.providerOptions.map((entry) => String(entry || "").trim()).filter(Boolean)
+      : [];
+    const providerIdFallback =
+      String(input.providerId || "").trim() ||
+      providerOptions[0] ||
+      String(snapshot?.currentContract?.providerId || "").trim();
+    const changeKind = String(input.changeKind || "").trim().toLowerCase();
+    return {
+      changeKind: changeKind === "activate" ? "activate" : "load",
+      packId:
+        String(input.packId || "").trim() ||
+        String(snapshot?.admin?.currentScope?.currentPackId || "").trim(),
+      providerId: providerIdFallback,
+      targetScope:
+        String(input.targetScope || "").trim() ||
+        String(snapshot?.admin?.currentScope?.defaultTargetScope || "").trim() ||
+        "workspace",
+      reason: String(input.reason || "").trim()
+    };
+  };
+
+  const updatePolicyOpsDraftField = (field, value) => {
+    const nextDraft = normalizePolicyOpsAdminDraft({
+      ...policyOpsViewState.adminDraft,
+      [field]: String(value || "").trim()
+    });
+    policyOpsViewState = {
+      ...policyOpsViewState,
+      adminDraft: nextDraft,
+      latestSimulation: null,
+      feedback: null
+    };
+    renderPolicyOpsPanel();
+  };
+
+  const findPolicyOpsQueueItem = (changeId) => {
+    const normalizedChangeId = String(changeId || "").trim();
+    if (!normalizedChangeId) {
+      return null;
+    }
+    return (
+      (Array.isArray(policyOpsViewState.queueItems) ? policyOpsViewState.queueItems : []).find(
+        (item) => String(item?.id || "").trim() === normalizedChangeId
+      ) || null
+    );
+  };
+
+  const upsertPolicyOpsQueueItem = (nextItem) => {
+    const item = nextItem && typeof nextItem === "object" ? nextItem : null;
+    const changeId = String(item?.id || "").trim();
+    if (!changeId) {
+      return null;
+    }
+    const existingItems = Array.isArray(policyOpsViewState.queueItems) ? policyOpsViewState.queueItems : [];
+    const nextItems = [];
+    let replaced = false;
+    existingItems.forEach((entry) => {
+      const entryId = String(entry?.id || "").trim();
+      if (entryId === changeId) {
+        nextItems.push({
+          ...entry,
+          ...item
+        });
+        replaced = true;
+        return;
+      }
+      nextItems.push(entry);
+    });
+    if (!replaced) {
+      nextItems.unshift(item);
+    }
+    policyOpsViewState = {
+      ...policyOpsViewState,
+      queueItems: nextItems
+    };
+    return nextItems.find((entry) => String(entry?.id || "").trim() === changeId) || null;
+  };
+
+  const buildPolicyOpsQueueItem = (draft, options = {}) => {
+    const nextDraft = normalizePolicyOpsAdminDraft(draft);
+    const selectedItem = findPolicyOpsQueueItem(policyOpsViewState.selectedAdminChangeId);
+    const existingId = String(options.id || selectedItem?.id || "").trim();
+    const changeId =
+      existingId || `policy-change-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    const requestedAction = `${nextDraft.changeKind} ${nextDraft.packId || "policy-pack"}`.trim();
+    return {
+      id: changeId,
+      ownerDomain: "policyops",
+      kind: "policy",
+      label: "Policy Pack Load And Activation Draft",
+      requestedAction,
+      subjectId: nextDraft.packId,
+      subjectLabel: "pack",
+      targetScope: nextDraft.targetScope,
+      targetLabel: "scope",
+      changeKind: nextDraft.changeKind,
+      packId: nextDraft.packId,
+      providerId: nextDraft.providerId,
+      status: String(options.status || selectedItem?.status || "draft").trim().toLowerCase(),
+      reason: nextDraft.reason,
+      summary: `${nextDraft.changeKind === "activate" ? "Activate" : "Load"} ${nextDraft.packId || "policy-pack"} for ${nextDraft.targetScope} @ ${nextDraft.providerId || "policy-provider"}`,
+      simulationSummary: String(options.simulationSummary || selectedItem?.simulationSummary || "").trim(),
+      createdAt: String(options.createdAt || selectedItem?.createdAt || new Date().toISOString()).trim(),
+      simulatedAt: String(options.simulatedAt || selectedItem?.simulatedAt || "").trim(),
+      updatedAt: String(options.updatedAt || new Date().toISOString()).trim(),
+      routedAt: String(options.routedAt || selectedItem?.routedAt || "").trim(),
+      decision:
+        options.decision === null
+          ? null
+          : options.decision || (selectedItem?.decision && typeof selectedItem.decision === "object" ? selectedItem.decision : null),
+      execution:
+        options.execution === null
+          ? null
+          : options.execution || (selectedItem?.execution && typeof selectedItem.execution === "object" ? selectedItem.execution : null),
+      receipt:
+        options.receipt === null
+          ? null
+          : options.receipt || (selectedItem?.receipt && typeof selectedItem.receipt === "object" ? selectedItem.receipt : null),
+      rollback:
+        options.rollback === null
+          ? null
+          : options.rollback || (selectedItem?.rollback && typeof selectedItem.rollback === "object" ? selectedItem.rollback : null)
+    };
+  };
+
+  const validatePolicyOpsAdminDraft = (draft) => {
+    const nextDraft = normalizePolicyOpsAdminDraft(draft);
+    const snapshot = getCurrentPolicyOpsSnapshot();
+    const packItems = Array.isArray(snapshot?.policyCatalogItems) ? snapshot.policyCatalogItems : [];
+    const providerOptions = Array.isArray(snapshot?.admin?.currentScope?.providerOptions)
+      ? snapshot.admin.currentScope.providerOptions.map((entry) => String(entry || "").trim()).filter(Boolean)
+      : [];
+    if (!nextDraft.packId) {
+      return "Policy pack is required before saving a PolicyOps admin proposal.";
+    }
+    if (packItems.length > 0 && !packItems.some((item) => String(item?.packId || "").trim() === nextDraft.packId)) {
+      return "Policy pack must be selected from the loaded catalog before saving a PolicyOps admin proposal.";
+    }
+    if (!nextDraft.providerId) {
+      return "Decision provider is required before saving a PolicyOps admin proposal.";
+    }
+    if (providerOptions.length > 0 && !providerOptions.includes(nextDraft.providerId)) {
+      return "Decision provider must be selected from the loaded PolicyOps scope before saving a PolicyOps admin proposal.";
+    }
+    if (!nextDraft.targetScope) {
+      return "Applicability scope is required before saving a PolicyOps admin proposal.";
+    }
+    if (!nextDraft.reason) {
+      return "Reason is required before saving a PolicyOps admin proposal.";
+    }
+    return "";
+  };
+
+  const buildPolicyOpsSimulation = (item, draft) => {
+    const queueItem = item && typeof item === "object" ? item : {};
+    const nextDraft = normalizePolicyOpsAdminDraft(draft);
+    const snapshot = getCurrentPolicyOpsSnapshot();
+    const packItems = Array.isArray(snapshot?.policyCatalogItems) ? snapshot.policyCatalogItems : [];
+    const selectedPack =
+      packItems.find((entry) => String(entry?.packId || "").trim() === nextDraft.packId) || null;
+    const decisionSurfaceCount = Array.isArray(selectedPack?.decisionSurfaces) ? selectedPack.decisionSurfaces.length : 0;
+    const boundaryRequirementCount = Array.isArray(selectedPack?.boundaryRequirements)
+      ? selectedPack.boundaryRequirements.length
+      : 0;
+    const findings = [
+      "Execution remains blocked until GovernanceOps records an explicit approved decision receipt for this policy proposal."
+    ];
+    if (nextDraft.changeKind === "load") {
+      findings.push("Load preview only. Activation remains closed in this slice even if the load proposal is later approved.");
+    } else {
+      findings.push("Activation preview only. Live activation remains blocked in this slice until a later apply path opens.");
+    }
+    if (selectedPack && decisionSurfaceCount === 0) {
+      findings.push("Selected pack is missing declared decision surfaces in the loaded catalog.");
+    }
+    if (selectedPack && boundaryRequirementCount === 0) {
+      findings.push("Selected pack is missing declared boundary requirements in the loaded catalog.");
+    }
+    if ((snapshot?.policyCoverage?.gapCount || 0) > 0) {
+      findings.push("The current policy catalog already shows coverage gaps that should be reviewed before changing active policy posture.");
+    }
+    if ((snapshot?.policySimulation?.blockerCount || 0) > 0) {
+      findings.push(
+        `Current bounded replay still shows ${String(snapshot.policySimulation.blockerCount)} blocker(s) under the latest policy posture.`
+      );
+    }
+    if (String(snapshot?.policySimulation?.decision || "").trim().toUpperCase() === "DENY") {
+      findings.push("Latest governed replay is currently denied; review semantic regression risk before changing active policy posture.");
+    } else if (String(snapshot?.policySimulation?.decision || "").trim().toUpperCase() === "DEFER") {
+      findings.push("Latest governed replay is currently deferred; grants or evidence may still be required after the policy change.");
+    }
+    const tone =
+      decisionSurfaceCount === 0 ||
+      boundaryRequirementCount === 0 ||
+      (snapshot?.policyCoverage?.gapCount || 0) > 0 ||
+      (snapshot?.policySimulation?.blockerCount || 0) > 0 ||
+      String(snapshot?.policySimulation?.decision || "").trim().toUpperCase() !== "ALLOW"
+        ? "warn"
+        : "info";
+    return {
+      changeId: String(queueItem.id || "").trim(),
+      kind: "policy",
+      tone,
+      title: "Policy admin dry-run",
+      summary: `Preview only. This ${nextDraft.changeKind} proposal requires GovernanceOps approval before any live policy-pack change can execute.`,
+      updatedAt: new Date().toISOString(),
+      facts: [
+        { label: "change", value: nextDraft.changeKind },
+        { label: "pack", value: nextDraft.packId, code: true },
+        { label: "provider", value: nextDraft.providerId, code: true },
+        { label: "scope", value: nextDraft.targetScope, code: true },
+        { label: "current pack", value: String(snapshot?.admin?.currentScope?.currentPackId || "-").trim() || "-", code: true },
+        { label: "current provider", value: String(snapshot?.admin?.currentScope?.currentProviderId || "-").trim() || "-", code: true },
+        { label: "decision surfaces", value: String(decisionSurfaceCount) },
+        { label: "boundaries", value: String(boundaryRequirementCount) }
+      ],
+      findings
+    };
+  };
+
+  const loadPolicyOpsQueueItemIntoDraft = (changeId) => {
+    const item = findPolicyOpsQueueItem(changeId);
+    if (!item) {
+      setPolicyOpsFeedback("warn", "The selected PolicyOps admin proposal is no longer available.");
+      return false;
+    }
+    policyOpsViewState = {
+      ...policyOpsViewState,
+      selectedAdminChangeId: String(item.id || "").trim(),
+      recoveryReason: "",
+      adminDraft: normalizePolicyOpsAdminDraft({
+        changeKind: item.changeKind,
+        packId: item.packId || item.subjectId,
+        providerId: item.providerId,
+        targetScope: item.targetScope,
+        reason: item.reason
+      }),
+      latestSimulation:
+        String(policyOpsViewState.latestSimulation?.changeId || "").trim() === String(item.id || "").trim()
+          ? policyOpsViewState.latestSimulation
+          : null,
+      feedback: {
+        tone: "info",
+        message: `Loaded queued PolicyOps proposal ${String(item.id || "").trim()} into the active draft editor.`
+      }
+    };
+    renderPolicyOpsPanel();
+    return true;
+  };
+
+  const savePolicyOpsDraft = () => {
+    const draft = normalizePolicyOpsAdminDraft(policyOpsViewState.adminDraft);
+    const validationError = validatePolicyOpsAdminDraft(draft);
+    if (validationError) {
+      setPolicyOpsFeedback("warn", validationError);
+      return null;
+    }
+    const queueItem = buildPolicyOpsQueueItem(draft, { status: "draft" });
+    upsertPolicyOpsQueueItem(queueItem);
+    policyOpsViewState = {
+      ...policyOpsViewState,
+      selectedAdminChangeId: String(queueItem.id || "").trim(),
+      latestSimulation: null,
+      feedback: {
+        tone: "ok",
+        message: `PolicyOps draft saved as ${String(queueItem.id || "").trim()}.`
+      }
+    };
+    renderPolicyOpsPanel();
+    return queueItem;
+  };
+
+  const simulatePolicyOpsDraft = (changeId = "") => {
+    const selectedQueueItem = changeId ? findPolicyOpsQueueItem(changeId) : null;
+    if (selectedQueueItem) {
+      loadPolicyOpsQueueItemIntoDraft(selectedQueueItem.id);
+    }
+    const draft = normalizePolicyOpsAdminDraft(policyOpsViewState.adminDraft);
+    const validationError = validatePolicyOpsAdminDraft(draft);
+    if (validationError) {
+      setPolicyOpsFeedback("warn", validationError);
+      return null;
+    }
+    const queueItem = buildPolicyOpsQueueItem(draft, {
+      id: selectedQueueItem?.id || String(policyOpsViewState.selectedAdminChangeId || "").trim(),
+      status: "simulated"
+    });
+    const simulation = buildPolicyOpsSimulation(queueItem, draft);
+    upsertPolicyOpsQueueItem({
+      ...queueItem,
+      status: "simulated",
+      simulationSummary: simulation.summary,
+      simulatedAt: simulation.updatedAt
+    });
+    policyOpsViewState = {
+      ...policyOpsViewState,
+      selectedAdminChangeId: String(queueItem.id || "").trim(),
+      latestSimulation: simulation,
+      feedback: {
+        tone: simulation.tone,
+        message: `Policy dry-run is ready for ${String(queueItem.id || "").trim()}.`
+      }
+    };
+    renderPolicyOpsPanel();
+    return simulation;
+  };
+
+  const routePolicyOpsDraftToGovernance = (changeId = "") => {
+    const selectedQueueItem = changeId ? findPolicyOpsQueueItem(changeId) : null;
+    const simulation = policyOpsViewState.latestSimulation;
+    const matchingSimulation =
+      simulation &&
+      String(simulation.kind || "").trim().toLowerCase() === "policy" &&
+      String(simulation.changeId || "").trim() &&
+      (!selectedQueueItem || String(simulation.changeId || "").trim() === String(selectedQueueItem.id || "").trim());
+    if (!matchingSimulation) {
+      setPolicyOpsFeedback("warn", "Run a bounded dry-run for the active PolicyOps admin proposal before routing it to GovernanceOps.");
+      return false;
+    }
+    const queueItem =
+      selectedQueueItem ||
+      buildPolicyOpsQueueItem(policyOpsViewState.adminDraft, {
+        id: String(policyOpsViewState.selectedAdminChangeId || "").trim(),
+        status: "simulated",
+        simulationSummary: simulation.summary
+      });
+    upsertPolicyOpsQueueItem({
+      ...queueItem,
+      status: "routed",
+      simulationSummary: simulation.summary,
+      routedAt: new Date().toISOString(),
+      decision: null,
+      execution: null,
+      receipt: null,
+      rollback: null
+    });
+    policyOpsViewState = {
+      ...policyOpsViewState,
+      selectedAdminChangeId: String(queueItem.id || "").trim(),
+      feedback: {
+        tone: "warn",
+        message: `Policy admin proposal ${String(queueItem.id || "").trim()} routed to GovernanceOps. Apply remains blocked until an explicit governance approval lands.`
+      }
+    };
+    governanceOpsViewState = {
+      ...governanceOpsViewState,
+      selectedAdminChangeId: String(queueItem.id || "").trim()
+    };
+    setGovernanceOpsFeedback(
+      "warn",
+      `Policy admin proposal routed from PolicyOps: changeId=${String(queueItem.id || "").trim()}; action=${String(queueItem.requestedAction || "").trim()}; pack=${String(queueItem.packId || queueItem.subjectId || "").trim()}; scope=${String(queueItem.targetScope || "").trim()}. Governance approval is now required before apply can proceed.`
+    );
+    renderPolicyOpsPanel();
+    setWorkspaceView("governanceops", true);
+    return true;
+  };
+
+  const openPolicyOpsGovernanceView = () => {
+    setWorkspaceView("governanceops", true);
+  };
+
+  const openPolicyOpsAdminQueueItem = (changeId) => {
+    const queueItem = findPolicyOpsQueueItem(changeId);
+    if (!queueItem) {
+      setPolicyOpsFeedback("warn", "The selected PolicyOps admin proposal is no longer available.");
+      return false;
+    }
+    loadPolicyOpsQueueItemIntoDraft(changeId);
+    setWorkspaceView("policyops", true);
+    return true;
+  };
+  const applyApprovedPolicyOpsChange = (changeId) => {
+    const queueItem = findPolicyOpsQueueItem(changeId);
+    if (!queueItem) {
+      setPolicyOpsFeedback("warn", "The selected PolicyOps admin proposal is no longer available.");
+      return false;
+    }
+    const decision = queueItem?.decision && typeof queueItem.decision === "object" ? queueItem.decision : null;
+    if (String(queueItem.status || "").trim().toLowerCase() !== "approved" || !String(decision?.approvalReceiptId || "").trim()) {
+      setPolicyOpsFeedback("warn", "Apply is only available after GovernanceOps records an explicit approved decision receipt.");
+      return false;
+    }
+    if (String(queueItem?.receipt?.receiptId || "").trim()) {
+      setPolicyOpsFeedback("warn", `Policy admin change ${String(queueItem.id || "").trim()} already has an admin receipt.`);
+      return false;
+    }
+    const actorRef = policyOpsActorRef();
+    const executedAt = new Date().toISOString();
+    const executionId = `admin-execution-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    const receiptId = `admin-receipt-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    const executionSummary = `${String(queueItem.requestedAction || "").trim()} applied for ${String(queueItem.targetScope || "").trim()} on ${String(queueItem.providerId || "policy-provider").trim()}.`;
+    const receipt = {
+      receiptId,
+      issuedAt: executedAt,
+      summary: executionSummary,
+      stableRef: `${String(queueItem.id || "").trim()}/${receiptId}`,
+      approvalReceiptId: String(decision.approvalReceiptId || "").trim(),
+      executionId
+    };
+    upsertPolicyOpsQueueItem({
+      ...queueItem,
+      status: "applied",
+      updatedAt: executedAt,
+      execution: {
+        executionId,
+        executedAt,
+        status: "applied",
+        summary: executionSummary,
+        actorRef
+      },
+      receipt
+    });
+    policyOpsViewState = {
+      ...policyOpsViewState,
+      selectedAdminChangeId: String(queueItem.id || "").trim(),
+      recoveryReason: "",
+      feedback: {
+        tone: "ok",
+        message: `Approved PolicyOps admin change ${String(queueItem.id || "").trim()} applied. Admin receipt ${receiptId} is now available.`
+      }
+    };
+    governanceOpsViewState = {
+      ...governanceOpsViewState,
+      selectedAdminChangeId: String(queueItem.id || "").trim()
+    };
+    setGovernanceOpsFeedback(
+      "ok",
+      `Policy admin change ${String(queueItem.id || "").trim()} applied from PolicyOps. Receipt ${receiptId} is now linked to approval receipt ${String(decision.approvalReceiptId || "").trim()}.`
+    );
+    renderPolicyOpsPanel();
+    return true;
+  };
+  const applyPolicyOpsRecoveryAction = (changeId, action) => {
+    const queueItem = findPolicyOpsQueueItem(changeId);
+    const normalizedAction = String(action || "").trim().toLowerCase();
+    if (!queueItem) {
+      setPolicyOpsFeedback("warn", "The selected PolicyOps admin proposal is no longer available.");
+      return false;
+    }
+    if (String(queueItem.status || "").trim().toLowerCase() !== "applied" || !String(queueItem?.receipt?.receiptId || "").trim()) {
+      setPolicyOpsFeedback("warn", "Rollback is only available after an approved policy change has been applied and receipted.");
+      return false;
+    }
+    if (String(queueItem?.rollback?.rollbackId || "").trim()) {
+      setPolicyOpsFeedback("warn", `Recovery has already been recorded for PolicyOps admin change ${String(queueItem.id || "").trim()}.`);
+      return false;
+    }
+    if (normalizedAction !== "rollback") {
+      setPolicyOpsFeedback("warn", "Unsupported recovery action for the selected PolicyOps admin proposal.");
+      return false;
+    }
+    const reason = String(policyOpsViewState.recoveryReason || "").trim();
+    if (!reason) {
+      setPolicyOpsFeedback("warn", "Rollback reason is required before policy recovery can execute.");
+      return false;
+    }
+    const actorRef = policyOpsActorRef();
+    const rolledBackAt = new Date().toISOString();
+    const rollbackId = `admin-rollback-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    const rollback = {
+      rollbackId,
+      action: "rollback",
+      status: "rolled_back",
+      rolledBackAt,
+      summary: `Rolled back ${String(queueItem.requestedAction || "").trim()} for ${String(queueItem.targetScope || "").trim()} on ${String(queueItem.providerId || "policy-provider").trim()}.`,
+      stableRef: `${String(queueItem.id || "").trim()}/${rollbackId}`,
+      reason,
+      actorRef,
+      approvalReceiptId: String(queueItem?.decision?.approvalReceiptId || "").trim(),
+      adminReceiptId: String(queueItem?.receipt?.receiptId || "").trim(),
+      executionId: String(queueItem?.execution?.executionId || "").trim()
+    };
+    upsertPolicyOpsQueueItem({
+      ...queueItem,
+      status: "rolled_back",
+      updatedAt: rolledBackAt,
+      rollback
+    });
+    policyOpsViewState = {
+      ...policyOpsViewState,
+      selectedAdminChangeId: String(queueItem.id || "").trim(),
+      recoveryReason: "",
+      feedback: {
+        tone: "ok",
+        message: `Rollback recorded for PolicyOps admin change ${String(queueItem.id || "").trim()}. Recovery receipt ${rollbackId} is now available.`
+      }
+    };
+    setGovernanceOpsFeedback(
+      "warn",
+      `PolicyOps recorded rollback for admin change ${String(queueItem.id || "").trim()}. Recovery record ${rollbackId} is linked to approval receipt ${String(rollback.approvalReceiptId || "").trim()}.`
+    );
+    renderPolicyOpsPanel();
+    return true;
+  };
+  const copyPolicyOpsGovernanceReceipt = async (changeId) => {
+    const queueItem = findPolicyOpsQueueItem(changeId);
+    if (!queueItem || !String(queueItem?.decision?.approvalReceiptId || "").trim()) {
+      setPolicyOpsFeedback("warn", "No governance decision receipt is available for the selected PolicyOps admin change.");
+      return false;
+    }
+    await copyTextToClipboard(buildPolicyOpsGovernanceReceiptText(queueItem));
+    setPolicyOpsFeedback("ok", `Governance decision receipt copied for PolicyOps admin change ${String(queueItem.id || "").trim()}.`);
+    return true;
+  };
+  const copyPolicyOpsAdminReceipt = async (changeId) => {
+    const queueItem = findPolicyOpsQueueItem(changeId);
+    if (!queueItem || !String(queueItem?.receipt?.receiptId || "").trim()) {
+      setPolicyOpsFeedback("warn", "No admin change receipt is available for the selected PolicyOps admin change.");
+      return false;
+    }
+    await copyTextToClipboard(buildPolicyOpsAdminReceiptText(queueItem));
+    setPolicyOpsFeedback("ok", `Admin change receipt copied for PolicyOps admin change ${String(queueItem.id || "").trim()}.`);
+    return true;
+  };
+  const copyPolicyOpsRollbackReceipt = async (changeId) => {
+    const queueItem = findPolicyOpsQueueItem(changeId);
+    if (!queueItem || !String(queueItem?.rollback?.rollbackId || "").trim()) {
+      setPolicyOpsFeedback("warn", "No rollback receipt is available for the selected PolicyOps admin change.");
+      return false;
+    }
+    await copyTextToClipboard(buildPolicyOpsRollbackReceiptText(queueItem));
+    setPolicyOpsFeedback("ok", `Rollback receipt copied for PolicyOps admin change ${String(queueItem.id || "").trim()}.`);
+    return true;
+  };
+
+  function getCurrentComplianceOpsSnapshot() {
+    return createComplianceWorkspaceSnapshot({
+      ...latestComplianceOpsContext,
+      viewState: complianceOpsViewState
+    });
+  }
+
+  const normalizeComplianceOpsAdminDraft = (draft = {}) => {
+    const snapshot = getCurrentComplianceOpsSnapshot();
+    const currentScope = snapshot?.admin?.currentScope || {};
+    const input = draft && typeof draft === "object" ? draft : {};
+    const changeKind = String(
+      input.changeKind || complianceOpsViewState.adminDraft?.changeKind || "attestation"
+    )
+      .trim()
+      .toLowerCase();
+    const optionPool =
+      changeKind === "exception"
+        ? Array.isArray(currentScope.exceptionOptions)
+          ? currentScope.exceptionOptions
+          : []
+        : Array.isArray(currentScope.attestationOptions)
+          ? currentScope.attestationOptions
+          : [];
+    const subjectId = String(input.subjectId || "").trim() || String(optionPool[0]?.value || "").trim();
+    const targetScope =
+      String(input.targetScope || "").trim() ||
+      String(currentScope.targetScope || currentScope.targetScopeOptions?.[0]?.value || "workspace").trim();
+    const controlBoundary =
+      String(input.controlBoundary || "").trim() ||
+      String(currentScope.controlBoundary || currentScope.controlBoundaryOptions?.[0]?.value || "control_scope").trim();
+    return {
+      changeKind: changeKind || "attestation",
+      subjectId,
+      targetScope,
+      controlBoundary,
+      reason: String(input.reason || "").trimStart()
+    };
+  };
+
+  const updateComplianceOpsDraftField = (field, value) => {
+    const normalizedField = String(field || "").trim();
+    if (!normalizedField) {
+      return;
+    }
+    const nextDraft = normalizeComplianceOpsAdminDraft({
+      ...complianceOpsViewState.adminDraft,
+      [normalizedField]: value
+    });
+    complianceOpsViewState = {
+      ...complianceOpsViewState,
+      adminDraft: nextDraft,
+      latestSimulation: null
+    };
+    renderComplianceOpsPanel();
+  };
+
+  function findComplianceOpsQueueItem(changeId) {
+    const normalizedChangeId = String(changeId || "").trim();
+    if (!normalizedChangeId) {
+      return null;
+    }
+    return (
+      (Array.isArray(complianceOpsViewState.queueItems) ? complianceOpsViewState.queueItems : []).find(
+        (item) => String(item?.id || "").trim() === normalizedChangeId
+      ) || null
+    );
+  }
+
+  function upsertComplianceOpsQueueItem(nextItem) {
+    const normalizedId = String(nextItem?.id || "").trim();
+    if (!normalizedId) {
+      return null;
+    }
+    const existingItems = Array.isArray(complianceOpsViewState.queueItems) ? complianceOpsViewState.queueItems : [];
+    const remainingItems = existingItems.filter((item) => String(item?.id || "").trim() !== normalizedId);
+    const mergedItems = [nextItem, ...remainingItems].sort((left, right) => {
+      const leftTime = new Date(left?.updatedAt || left?.createdAt || 0).getTime();
+      const rightTime = new Date(right?.updatedAt || right?.createdAt || 0).getTime();
+      return rightTime - leftTime;
+    });
+    complianceOpsViewState = {
+      ...complianceOpsViewState,
+      queueItems: mergedItems
+    };
+    return nextItem;
+  }
+
+  function buildComplianceOpsQueueItem(draft, options = {}) {
+    const nextDraft = normalizeComplianceOpsAdminDraft(draft);
+    const selectedItem = findComplianceOpsQueueItem(options.id || complianceOpsViewState.selectedAdminChangeId);
+    const now = new Date().toISOString();
+    const id =
+      String(options.id || selectedItem?.id || "").trim() ||
+      `compliance-change-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    const requestedAction =
+      nextDraft.changeKind === "exception" ? "exception_proposal" : "attestation_proposal";
+    const subjectLabel = nextDraft.changeKind === "exception" ? "exception" : "attestation";
+    return {
+      id,
+      ownerDomain: "complianceops",
+      kind: "compliance",
+      label: "Attestation And Exception Draft",
+      requestedAction,
+      subjectId: nextDraft.subjectId,
+      subjectLabel,
+      targetScope: nextDraft.targetScope,
+      targetLabel: "scope",
+      changeKind: nextDraft.changeKind,
+      controlBoundary: nextDraft.controlBoundary,
+      status: String(options.status || selectedItem?.status || "draft").trim().toLowerCase(),
+      reason: nextDraft.reason,
+      summary: `${
+        nextDraft.changeKind === "exception" ? "Exception" : "Attestation"
+      } ${nextDraft.subjectId || "proposal"} for ${nextDraft.targetScope} @ ${nextDraft.controlBoundary}`,
+      simulationSummary: String(options.simulationSummary || selectedItem?.simulationSummary || "").trim(),
+      createdAt: String(options.createdAt || selectedItem?.createdAt || now).trim(),
+      simulatedAt: String(options.simulatedAt || selectedItem?.simulatedAt || "").trim(),
+      updatedAt: String(options.updatedAt || now).trim(),
+      routedAt: String(options.routedAt || selectedItem?.routedAt || "").trim(),
+      decision:
+        options.decision === null
+          ? null
+          : options.decision || (selectedItem?.decision && typeof selectedItem.decision === "object" ? selectedItem.decision : null),
+      execution:
+        options.execution === null
+          ? null
+          : options.execution || (selectedItem?.execution && typeof selectedItem.execution === "object" ? selectedItem.execution : null),
+      receipt:
+        options.receipt === null
+          ? null
+          : options.receipt || (selectedItem?.receipt && typeof selectedItem.receipt === "object" ? selectedItem.receipt : null),
+      rollback:
+        options.rollback === null
+          ? null
+          : options.rollback || (selectedItem?.rollback && typeof selectedItem.rollback === "object" ? selectedItem.rollback : null),
+      history:
+        options.history === null
+          ? []
+          : Array.isArray(options.history)
+            ? options.history
+            : Array.isArray(selectedItem?.history)
+              ? selectedItem.history
+              : []
+    };
+  }
+
+  const validateComplianceOpsAdminDraft = (draft) => {
+    const nextDraft = normalizeComplianceOpsAdminDraft(draft);
+    const snapshot = getCurrentComplianceOpsSnapshot();
+    const currentScope = snapshot?.admin?.currentScope || {};
+    const subjectOptions =
+      nextDraft.changeKind === "exception"
+        ? Array.isArray(currentScope.exceptionOptions)
+          ? currentScope.exceptionOptions
+          : []
+        : Array.isArray(currentScope.attestationOptions)
+          ? currentScope.attestationOptions
+          : [];
+    const targetScopeOptions = Array.isArray(currentScope.targetScopeOptions) ? currentScope.targetScopeOptions : [];
+    const controlBoundaryOptions = Array.isArray(currentScope.controlBoundaryOptions)
+      ? currentScope.controlBoundaryOptions
+      : [];
+    if (!nextDraft.subjectId) {
+      return nextDraft.changeKind === "exception"
+        ? "Exception profile is required before saving a ComplianceOps admin proposal."
+        : "Attestation candidate is required before saving a ComplianceOps admin proposal.";
+    }
+    if (subjectOptions.length > 0 && !subjectOptions.some((item) => String(item?.value || "").trim() === nextDraft.subjectId)) {
+      return nextDraft.changeKind === "exception"
+        ? "Exception profile must be selected from the loaded ComplianceOps scope before saving a proposal."
+        : "Attestation candidate must be selected from the loaded ComplianceOps scope before saving a proposal.";
+    }
+    if (!nextDraft.targetScope) {
+      return "Target scope is required before saving a ComplianceOps admin proposal.";
+    }
+    if (targetScopeOptions.length > 0 && !targetScopeOptions.some((item) => String(item?.value || "").trim() === nextDraft.targetScope)) {
+      return "Target scope must be selected from the loaded ComplianceOps scope before saving a proposal.";
+    }
+    if (!nextDraft.controlBoundary) {
+      return "Control boundary is required before saving a ComplianceOps admin proposal.";
+    }
+    if (
+      controlBoundaryOptions.length > 0 &&
+      !controlBoundaryOptions.some((item) => String(item?.value || "").trim() === nextDraft.controlBoundary)
+    ) {
+      return "Control boundary must be selected from the loaded ComplianceOps scope before saving a proposal.";
+    }
+    if (!String(nextDraft.reason || "").trim()) {
+      return "Reason is required before saving a ComplianceOps admin proposal.";
+    }
+    return "";
+  };
+
+  const buildComplianceOpsSimulation = (item, draft) => {
+    const queueItem = item && typeof item === "object" ? item : {};
+    const nextDraft = normalizeComplianceOpsAdminDraft(draft);
+    const snapshot = getCurrentComplianceOpsSnapshot();
+    const currentScope = snapshot?.admin?.currentScope || {};
+    const findings = [
+      "Execution remains blocked until GovernanceOps records an explicit approved decision receipt for this compliance proposal."
+    ];
+    if (nextDraft.changeKind === "exception") {
+      findings.push("Exception preview only. Live exception activation remains blocked in this slice until a later apply path opens.");
+    } else {
+      findings.push("Attestation preview only. Live attestation issuance remains blocked in this slice until a later apply path opens.");
+    }
+    if ((currentScope.gapCount || 0) > 0) {
+      findings.push(
+        `Current compliance posture already shows ${String(currentScope.gapCount || 0)} gap(s); review obligation drift before mutating formal compliance posture.`
+      );
+    }
+    if ((currentScope.blockedCount || 0) > 0) {
+      findings.push(
+        `Current compliance posture includes ${String(currentScope.blockedCount || 0)} blocked control record(s); missing proof or policy blockers still exist.`
+      );
+    }
+    if ((currentScope.pendingApprovalCount || 0) > 0) {
+      findings.push(
+        `There are ${String(currentScope.pendingApprovalCount || 0)} pending approval-bound control anchor(s) that may affect final attestation or exception scope.`
+      );
+    }
+    if (nextDraft.changeKind === "exception" && (currentScope.exceptionOptions?.length || 0) === 0) {
+      findings.push("No bounded exception profile is currently loaded for this desktop scope.");
+    }
+    if (nextDraft.changeKind === "attestation" && (currentScope.attestationOptions?.length || 0) === 0) {
+      findings.push("No bounded attestation candidate is currently loaded for this desktop scope.");
+    }
+    if ((currentScope.residencyExceptionCount || 0) > 0 || (currentScope.legalHoldExceptionCount || 0) > 0) {
+      findings.push("Existing disclosure exceptions are present and should be reviewed before mutating formal compliance posture.");
+    }
+    const tone =
+      (currentScope.gapCount || 0) > 0 ||
+      (currentScope.blockedCount || 0) > 0 ||
+      (currentScope.pendingApprovalCount || 0) > 0 ||
+      (nextDraft.changeKind === "exception" && (currentScope.exceptionOptions?.length || 0) === 0) ||
+      (nextDraft.changeKind === "attestation" && (currentScope.attestationOptions?.length || 0) === 0)
+        ? "warn"
+        : "info";
+    return {
+      changeId: String(queueItem.id || "").trim(),
+      kind: "compliance",
+      tone,
+      title: "Compliance admin dry-run",
+      summary: `Preview only. This ${
+        nextDraft.changeKind === "exception" ? "exception" : "attestation"
+      } proposal requires GovernanceOps approval before any live compliance change can execute.`,
+      updatedAt: new Date().toISOString(),
+      facts: [
+        { label: "change", value: nextDraft.changeKind },
+        { label: "proposal", value: nextDraft.subjectId, code: true },
+        { label: "scope", value: nextDraft.targetScope, code: true },
+        { label: "boundary", value: nextDraft.controlBoundary, code: true },
+        { label: "covered", value: String(currentScope.coveredCount || 0) },
+        { label: "blocked", value: String(currentScope.blockedCount || 0) },
+        { label: "gaps", value: String(currentScope.gapCount || 0) },
+        { label: "export profiles", value: String(currentScope.exportProfileCount || 0) }
+      ],
+      findings
+    };
+  };
+
+  const loadComplianceOpsQueueItemIntoDraft = (changeId) => {
+    const item = findComplianceOpsQueueItem(changeId);
+    if (!item) {
+      setComplianceOpsFeedback("warn", "The selected ComplianceOps admin proposal is no longer available.");
+      return false;
+    }
+    complianceOpsViewState = {
+      ...complianceOpsViewState,
+      selectedAdminChangeId: String(item.id || "").trim(),
+      recoveryReason: "",
+      adminDraft: normalizeComplianceOpsAdminDraft({
+        changeKind: item.changeKind,
+        subjectId: item.subjectId,
+        targetScope: item.targetScope,
+        controlBoundary: item.controlBoundary,
+        reason: item.reason
+      }),
+      latestSimulation:
+        String(complianceOpsViewState.latestSimulation?.changeId || "").trim() === String(item.id || "").trim()
+          ? complianceOpsViewState.latestSimulation
+          : null,
+      feedback: {
+        tone: "info",
+        message: `Loaded queued ComplianceOps proposal ${String(item.id || "").trim()} into the active draft editor.`
+      }
+    };
+    renderComplianceOpsPanel();
+    return true;
+  };
+
+  const saveComplianceOpsDraft = () => {
+    const draft = normalizeComplianceOpsAdminDraft(complianceOpsViewState.adminDraft);
+    const validationError = validateComplianceOpsAdminDraft(draft);
+    if (validationError) {
+      setComplianceOpsFeedback("warn", validationError);
+      return null;
+    }
+    const queueItem = buildComplianceOpsQueueItem(draft, { status: "draft" });
+    upsertComplianceOpsQueueItem(queueItem);
+    complianceOpsViewState = {
+      ...complianceOpsViewState,
+      selectedAdminChangeId: String(queueItem.id || "").trim(),
+      recoveryReason: "",
+      latestSimulation: null,
+      feedback: {
+        tone: "ok",
+        message: `ComplianceOps draft saved as ${String(queueItem.id || "").trim()}.`
+      }
+    };
+    renderComplianceOpsPanel();
+    return queueItem;
+  };
+
+  const simulateComplianceOpsDraft = (changeId = "") => {
+    const selectedQueueItem = changeId ? findComplianceOpsQueueItem(changeId) : null;
+    if (selectedQueueItem) {
+      loadComplianceOpsQueueItemIntoDraft(selectedQueueItem.id);
+    }
+    const draft = normalizeComplianceOpsAdminDraft(complianceOpsViewState.adminDraft);
+    const validationError = validateComplianceOpsAdminDraft(draft);
+    if (validationError) {
+      setComplianceOpsFeedback("warn", validationError);
+      return null;
+    }
+    const queueItem = buildComplianceOpsQueueItem(draft, {
+      id: selectedQueueItem?.id || String(complianceOpsViewState.selectedAdminChangeId || "").trim(),
+      status: "simulated"
+    });
+    const simulation = buildComplianceOpsSimulation(queueItem, draft);
+    upsertComplianceOpsQueueItem({
+      ...queueItem,
+      status: "simulated",
+      simulationSummary: simulation.summary,
+      simulatedAt: simulation.updatedAt
+    });
+    complianceOpsViewState = {
+      ...complianceOpsViewState,
+      selectedAdminChangeId: String(queueItem.id || "").trim(),
+      recoveryReason: "",
+      latestSimulation: simulation,
+      feedback: {
+        tone: simulation.tone,
+        message: `Compliance dry-run is ready for ${String(queueItem.id || "").trim()}.`
+      }
+    };
+    renderComplianceOpsPanel();
+    return simulation;
+  };
+
+  const routeComplianceOpsDraftToGovernance = (changeId = "") => {
+    const selectedQueueItem = changeId ? findComplianceOpsQueueItem(changeId) : null;
+    const simulation = complianceOpsViewState.latestSimulation;
+    const matchingSimulation =
+      simulation &&
+      String(simulation.kind || "").trim().toLowerCase() === "compliance" &&
+      String(simulation.changeId || "").trim() &&
+      (!selectedQueueItem || String(simulation.changeId || "").trim() === String(selectedQueueItem.id || "").trim());
+    if (!matchingSimulation) {
+      setComplianceOpsFeedback("warn", "Run a bounded dry-run for the active ComplianceOps admin proposal before routing it to GovernanceOps.");
+      return false;
+    }
+    const queueItem =
+      selectedQueueItem ||
+      buildComplianceOpsQueueItem(complianceOpsViewState.adminDraft, {
+        id: String(complianceOpsViewState.selectedAdminChangeId || "").trim(),
+        status: "simulated",
+        simulationSummary: simulation.summary
+      });
+    upsertComplianceOpsQueueItem({
+      ...queueItem,
+      status: "routed",
+      simulationSummary: simulation.summary,
+      routedAt: new Date().toISOString(),
+      decision: null,
+      execution: null,
+      receipt: null,
+      rollback: null
+    });
+    complianceOpsViewState = {
+      ...complianceOpsViewState,
+      selectedAdminChangeId: String(queueItem.id || "").trim(),
+      recoveryReason: "",
+      feedback: {
+        tone: "warn",
+        message: `Compliance admin proposal ${String(queueItem.id || "").trim()} routed to GovernanceOps. Apply remains blocked until an explicit governance approval lands.`
+      }
+    };
+    governanceOpsViewState = {
+      ...governanceOpsViewState,
+      selectedAdminChangeId: String(queueItem.id || "").trim()
+    };
+    setGovernanceOpsFeedback(
+      "warn",
+      `Compliance admin proposal routed from ComplianceOps: changeId=${String(queueItem.id || "").trim()}; action=${String(queueItem.requestedAction || "").trim()}; proposal=${String(queueItem.subjectId || "").trim()}; scope=${String(queueItem.targetScope || "").trim()}. Governance approval is now required before apply can proceed.`
+    );
+    renderComplianceOpsPanel();
+    setWorkspaceView("governanceops", true);
+    return true;
+  };
+
+  const openComplianceOpsGovernanceView = () => {
+    setWorkspaceView("governanceops", true);
+  };
+
+  const openComplianceOpsAdminQueueItem = (changeId) => {
+    const queueItem = findComplianceOpsQueueItem(changeId);
+    if (!queueItem) {
+      setComplianceOpsFeedback("warn", "The selected ComplianceOps admin proposal is no longer available.");
+      return false;
+    }
+    loadComplianceOpsQueueItemIntoDraft(changeId);
+    setWorkspaceView("complianceops", true);
+    return true;
+  };
+  const applyApprovedComplianceOpsChange = (changeId) => {
+    const queueItem = findComplianceOpsQueueItem(changeId);
+    if (!queueItem) {
+      setComplianceOpsFeedback("warn", "The selected ComplianceOps admin proposal is no longer available.");
+      return false;
+    }
+    const decision = queueItem?.decision && typeof queueItem.decision === "object" ? queueItem.decision : null;
+    if (String(queueItem.status || "").trim().toLowerCase() !== "approved" || !String(decision?.approvalReceiptId || "").trim()) {
+      setComplianceOpsFeedback("warn", "Apply is only available after GovernanceOps records an explicit approved decision receipt.");
+      return false;
+    }
+    if (String(queueItem?.receipt?.receiptId || "").trim()) {
+      setComplianceOpsFeedback("warn", `Compliance admin change ${String(queueItem.id || "").trim()} already has an admin receipt.`);
+      return false;
+    }
+    const actorRef = complianceOpsActorRef();
+    const executedAt = new Date().toISOString();
+    const executionId = `admin-execution-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    const receiptId = `admin-receipt-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    const executionSummary = `${String(queueItem.requestedAction || "").trim()} applied for ${String(queueItem.targetScope || "").trim()} @ ${String(queueItem.controlBoundary || "").trim()}.`;
+    const receipt = {
+      receiptId,
+      issuedAt: executedAt,
+      summary: executionSummary,
+      stableRef: `${String(queueItem.id || "").trim()}/${receiptId}`,
+      approvalReceiptId: String(decision.approvalReceiptId || "").trim(),
+      executionId
+    };
+    upsertComplianceOpsQueueItem({
+      ...queueItem,
+      status: "applied",
+      updatedAt: executedAt,
+      execution: {
+        executionId,
+        executedAt,
+        status: "applied",
+        summary: executionSummary,
+        actorRef
+      },
+      receipt
+    });
+    complianceOpsViewState = {
+      ...complianceOpsViewState,
+      selectedAdminChangeId: String(queueItem.id || "").trim(),
+      recoveryReason: "",
+      feedback: {
+        tone: "ok",
+        message: `Approved ComplianceOps admin change ${String(queueItem.id || "").trim()} applied. Admin receipt ${receiptId} is now available.`
+      }
+    };
+    governanceOpsViewState = {
+      ...governanceOpsViewState,
+      selectedAdminChangeId: String(queueItem.id || "").trim()
+    };
+    setGovernanceOpsFeedback(
+      "ok",
+      `Compliance admin change ${String(queueItem.id || "").trim()} applied from ComplianceOps. Receipt ${receiptId} is now linked to approval receipt ${String(decision.approvalReceiptId || "").trim()}.`
+    );
+    renderComplianceOpsPanel();
+    return true;
+  };
+  const applyComplianceOpsRecoveryAction = (changeId, action) => {
+    const queueItem = findComplianceOpsQueueItem(changeId);
+    const normalizedAction = String(action || "").trim().toLowerCase();
+    if (!queueItem) {
+      setComplianceOpsFeedback("warn", "The selected ComplianceOps admin proposal is no longer available.");
+      return false;
+    }
+    const status = String(queueItem.status || "").trim().toLowerCase();
+    const existingRecovery = queueItem?.rollback && typeof queueItem.rollback === "object" ? queueItem.rollback : null;
+    const hasReceipt = Boolean(String(queueItem?.receipt?.receiptId || "").trim());
+    if (!hasReceipt) {
+      setComplianceOpsFeedback("warn", "Expiry or renewal is only available after an approved compliance change has been applied and receipted.");
+      return false;
+    }
+    if (normalizedAction === "expiry") {
+      if (status !== "applied") {
+        setComplianceOpsFeedback("warn", "Expiry is only available for applied compliance admin changes.");
+        return false;
+      }
+      if (String(existingRecovery?.rollbackId || "").trim()) {
+        setComplianceOpsFeedback("warn", `Recovery has already been recorded for ComplianceOps admin change ${String(queueItem.id || "").trim()}.`);
+        return false;
+      }
+    } else if (normalizedAction === "renew") {
+      if (status !== "expired" || String(existingRecovery?.action || "").trim().toLowerCase() !== "expiry") {
+        setComplianceOpsFeedback("warn", "Renewal is only available after an applied compliance change has been explicitly expired.");
+        return false;
+      }
+    } else {
+      setComplianceOpsFeedback("warn", "Unsupported recovery action for the selected ComplianceOps admin proposal.");
+      return false;
+    }
+    const reason = String(complianceOpsViewState.recoveryReason || "").trim();
+    if (!reason) {
+      setComplianceOpsFeedback("warn", "Expiry or renewal reason is required before compliance recovery can execute.");
+      return false;
+    }
+    const actorRef = complianceOpsActorRef();
+    const recordedAt = new Date().toISOString();
+    const recoveryId = `${
+      normalizedAction === "renew" ? "admin-renewal" : "admin-expiry"
+    }-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    const nextStatus = normalizedAction === "renew" ? "renewed" : "expired";
+    const summary =
+      normalizedAction === "renew"
+        ? `Renewed ${String(queueItem.requestedAction || "").trim()} for ${String(queueItem.targetScope || "").trim()} @ ${String(queueItem.controlBoundary || "").trim()}.`
+        : `Expired ${String(queueItem.requestedAction || "").trim()} for ${String(queueItem.targetScope || "").trim()} @ ${String(queueItem.controlBoundary || "").trim()}.`;
+    const rollback = {
+      rollbackId: recoveryId,
+      action: normalizedAction,
+      status: nextStatus,
+      rolledBackAt: recordedAt,
+      summary,
+      stableRef: `${String(queueItem.id || "").trim()}/${recoveryId}`,
+      reason,
+      actorRef,
+      approvalReceiptId: String(queueItem?.decision?.approvalReceiptId || "").trim(),
+      adminReceiptId: String(queueItem?.receipt?.receiptId || "").trim(),
+      executionId: String(queueItem?.execution?.executionId || "").trim()
+    };
+    const existingHistory = Array.isArray(queueItem.history) ? queueItem.history : [];
+    const nextHistory = [
+      ...existingHistory,
+      {
+        label: normalizedAction === "renew" ? "Renewal" : "Expiry",
+        at: recordedAt,
+        summary
+      }
+    ];
+    upsertComplianceOpsQueueItem({
+      ...queueItem,
+      status: nextStatus,
+      updatedAt: recordedAt,
+      rollback,
+      history: nextHistory
+    });
+    complianceOpsViewState = {
+      ...complianceOpsViewState,
+      selectedAdminChangeId: String(queueItem.id || "").trim(),
+      recoveryReason: "",
+      feedback: {
+        tone: "ok",
+        message: `${normalizedAction === "renew" ? "Renewal" : "Expiry"} recorded for ComplianceOps admin change ${String(queueItem.id || "").trim()}. Recovery receipt ${recoveryId} is now available.`
+      }
+    };
+    setGovernanceOpsFeedback(
+      "warn",
+      `ComplianceOps recorded ${normalizedAction === "renew" ? "renewal" : "expiry"} for admin change ${String(queueItem.id || "").trim()}. Recovery record ${recoveryId} is linked to approval receipt ${String(rollback.approvalReceiptId || "").trim()}.`
+    );
+    renderComplianceOpsPanel();
+    return true;
+  };
+  const copyComplianceOpsGovernanceReceipt = async (changeId) => {
+    const queueItem = findComplianceOpsQueueItem(changeId);
+    if (!queueItem || !String(queueItem?.decision?.approvalReceiptId || "").trim()) {
+      setComplianceOpsFeedback("warn", "No governance decision receipt is available for the selected ComplianceOps admin change.");
+      return false;
+    }
+    await copyTextToClipboard(buildComplianceOpsGovernanceReceiptText(queueItem));
+    setComplianceOpsFeedback("ok", `Governance decision receipt copied for ComplianceOps admin change ${String(queueItem.id || "").trim()}.`);
+    return true;
+  };
+  const copyComplianceOpsAdminReceipt = async (changeId) => {
+    const queueItem = findComplianceOpsQueueItem(changeId);
+    if (!queueItem || !String(queueItem?.receipt?.receiptId || "").trim()) {
+      setComplianceOpsFeedback("warn", "No admin change receipt is available for the selected ComplianceOps admin change.");
+      return false;
+    }
+    await copyTextToClipboard(buildComplianceOpsAdminReceiptText(queueItem));
+    setComplianceOpsFeedback("ok", `Admin change receipt copied for ComplianceOps admin change ${String(queueItem.id || "").trim()}.`);
+    return true;
+  };
+  const copyComplianceOpsRecoveryReceipt = async (changeId) => {
+    const queueItem = findComplianceOpsQueueItem(changeId);
+    if (!queueItem || !String(queueItem?.rollback?.rollbackId || "").trim()) {
+      setComplianceOpsFeedback("warn", "No expiry or renewal receipt is available for the selected ComplianceOps admin change.");
+      return false;
+    }
+    await copyTextToClipboard(buildComplianceOpsRecoveryReceiptText(queueItem));
+    setComplianceOpsFeedback("ok", `Recovery receipt copied for ComplianceOps admin change ${String(queueItem.id || "").trim()}.`);
+    return true;
+  };
+
+  function getCurrentNetworkOpsSnapshot() {
+    return createNetworkWorkspaceSnapshot({
+      ...latestNetworkOpsContext,
+      viewState: networkOpsViewState
+    });
+  }
+
+  const setNetworkOpsFeedback = (tone, message) => {
+    networkOpsViewState = {
+      ...networkOpsViewState,
+      feedback: message
+        ? {
+            tone: String(tone || "info").trim().toLowerCase(),
+            message: String(message || "").trim()
+          }
+        : null
+    };
+    renderNetworkOpsPanel();
+  };
+  const setNetworkOpsRecoveryReason = (value) => {
+    networkOpsViewState = {
+      ...networkOpsViewState,
+      recoveryReason: String(value || "").trimStart()
+    };
+  };
+
+  const normalizeNetworkOpsAdminDraft = (draft = {}) => {
+    const snapshot = getCurrentNetworkOpsSnapshot();
+    const currentScope = snapshot?.admin?.currentScope || {};
+    const input = draft && typeof draft === "object" ? draft : {};
+    return {
+      changeKind: "probe",
+      boundaryPathId:
+        String(input.boundaryPathId || "").trim() ||
+        String(currentScope.currentBoundaryPath || currentScope.boundaryPathOptions?.[0]?.value || "gateway_path").trim(),
+      targetScope:
+        String(input.targetScope || "").trim() ||
+        String(currentScope.defaultTargetScope || "workspace").trim() ||
+        "workspace",
+      targetEndpointId:
+        String(input.targetEndpointId || "").trim() ||
+        String(currentScope.endpointOptions?.[0]?.value || "").trim(),
+      reason: String(input.reason || "").trimStart()
+    };
+  };
+
+  const updateNetworkOpsDraftField = (field, value) => {
+    const normalizedField = String(field || "").trim();
+    if (!normalizedField) {
+      return;
+    }
+    const nextDraft = normalizeNetworkOpsAdminDraft({
+      ...networkOpsViewState.adminDraft,
+      [normalizedField]: value
+    });
+    networkOpsViewState = {
+      ...networkOpsViewState,
+      adminDraft: nextDraft,
+      latestSimulation: null,
+      feedback: null
+    };
+    renderNetworkOpsPanel();
+  };
+
+  function findNetworkOpsQueueItem(changeId) {
+    const normalizedChangeId = String(changeId || "").trim();
+    if (!normalizedChangeId) {
+      return null;
+    }
+    return (
+      (Array.isArray(networkOpsViewState.queueItems) ? networkOpsViewState.queueItems : []).find(
+        (item) => String(item?.id || "").trim() === normalizedChangeId
+      ) || null
+    );
+  }
+
+  function upsertNetworkOpsQueueItem(nextItem) {
+    const normalizedId = String(nextItem?.id || "").trim();
+    if (!normalizedId) {
+      return null;
+    }
+    const existingItems = Array.isArray(networkOpsViewState.queueItems) ? networkOpsViewState.queueItems : [];
+    const remainingItems = existingItems.filter((item) => String(item?.id || "").trim() !== normalizedId);
+    const mergedItems = [nextItem, ...remainingItems].sort((left, right) => {
+      const leftTime = new Date(left?.updatedAt || left?.createdAt || 0).getTime();
+      const rightTime = new Date(right?.updatedAt || right?.createdAt || 0).getTime();
+      return rightTime - leftTime;
+    });
+    networkOpsViewState = {
+      ...networkOpsViewState,
+      queueItems: mergedItems
+    };
+    return nextItem;
+  }
+
+  function buildNetworkOpsQueueItem(draft, options = {}) {
+    const nextDraft = normalizeNetworkOpsAdminDraft(draft);
+    const snapshot = getCurrentNetworkOpsSnapshot();
+    const currentScope = snapshot?.admin?.currentScope || {};
+    const selectedItem = findNetworkOpsQueueItem(options.id || networkOpsViewState.selectedAdminChangeId);
+    const now = new Date().toISOString();
+    const id =
+      String(options.id || selectedItem?.id || "").trim() ||
+      `network-change-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    const boundaryOption =
+      (Array.isArray(currentScope.boundaryPathOptions) ? currentScope.boundaryPathOptions : []).find(
+        (item) => String(item?.value || "").trim() === nextDraft.boundaryPathId
+      ) || null;
+    const endpointOption =
+      (Array.isArray(currentScope.endpointOptions) ? currentScope.endpointOptions : []).find(
+        (item) => String(item?.value || "").trim() === nextDraft.targetEndpointId
+      ) || null;
+    return {
+      id,
+      ownerDomain: "networkops",
+      kind: "network",
+      label: "Probe Request Draft",
+      requestedAction: `probe ${nextDraft.boundaryPathId || "boundary"} ${nextDraft.targetEndpointId || ""}`.trim(),
+      subjectId: nextDraft.boundaryPathId,
+      subjectLabel: "boundary",
+      targetScope: nextDraft.targetScope,
+      targetLabel: "scope",
+      changeKind: "probe",
+      boundaryPathId: nextDraft.boundaryPathId,
+      boundaryPathLabel: String(boundaryOption?.label || nextDraft.boundaryPathId).trim(),
+      targetEndpointId: nextDraft.targetEndpointId,
+      targetEndpointLabel: String(endpointOption?.label || nextDraft.targetEndpointId).trim(),
+      status: String(options.status || selectedItem?.status || "draft").trim().toLowerCase(),
+      reason: nextDraft.reason,
+      summary: `Probe ${String(boundaryOption?.label || nextDraft.boundaryPathId || "boundary").trim()} against ${String(endpointOption?.label || nextDraft.targetEndpointId || "endpoint").trim()} within ${nextDraft.targetScope}`,
+      simulationSummary: String(options.simulationSummary || selectedItem?.simulationSummary || "").trim(),
+      createdAt: String(options.createdAt || selectedItem?.createdAt || now).trim(),
+      simulatedAt: String(options.simulatedAt || selectedItem?.simulatedAt || "").trim(),
+      updatedAt: String(options.updatedAt || now).trim(),
+      routedAt: String(options.routedAt || selectedItem?.routedAt || "").trim(),
+      decision:
+        options.decision === null
+          ? null
+          : options.decision || (selectedItem?.decision && typeof selectedItem.decision === "object" ? selectedItem.decision : null),
+      execution:
+        options.execution === null
+          ? null
+          : options.execution || (selectedItem?.execution && typeof selectedItem.execution === "object" ? selectedItem.execution : null),
+      receipt:
+        options.receipt === null
+          ? null
+          : options.receipt || (selectedItem?.receipt && typeof selectedItem.receipt === "object" ? selectedItem.receipt : null),
+      rollback:
+        options.rollback === null
+          ? null
+          : options.rollback || (selectedItem?.rollback && typeof selectedItem.rollback === "object" ? selectedItem.rollback : null)
+    };
+  }
+
+  const validateNetworkOpsAdminDraft = (draft) => {
+    const nextDraft = normalizeNetworkOpsAdminDraft(draft);
+    const snapshot = getCurrentNetworkOpsSnapshot();
+    const currentScope = snapshot?.admin?.currentScope || {};
+    const boundaryPathOptions = Array.isArray(currentScope.boundaryPathOptions) ? currentScope.boundaryPathOptions : [];
+    const endpointOptions = Array.isArray(currentScope.endpointOptions) ? currentScope.endpointOptions : [];
+    if (!nextDraft.boundaryPathId) {
+      return "Boundary path is required before saving a NetworkOps admin proposal.";
+    }
+    if (
+      boundaryPathOptions.length > 0 &&
+      !boundaryPathOptions.some((item) => String(item?.value || "").trim() === nextDraft.boundaryPathId)
+    ) {
+      return "Boundary path must be selected from the loaded NetworkOps scope before saving a proposal.";
+    }
+    if (!nextDraft.targetEndpointId) {
+      return "Target endpoint is required before saving a NetworkOps admin proposal.";
+    }
+    if (
+      endpointOptions.length > 0 &&
+      !endpointOptions.some((item) => String(item?.value || "").trim() === nextDraft.targetEndpointId)
+    ) {
+      return "Target endpoint must be selected from the loaded NetworkOps scope before saving a proposal.";
+    }
+    if (!nextDraft.targetScope) {
+      return "Target scope is required before saving a NetworkOps admin proposal.";
+    }
+    if (!String(nextDraft.reason || "").trim()) {
+      return "Reason is required before saving a NetworkOps admin proposal.";
+    }
+    return "";
+  };
+
+  const buildNetworkOpsSimulation = (item, draft) => {
+    const queueItem = item && typeof item === "object" ? item : {};
+    const nextDraft = normalizeNetworkOpsAdminDraft(draft);
+    const snapshot = getCurrentNetworkOpsSnapshot();
+    const currentScope = snapshot?.admin?.currentScope || {};
+    const endpointOption =
+      (Array.isArray(currentScope.endpointOptions) ? currentScope.endpointOptions : []).find(
+        (entry) => String(entry?.value || "").trim() === nextDraft.targetEndpointId
+      ) || null;
+    const findings = [
+      "Execution remains blocked until GovernanceOps records an explicit approved decision receipt for this network probe proposal."
+    ];
+    if (String(endpointOption?.state || "").trim().toLowerCase() === "warn") {
+      findings.push("Selected endpoint already shows warning posture in the loaded NetworkOps scope.");
+    }
+    if (String(endpointOption?.state || "").trim().toLowerCase() === "error") {
+      findings.push("Selected endpoint already shows error posture in the loaded NetworkOps scope.");
+    }
+    if ((currentScope.degradedProviderCount || 0) > 0) {
+      findings.push(
+        `Provider readiness already shows ${String(currentScope.degradedProviderCount || 0)} degraded provider(s) across the active network surface.`
+      );
+    }
+    if ((currentScope.trustWarningCount || 0) > 0 || (currentScope.secureSecretMissingCount || 0) > 0) {
+      findings.push("Trust posture already includes warning or missing-secret signals that should be reviewed before any live probe opens.");
+    }
+    if (String(currentScope.directFallbackState || "").trim().toLowerCase() === "available") {
+      findings.push("Direct provider fallback is available on the current network surface and should be considered during probe review.");
+    }
+    const tone =
+      String(endpointOption?.state || "").trim().toLowerCase() === "warn" ||
+      String(endpointOption?.state || "").trim().toLowerCase() === "error" ||
+      (currentScope.degradedProviderCount || 0) > 0 ||
+      (currentScope.trustWarningCount || 0) > 0 ||
+      (currentScope.secureSecretMissingCount || 0) > 0 ||
+      String(currentScope.directFallbackState || "").trim().toLowerCase() === "available"
+        ? "warn"
+        : "info";
+    return {
+      changeId: String(queueItem.id || "").trim(),
+      kind: "network",
+      tone,
+      title: "Network admin dry-run",
+      summary: `Preview only. This bounded probe request requires GovernanceOps approval before any live network probe can execute.`,
+      updatedAt: new Date().toISOString(),
+      facts: [
+        { label: "boundary", value: nextDraft.boundaryPathId, code: true },
+        { label: "endpoint", value: nextDraft.targetEndpointId, code: true },
+        { label: "scope", value: nextDraft.targetScope, code: true },
+        { label: "provider", value: String(currentScope.selectedProviderId || "-").trim() || "-", code: true },
+        { label: "reachable", value: String(currentScope.reachableEndpointCount || 0) },
+        { label: "degraded providers", value: String(currentScope.degradedProviderCount || 0) },
+        { label: "trust warnings", value: String(currentScope.trustWarningCount || 0) },
+        { label: "fallback", value: String(currentScope.directFallbackState || "-").trim() || "-" }
+      ],
+      findings
+    };
+  };
+
+  const loadNetworkOpsQueueItemIntoDraft = (changeId) => {
+    const item = findNetworkOpsQueueItem(changeId);
+    if (!item) {
+      setNetworkOpsFeedback("warn", "The selected NetworkOps admin proposal is no longer available.");
+      return false;
+    }
+    networkOpsViewState = {
+      ...networkOpsViewState,
+      selectedAdminChangeId: String(item.id || "").trim(),
+      adminDraft: normalizeNetworkOpsAdminDraft({
+        boundaryPathId: item.boundaryPathId || item.subjectId,
+        targetScope: item.targetScope,
+        targetEndpointId: item.targetEndpointId,
+        reason: item.reason
+      }),
+      latestSimulation:
+        String(networkOpsViewState.latestSimulation?.changeId || "").trim() === String(item.id || "").trim()
+          ? networkOpsViewState.latestSimulation
+          : null,
+      feedback: {
+        tone: "info",
+        message: `Loaded queued NetworkOps proposal ${String(item.id || "").trim()} into the active draft editor.`
+      }
+    };
+    renderNetworkOpsPanel();
+    return true;
+  };
+
+  const saveNetworkOpsDraft = () => {
+    const draft = normalizeNetworkOpsAdminDraft(networkOpsViewState.adminDraft);
+    const validationError = validateNetworkOpsAdminDraft(draft);
+    if (validationError) {
+      setNetworkOpsFeedback("warn", validationError);
+      return null;
+    }
+    const queueItem = buildNetworkOpsQueueItem(draft, { status: "draft" });
+    upsertNetworkOpsQueueItem(queueItem);
+    networkOpsViewState = {
+      ...networkOpsViewState,
+      selectedAdminChangeId: String(queueItem.id || "").trim(),
+      latestSimulation: null,
+      feedback: {
+        tone: "ok",
+        message: `NetworkOps draft saved as ${String(queueItem.id || "").trim()}.`
+      }
+    };
+    renderNetworkOpsPanel();
+    return queueItem;
+  };
+
+  const simulateNetworkOpsDraft = (changeId = "") => {
+    const selectedQueueItem = changeId ? findNetworkOpsQueueItem(changeId) : null;
+    if (selectedQueueItem) {
+      loadNetworkOpsQueueItemIntoDraft(selectedQueueItem.id);
+    }
+    const draft = normalizeNetworkOpsAdminDraft(networkOpsViewState.adminDraft);
+    const validationError = validateNetworkOpsAdminDraft(draft);
+    if (validationError) {
+      setNetworkOpsFeedback("warn", validationError);
+      return null;
+    }
+    const queueItem = buildNetworkOpsQueueItem(draft, {
+      id: selectedQueueItem?.id || String(networkOpsViewState.selectedAdminChangeId || "").trim(),
+      status: "simulated"
+    });
+    const simulation = buildNetworkOpsSimulation(queueItem, draft);
+    upsertNetworkOpsQueueItem({
+      ...queueItem,
+      status: "simulated",
+      simulationSummary: simulation.summary,
+      simulatedAt: simulation.updatedAt
+    });
+    networkOpsViewState = {
+      ...networkOpsViewState,
+      selectedAdminChangeId: String(queueItem.id || "").trim(),
+      latestSimulation: simulation,
+      feedback: {
+        tone: simulation.tone,
+        message: `Network dry-run is ready for ${String(queueItem.id || "").trim()}.`
+      }
+    };
+    renderNetworkOpsPanel();
+    return simulation;
+  };
+
+  const routeNetworkOpsDraftToGovernance = (changeId = "") => {
+    const selectedQueueItem = changeId ? findNetworkOpsQueueItem(changeId) : null;
+    const simulation = networkOpsViewState.latestSimulation;
+    const matchingSimulation =
+      simulation &&
+      String(simulation.kind || "").trim().toLowerCase() === "network" &&
+      String(simulation.changeId || "").trim() &&
+      (!selectedQueueItem || String(simulation.changeId || "").trim() === String(selectedQueueItem.id || "").trim());
+    if (!matchingSimulation) {
+      setNetworkOpsFeedback("warn", "Run a bounded dry-run for the active NetworkOps admin proposal before routing it to GovernanceOps.");
+      return false;
+    }
+    const queueItem =
+      selectedQueueItem ||
+      buildNetworkOpsQueueItem(networkOpsViewState.adminDraft, {
+        id: String(networkOpsViewState.selectedAdminChangeId || "").trim(),
+        status: "simulated",
+        simulationSummary: simulation.summary
+      });
+    upsertNetworkOpsQueueItem({
+      ...queueItem,
+      status: "routed",
+      simulationSummary: simulation.summary,
+      routedAt: new Date().toISOString(),
+      decision: null,
+      execution: null,
+      receipt: null,
+      rollback: null
+    });
+    networkOpsViewState = {
+      ...networkOpsViewState,
+      selectedAdminChangeId: String(queueItem.id || "").trim(),
+      feedback: {
+        tone: "warn",
+        message: `Network admin proposal ${String(queueItem.id || "").trim()} routed to GovernanceOps. Probe execution remains blocked until an explicit governance approval lands.`
+      }
+    };
+    governanceOpsViewState = {
+      ...governanceOpsViewState,
+      selectedAdminChangeId: String(queueItem.id || "").trim()
+    };
+    setGovernanceOpsFeedback(
+      "warn",
+      `Network admin proposal routed from NetworkOps: changeId=${String(queueItem.id || "").trim()}; action=${String(queueItem.requestedAction || "").trim()}; boundary=${String(queueItem.subjectId || "").trim()}; scope=${String(queueItem.targetScope || "").trim()}. Governance approval is now required before any live network probe can proceed.`
+    );
+    renderNetworkOpsPanel();
+    setWorkspaceView("governanceops", true);
+    return true;
+  };
+
+  const openNetworkOpsGovernanceView = () => {
+    setWorkspaceView("governanceops", true);
+  };
+
+  const openNetworkOpsAdminQueueItem = (changeId) => {
+    const queueItem = findNetworkOpsQueueItem(changeId);
+    if (!queueItem) {
+      setNetworkOpsFeedback("warn", "The selected NetworkOps admin proposal is no longer available.");
+      return false;
+    }
+    loadNetworkOpsQueueItemIntoDraft(changeId);
+    setWorkspaceView("networkops", true);
+    return true;
+  };
+
+  const applyApprovedNetworkOpsChange = (changeId) => {
+    const queueItem = findNetworkOpsQueueItem(changeId);
+    if (!queueItem) {
+      setNetworkOpsFeedback("warn", "The selected NetworkOps admin proposal is no longer available.");
+      return false;
+    }
+    const decision = queueItem?.decision && typeof queueItem.decision === "object" ? queueItem.decision : null;
+    if (String(queueItem.status || "").trim().toLowerCase() !== "approved" || !String(decision?.approvalReceiptId || "").trim()) {
+      setNetworkOpsFeedback("warn", "Apply is only available after GovernanceOps records an explicit approved decision receipt.");
+      return false;
+    }
+    if (String(queueItem?.receipt?.receiptId || "").trim()) {
+      setNetworkOpsFeedback("warn", `Network admin change ${String(queueItem.id || "").trim()} already has a result receipt.`);
+      return false;
+    }
+    const actorRef = networkOpsActorRef();
+    const executedAt = new Date().toISOString();
+    const executionId = `admin-execution-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    const receiptId = `admin-receipt-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    const executionSummary = `Executed bounded probe ${String(queueItem.subjectId || queueItem.boundaryPathId || "").trim()} -> ${String(queueItem.targetEndpointId || "").trim()} within ${String(queueItem.targetScope || "").trim()}.`;
+    const receipt = {
+      receiptId,
+      issuedAt: executedAt,
+      summary: executionSummary,
+      stableRef: `${String(queueItem.id || "").trim()}/${receiptId}`,
+      approvalReceiptId: String(decision.approvalReceiptId || "").trim(),
+      executionId
+    };
+    upsertNetworkOpsQueueItem({
+      ...queueItem,
+      status: "applied",
+      updatedAt: executedAt,
+      execution: {
+        executionId,
+        executedAt,
+        status: "completed",
+        summary: executionSummary,
+        actorRef
+      },
+      receipt
+    });
+    networkOpsViewState = {
+      ...networkOpsViewState,
+      selectedAdminChangeId: String(queueItem.id || "").trim(),
+      recoveryReason: "",
+      feedback: {
+        tone: "ok",
+        message: `Approved network admin change ${String(queueItem.id || "").trim()} applied. Result receipt ${receiptId} is now available.`
+      }
+    };
+    governanceOpsViewState = {
+      ...governanceOpsViewState,
+      selectedAdminChangeId: String(queueItem.id || "").trim()
+    };
+    setGovernanceOpsFeedback(
+      "ok",
+      `Network admin change ${String(queueItem.id || "").trim()} applied from NetworkOps. Result receipt ${receiptId} is now linked to approval receipt ${String(decision.approvalReceiptId || "").trim()}.`
+    );
+    renderNetworkOpsPanel();
+    return true;
+  };
+
+  const applyNetworkOpsRecoveryAction = (changeId, action) => {
+    const queueItem = findNetworkOpsQueueItem(changeId);
+    const normalizedAction = String(action || "").trim().toLowerCase();
+    if (!queueItem) {
+      setNetworkOpsFeedback("warn", "The selected NetworkOps admin proposal is no longer available.");
+      return false;
+    }
+    if (String(queueItem.status || "").trim().toLowerCase() !== "applied" || !String(queueItem?.receipt?.receiptId || "").trim()) {
+      setNetworkOpsFeedback("warn", "Rollback is only available after an approved network change has been applied and receipted.");
+      return false;
+    }
+    if (String(queueItem?.rollback?.rollbackId || "").trim()) {
+      setNetworkOpsFeedback("warn", `Recovery has already been recorded for NetworkOps admin change ${String(queueItem.id || "").trim()}.`);
+      return false;
+    }
+    if (normalizedAction !== "rollback") {
+      setNetworkOpsFeedback("warn", "Unsupported recovery action for the selected NetworkOps admin proposal.");
+      return false;
+    }
+    const reason = String(networkOpsViewState.recoveryReason || "").trim();
+    if (!reason) {
+      setNetworkOpsFeedback("warn", "Rollback reason is required before network recovery can execute.");
+      return false;
+    }
+    const actorRef = networkOpsActorRef();
+    const rolledBackAt = new Date().toISOString();
+    const rollbackId = `admin-rollback-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    const rollback = {
+      rollbackId,
+      action: "rollback",
+      status: "rolled_back",
+      rolledBackAt,
+      summary: `Rolled back ${String(queueItem.requestedAction || "").trim()} for ${String(queueItem.targetScope || "").trim()} on ${String(queueItem.targetEndpointId || queueItem.subjectId || "").trim()}.`,
+      stableRef: `${String(queueItem.id || "").trim()}/${rollbackId}`,
+      reason,
+      actorRef,
+      approvalReceiptId: String(queueItem?.decision?.approvalReceiptId || "").trim(),
+      adminReceiptId: String(queueItem?.receipt?.receiptId || "").trim(),
+      executionId: String(queueItem?.execution?.executionId || "").trim()
+    };
+    upsertNetworkOpsQueueItem({
+      ...queueItem,
+      status: "rolled_back",
+      updatedAt: rolledBackAt,
+      rollback
+    });
+    networkOpsViewState = {
+      ...networkOpsViewState,
+      selectedAdminChangeId: String(queueItem.id || "").trim(),
+      recoveryReason: "",
+      feedback: {
+        tone: "ok",
+        message: `Rollback recorded for NetworkOps admin change ${String(queueItem.id || "").trim()}. Recovery receipt ${rollbackId} is now available.`
+      }
+    };
+    setGovernanceOpsFeedback(
+      "warn",
+      `NetworkOps recorded rollback for admin change ${String(queueItem.id || "").trim()}. Recovery record ${rollbackId} is linked to approval receipt ${String(rollback.approvalReceiptId || "").trim()}.`
+    );
+    renderNetworkOpsPanel();
+    return true;
+  };
+
+  async function copyNetworkOpsGovernanceReceipt(changeId) {
+    const queueItem = findNetworkOpsQueueItem(changeId);
+    if (!queueItem || !String(queueItem?.decision?.approvalReceiptId || "").trim()) {
+      setNetworkOpsFeedback("warn", "No governance decision receipt is available for the selected NetworkOps admin change.");
+      return false;
+    }
+    await copyTextToClipboard(buildNetworkOpsGovernanceReceiptText(queueItem));
+    setNetworkOpsFeedback("ok", `Governance decision receipt copied for NetworkOps admin change ${String(queueItem.id || "").trim()}.`);
+    return true;
+  }
+
+  async function copyNetworkOpsResultReceipt(changeId) {
+    const queueItem = findNetworkOpsQueueItem(changeId);
+    if (!queueItem || !String(queueItem?.receipt?.receiptId || "").trim()) {
+      setNetworkOpsFeedback("warn", "No result receipt is available for the selected NetworkOps admin change.");
+      return false;
+    }
+    await copyTextToClipboard(buildNetworkOpsResultReceiptText(queueItem));
+    setNetworkOpsFeedback("ok", `Result receipt copied for NetworkOps admin change ${String(queueItem.id || "").trim()}.`);
+    return true;
+  }
+
+  async function copyNetworkOpsRollbackReceipt(changeId) {
+    const queueItem = findNetworkOpsQueueItem(changeId);
+    if (!queueItem || !String(queueItem?.rollback?.rollbackId || "").trim()) {
+      setNetworkOpsFeedback("warn", "No rollback receipt is available for the selected NetworkOps admin change.");
+      return false;
+    }
+    await copyTextToClipboard(buildNetworkOpsRollbackReceiptText(queueItem));
+    setNetworkOpsFeedback("ok", `Rollback receipt copied for NetworkOps admin change ${String(queueItem.id || "").trim()}.`);
+    return true;
+  }
+
   function getCurrentIncidentOpsSnapshot() {
     return createIncidentOpsWorkspaceSnapshot({
       ...latestIncidentOpsContext,
@@ -5230,29 +9241,17 @@ async function main() {
     });
   }
 
-  function getCurrentIncidentOpsEntry(entryId = "") {
-    const snapshot = getCurrentIncidentOpsSnapshot();
-    const resolvedEntryId =
-      String(entryId || "").trim() ||
-      String(snapshot?.selectedIncidentId || "").trim() ||
+function getCurrentIncidentOpsEntry(entryId = "") {
+  const snapshot = getCurrentIncidentOpsSnapshot();
+  const resolvedEntryId =
+    String(entryId || "").trim() ||
+    String(snapshot?.selectedIncidentId || "").trim() ||
       String(snapshot?.activeIncidentBoard?.entryId || "").trim();
     if (!resolvedEntryId) {
       return null;
-    }
-    return store.getIncidentPackageHistoryById(resolvedEntryId);
   }
-
-  function syncIncidentOpsSelectionAfterHistoryChange(entryId = "") {
-    const items = store.getIncidentPackageHistory();
-    const candidateId = String(entryId || incidentOpsViewState.selectedIncidentId || "").trim();
-    const resolvedEntry =
-      items.find((item) => String(item?.id || "").trim() === candidateId) || items[0] || null;
-    incidentOpsViewState = {
-      ...incidentOpsViewState,
-      selectedIncidentId: String(resolvedEntry?.id || "").trim()
-    };
-    renderIncidentOpsPanel();
-  }
+  return store.getIncidentPackageHistoryById(resolvedEntryId);
+}
 
   function buildEvidenceOpsBundleReviewPayload(snapshot = {}) {
     return {
@@ -6121,6 +10120,411 @@ async function main() {
       }
       return false;
     }
+  }
+
+  function governanceAdminQueueItemById(changeId) {
+    return (
+      findIdentityOpsQueueItem(changeId) ||
+      findPlatformOpsQueueItem(changeId) ||
+      findGuardrailOpsQueueItem(changeId) ||
+      findPolicyOpsQueueItem(changeId) ||
+      findComplianceOpsQueueItem(changeId) ||
+      findNetworkOpsQueueItem(changeId)
+    );
+  }
+
+  function governanceOpsActorRef() {
+    return (
+      String(session?.claims?.sub || session?.claims?.email || session?.claims?.client_id || "").trim() ||
+      "governance-reviewer"
+    );
+  }
+
+  function governanceAdminQueueOwnerDomain(queueItem) {
+    return String(queueItem?.ownerDomain || queueItem?.domain || "identityops").trim().toLowerCase() || "identityops";
+  }
+
+  function upsertGovernanceAdminQueueItem(nextItem) {
+    const ownerDomain = governanceAdminQueueOwnerDomain(nextItem);
+    if (ownerDomain === "networkops") {
+      return upsertNetworkOpsQueueItem(nextItem);
+    }
+    if (ownerDomain === "complianceops") {
+      return upsertComplianceOpsQueueItem(nextItem);
+    }
+    if (ownerDomain === "platformops") {
+      return upsertPlatformOpsQueueItem(nextItem);
+    }
+    if (ownerDomain === "guardrailops") {
+      return upsertGuardrailOpsQueueItem(nextItem);
+    }
+    if (ownerDomain === "policyops") {
+      return upsertPolicyOpsQueueItem(nextItem);
+    }
+    return upsertIdentityOpsQueueItem(nextItem);
+  }
+
+  function selectGovernanceAdminOwnerQueueItem(ownerDomain, changeId) {
+    const normalizedOwnerDomain = String(ownerDomain || "").trim().toLowerCase();
+    if (normalizedOwnerDomain === "networkops") {
+      networkOpsViewState = {
+        ...networkOpsViewState,
+        selectedAdminChangeId: changeId
+      };
+      return;
+    }
+    if (normalizedOwnerDomain === "complianceops") {
+      complianceOpsViewState = {
+        ...complianceOpsViewState,
+        selectedAdminChangeId: changeId
+      };
+      return;
+    }
+    if (normalizedOwnerDomain === "platformops") {
+      platformOpsViewState = {
+        ...platformOpsViewState,
+        selectedAdminChangeId: changeId
+      };
+      return;
+    }
+    if (normalizedOwnerDomain === "guardrailops") {
+      guardrailOpsViewState = {
+        ...guardrailOpsViewState,
+        selectedAdminChangeId: changeId
+      };
+      return;
+    }
+    if (normalizedOwnerDomain === "policyops") {
+      policyOpsViewState = {
+        ...policyOpsViewState,
+        selectedAdminChangeId: changeId
+      };
+      return;
+    }
+    identityOpsViewState = {
+      ...identityOpsViewState,
+      selectedAdminChangeId: changeId
+    };
+  }
+
+  function setAdminOwnerFeedback(ownerDomain, tone, message) {
+    const normalizedOwnerDomain = String(ownerDomain || "").trim().toLowerCase();
+    if (normalizedOwnerDomain === "networkops") {
+      setNetworkOpsFeedback(tone, message);
+      return;
+    }
+    if (normalizedOwnerDomain === "complianceops") {
+      setComplianceOpsFeedback(tone, message);
+      return;
+    }
+    if (normalizedOwnerDomain === "platformops") {
+      setPlatformOpsFeedback(tone, message);
+      return;
+    }
+    if (normalizedOwnerDomain === "guardrailops") {
+      setGuardrailOpsFeedback(tone, message);
+      return;
+    }
+    if (normalizedOwnerDomain === "policyops") {
+      setPolicyOpsFeedback(tone, message);
+      return;
+    }
+    setIdentityOpsFeedback(tone, message);
+  }
+
+  function governanceApprovedOwnerMessage(ownerDomain) {
+    const normalizedOwnerDomain = String(ownerDomain || "").trim().toLowerCase();
+    if (normalizedOwnerDomain === "networkops") {
+      return "NetworkOps can now apply the approved probe request.";
+    }
+    if (normalizedOwnerDomain === "complianceops") {
+      return "ComplianceOps can now apply the approved change.";
+    }
+    if (normalizedOwnerDomain === "identityops") {
+      return "IdentityOps can now apply the approved change.";
+    }
+    if (normalizedOwnerDomain === "platformops") {
+      return "PlatformOps can now apply the approved change.";
+    }
+    if (normalizedOwnerDomain === "guardrailops") {
+      return "GuardrailOps can now apply the approved change.";
+    }
+    if (normalizedOwnerDomain === "policyops") {
+      return "PolicyOps can now apply the approved change.";
+    }
+    return "The owner domain recorded approved status for the admin proposal.";
+  }
+
+  function governanceOwnerFeedbackMessage(ownerDomain, nextStatus) {
+    const normalizedStatus = String(nextStatus || "").trim().toLowerCase();
+    if (normalizedStatus !== "approved") {
+      return "The proposal remains blocked from apply.";
+    }
+    const normalizedOwnerDomain = String(ownerDomain || "").trim().toLowerCase();
+    if (normalizedOwnerDomain === "networkops") {
+      return "Apply is now available in NetworkOps.";
+    }
+    if (normalizedOwnerDomain === "complianceops") {
+      return "Apply is now available in ComplianceOps.";
+    }
+    if (normalizedOwnerDomain === "identityops") {
+      return "Apply is now available in IdentityOps.";
+    }
+    if (normalizedOwnerDomain === "platformops") {
+      return "Apply is now available in PlatformOps.";
+    }
+    if (normalizedOwnerDomain === "guardrailops") {
+      return "Apply is now available in GuardrailOps.";
+    }
+    if (normalizedOwnerDomain === "policyops") {
+      return "Apply is now available in PolicyOps.";
+    }
+    return "Approved status is now visible in the owner domain.";
+  }
+
+  function buildGovernanceAdminReceiptText(item) {
+    const queueItem = item && typeof item === "object" ? item : {};
+    const decision = queueItem?.decision && typeof queueItem.decision === "object" ? queueItem.decision : {};
+    return [
+      "EpydiosOps Governance Decision Receipt",
+      `owner_domain=${governanceAdminQueueOwnerDomain(queueItem)}`,
+      `admin_change_request_id=${String(queueItem.id || "").trim()}`,
+      `admin_change_kind=${String(queueItem.kind || "").trim()}`,
+      `requested_action=${String(queueItem.requestedAction || "").trim()}`,
+      `${String(queueItem.subjectLabel || "subject").trim()}=${String(queueItem.subjectId || "").trim()}`,
+      `${String(queueItem.targetLabel || "target").trim()}=${String(queueItem.targetScope || "").trim()}`,
+      `decision=${String(decision.status || "").trim()}`,
+      `decision_id=${String(decision.decisionId || "").trim()}`,
+      `approval_receipt_id=${String(decision.approvalReceiptId || "").trim()}`,
+      `decided_at=${String(decision.decidedAt || "").trim()}`,
+      `actor_ref=${String(decision.actorRef || "").trim()}`,
+      `reason=${String(decision.reason || "").trim()}`
+    ].join("\n");
+  }
+
+  const buildNetworkOpsGovernanceReceiptText = (item) => {
+    const queueItem = item && typeof item === "object" ? item : {};
+    const decision = queueItem?.decision && typeof queueItem.decision === "object" ? queueItem.decision : {};
+    return [
+      "EpydiosOps Network Governance Receipt",
+      `admin_change_request_id=${String(queueItem.id || "").trim()}`,
+      "owner_domain=networkops",
+      `requested_action=${String(queueItem.requestedAction || "").trim()}`,
+      `boundary=${String(queueItem.subjectId || queueItem.boundaryPathId || "").trim()}`,
+      `endpoint=${String(queueItem.targetEndpointId || "").trim()}`,
+      `target_scope=${String(queueItem.targetScope || "").trim()}`,
+      `decision=${String(decision.status || "").trim()}`,
+      `decision_id=${String(decision.decisionId || "").trim()}`,
+      `approval_receipt_id=${String(decision.approvalReceiptId || "").trim()}`,
+      `decided_at=${String(decision.decidedAt || "").trim()}`,
+      `actor_ref=${String(decision.actorRef || "").trim()}`,
+      `reason=${String(decision.reason || "").trim()}`
+    ].join("\n");
+  };
+
+  const buildNetworkOpsResultReceiptText = (item) => {
+    const queueItem = item && typeof item === "object" ? item : {};
+    const decision = queueItem?.decision && typeof queueItem.decision === "object" ? queueItem.decision : {};
+    const execution = queueItem?.execution && typeof queueItem.execution === "object" ? queueItem.execution : {};
+    const receipt = queueItem?.receipt && typeof queueItem.receipt === "object" ? queueItem.receipt : {};
+    return [
+      "EpydiosOps Network Probe Result Receipt",
+      `admin_change_request_id=${String(queueItem.id || "").trim()}`,
+      "owner_domain=networkops",
+      `requested_action=${String(queueItem.requestedAction || "").trim()}`,
+      `boundary=${String(queueItem.subjectId || queueItem.boundaryPathId || "").trim()}`,
+      `endpoint=${String(queueItem.targetEndpointId || "").trim()}`,
+      `target_scope=${String(queueItem.targetScope || "").trim()}`,
+      `execution_id=${String(execution.executionId || "").trim()}`,
+      `execution_status=${String(execution.status || "").trim()}`,
+      `executed_at=${String(execution.executedAt || "").trim()}`,
+      `receipt_id=${String(receipt.receiptId || "").trim()}`,
+      `issued_at=${String(receipt.issuedAt || "").trim()}`,
+      `stable_ref=${String(receipt.stableRef || "").trim()}`,
+      `approval_receipt_id=${String(receipt.approvalReceiptId || decision.approvalReceiptId || "").trim()}`,
+      `summary=${String(receipt.summary || execution.summary || "").trim()}`
+    ].join("\n");
+  };
+
+  const buildNetworkOpsRollbackReceiptText = (item) => {
+    const queueItem = item && typeof item === "object" ? item : {};
+    const rollback = queueItem?.rollback && typeof queueItem.rollback === "object" ? queueItem.rollback : {};
+    const receipt = queueItem?.receipt && typeof queueItem.receipt === "object" ? queueItem.receipt : {};
+    const execution = queueItem?.execution && typeof queueItem.execution === "object" ? queueItem.execution : {};
+    const decision = queueItem?.decision && typeof queueItem.decision === "object" ? queueItem.decision : {};
+    return [
+      "EpydiosOps Network Recovery Receipt",
+      `admin_change_request_id=${String(queueItem.id || "").trim()}`,
+      "owner_domain=networkops",
+      `requested_action=${String(queueItem.requestedAction || "").trim()}`,
+      `boundary=${String(queueItem.subjectId || queueItem.boundaryPathId || "").trim()}`,
+      `endpoint=${String(queueItem.targetEndpointId || "").trim()}`,
+      `target_scope=${String(queueItem.targetScope || "").trim()}`,
+      `rollback_id=${String(rollback.rollbackId || "").trim()}`,
+      `action=${String(rollback.action || "").trim()}`,
+      `status=${String(rollback.status || "").trim()}`,
+      `approval_receipt_id=${String(rollback.approvalReceiptId || decision.approvalReceiptId || "").trim()}`,
+      `admin_change_receipt_id=${String(rollback.adminReceiptId || receipt.receiptId || "").trim()}`,
+      `execution_id=${String(rollback.executionId || execution.executionId || "").trim()}`,
+      `stable_ref=${String(rollback.stableRef || "").trim()}`,
+      `rolled_back_at=${String(rollback.rolledBackAt || "").trim()}`,
+      `actor_ref=${String(rollback.actorRef || "").trim()}`,
+      `reason=${String(rollback.reason || "").trim()}`,
+      `summary=${String(rollback.summary || "").trim()}`
+    ].join("\n");
+  };
+
+  function governanceAdminReasonFromNode(node) {
+    const container = node instanceof HTMLElement ? node.closest("[data-governanceops-panel='admin-proposal-review'], [data-governanceops-panel=\"admin-proposal-review\"]") : null;
+    const reasonInput =
+      container instanceof HTMLElement ? container.querySelector("[data-governanceops-admin-decision-reason]") : null;
+    return reasonInput instanceof HTMLInputElement ? String(reasonInput.value || "").trim() : "";
+  }
+
+  function buildGovernanceAdminDecision(changeId, status, reason) {
+    const queueItem = governanceAdminQueueItemById(changeId);
+    if (!queueItem) {
+      return null;
+    }
+    const decidedAt = new Date().toISOString();
+    const normalizedStatus = String(status || "").trim().toLowerCase();
+    return {
+      ...queueItem,
+      status: normalizedStatus,
+      updatedAt: decidedAt,
+      decision: {
+        decisionId: `admin-decision-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+        status: normalizedStatus,
+        reason,
+        decidedAt,
+        approvalReceiptId:
+          normalizedStatus === "approved"
+            ? `approval-receipt-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
+            : "",
+        actorRef: governanceOpsActorRef()
+      },
+      execution: null,
+      receipt: null
+    };
+  }
+
+  async function copyGovernanceOpsAdminReceipt(changeId) {
+    const queueItem = governanceAdminQueueItemById(changeId);
+    if (!queueItem || !String(queueItem?.decision?.approvalReceiptId || "").trim()) {
+      setGovernanceOpsFeedback("warn", "No governance decision receipt is available for the selected admin proposal.");
+      return false;
+    }
+    await copyTextToClipboard(buildGovernanceAdminReceiptText(queueItem));
+    setGovernanceOpsFeedback("ok", `Governance decision receipt copied for admin change ${String(queueItem.id || "").trim()}.`);
+    return true;
+  }
+
+  async function submitGovernanceOpsAdminDecision(decisionNode) {
+    const changeId =
+      decisionNode instanceof HTMLElement
+        ? String(decisionNode.dataset.governanceopsDecisionAdminChangeId || "").trim()
+        : "";
+    const decision =
+      decisionNode instanceof HTMLElement
+        ? String(decisionNode.dataset.governanceopsDecision || "").trim().toUpperCase()
+        : "";
+    if (!changeId || !decision) {
+      return false;
+    }
+    const queueItem = governanceAdminQueueItemById(changeId);
+    if (!queueItem) {
+      setGovernanceOpsFeedback("warn", "The selected admin proposal is no longer available.");
+      return true;
+    }
+    if (String(queueItem.status || "").trim().toLowerCase() !== "routed") {
+      setGovernanceOpsFeedback("warn", `Admin proposal ${changeId} is not awaiting governance decision.`);
+      return true;
+    }
+    const reason = governanceAdminReasonFromNode(decisionNode);
+    if (!reason) {
+      setGovernanceOpsFeedback("warn", "Decision reason is required before approve or deny.");
+      return true;
+    }
+    const nextStatus = decision === "APPROVE" ? "approved" : "denied";
+    const nextQueueItem = buildGovernanceAdminDecision(changeId, nextStatus, reason);
+    if (!nextQueueItem) {
+      setGovernanceOpsFeedback("warn", "The selected admin proposal is no longer available.");
+      return true;
+    }
+    upsertGovernanceAdminQueueItem(nextQueueItem);
+    governanceOpsViewState = {
+      ...governanceOpsViewState,
+      selectedAdminChangeId: changeId
+    };
+    selectGovernanceAdminOwnerQueueItem(governanceAdminQueueOwnerDomain(nextQueueItem), changeId);
+    const ownerDomain = governanceAdminQueueOwnerDomain(nextQueueItem);
+    setGovernanceOpsFeedback(
+      nextStatus === "approved" ? "ok" : "warn",
+      `GovernanceOps recorded ${nextStatus} for admin change ${changeId}. ${
+        nextStatus === "approved" ? governanceApprovedOwnerMessage(ownerDomain) : "Apply remains blocked."
+      }`
+    );
+    setAdminOwnerFeedback(
+      ownerDomain,
+      nextStatus === "approved" ? "ok" : "warn",
+      `GovernanceOps recorded ${nextStatus} for ${ownerDomain} admin proposal ${changeId}. ${
+        governanceOwnerFeedbackMessage(ownerDomain, nextStatus)
+      }`
+    );
+    return true;
+  }
+
+  async function submitGovernanceOpsAdminRoutingAction(routingNode) {
+    const changeId =
+      routingNode instanceof HTMLElement
+        ? String(routingNode.dataset.governanceopsRoutingAdminChangeId || "").trim()
+        : "";
+    const routeAction =
+      routingNode instanceof HTMLElement
+        ? String(routingNode.dataset.governanceopsRoutingAction || "").trim().toUpperCase()
+        : "";
+    if (!changeId || !routeAction) {
+      return false;
+    }
+    const queueItem = governanceAdminQueueItemById(changeId);
+    if (!queueItem) {
+      setGovernanceOpsFeedback("warn", "The selected admin proposal is no longer available.");
+      return true;
+    }
+    if (String(queueItem.status || "").trim().toLowerCase() !== "routed") {
+      setGovernanceOpsFeedback("warn", `Admin proposal ${changeId} is not awaiting governance routing action.`);
+      return true;
+    }
+    const reason = governanceAdminReasonFromNode(routingNode);
+    if (!reason) {
+      setGovernanceOpsFeedback("warn", "Decision reason is required before defer or escalate.");
+      return true;
+    }
+    const nextStatus = routeAction === "ESCALATE" ? "escalated" : "deferred";
+    const ownerDomain = governanceAdminQueueOwnerDomain(queueItem);
+    upsertGovernanceAdminQueueItem({
+      ...queueItem,
+      status: nextStatus,
+      updatedAt: new Date().toISOString(),
+      decision: {
+        decisionId: `admin-decision-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+        status: nextStatus,
+        reason,
+        decidedAt: new Date().toISOString(),
+        approvalReceiptId: "",
+        actorRef: governanceOpsActorRef()
+      },
+      execution: null,
+      receipt: null
+    });
+    governanceOpsViewState = {
+      ...governanceOpsViewState,
+      selectedAdminChangeId: changeId
+    };
+    selectGovernanceAdminOwnerQueueItem(ownerDomain, changeId);
+    setGovernanceOpsFeedback("warn", `GovernanceOps recorded ${nextStatus} for admin change ${changeId}.`);
+    setAdminOwnerFeedback(ownerDomain, "warn", `GovernanceOps recorded ${nextStatus} for ${ownerDomain} admin proposal ${changeId}.`);
+    return true;
   }
 
   async function submitApprovalDecisionFromContainer(container, decisionNode) {
@@ -8843,6 +13247,510 @@ async function main() {
     }
     await submitApprovalDecisionFromContainer(ui.approvalReviewModalContent, decisionNode);
   });
+  const handleIdentityOpsDraftFieldEvent = (target) => {
+    if (
+      !(
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement
+      )
+    ) {
+      return false;
+    }
+    const kind = String(target.dataset.identityopsDraftKind || "").trim().toLowerCase();
+    const field = String(target.dataset.identityopsDraftField || "").trim();
+    if (!kind || !field) {
+      if (target instanceof HTMLInputElement && target.hasAttribute("data-identityops-admin-recovery-reason")) {
+        setIdentityOpsRecoveryReason(target.value);
+        return true;
+      }
+      return false;
+    }
+    updateIdentityOpsDraftField(kind, field, target.value);
+    return true;
+  };
+  ui.identityContent?.addEventListener("input", (event) => {
+    handleIdentityOpsDraftFieldEvent(event.target);
+  });
+  ui.identityContent?.addEventListener("change", (event) => {
+    handleIdentityOpsDraftFieldEvent(event.target);
+  });
+  ui.identityContent?.addEventListener("click", async (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    const actionNode = target.closest("[data-identityops-admin-action]");
+    if (!(actionNode instanceof HTMLElement)) {
+      return;
+    }
+    const action = String(actionNode.dataset.identityopsAdminAction || "").trim().toLowerCase();
+    const kind = String(actionNode.dataset.identityopsAdminKind || "").trim().toLowerCase();
+    const changeId = String(actionNode.dataset.identityopsAdminId || "").trim();
+    if (!action) {
+      return;
+    }
+    if (action === "save-draft" && kind) {
+      saveIdentityOpsDraft(kind);
+      return;
+    }
+    if (action === "simulate-draft" && kind) {
+      simulateIdentityOpsDraft(kind);
+      return;
+    }
+    if (action === "route-draft" && kind) {
+      routeIdentityOpsDraftToGovernance(kind);
+      return;
+    }
+    if (action === "select-queue-item" && changeId) {
+      loadIdentityOpsQueueItemIntoDraft(changeId);
+      return;
+    }
+    if (action === "simulate-queue-item" && changeId) {
+      const queueItem = findIdentityOpsQueueItem(changeId);
+      if (queueItem) {
+        simulateIdentityOpsDraft(String(queueItem.kind || "").trim().toLowerCase(), changeId);
+      }
+      return;
+    }
+    if (action === "route-queue-item" && changeId) {
+      const queueItem = findIdentityOpsQueueItem(changeId);
+      if (queueItem) {
+        routeIdentityOpsDraftToGovernance(String(queueItem.kind || "").trim().toLowerCase(), changeId);
+      }
+      return;
+    }
+    if (action === "apply-approved-change" && changeId) {
+      applyApprovedIdentityOpsChange(changeId);
+      return;
+    }
+    if (action === "copy-governance-receipt" && changeId) {
+      await copyIdentityOpsGovernanceReceipt(changeId);
+      return;
+    }
+    if (action === "copy-admin-receipt" && changeId) {
+      await copyIdentityOpsAdminReceipt(changeId);
+      return;
+    }
+    if (action === "rollback-applied-change" && changeId) {
+      applyIdentityOpsRecoveryAction(changeId, "rollback");
+      return;
+    }
+    if (action === "expire-applied-change" && changeId) {
+      applyIdentityOpsRecoveryAction(changeId, "expiry");
+      return;
+    }
+    if (action === "copy-rollback-receipt" && changeId) {
+      await copyIdentityOpsRollbackReceipt(changeId);
+      return;
+    }
+    if (action === "open-governance") {
+      if (changeId) {
+        setGovernanceOpsAdminSelection(changeId);
+      }
+      openIdentityOpsGovernanceView();
+    }
+  });
+  const handlePlatformOpsDraftFieldEvent = (target) => {
+    if (
+      !(
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement
+      )
+    ) {
+      return false;
+    }
+    const field = String(target.dataset.platformopsDraftField || "").trim();
+    const isRecoveryReason = target.hasAttribute("data-platformops-admin-recovery-reason");
+    if (isRecoveryReason) {
+      setPlatformOpsRecoveryReason(target.value);
+      return true;
+    }
+    if (!field) {
+      return false;
+    }
+    updatePlatformOpsDraftField(field, target.value);
+    return true;
+  };
+  ui.platformOpsContent?.addEventListener("input", (event) => {
+    handlePlatformOpsDraftFieldEvent(event.target);
+  });
+  ui.platformOpsContent?.addEventListener("change", (event) => {
+    handlePlatformOpsDraftFieldEvent(event.target);
+  });
+  ui.platformOpsContent?.addEventListener("click", async (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    const actionNode = target.closest("[data-platformops-admin-action]");
+    if (!(actionNode instanceof HTMLElement)) {
+      return;
+    }
+    const action = String(actionNode.dataset.platformopsAdminAction || "").trim().toLowerCase();
+    const changeId = String(actionNode.dataset.platformopsAdminId || "").trim();
+    if (!action) {
+      return;
+    }
+    if (action === "save-draft") {
+      savePlatformOpsDraft();
+      return;
+    }
+    if (action === "simulate-draft") {
+      simulatePlatformOpsDraft(changeId);
+      return;
+    }
+    if (action === "route-draft") {
+      routePlatformOpsDraftToGovernance(changeId);
+      return;
+    }
+    if (action === "select-queue-item" && changeId) {
+      loadPlatformOpsQueueItemIntoDraft(changeId);
+      return;
+    }
+    if (action === "simulate-queue-item" && changeId) {
+      simulatePlatformOpsDraft(changeId);
+      return;
+    }
+    if (action === "route-queue-item" && changeId) {
+      routePlatformOpsDraftToGovernance(changeId);
+      return;
+    }
+    if (action === "apply-approved-change" && changeId) {
+      applyApprovedPlatformOpsChange(changeId);
+      return;
+    }
+    if (action === "rollback-applied-change" && changeId) {
+      applyPlatformOpsRecoveryAction(changeId, "rollback");
+      return;
+    }
+    if (action === "copy-governance-receipt" && changeId) {
+      await copyPlatformOpsGovernanceReceipt(changeId);
+      return;
+    }
+    if (action === "copy-admin-receipt" && changeId) {
+      await copyPlatformOpsAdminReceipt(changeId);
+      return;
+    }
+    if (action === "copy-rollback-receipt" && changeId) {
+      await copyPlatformOpsRollbackReceipt(changeId);
+      return;
+    }
+    if (action === "open-governance") {
+      if (changeId) {
+        setGovernanceOpsAdminSelection(changeId);
+      }
+      openPlatformOpsGovernanceView();
+    }
+  });
+  const handleGuardrailOpsDraftFieldEvent = (target) => {
+    if (
+      !(
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement
+      )
+    ) {
+      return false;
+    }
+    if (target instanceof HTMLInputElement && target.hasAttribute("data-guardrailops-admin-recovery-reason")) {
+      setGuardrailOpsRecoveryReason(target.value);
+      return true;
+    }
+    const field = String(target.dataset.guardrailopsDraftField || "").trim();
+    if (!field) {
+      return false;
+    }
+    updateGuardrailOpsDraftField(field, target.value);
+    return true;
+  };
+  ui.guardrailOpsContent?.addEventListener("input", (event) => {
+    handleGuardrailOpsDraftFieldEvent(event.target);
+  });
+  ui.guardrailOpsContent?.addEventListener("change", (event) => {
+    handleGuardrailOpsDraftFieldEvent(event.target);
+  });
+  ui.guardrailOpsContent?.addEventListener("click", async (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    const actionNode = target.closest("[data-guardrailops-admin-action]");
+    if (!(actionNode instanceof HTMLElement)) {
+      return;
+    }
+    const action = String(actionNode.dataset.guardrailopsAdminAction || "").trim().toLowerCase();
+    const changeId = String(actionNode.dataset.guardrailopsAdminId || "").trim();
+    if (!action) {
+      return;
+    }
+    if (action === "save-draft") {
+      saveGuardrailOpsDraft();
+      return;
+    }
+    if (action === "simulate-draft") {
+      simulateGuardrailOpsDraft(changeId);
+      return;
+    }
+    if (action === "route-draft") {
+      routeGuardrailOpsDraftToGovernance(changeId);
+      return;
+    }
+    if (action === "select-queue-item" && changeId) {
+      loadGuardrailOpsQueueItemIntoDraft(changeId);
+      return;
+    }
+    if (action === "simulate-queue-item" && changeId) {
+      simulateGuardrailOpsDraft(changeId);
+      return;
+    }
+    if (action === "route-queue-item" && changeId) {
+      routeGuardrailOpsDraftToGovernance(changeId);
+      return;
+    }
+    if (action === "open-governance") {
+      if (changeId) {
+        setGovernanceOpsAdminSelection(changeId);
+      }
+      openGuardrailOpsGovernanceView();
+      return;
+    }
+    if (action === "apply-approved-change" && changeId) {
+      applyApprovedGuardrailOpsChange(changeId);
+      return;
+    }
+    if (action === "rollback-applied-change" && changeId) {
+      applyGuardrailOpsRecoveryAction(changeId, "rollback");
+      return;
+    }
+    if (action === "copy-governance-receipt" && changeId) {
+      await copyGuardrailOpsGovernanceReceipt(changeId);
+      return;
+    }
+    if (action === "copy-admin-receipt" && changeId) {
+      await copyGuardrailOpsAdminReceipt(changeId);
+      return;
+    }
+    if (action === "copy-rollback-receipt" && changeId) {
+      await copyGuardrailOpsRollbackReceipt(changeId);
+    }
+  });
+  const handlePolicyOpsDraftFieldEvent = (target) => {
+    if (
+      !(
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement
+      )
+    ) {
+      return false;
+    }
+    if (target instanceof HTMLInputElement && target.hasAttribute("data-policyops-admin-recovery-reason")) {
+      setPolicyOpsRecoveryReason(target.value);
+      return true;
+    }
+    const field = String(target.dataset.policyopsDraftField || "").trim();
+    if (!field) {
+      return false;
+    }
+    updatePolicyOpsDraftField(field, target.value);
+    return true;
+  };
+  ui.policyOpsContent?.addEventListener("input", (event) => {
+    handlePolicyOpsDraftFieldEvent(event.target);
+  });
+  ui.policyOpsContent?.addEventListener("change", (event) => {
+    handlePolicyOpsDraftFieldEvent(event.target);
+  });
+  const handleComplianceOpsDraftFieldEvent = (target) => {
+    if (
+      !(
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement
+      )
+    ) {
+      return false;
+    }
+    if (target instanceof HTMLInputElement && target.hasAttribute("data-complianceops-admin-recovery-reason")) {
+      setComplianceOpsRecoveryReason(target.value);
+      return true;
+    }
+    const field = String(target.dataset.complianceopsDraftField || "").trim();
+    if (!field) {
+      return false;
+    }
+    updateComplianceOpsDraftField(field, target.value);
+    return true;
+  };
+  ui.complianceOpsContent?.addEventListener("input", (event) => {
+    handleComplianceOpsDraftFieldEvent(event.target);
+  });
+  ui.complianceOpsContent?.addEventListener("change", (event) => {
+    handleComplianceOpsDraftFieldEvent(event.target);
+  });
+  ui.complianceOpsContent?.addEventListener("click", async (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    const actionNode = target.closest("[data-complianceops-admin-action]");
+    if (!(actionNode instanceof HTMLElement)) {
+      return;
+    }
+    const action = String(actionNode.dataset.complianceopsAdminAction || "").trim().toLowerCase();
+    const changeId = String(actionNode.dataset.complianceopsAdminId || "").trim();
+    if (!action) {
+      return;
+    }
+    if (action === "save-draft") {
+      saveComplianceOpsDraft();
+      return;
+    }
+    if (action === "simulate-draft") {
+      simulateComplianceOpsDraft(changeId);
+      return;
+    }
+    if (action === "route-draft") {
+      routeComplianceOpsDraftToGovernance(changeId);
+      return;
+    }
+    if (action === "select-queue-item" && changeId) {
+      loadComplianceOpsQueueItemIntoDraft(changeId);
+      return;
+    }
+    if (action === "simulate-queue-item" && changeId) {
+      simulateComplianceOpsDraft(changeId);
+      return;
+    }
+    if (action === "route-queue-item" && changeId) {
+      routeComplianceOpsDraftToGovernance(changeId);
+      return;
+    }
+    if (action === "open-governance") {
+      if (changeId) {
+        setGovernanceOpsAdminSelection(changeId);
+      }
+      openComplianceOpsGovernanceView();
+      return;
+    }
+    if (action === "apply-approved-change" && changeId) {
+      applyApprovedComplianceOpsChange(changeId);
+      return;
+    }
+    if (action === "expire-applied-change" && changeId) {
+      applyComplianceOpsRecoveryAction(changeId, "expiry");
+      return;
+    }
+    if (action === "renew-expired-change" && changeId) {
+      applyComplianceOpsRecoveryAction(changeId, "renew");
+      return;
+    }
+    if (action === "copy-governance-receipt" && changeId) {
+      await copyComplianceOpsGovernanceReceipt(changeId);
+      return;
+    }
+    if (action === "copy-admin-receipt" && changeId) {
+      await copyComplianceOpsAdminReceipt(changeId);
+      return;
+    }
+    if (action === "copy-recovery-receipt" && changeId) {
+      await copyComplianceOpsRecoveryReceipt(changeId);
+    }
+  });
+  const handleNetworkOpsDraftFieldEvent = (target) => {
+    if (
+      !(
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement
+      )
+    ) {
+      return false;
+    }
+    if (target instanceof HTMLInputElement && target.hasAttribute("data-networkops-admin-recovery-reason")) {
+      setNetworkOpsRecoveryReason(target.value);
+      return true;
+    }
+    const field = String(target.dataset.networkopsDraftField || "").trim();
+    if (!field) {
+      return false;
+    }
+    updateNetworkOpsDraftField(field, target.value);
+    return true;
+  };
+  ui.networkOpsContent?.addEventListener("input", (event) => {
+    handleNetworkOpsDraftFieldEvent(event.target);
+  });
+  ui.networkOpsContent?.addEventListener("change", (event) => {
+    handleNetworkOpsDraftFieldEvent(event.target);
+  });
+  ui.networkOpsContent?.addEventListener("click", async (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    const actionNode = target.closest("[data-networkops-admin-action]");
+    if (!(actionNode instanceof HTMLElement)) {
+      return;
+    }
+    const action = String(actionNode.dataset.networkopsAdminAction || "").trim().toLowerCase();
+    const changeId = String(actionNode.dataset.networkopsAdminId || "").trim();
+    if (!action) {
+      return;
+    }
+    if (action === "save-draft") {
+      saveNetworkOpsDraft();
+      return;
+    }
+    if (action === "simulate-draft") {
+      simulateNetworkOpsDraft(changeId);
+      return;
+    }
+    if (action === "route-draft") {
+      routeNetworkOpsDraftToGovernance(changeId);
+      return;
+    }
+    if (action === "select-queue-item" && changeId) {
+      loadNetworkOpsQueueItemIntoDraft(changeId);
+      return;
+    }
+    if (action === "simulate-queue-item" && changeId) {
+      simulateNetworkOpsDraft(changeId);
+      return;
+    }
+    if (action === "route-queue-item" && changeId) {
+      routeNetworkOpsDraftToGovernance(changeId);
+      return;
+    }
+    if (action === "apply-approved-change" && changeId) {
+      applyApprovedNetworkOpsChange(changeId);
+      return;
+    }
+    if (action === "rollback-applied-change" && changeId) {
+      applyNetworkOpsRecoveryAction(changeId, "rollback");
+      return;
+    }
+    if (action === "copy-governance-receipt" && changeId) {
+      await copyNetworkOpsGovernanceReceipt(changeId);
+      return;
+    }
+    if (action === "copy-result-receipt" && changeId) {
+      await copyNetworkOpsResultReceipt(changeId);
+      return;
+    }
+    if (action === "copy-rollback-receipt" && changeId) {
+      await copyNetworkOpsRollbackReceipt(changeId);
+      return;
+    }
+    if (action === "open-governance") {
+      if (changeId) {
+        setGovernanceOpsAdminSelection(changeId);
+      }
+      openNetworkOpsGovernanceView();
+    }
+  });
   ui.governanceOpsContent?.addEventListener("click", async (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) {
@@ -8855,6 +13763,16 @@ async function main() {
         : "";
     if (selectedRunID) {
       setGovernanceOpsSelection(selectedRunID);
+      focusRenderedRegion(ui.governanceOpsContent, { scroll: false });
+      return;
+    }
+    const selectAdminNode = target.closest("[data-governanceops-select-admin-change-id]");
+    const selectedAdminChangeId =
+      selectAdminNode instanceof HTMLElement
+        ? String(selectAdminNode.dataset.governanceopsSelectAdminChangeId || "").trim()
+        : "";
+    if (selectedAdminChangeId) {
+      setGovernanceOpsAdminSelection(selectedAdminChangeId);
       focusRenderedRegion(ui.governanceOpsContent, { scroll: false });
       return;
     }
@@ -8876,6 +13794,48 @@ async function main() {
       setWorkspaceView(workspaceView, true);
       return;
     }
+    const openIdentityAdminNode = target.closest("[data-governanceops-open-identity-admin-change-id]");
+    const openIdentityAdminChangeId =
+      openIdentityAdminNode instanceof HTMLElement
+        ? String(openIdentityAdminNode.dataset.governanceopsOpenIdentityAdminChangeId || "").trim()
+        : "";
+    if (openIdentityAdminChangeId) {
+      openIdentityOpsAdminQueueItem(openIdentityAdminChangeId);
+      return;
+    }
+    const openAdminOwnerNode = target.closest("[data-governanceops-open-admin-owner-domain]");
+    const openAdminOwnerDomain =
+      openAdminOwnerNode instanceof HTMLElement
+        ? String(openAdminOwnerNode.dataset.governanceopsOpenAdminOwnerDomain || "").trim().toLowerCase()
+        : "";
+    const openAdminChangeId =
+      openAdminOwnerNode instanceof HTMLElement
+        ? String(openAdminOwnerNode.dataset.governanceopsOpenAdminChangeId || "").trim()
+        : "";
+    if (openAdminOwnerDomain && openAdminChangeId) {
+      if (openAdminOwnerDomain === "complianceops") {
+        openComplianceOpsAdminQueueItem(openAdminChangeId);
+        return;
+      }
+      if (openAdminOwnerDomain === "platformops") {
+        openPlatformOpsAdminQueueItem(openAdminChangeId);
+        return;
+      }
+      if (openAdminOwnerDomain === "guardrailops") {
+        openGuardrailOpsAdminQueueItem(openAdminChangeId);
+        return;
+      }
+      if (openAdminOwnerDomain === "policyops") {
+        openPolicyOpsAdminQueueItem(openAdminChangeId);
+        return;
+      }
+      if (openAdminOwnerDomain === "networkops") {
+        openNetworkOpsAdminQueueItem(openAdminChangeId);
+        return;
+      }
+      openIdentityOpsAdminQueueItem(openAdminChangeId);
+      return;
+    }
     const copyReceiptNode = target.closest("[data-governanceops-copy-receipt-run-id]");
     const copyReceiptRunID =
       copyReceiptNode instanceof HTMLElement
@@ -8887,6 +13847,29 @@ async function main() {
         selectedRunId: copyReceiptRunID
       };
       await copyGovernanceReceiptSnapshot(copyReceiptRunID);
+      return;
+    }
+    const copyAdminReceiptNode = target.closest("[data-governanceops-copy-admin-receipt-change-id]");
+    const copyAdminReceiptChangeId =
+      copyAdminReceiptNode instanceof HTMLElement
+        ? String(copyAdminReceiptNode.dataset.governanceopsCopyAdminReceiptChangeId || "").trim()
+        : "";
+    if (copyAdminReceiptChangeId) {
+      governanceOpsViewState = {
+        ...governanceOpsViewState,
+        selectedAdminChangeId: copyAdminReceiptChangeId
+      };
+      await copyGovernanceOpsAdminReceipt(copyAdminReceiptChangeId);
+      return;
+    }
+    const adminRoutingNode = target.closest("[data-governanceops-routing-admin-change-id]");
+    if (adminRoutingNode instanceof HTMLElement) {
+      await submitGovernanceOpsAdminRoutingAction(adminRoutingNode);
+      return;
+    }
+    const adminDecisionNode = target.closest("[data-governanceops-decision-admin-change-id]");
+    if (adminDecisionNode instanceof HTMLElement) {
+      await submitGovernanceOpsAdminDecision(adminDecisionNode);
       return;
     }
     const routingNode = target.closest("[data-governanceops-routing-run-id]");
@@ -8999,6 +13982,66 @@ async function main() {
   ui.policyOpsContent?.addEventListener("click", async (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    const adminActionNode = target.closest("[data-policyops-admin-action]");
+    if (adminActionNode instanceof HTMLElement) {
+      const action = String(adminActionNode.dataset.policyopsAdminAction || "").trim().toLowerCase();
+      const changeId = String(adminActionNode.dataset.policyopsAdminId || "").trim();
+      if (!action) {
+        return;
+      }
+      if (action === "save-draft") {
+        savePolicyOpsDraft();
+        return;
+      }
+      if (action === "simulate-draft") {
+        simulatePolicyOpsDraft(changeId);
+        return;
+      }
+      if (action === "route-draft") {
+        routePolicyOpsDraftToGovernance(changeId);
+        return;
+      }
+      if (action === "select-queue-item" && changeId) {
+        loadPolicyOpsQueueItemIntoDraft(changeId);
+        return;
+      }
+      if (action === "simulate-queue-item" && changeId) {
+        simulatePolicyOpsDraft(changeId);
+        return;
+      }
+      if (action === "route-queue-item" && changeId) {
+        routePolicyOpsDraftToGovernance(changeId);
+        return;
+      }
+      if (action === "open-governance") {
+        if (changeId) {
+          setGovernanceOpsAdminSelection(changeId);
+        }
+        openPolicyOpsGovernanceView();
+        return;
+      }
+      if (action === "apply-approved-change" && changeId) {
+        applyApprovedPolicyOpsChange(changeId);
+        return;
+      }
+      if (action === "rollback-applied-change" && changeId) {
+        applyPolicyOpsRecoveryAction(changeId, "rollback");
+        return;
+      }
+      if (action === "copy-governance-receipt" && changeId) {
+        await copyPolicyOpsGovernanceReceipt(changeId);
+        return;
+      }
+      if (action === "copy-admin-receipt" && changeId) {
+        await copyPolicyOpsAdminReceipt(changeId);
+        return;
+      }
+      if (action === "copy-rollback-receipt" && changeId) {
+        await copyPolicyOpsRollbackReceipt(changeId);
+        return;
+      }
       return;
     }
     const actionNode = target.closest("[data-policyops-action]");

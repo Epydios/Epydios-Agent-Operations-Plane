@@ -403,39 +403,103 @@ return true;
     )
     summary["terminalSubmits"] += 1
 
+    initial_incident_rows = exec_js(
+        session_id,
+        """
+const clearSearch = document.getElementById('incident-history-search-clear-button');
+if (clearSearch && !clearSearch.disabled) {
+  clearSearch.click();
+}
+const status = document.getElementById('incident-history-status-filter');
+if (status) {
+  status.value = '';
+  status.dispatchEvent(new Event('change', { bubbles: true }));
+}
+const timeRange = document.getElementById('incident-history-time-range');
+if (timeRange) {
+  timeRange.value = 'any';
+  timeRange.dispatchEvent(new Event('change', { bubbles: true }));
+}
+const timeFrom = document.getElementById('incident-history-time-from');
+if (timeFrom) {
+  timeFrom.value = '';
+  timeFrom.dispatchEvent(new Event('change', { bubbles: true }));
+}
+const timeTo = document.getElementById('incident-history-time-to');
+if (timeTo) {
+  timeTo.value = '';
+  timeTo.dispatchEvent(new Event('change', { bubbles: true }));
+}
+const quickAll = document.getElementById('incident-history-quick-all-button');
+if (quickAll && !quickAll.disabled) {
+  quickAll.click();
+}
+return document.querySelectorAll('[data-incident-history-entry-id]').length;
+""",
+    )
+
     for index in (1, 2):
-        opened_run = exec_js(
+        selected_run_id = exec_js(
             session_id,
             """
-const runButton = document.querySelector('#runs-content [data-run-id]');
-if (!runButton) return false;
-runButton.click();
-return true;
+const current = String(document.getElementById('run-detail-content')?.dataset?.selectedRunId || '');
+const runButtons = Array.from(document.querySelectorAll('#runs-content [data-run-id]'));
+if (!runButtons.length) return '';
+const currentButton = runButtons.find((node) => String(node.getAttribute('data-run-id') || '') === current);
+const alternateButton = runButtons.find((node) => String(node.getAttribute('data-run-id') || '') !== current);
+const target = currentButton || alternateButton || runButtons[0];
+const runId = String(target.getAttribute('data-run-id') || '');
+if (!runId) return '';
+if (runId !== current) {
+  target.click();
+}
+return runId;
 """,
         )
-        if not opened_run:
+        if not selected_run_id:
             raise RuntimeError("Could not open run detail before incident export.")
         wait_until(
             session_id,
             """
+const selected = String(document.getElementById('run-detail-content')?.dataset?.selectedRunId || '');
 const text = String(document.getElementById('run-detail-content')?.textContent || '');
-return !text.includes('Select a run to view detail.');
+return selected === arguments[0] && !text.includes('Select a run to view detail.');
 """,
+            [selected_run_id],
             timeout=20,
             label=f"run detail before incident export {index}",
         )
 
         click_button(session_id, "audit-export-incident-button")
-        wait_until(
-            session_id,
-            """
+        try:
+            wait_until(
+                session_id,
+                """
 const expectedCount = arguments[0];
 return document.querySelectorAll('[data-incident-history-entry-id]').length >= expectedCount;
 """,
-            [index],
-            timeout=20,
-            label=f"incident export queue growth {index}",
-        )
+                [int(initial_incident_rows or 0) + index],
+                timeout=20,
+                label=f"incident export queue growth {index}",
+            )
+        except RuntimeError as err:
+            queue_debug = exec_js(
+                session_id,
+                """
+return {
+  count: document.querySelectorAll('[data-incident-history-entry-id]').length,
+  ids: Array.from(document.querySelectorAll('[data-incident-history-entry-id]')).map((node) => String(node.getAttribute('data-incident-history-entry-id') || '')),
+  packages: Array.from(document.querySelectorAll('[data-incident-history-entry-id] .title')).map((node) => String(node.textContent || '').trim()),
+  statusFilter: String(document.getElementById('incident-history-status-filter')?.value || ''),
+  search: String(document.getElementById('incident-history-search-input')?.value || ''),
+  timeRange: String(document.getElementById('incident-history-time-range')?.value || ''),
+  auditFeedback: String(document.getElementById('audit-feedback')?.textContent || document.getElementById('auditops-feedback')?.textContent || '').trim()
+};
+""",
+            )
+            raise RuntimeError(
+                f"incident export queue growth {index} failed; debug={queue_debug!r}"
+            ) from err
         summary["incidentExports"] += 1
         time.sleep(0.25)
 

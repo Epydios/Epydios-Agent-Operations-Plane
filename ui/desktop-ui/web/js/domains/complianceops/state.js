@@ -63,6 +63,22 @@ function uniqueValues(items = []) {
   return Array.from(new Set((Array.isArray(items) ? items : []).map((item) => normalizeString(item)).filter(Boolean)));
 }
 
+function buildUniqueOptions(items = []) {
+  const map = new Map();
+  for (const item of Array.isArray(items) ? items : []) {
+    const value = normalizeString(item?.value);
+    if (!value || map.has(value)) {
+      continue;
+    }
+    map.set(value, {
+      value,
+      label: normalizeString(item?.label, value),
+      code: Boolean(item?.code)
+    });
+  }
+  return Array.from(map.values());
+}
+
 function approvalStatus(item = {}) {
   const status = normalizeString(item?.status).toUpperCase();
   return status || "UNLINKED";
@@ -241,6 +257,226 @@ function retentionTone(summary = {}) {
   return "neutral";
 }
 
+function normalizeComplianceAdminFeedback(feedback = null) {
+  if (!feedback || typeof feedback !== "object") {
+    return null;
+  }
+  const message = normalizeString(feedback.message);
+  if (!message) {
+    return null;
+  }
+  return {
+    tone: normalizeString(feedback.tone, "info").toLowerCase(),
+    message
+  };
+}
+
+function normalizeComplianceAdminDecision(decision = null) {
+  if (!decision || typeof decision !== "object") {
+    return null;
+  }
+  const decisionId = normalizeString(decision.decisionId);
+  const status = normalizeString(decision.status).toLowerCase();
+  const reason = normalizeString(decision.reason);
+  const decidedAt = normalizeString(decision.decidedAt);
+  const approvalReceiptId = normalizeString(decision.approvalReceiptId);
+  if (!decisionId && !status && !reason && !decidedAt && !approvalReceiptId) {
+    return null;
+  }
+  return {
+    decisionId,
+    status,
+    reason,
+    decidedAt,
+    approvalReceiptId,
+    actorRef: normalizeString(decision.actorRef)
+  };
+}
+
+function normalizeComplianceAdminReceipt(receipt = null) {
+  if (!receipt || typeof receipt !== "object") {
+    return null;
+  }
+  const receiptId = normalizeString(receipt.receiptId);
+  const issuedAt = normalizeString(receipt.issuedAt);
+  const summary = normalizeString(receipt.summary);
+  const stableRef = normalizeString(receipt.stableRef);
+  if (!receiptId && !issuedAt && !summary && !stableRef) {
+    return null;
+  }
+  return {
+    receiptId,
+    issuedAt,
+    summary,
+    stableRef,
+    approvalReceiptId: normalizeString(receipt.approvalReceiptId),
+    executionId: normalizeString(receipt.executionId)
+  };
+}
+
+function normalizeComplianceAdminExecution(execution = null) {
+  if (!execution || typeof execution !== "object") {
+    return null;
+  }
+  const executionId = normalizeString(execution.executionId);
+  const executedAt = normalizeString(execution.executedAt);
+  const status = normalizeString(execution.status).toLowerCase();
+  const summary = normalizeString(execution.summary);
+  if (!executionId && !executedAt && !status && !summary) {
+    return null;
+  }
+  return {
+    executionId,
+    executedAt,
+    status,
+    summary,
+    actorRef: normalizeString(execution.actorRef)
+  };
+}
+
+function normalizeComplianceAdminRollback(rollback = null) {
+  if (!rollback || typeof rollback !== "object") {
+    return null;
+  }
+  const rollbackId = normalizeString(rollback.rollbackId);
+  const action = normalizeString(rollback.action).toLowerCase();
+  const status = normalizeString(rollback.status).toLowerCase();
+  const rolledBackAt = normalizeString(rollback.rolledBackAt);
+  const summary = normalizeString(rollback.summary);
+  const stableRef = normalizeString(rollback.stableRef);
+  if (!rollbackId && !action && !status && !rolledBackAt && !summary && !stableRef) {
+    return null;
+  }
+  return {
+    rollbackId,
+    action,
+    status,
+    rolledBackAt,
+    summary,
+    stableRef,
+    reason: normalizeString(rollback.reason),
+    actorRef: normalizeString(rollback.actorRef),
+    approvalReceiptId: normalizeString(rollback.approvalReceiptId),
+    adminReceiptId: normalizeString(rollback.adminReceiptId),
+    executionId: normalizeString(rollback.executionId)
+  };
+}
+
+function normalizeComplianceAdminHistory(items = []) {
+  if (!Array.isArray(items)) {
+    return [];
+  }
+  return items
+    .map((item) => {
+      const entry = item && typeof item === "object" ? item : {};
+      const label = normalizeString(entry.label || entry.stage);
+      const at = normalizeString(entry.at || entry.rolledBackAt || entry.executedAt || entry.updatedAt);
+      const summary = normalizeString(entry.summary);
+      if (!label && !at && !summary) {
+        return null;
+      }
+      return {
+        label: label || "History",
+        at,
+        summary
+      };
+    })
+    .filter(Boolean);
+}
+
+function normalizeComplianceAdminDraft(draft = null, defaults = {}) {
+  const input = draft && typeof draft === "object" ? draft : {};
+  return {
+    changeKind: normalizeString(input.changeKind || defaults.changeKind, "attestation").toLowerCase(),
+    subjectId: normalizeString(input.subjectId || defaults.subjectId),
+    targetScope: normalizeString(input.targetScope || defaults.targetScope, "workspace"),
+    controlBoundary: normalizeString(input.controlBoundary || defaults.controlBoundary, "control_scope"),
+    reason: normalizeString(input.reason)
+  };
+}
+
+function normalizeComplianceAdminQueueItems(items = []) {
+  if (!Array.isArray(items)) {
+    return [];
+  }
+  return items
+    .map((item) => {
+      const entry = item && typeof item === "object" ? item : {};
+      const id = normalizeString(entry.id);
+      if (!id) {
+        return null;
+      }
+      return {
+        id,
+        ownerDomain: normalizeString(entry.ownerDomain || entry.domain, "complianceops").toLowerCase(),
+        kind: normalizeString(entry.kind, "compliance").toLowerCase(),
+        label: normalizeString(entry.label, "Attestation And Exception Draft"),
+        requestedAction: normalizeString(entry.requestedAction, "proposal"),
+        subjectId: normalizeString(entry.subjectId, "-"),
+        subjectLabel: normalizeString(entry.subjectLabel, "proposal").toLowerCase(),
+        targetScope: normalizeString(entry.targetScope, "-"),
+        targetLabel: normalizeString(entry.targetLabel, "scope").toLowerCase(),
+        changeKind: normalizeString(entry.changeKind, "attestation").toLowerCase(),
+        controlBoundary: normalizeString(entry.controlBoundary, "-"),
+        status: normalizeString(entry.status, "draft").toLowerCase(),
+        reason: normalizeString(entry.reason),
+        summary: normalizeString(entry.summary),
+        simulationSummary: normalizeString(entry.simulationSummary),
+        createdAt: normalizeString(entry.createdAt),
+        simulatedAt: normalizeString(entry.simulatedAt),
+        updatedAt: normalizeString(entry.updatedAt),
+        routedAt: normalizeString(entry.routedAt),
+        decision: normalizeComplianceAdminDecision(entry.decision || null),
+        execution: normalizeComplianceAdminExecution(entry.execution || null),
+        receipt: normalizeComplianceAdminReceipt(entry.receipt || null),
+        rollback: normalizeComplianceAdminRollback(entry.rollback || null),
+        history: normalizeComplianceAdminHistory(entry.history || [])
+      };
+    })
+    .filter(Boolean);
+}
+
+function normalizeComplianceAdminSimulation(simulation = null) {
+  if (!simulation || typeof simulation !== "object") {
+    return null;
+  }
+  const title = normalizeString(simulation.title);
+  const summary = normalizeString(simulation.summary);
+  const facts = Array.isArray(simulation.facts)
+    ? simulation.facts
+        .map((fact) => {
+          const item = fact && typeof fact === "object" ? fact : {};
+          const label = normalizeString(item.label);
+          const value = normalizeString(item.value);
+          if (!label || !value) {
+            return null;
+          }
+          return {
+            label,
+            value,
+            code: Boolean(item.code)
+          };
+        })
+        .filter(Boolean)
+    : [];
+  const findings = Array.isArray(simulation.findings)
+    ? simulation.findings.map((entry) => normalizeString(entry)).filter(Boolean)
+    : [];
+  if (!title && !summary && facts.length === 0 && findings.length === 0) {
+    return null;
+  }
+  return {
+    changeId: normalizeString(simulation.changeId),
+    kind: normalizeString(simulation.kind, "compliance").toLowerCase(),
+    tone: normalizeString(simulation.tone, "info").toLowerCase(),
+    title: title || "Compliance admin dry-run",
+    summary,
+    updatedAt: normalizeString(simulation.updatedAt),
+    facts,
+    findings
+  };
+}
+
 function summarizeControlRecord(run = {}, approvalsByRunId) {
   const richness = derivePolicyRichness(run);
   const runId = normalizeString(run?.runId);
@@ -285,6 +521,7 @@ export function createComplianceWorkspaceSnapshot(context = {}) {
   const aimxsActivation = readObject(context?.aimxsActivation);
   const exportProfiles = readObject(context?.exportProfiles);
   const orgAdminProfiles = readObject(context?.orgAdminProfiles);
+  const viewState = readObject(context?.viewState);
   const retentionDefaults = resolveRetentionDefaults(settings);
   const approvalsByRunId = buildApprovalLookup(approvals);
   const controlRecords = runs
@@ -334,6 +571,58 @@ export function createComplianceWorkspaceSnapshot(context = {}) {
   }, 0);
   const residencyExceptionCount = exceptionProfiles.filter((item) => item.category === "residency").length;
   const legalHoldExceptionCount = exceptionProfiles.filter((item) => item.category === "legal_hold").length;
+  const targetScopeOptions = buildUniqueOptions(
+    controlRecords.map((item) => ({
+      value: item.scope,
+      label: item.scope,
+      code: true
+    }))
+  );
+  const controlBoundaryOptions = buildUniqueOptions(
+    uniqueValues([
+      ...controlRecords.map((item) => item.boundaryClass),
+      ...boundaryRequirements
+    ]).map((value) => ({
+      value,
+      label: value
+    }))
+  );
+  const attestationOptions = buildUniqueOptions(
+    controlRecords.map((item) => ({
+      value: item.runId || `${item.scope}:${item.boundaryClass}`,
+      label: `${item.scope || "-"} • ${item.boundaryClass || "-"} • ${item.decision || "-"}`,
+      code: Boolean(item.runId)
+    }))
+  );
+  const exceptionOptions = buildUniqueOptions(
+    exceptionProfiles.map((item) => ({
+      value: item.label || item.category,
+      label: item.category ? `${item.label || item.category} • ${item.category}` : item.label || item.category
+    }))
+  );
+  const defaultChangeKind =
+    coveredCount > 0 || attestationOptions.length > 0
+      ? "attestation"
+      : exceptionOptions.length > 0
+        ? "exception"
+        : "attestation";
+  const adminDefaults = {
+    changeKind: defaultChangeKind,
+    subjectId:
+      defaultChangeKind === "exception"
+        ? exceptionOptions[0]?.value || ""
+        : attestationOptions[0]?.value || exceptionOptions[0]?.value || "",
+    targetScope: latestControl.scope || targetScopeOptions[0]?.value || normalizeString(pipeline?.environment, "workspace"),
+    controlBoundary:
+      latestControl.boundaryClass ||
+      controlBoundaryOptions[0]?.value ||
+      "control_scope",
+    reason: ""
+  };
+  const adminQueueItems = normalizeComplianceAdminQueueItems(viewState.queueItems || []);
+  const selectedAdminChangeId = normalizeString(viewState.selectedAdminChangeId);
+  const selectedAdminQueueItem =
+    adminQueueItems.find((item) => item.id === selectedAdminChangeId) || adminQueueItems[0] || null;
 
   return {
     controlCoverageBoard: {
@@ -448,6 +737,39 @@ export function createComplianceWorkspaceSnapshot(context = {}) {
         residencyExceptionCount,
         legalHoldExceptionCount
       })
+    },
+    admin: {
+      feedback: normalizeComplianceAdminFeedback(viewState?.feedback || null),
+      selectedChangeId: selectedAdminQueueItem ? selectedAdminQueueItem.id : selectedAdminChangeId,
+      selectedQueueItem: selectedAdminQueueItem,
+      queueItems: adminQueueItems,
+      draft: normalizeComplianceAdminDraft(viewState?.adminDraft || {}, adminDefaults),
+      latestSimulation: normalizeComplianceAdminSimulation(viewState?.latestSimulation || null),
+      recoveryReason: normalizeString(viewState?.recoveryReason),
+      currentScope: {
+        targetScope: adminDefaults.targetScope,
+        controlBoundary: adminDefaults.controlBoundary,
+        attestationOptions,
+        exceptionOptions,
+        targetScopeOptions,
+        controlBoundaryOptions,
+        coveredCount,
+        blockedCount,
+        gapCount,
+        pendingApprovalCount,
+        evidenceLinkedCount,
+        exportProfileCount: desktopExportProfiles.length,
+        latestRunId: latestControl.runId || "-",
+        latestCoverageStatus: latestControl.coverageStatus || "-",
+        latestApprovalStatus: latestControl.approvalStatus || "-",
+        firstProfileLabel: firstDesktopExportProfile.label || "-",
+        firstAudience: firstDesktopExportProfile.defaultAudience || allowedAudiences[0] || "-",
+        firstRedactionMode: firstDesktopExportProfile.redactionMode || redactionModes[0] || "-",
+        residencyExceptionCount,
+        legalHoldExceptionCount,
+        firstDecisionSurface: decisionSurfaces[0] || "-",
+        firstBoundaryRequirement: boundaryRequirements[0] || "-"
+      }
     }
   };
 }

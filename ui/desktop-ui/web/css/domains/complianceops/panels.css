@@ -3,7 +3,22 @@
   gap: 1rem;
 }
 
+.complianceops-admin-grid,
+.complianceops-primary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.complianceops-admin-grid > .complianceops-card-wide,
+.complianceops-primary-grid > .complianceops-card-wide,
+.complianceops-card-wide {
+  grid-column: 1 / -1;
+}
+
 .complianceops-card {
+  display: grid;
+  gap: 0.85rem;
   border: 1px solid var(--line);
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--ok) 8%, var(--surface)), color-mix(in srgb, var(--panel) 78%, var(--surface))),
@@ -11,11 +26,34 @@
   box-shadow: var(--shadow-1), var(--shadow-inset);
 }
 
+.complianceops-feedback-panel .metric {
+  border: 1px solid var(--line);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--primary-bg) 10%, var(--surface)), color-mix(in srgb, var(--panel) 74%, var(--surface))),
+    var(--surface-raised);
+}
+
 .complianceops-chip-row {
   display: flex;
   flex-wrap: wrap;
   gap: 0.45rem;
   margin-top: 0.65rem;
+}
+
+.complianceops-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.complianceops-admin-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.85rem;
+}
+
+.complianceops-field-wide {
+  grid-column: 1 / -1;
 }
 
 .complianceops-kv-list {
@@ -108,6 +146,65 @@
   text-transform: uppercase;
   color: var(--ink-soft);
   margin-bottom: 0.55rem;
+}
+
+.complianceops-queue-grid {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.complianceops-queue-card {
+  display: grid;
+  gap: 0.7rem;
+  padding: 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+  border-radius: var(--radius-2);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface) 94%, transparent), color-mix(in srgb, var(--panel) 82%, transparent)),
+    var(--surface-raised);
+  box-shadow: var(--shadow-1), var(--shadow-inset);
+}
+
+.complianceops-findings-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.35rem;
+  color: var(--ink);
+}
+
+.complianceops-history-list {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.complianceops-history-item {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+  border-radius: var(--radius-2);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface) 94%, transparent), color-mix(in srgb, var(--panel) 82%, transparent)),
+    var(--surface-raised);
+  box-shadow: var(--shadow-inset);
+}
+
+.complianceops-history-stage {
+  font-size: var(--font-size-2xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.complianceops-history-time {
+  font-size: var(--font-size-xs);
+  color: var(--ink-soft);
+}
+
+.complianceops-history-summary {
+  color: var(--ink);
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 900px) {

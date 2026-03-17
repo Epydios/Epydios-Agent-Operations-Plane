@@ -107,6 +107,209 @@ function countItemsMissingList(items = [], key) {
   return (Array.isArray(items) ? items : []).filter((item) => readStringArray(item?.[key]).length === 0).length;
 }
 
+function normalizeString(value, fallback = "") {
+  const normalized = String(value || "").trim();
+  return normalized || fallback;
+}
+
+function normalizePolicyAdminFeedback(feedback = null) {
+  if (!feedback || typeof feedback !== "object") {
+    return null;
+  }
+  const message = normalizeString(feedback.message);
+  if (!message) {
+    return null;
+  }
+  return {
+    tone: normalizeString(feedback.tone, "info").toLowerCase(),
+    message
+  };
+}
+
+function normalizePolicyAdminDecision(decision = null) {
+  if (!decision || typeof decision !== "object") {
+    return null;
+  }
+  const decisionId = normalizeString(decision.decisionId);
+  const status = normalizeString(decision.status).toLowerCase();
+  const reason = normalizeString(decision.reason);
+  const decidedAt = normalizeString(decision.decidedAt);
+  const approvalReceiptId = normalizeString(decision.approvalReceiptId);
+  if (!decisionId && !status && !reason && !decidedAt && !approvalReceiptId) {
+    return null;
+  }
+  return {
+    decisionId,
+    status,
+    reason,
+    decidedAt,
+    approvalReceiptId,
+    actorRef: normalizeString(decision.actorRef)
+  };
+}
+
+function normalizePolicyAdminReceipt(receipt = null) {
+  if (!receipt || typeof receipt !== "object") {
+    return null;
+  }
+  const receiptId = normalizeString(receipt.receiptId);
+  const issuedAt = normalizeString(receipt.issuedAt);
+  const summary = normalizeString(receipt.summary);
+  const stableRef = normalizeString(receipt.stableRef);
+  if (!receiptId && !issuedAt && !summary && !stableRef) {
+    return null;
+  }
+  return {
+    receiptId,
+    issuedAt,
+    summary,
+    stableRef,
+    approvalReceiptId: normalizeString(receipt.approvalReceiptId),
+    executionId: normalizeString(receipt.executionId)
+  };
+}
+
+function normalizePolicyAdminExecution(execution = null) {
+  if (!execution || typeof execution !== "object") {
+    return null;
+  }
+  const executionId = normalizeString(execution.executionId);
+  const executedAt = normalizeString(execution.executedAt);
+  const status = normalizeString(execution.status).toLowerCase();
+  const summary = normalizeString(execution.summary);
+  if (!executionId && !executedAt && !status && !summary) {
+    return null;
+  }
+  return {
+    executionId,
+    executedAt,
+    status,
+    summary,
+    actorRef: normalizeString(execution.actorRef)
+  };
+}
+
+function normalizePolicyAdminRollback(rollback = null) {
+  if (!rollback || typeof rollback !== "object") {
+    return null;
+  }
+  const rollbackId = normalizeString(rollback.rollbackId);
+  const action = normalizeString(rollback.action).toLowerCase();
+  const status = normalizeString(rollback.status).toLowerCase();
+  const rolledBackAt = normalizeString(rollback.rolledBackAt);
+  const summary = normalizeString(rollback.summary);
+  const stableRef = normalizeString(rollback.stableRef);
+  if (!rollbackId && !action && !status && !rolledBackAt && !summary && !stableRef) {
+    return null;
+  }
+  return {
+    rollbackId,
+    action,
+    status,
+    rolledBackAt,
+    summary,
+    stableRef,
+    reason: normalizeString(rollback.reason),
+    actorRef: normalizeString(rollback.actorRef),
+    approvalReceiptId: normalizeString(rollback.approvalReceiptId),
+    adminReceiptId: normalizeString(rollback.adminReceiptId),
+    executionId: normalizeString(rollback.executionId)
+  };
+}
+
+function normalizePolicyAdminDraft(draft = null, defaults = {}) {
+  const input = draft && typeof draft === "object" ? draft : {};
+  return {
+    changeKind: normalizeString(input.changeKind || defaults.changeKind, "load").toLowerCase(),
+    packId: normalizeString(input.packId || defaults.packId),
+    providerId: normalizeString(input.providerId || defaults.providerId),
+    targetScope: normalizeString(input.targetScope || defaults.targetScope, "workspace"),
+    reason: normalizeString(input.reason)
+  };
+}
+
+function normalizePolicyAdminQueueItems(items = []) {
+  if (!Array.isArray(items)) {
+    return [];
+  }
+  return items
+    .map((item) => {
+      const entry = item && typeof item === "object" ? item : {};
+      const id = normalizeString(entry.id);
+      if (!id) {
+        return null;
+      }
+      return {
+        id,
+        ownerDomain: normalizeString(entry.ownerDomain || entry.domain, "policyops").toLowerCase(),
+        kind: normalizeString(entry.kind, "policy").toLowerCase(),
+        label: normalizeString(entry.label, "Policy Pack Load And Activation Draft"),
+        requestedAction: normalizeString(entry.requestedAction, "proposal"),
+        subjectId: normalizeString(entry.subjectId, "-"),
+        subjectLabel: normalizeString(entry.subjectLabel, "pack").toLowerCase(),
+        targetScope: normalizeString(entry.targetScope, "-"),
+        targetLabel: normalizeString(entry.targetLabel, "scope").toLowerCase(),
+        changeKind: normalizeString(entry.changeKind, "load").toLowerCase(),
+        packId: normalizeString(entry.packId),
+        providerId: normalizeString(entry.providerId),
+        status: normalizeString(entry.status, "draft").toLowerCase(),
+        reason: normalizeString(entry.reason),
+        summary: normalizeString(entry.summary),
+        simulationSummary: normalizeString(entry.simulationSummary),
+        createdAt: normalizeString(entry.createdAt),
+        simulatedAt: normalizeString(entry.simulatedAt),
+        updatedAt: normalizeString(entry.updatedAt),
+        routedAt: normalizeString(entry.routedAt),
+        decision: normalizePolicyAdminDecision(entry.decision || null),
+        execution: normalizePolicyAdminExecution(entry.execution || null),
+        receipt: normalizePolicyAdminReceipt(entry.receipt || null),
+        rollback: normalizePolicyAdminRollback(entry.rollback || null)
+      };
+    })
+    .filter(Boolean);
+}
+
+function normalizePolicyAdminSimulation(simulation = null) {
+  if (!simulation || typeof simulation !== "object") {
+    return null;
+  }
+  const title = normalizeString(simulation.title);
+  const summary = normalizeString(simulation.summary);
+  const facts = Array.isArray(simulation.facts)
+    ? simulation.facts
+        .map((fact) => {
+          const item = fact && typeof fact === "object" ? fact : {};
+          const label = normalizeString(item.label);
+          const value = normalizeString(item.value);
+          if (!label || !value) {
+            return null;
+          }
+          return {
+            label,
+            value,
+            code: Boolean(item.code)
+          };
+        })
+        .filter(Boolean)
+    : [];
+  const findings = Array.isArray(simulation.findings)
+    ? simulation.findings.map((entry) => normalizeString(entry)).filter(Boolean)
+    : [];
+  if (!title && !summary && facts.length === 0 && findings.length === 0) {
+    return null;
+  }
+  return {
+    changeId: normalizeString(simulation.changeId),
+    kind: normalizeString(simulation.kind, "policy").toLowerCase(),
+    tone: normalizeString(simulation.tone, "info").toLowerCase(),
+    title: title || "Policy admin dry-run",
+    summary,
+    updatedAt: normalizeString(simulation.updatedAt),
+    facts,
+    findings
+  };
+}
+
 export function derivePolicyRichness(run) {
   const requestPayload = readObject(run?.requestPayload);
   const requestMeta = readObject(requestPayload.meta);
@@ -287,6 +490,15 @@ function selectLatestPolicyRun(items = []) {
   return ranked[0] || null;
 }
 
+function buildPolicyScopeLabel(tenantValues = [], projectValues = []) {
+  const tenant = readStringArray(tenantValues)[0] || "";
+  const project = readStringArray(projectValues)[0] || "";
+  if (tenant && project) {
+    return `${tenant} / ${project}`;
+  }
+  return tenant || project || "workspace";
+}
+
 export function createPolicyWorkspaceSnapshot(context = {}) {
   const settings = context?.settings && typeof context.settings === "object" ? context.settings : {};
   const runs = context?.runs && typeof context.runs === "object" ? context.runs : {};
@@ -301,12 +513,36 @@ export function createPolicyWorkspaceSnapshot(context = {}) {
   const activePack = policyCatalogItems[0] || {};
   const feedbackMessage = String(viewState?.feedback?.message || "").trim();
   const simulationRefreshedAt = String(viewState?.simulationRefreshedAt || "").trim();
+  const providerId = String(
+    settings?.aimxs?.activation?.selectedProviderId ||
+      decisionRichness?.providerId ||
+      latestPolicyRun?.run?.selectedPolicyProvider ||
+      ""
+  ).trim();
+  const runtimeIdentityActor =
+    runtimeIdentity?.identity && typeof runtimeIdentity.identity === "object" ? runtimeIdentity.identity : {};
+  const defaultTargetScope = buildPolicyScopeLabel(
+    decisionRichness?.authorityTenantScopes || runtimeIdentityActor?.tenantIds,
+    decisionRichness?.authorityProjectScopes || runtimeIdentityActor?.projectIds
+  );
+  const adminDefaults = {
+    changeKind: "load",
+    packId: String(activePack?.packId || "").trim(),
+    providerId,
+    targetScope: defaultTargetScope
+  };
+  const adminQueueItems = normalizePolicyAdminQueueItems(viewState?.queueItems || []);
+  const selectedAdminChangeId = normalizeString(viewState?.selectedAdminChangeId);
+  const selectedAdminQueueItem =
+    adminQueueItems.find((item) => item.id === selectedAdminChangeId) ||
+    adminQueueItems.find((item) => item.status === "routed") ||
+    adminQueueItems.find((item) => item.status === "simulated") ||
+    adminQueueItems[0] ||
+    null;
   const stableReferences = {
     contractId: String(decisionRichness?.contractId || "").trim(),
     runId: String(latestPolicyRun?.run?.runId || "").trim(),
-    providerId: String(
-      decisionRichness?.providerId || latestPolicyRun?.run?.selectedPolicyProvider || ""
-    ).trim(),
+    providerId: String(decisionRichness?.providerId || latestPolicyRun?.run?.selectedPolicyProvider || providerId).trim(),
     packId: String(activePack?.packId || "").trim(),
     boundaryClass: String(decisionRichness?.boundaryClass || "").trim(),
     riskTier: String(decisionRichness?.riskTier || "").trim(),
@@ -327,6 +563,7 @@ export function createPolicyWorkspaceSnapshot(context = {}) {
     policyCatalogItems,
     currentContract: {
       providerLabel: policyProviderLabel(settings),
+      providerId,
       mode: String(settings?.aimxs?.mode || "").trim(),
       catalogSource: summarizePolicyDataSource(policyCatalog?.source || "unknown"),
       packCount: policyCatalog?.count || policyCatalogItems.length || 0,
@@ -416,7 +653,43 @@ export function createPolicyWorkspaceSnapshot(context = {}) {
               ? "warn"
               : String(decisionRichness?.decision || "").trim().toUpperCase() === "DENY"
                 ? "danger"
-                : "neutral"
+              : "neutral"
+    },
+    admin: {
+      feedback: normalizePolicyAdminFeedback(viewState?.feedback || null),
+      selectedChangeId: selectedAdminQueueItem ? selectedAdminQueueItem.id : selectedAdminChangeId,
+      selectedQueueItem: selectedAdminQueueItem,
+      recoveryReason: normalizeString(viewState?.recoveryReason),
+      queueItems: adminQueueItems,
+      draft: normalizePolicyAdminDraft(viewState?.adminDraft || {}, adminDefaults),
+      latestSimulation: normalizePolicyAdminSimulation(viewState?.latestSimulation || null),
+      currentScope: {
+        currentPackId: String(activePack?.packId || "").trim() || "-",
+        currentPackLabel: String(activePack?.label || "").trim() || "-",
+        currentProviderId: providerId || "-",
+        currentProviderLabel: policyProviderLabel(settings),
+        defaultTargetScope,
+        contractId: String(decisionRichness?.contractId || "").trim() || "-",
+        boundaryClass: String(decisionRichness?.boundaryClass || "").trim() || "-",
+        riskTier: String(decisionRichness?.riskTier || "").trim() || "-",
+        latestDecision: String(decisionRichness?.decision || "").trim().toUpperCase() || "-",
+        latestRunId: String(latestPolicyRun?.run?.runId || "").trim() || "-",
+        catalogSource: summarizePolicyDataSource(policyCatalog?.source || "unknown"),
+        packCount: policyCatalog?.count || policyCatalogItems.length || 0,
+        decisionSurfaceCount: uniqueCountFromItems(policyCatalogItems, "decisionSurfaces"),
+        boundaryRequirementCount: uniqueCountFromItems(policyCatalogItems, "boundaryRequirements"),
+        packsMissingDecisionSurfaces: countItemsMissingList(policyCatalogItems, "decisionSurfaces"),
+        packsMissingBoundaryRequirements: countItemsMissingList(policyCatalogItems, "boundaryRequirements"),
+        providerOptions: [
+          ...new Set(
+            [
+              providerId,
+              String(decisionRichness?.providerId || "").trim(),
+              String(latestPolicyRun?.run?.selectedPolicyProvider || "").trim()
+            ].filter(Boolean)
+          )
+        ]
+      }
     }
   };
 }

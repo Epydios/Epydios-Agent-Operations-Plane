@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { renderGovernanceOpsEmptyState, renderGovernanceOpsPage } from "../domains/governanceops/routes.js";
 
-test("governanceops page renders approval queue, authority ladder, and decision receipt", () => {
+test("governanceops page renders runtime approvals plus identity admin proposal review", () => {
   const ui = { governanceOpsContent: { innerHTML: "" } };
   renderGovernanceOpsPage(ui, {
     settings: {
@@ -131,10 +131,30 @@ test("governanceops page renders approval queue, authority ladder, and decision 
         client_id: "epydiosops-desktop-local"
       }
     },
+    adminQueueItems: [
+      {
+        id: "authority-change-001",
+        kind: "authority",
+        label: "Authority Change Draft",
+        requestedAction: "set project_admin",
+        subjectId: "demo.operator",
+        targetScope: "tenant-demo / project-core",
+        status: "routed",
+        reason: "Project operator coverage needs temporary admin review.",
+        summary: "project_admin for demo.operator @ tenant-demo / project-core",
+        simulationSummary: "Preview only. This authority proposal requires GovernanceOps approval before a live authority mutation can execute.",
+        updatedAt: "2026-03-15T10:11:00Z",
+        routedAt: "2026-03-15T10:12:00Z"
+      }
+    ],
+    viewState: {
+      selectedAdminChangeId: "authority-change-001"
+    },
     now: "2026-03-14T21:05:00Z"
   });
 
   assert.match(ui.governanceOpsContent.innerHTML, /data-domain-root="governanceops"/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Admin Proposal Review/);
   assert.match(ui.governanceOpsContent.innerHTML, /Approval Queue/);
   assert.match(ui.governanceOpsContent.innerHTML, /Authority Ladder/);
   assert.match(ui.governanceOpsContent.innerHTML, /Decision Receipt/);
@@ -150,6 +170,7 @@ test("governanceops page renders approval queue, authority ladder, and decision 
   assert.match(ui.governanceOpsContent.innerHTML, /bearer_token_jwt/);
   assert.match(ui.governanceOpsContent.innerHTML, /runtime\.auth\.context/);
   assert.match(ui.governanceOpsContent.innerHTML, /runtime-approval-endpoint/);
+  assert.match(ui.governanceOpsContent.innerHTML, /identityops-admin/);
   assert.match(ui.governanceOpsContent.innerHTML, /aimxs-policy-primary/);
   assert.match(ui.governanceOpsContent.innerHTML, /recorded/);
   assert.match(ui.governanceOpsContent.innerHTML, /grant token/);
@@ -161,10 +182,17 @@ test("governanceops page renders approval queue, authority ladder, and decision 
   assert.match(ui.governanceOpsContent.innerHTML, /role-scoped/);
   assert.match(ui.governanceOpsContent.innerHTML, /scope-bound/);
   assert.match(ui.governanceOpsContent.innerHTML, /exception-linked/);
+  assert.match(ui.governanceOpsContent.innerHTML, /authority-change-001/);
+  assert.match(ui.governanceOpsContent.innerHTML, /tenant-demo \/ project-core/);
+  assert.match(ui.governanceOpsContent.innerHTML, /project_admin for demo\.operator @ tenant-demo \/ project-core/);
   assert.match(ui.governanceOpsContent.innerHTML, /data-governanceops-decision="APPROVE"/);
   assert.match(ui.governanceOpsContent.innerHTML, /data-governanceops-decision="DENY"/);
   assert.match(ui.governanceOpsContent.innerHTML, /data-governanceops-routing-action="DEFER"/);
   assert.match(ui.governanceOpsContent.innerHTML, /data-governanceops-routing-action="ESCALATE"/);
+  assert.match(ui.governanceOpsContent.innerHTML, /data-governanceops-decision-admin-change-id="authority-change-001"/);
+  assert.match(ui.governanceOpsContent.innerHTML, /data-governanceops-routing-admin-change-id="authority-change-001"/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Open IdentityOps/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Copy Decision Receipt/);
   assert.match(ui.governanceOpsContent.innerHTML, /Copy Receipt Snapshot/);
   assert.match(ui.governanceOpsContent.innerHTML, /Open AuditOps/);
   assert.match(ui.governanceOpsContent.innerHTML, /Centralized Enterprise Admin Residency Exception/);
@@ -221,6 +249,211 @@ test("governanceops page tolerates approvals without org-admin decision bindings
 
   assert.match(ui.governanceOpsContent.innerHTML, /Override And Exception Posture/);
   assert.match(ui.governanceOpsContent.innerHTML, /approval-no-binding-001/);
+});
+
+test("governanceops admin review renders a routed platform proposal without identity-specific leakage", () => {
+  const ui = { governanceOpsContent: { innerHTML: "" } };
+  renderGovernanceOpsPage(ui, {
+    approvals: { items: [] },
+    runs: { items: [] },
+    orgAdminProfiles: { items: [] },
+    settings: {},
+    session: {},
+    adminQueueItems: [
+      {
+        id: "platform-change-queue-001",
+        ownerDomain: "platformops",
+        kind: "platform",
+        label: "Promotion Draft",
+        requestedAction: "promote staging-full-gate-20260316T200000Z.log",
+        subjectId: "staging-full-gate-20260316T200000Z.log",
+        subjectLabel: "release",
+        targetScope: "staging / aimxs-full",
+        targetLabel: "target",
+        status: "routed",
+        reason: "Promote the verified staging gate after bounded readiness preview.",
+        summary: "Promote staging-full-gate-20260316T200000Z.log to staging / aimxs-full",
+        simulationSummary: "Preview only. This promotion proposal requires GovernanceOps approval before any live platform change can execute.",
+        updatedAt: "2026-03-16T20:21:00Z",
+        routedAt: "2026-03-16T20:22:00Z"
+      }
+    ],
+    viewState: {
+      selectedAdminChangeId: "platform-change-queue-001"
+    }
+  });
+
+  assert.match(ui.governanceOpsContent.innerHTML, /Admin Proposal Review/);
+  assert.match(ui.governanceOpsContent.innerHTML, /owner=platformops/);
+  assert.match(ui.governanceOpsContent.innerHTML, /platformops-admin/);
+  assert.match(ui.governanceOpsContent.innerHTML, /staging-full-gate-20260316T200000Z\.log/);
+  assert.match(ui.governanceOpsContent.innerHTML, /staging \/ aimxs-full/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Open PlatformOps/);
+  assert.match(ui.governanceOpsContent.innerHTML, /data-governanceops-open-admin-owner-domain="platformops"/);
+});
+
+test("governanceops admin review renders a routed guardrail proposal without platform leakage", () => {
+  const ui = { governanceOpsContent: { innerHTML: "" } };
+  renderGovernanceOpsPage(ui, {
+    approvals: { items: [] },
+    runs: { items: [] },
+    orgAdminProfiles: { items: [] },
+    settings: {},
+    session: {},
+    adminQueueItems: [
+      {
+        id: "guardrail-change-queue-001",
+        ownerDomain: "guardrailops",
+        kind: "guardrail",
+        label: "Guardrail Change Draft",
+        requestedAction: "tighten approval_required",
+        subjectId: "sandbox_vm_autonomous",
+        subjectLabel: "profile",
+        targetScope: "tenant-demo / project-core",
+        targetLabel: "scope",
+        status: "routed",
+        reason: "Keep sandbox actuation scoped while approvals remain pending.",
+        summary: "tighten approval_required for tenant-demo / project-core @ sandbox_vm_autonomous",
+        simulationSummary: "Preview only. This tighten guardrail proposal requires GovernanceOps approval before any live guardrail change can execute.",
+        updatedAt: "2026-03-16T22:10:00Z",
+        routedAt: "2026-03-16T22:11:00Z"
+      }
+    ],
+    viewState: {
+      selectedAdminChangeId: "guardrail-change-queue-001"
+    }
+  });
+
+  assert.match(ui.governanceOpsContent.innerHTML, /Admin Proposal Review/);
+  assert.match(ui.governanceOpsContent.innerHTML, /owner=guardrailops/);
+  assert.match(ui.governanceOpsContent.innerHTML, /guardrailops-admin/);
+  assert.match(ui.governanceOpsContent.innerHTML, /sandbox_vm_autonomous/);
+  assert.match(ui.governanceOpsContent.innerHTML, /tenant-demo \/ project-core/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Open GuardrailOps/);
+  assert.match(ui.governanceOpsContent.innerHTML, /data-governanceops-open-admin-owner-domain="guardrailops"/);
+});
+
+test("governanceops admin review renders a routed policy proposal without identity fallback leakage", () => {
+  const ui = { governanceOpsContent: { innerHTML: "" } };
+  renderGovernanceOpsPage(ui, {
+    approvals: { items: [] },
+    runs: { items: [] },
+    orgAdminProfiles: { items: [] },
+    settings: {},
+    session: {},
+    adminQueueItems: [
+      {
+        id: "policy-change-queue-001",
+        ownerDomain: "policyops",
+        kind: "policy",
+        label: "Policy Pack Load And Activation Draft",
+        requestedAction: "activate finance_supervisor_review",
+        subjectId: "finance_supervisor_review",
+        subjectLabel: "pack",
+        targetScope: "tenant-demo / project-finance",
+        targetLabel: "scope",
+        status: "routed",
+        reason: "Route a bounded policy activation preview into governance.",
+        summary: "Activate finance_supervisor_review for tenant-demo / project-finance @ aimxs-policy-primary",
+        simulationSummary: "Preview only. This activate proposal requires GovernanceOps approval before any live policy-pack change can execute.",
+        updatedAt: "2026-03-16T23:20:00Z",
+        routedAt: "2026-03-16T23:21:00Z"
+      }
+    ],
+    viewState: {
+      selectedAdminChangeId: "policy-change-queue-001"
+    }
+  });
+
+  assert.match(ui.governanceOpsContent.innerHTML, /Admin Proposal Review/);
+  assert.match(ui.governanceOpsContent.innerHTML, /owner=policyops/);
+  assert.match(ui.governanceOpsContent.innerHTML, /policyops-admin/);
+  assert.match(ui.governanceOpsContent.innerHTML, /finance_supervisor_review/);
+  assert.match(ui.governanceOpsContent.innerHTML, /tenant-demo \/ project-finance/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Open PolicyOps/);
+  assert.match(ui.governanceOpsContent.innerHTML, /data-governanceops-open-admin-owner-domain="policyops"/);
+});
+
+test("governanceops admin review renders a routed compliance proposal without policy fallback leakage", () => {
+  const ui = { governanceOpsContent: { innerHTML: "" } };
+  renderGovernanceOpsPage(ui, {
+    approvals: { items: [] },
+    runs: { items: [] },
+    orgAdminProfiles: { items: [] },
+    settings: {},
+    session: {},
+    adminQueueItems: [
+      {
+        id: "compliance-change-queue-001",
+        ownerDomain: "complianceops",
+        kind: "compliance",
+        label: "Attestation And Exception Draft",
+        requestedAction: "exception_proposal",
+        subjectId: "Centralized Enterprise Admin Residency Exception",
+        subjectLabel: "exception",
+        targetScope: "tenant-demo / project-payments",
+        targetLabel: "scope",
+        status: "routed",
+        reason: "Route a bounded compliance exception preview into governance.",
+        summary: "Exception Centralized Enterprise Admin Residency Exception for tenant-demo / project-payments @ financial_control",
+        simulationSummary: "Preview only. This exception proposal requires GovernanceOps approval before any live compliance change can execute.",
+        updatedAt: "2026-03-16T23:40:00Z",
+        routedAt: "2026-03-16T23:41:00Z"
+      }
+    ],
+    viewState: {
+      selectedAdminChangeId: "compliance-change-queue-001"
+    }
+  });
+
+  assert.match(ui.governanceOpsContent.innerHTML, /Admin Proposal Review/);
+  assert.match(ui.governanceOpsContent.innerHTML, /owner=complianceops/);
+  assert.match(ui.governanceOpsContent.innerHTML, /complianceops-admin/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Centralized Enterprise Admin Residency Exception/);
+  assert.match(ui.governanceOpsContent.innerHTML, /tenant-demo \/ project-payments/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Open ComplianceOps/);
+  assert.match(ui.governanceOpsContent.innerHTML, /data-governanceops-open-admin-owner-domain="complianceops"/);
+});
+
+test("governanceops admin review renders a routed network proposal without identity fallback leakage", () => {
+  const ui = { governanceOpsContent: { innerHTML: "" } };
+  renderGovernanceOpsPage(ui, {
+    approvals: { items: [] },
+    runs: { items: [] },
+    orgAdminProfiles: { items: [] },
+    settings: {},
+    session: {},
+    adminQueueItems: [
+      {
+        id: "network-change-queue-001",
+        ownerDomain: "networkops",
+        kind: "network",
+        label: "Probe Request Draft",
+        requestedAction: "probe gateway_path runtime-sessions",
+        subjectId: "gateway_path",
+        subjectLabel: "boundary",
+        targetScope: "tenant-demo / project-payments",
+        targetLabel: "scope",
+        status: "routed",
+        reason: "Route a bounded network probe preview into governance.",
+        summary: "Probe Gateway path against Runtime Sessions within tenant-demo / project-payments",
+        simulationSummary: "Preview only. This bounded probe request requires GovernanceOps approval before any live network probe can execute.",
+        updatedAt: "2026-03-17T15:21:00Z",
+        routedAt: "2026-03-17T15:22:00Z"
+      }
+    ],
+    viewState: {
+      selectedAdminChangeId: "network-change-queue-001"
+    }
+  });
+
+  assert.match(ui.governanceOpsContent.innerHTML, /Admin Proposal Review/);
+  assert.match(ui.governanceOpsContent.innerHTML, /owner=networkops/);
+  assert.match(ui.governanceOpsContent.innerHTML, /networkops-admin/);
+  assert.match(ui.governanceOpsContent.innerHTML, /gateway_path/);
+  assert.match(ui.governanceOpsContent.innerHTML, /tenant-demo \/ project-payments/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Open NetworkOps/);
+  assert.match(ui.governanceOpsContent.innerHTML, /data-governanceops-open-admin-owner-domain="networkops"/);
 });
 
 test("governanceops page renders selected recorded review state and operational feedback", () => {

@@ -1,12 +1,24 @@
 .guardrailops-workspace {
   display: grid;
   gap: var(--space-4);
+  width: 100%;
+  min-width: 0;
 }
 
 .guardrailops-primary-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(18rem, 100%), 1fr));
   gap: var(--space-3);
+  width: 100%;
+  min-width: 0;
+}
+
+.guardrailops-admin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(22rem, 100%), 1fr));
+  gap: var(--space-3);
+  width: 100%;
+  min-width: 0;
 }
 
 .guardrailops-card-wide {
@@ -16,6 +28,8 @@
 .guardrailops-card {
   display: grid;
   gap: var(--space-3);
+  min-width: 0;
+  align-content: start;
 }
 
 .guardrailops-chip-row {
@@ -27,6 +41,7 @@
 .guardrailops-kv-list {
   display: grid;
   gap: var(--space-2);
+  min-width: 0;
 }
 
 .guardrailops-row {
@@ -50,12 +65,14 @@
 
 .guardrailops-row-value {
   color: var(--ink);
+  min-width: 0;
 }
 
 .guardrailops-value-group {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
+  min-width: 0;
 }
 
 .guardrailops-value-pill {
@@ -66,6 +83,7 @@
   border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--surface) 92%, var(--panel));
+  min-width: 0;
 }
 
 .guardrailops-value-key {
@@ -78,6 +96,9 @@
 .guardrailops-value-text {
   font-size: var(--font-size-sm);
   color: var(--ink);
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .guardrailops-value-text-code code {
@@ -87,4 +108,107 @@
 .guardrailops-empty {
   color: var(--ink-soft);
   font-size: var(--font-size-sm);
+}
+
+.guardrailops-feedback-shell {
+  display: grid;
+}
+
+.guardrailops-draft-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(14rem, 100%), 1fr));
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.guardrailops-field-wide {
+  grid-column: 1 / -1;
+}
+
+.guardrailops-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.guardrailops-queue-grid {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.guardrailops-queue-card {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--panel) 88%, var(--surface));
+}
+
+.guardrailops-queue-card-selected {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--line));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.guardrailops-findings {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.guardrailops-findings-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--ink);
+}
+
+.guardrailops-history-list {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.guardrailops-history-item {
+  display: grid;
+  gap: 0.15rem;
+  padding: var(--space-2);
+  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface) 92%, var(--panel));
+}
+
+.guardrailops-history-stage {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.guardrailops-history-time {
+  font-size: var(--font-size-2xs);
+  color: var(--ink-soft);
+}
+
+.guardrailops-history-summary {
+  font-size: var(--font-size-sm);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 960px) and (max-width: 1339px) {
+  .guardrailops-primary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .guardrailops-admin-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1340px) {
+  .guardrailops-primary-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .guardrailops-admin-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }

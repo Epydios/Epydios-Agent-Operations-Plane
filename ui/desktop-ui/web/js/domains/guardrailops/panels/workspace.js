@@ -1,4 +1,4 @@
-import { chipClassForStatus, escapeHTML } from "../../../views/common.js";
+import { chipClassForStatus, escapeHTML, renderPanelStateMetric } from "../../../views/common.js";
 import { createGuardrailWorkspaceSnapshot } from "../state.js";
 
 function chipClassForTone(value) {
@@ -56,6 +56,61 @@ function renderKeyValueRows(rows = []) {
     })
     .filter(Boolean)
     .join("");
+}
+
+function renderOperationalFeedback(snapshot) {
+  const feedback = snapshot?.admin?.feedback;
+  if (!feedback?.message) {
+    return "";
+  }
+  const tone =
+    feedback.tone === "error"
+      ? "error"
+      : feedback.tone === "ok"
+        ? "success"
+        : feedback.tone === "warn"
+          ? "warn"
+          : "info";
+  const title =
+    feedback.tone === "error"
+      ? "Guardrail change failed"
+      : feedback.tone === "ok"
+        ? "Guardrail change updated"
+        : feedback.tone === "warn"
+          ? "Guardrail handoff required"
+          : "Guardrail draft updated";
+  return `
+    <div class="guardrailops-feedback-shell" data-guardrailops-panel="operational-feedback">
+      ${renderPanelStateMetric(tone, title, feedback.message)}
+    </div>
+  `;
+}
+
+function guardrailAdminStatusChipClass(status = "") {
+  const normalized = String(status || "").trim().toLowerCase();
+  if (normalized === "approved" || normalized === "applied") {
+    return "chip chip-ok chip-compact";
+  }
+  if (normalized === "rolled_back") {
+    return "chip chip-warn chip-compact";
+  }
+  if (normalized === "denied") {
+    return "chip chip-danger chip-compact";
+  }
+  if (normalized === "deferred" || normalized === "escalated" || normalized === "routed" || normalized === "simulated") {
+    return "chip chip-warn chip-compact";
+  }
+  return "chip chip-neutral chip-compact";
+}
+
+function renderGuardrailAdminActionRow(attrs = "") {
+  return `
+    <div class="guardrailops-action-row">
+      <button class="btn btn-secondary btn-small" type="button" data-guardrailops-admin-action="save-draft"${attrs}>Save Draft</button>
+      <button class="btn btn-secondary btn-small" type="button" data-guardrailops-admin-action="simulate-draft"${attrs}>Run Dry-Run</button>
+      <button class="btn btn-secondary btn-small" type="button" data-guardrailops-admin-action="route-draft"${attrs}>Route To Governance</button>
+    </div>
+  `;
 }
 
 function renderGuardrailPostureBoard(snapshot) {
@@ -436,10 +491,481 @@ function renderBreakGlassPostureBoard(snapshot) {
   `;
 }
 
+function renderGuardrailAdminQueueBoard(snapshot) {
+  const admin = snapshot.admin || {};
+  const items = Array.isArray(admin.queueItems) ? admin.queueItems : [];
+  const selectedChangeId = String(admin.selectedChangeId || "").trim();
+  const queueMarkup =
+    items.length > 0
+      ? items
+          .map((item) => {
+            const id = String(item?.id || "").trim();
+            const selected = id && id === selectedChangeId;
+            const status = String(item?.status || "").trim().toLowerCase();
+            const rollbackStatus = String(item?.rollback?.status || "").trim().toLowerCase();
+            const alreadyInGovernance = ["routed", "approved", "applied", "denied", "deferred", "escalated", "rolled_back"].includes(status);
+            const routeAction = alreadyInGovernance ? "open-governance" : "route-queue-item";
+            const routeLabel = alreadyInGovernance ? "Open GovernanceOps" : "Route To Governance";
+            return `
+              <article class="guardrailops-queue-card${selected ? " guardrailops-queue-card-selected" : ""}">
+                <div class="metric-title-row">
+                  <div class="title">${escapeHTML(String(item?.label || "Guardrail Change Draft").trim())}</div>
+                  <span class="${guardrailAdminStatusChipClass(status)}">${escapeHTML(status || "draft")}</span>
+                </div>
+                <div class="guardrailops-chip-row">
+                  <span class="chip chip-neutral chip-compact">change=${escapeHTML(id || "-")}</span>
+                  <span class="chip chip-neutral chip-compact">kind=${escapeHTML(String(item?.changeKind || "-").trim() || "-")}</span>
+                  <span class="chip chip-neutral chip-compact">profile=${escapeHTML(String(item?.executionProfile || "-").trim() || "-")}</span>
+                  ${item?.decision?.approvalReceiptId ? '<span class="chip chip-ok chip-compact">decision receipt</span>' : ""}
+                  ${item?.receipt?.receiptId ? '<span class="chip chip-ok chip-compact">admin receipt</span>' : ""}
+                  ${rollbackStatus ? `<span class="${guardrailAdminStatusChipClass(rollbackStatus)}">${escapeHTML(rollbackStatus)}</span>` : ""}
+                </div>
+                <div class="guardrailops-kv-list">
+                  ${renderKeyValueRows([
+                    {
+                      label: "Draft Scope",
+                      value: renderValuePills([
+                        { label: "scope", value: String(item?.targetScope || "-").trim() || "-", code: true },
+                        { label: "boundary", value: String(item?.safetyBoundary || "-").trim() || "-", code: true },
+                        { label: "state", value: String(item?.proposedState || "-").trim() || "-" },
+                        { label: "updated", value: String(item?.updatedAt || "-").trim() || "-" }
+                      ])
+                    },
+                    {
+                      label: "Reason",
+                      value: escapeHTML(String(item?.reason || "").trim() || "-")
+                    },
+                    {
+                      label: "Dry-Run",
+                      value: escapeHTML(String(item?.simulationSummary || "").trim() || "pending")
+                    },
+                    {
+                      label: "Recovery",
+                      value: escapeHTML(String(item?.rollback?.summary || "").trim() || "pending")
+                    }
+                  ])}
+                </div>
+                <div class="guardrailops-action-row">
+                  <button class="btn btn-secondary btn-small" type="button" data-guardrailops-admin-action="select-queue-item" data-guardrailops-admin-id="${escapeHTML(id)}">Select Proposal</button>
+                  <button class="btn btn-secondary btn-small" type="button" data-guardrailops-admin-action="simulate-queue-item" data-guardrailops-admin-id="${escapeHTML(id)}">Refresh Dry-Run</button>
+                  <button class="btn btn-secondary btn-small" type="button" data-guardrailops-admin-action="${escapeHTML(routeAction)}" data-guardrailops-admin-id="${escapeHTML(id)}">${escapeHTML(routeLabel)}</button>
+                </div>
+              </article>
+            `;
+          })
+          .join("")
+      : `
+          <div class="guardrailops-kv-list">
+            <div class="guardrailops-row">
+              <div class="guardrailops-row-label">Status</div>
+              <div class="guardrailops-row-value"><span class="guardrailops-empty">No guardrail admin proposal is queued yet.</span></div>
+            </div>
+          </div>
+        `;
+
+  return `
+    <article class="metric guardrailops-card guardrailops-card-wide" data-domain-root="guardrailops" data-guardrailops-panel="admin-change-queue">
+      <div class="metric-title-row">
+        <div class="title">Admin Change Queue</div>
+        <span class="chip chip-neutral chip-compact">apply-gated</span>
+      </div>
+      <div class="guardrailops-chip-row">
+        <span class="chip chip-neutral chip-compact">queued=${escapeHTML(String(items.length))}</span>
+        <span class="chip chip-neutral chip-compact">selected=${escapeHTML(selectedChangeId || "none")}</span>
+      </div>
+      <div class="guardrailops-queue-grid">${queueMarkup}</div>
+    </article>
+  `;
+}
+
+function renderGuardrailChangeDraftBoard(snapshot) {
+  const admin = snapshot.admin || {};
+  const draft = admin.draft || {};
+  return `
+    <article class="metric guardrailops-card" data-domain-root="guardrailops" data-guardrailops-panel="guardrail-change-draft">
+      <div class="metric-title-row">
+        <div class="title">Guardrail Change Draft</div>
+        <span class="chip chip-neutral chip-compact">proposal</span>
+      </div>
+      <div class="guardrailops-draft-grid">
+        <label class="field">
+          <span class="label">Change Kind</span>
+          <select class="filter-select" data-guardrailops-draft-field="changeKind">
+            <option value="tighten"${draft.changeKind === "tighten" ? " selected" : ""}>Tighten</option>
+            <option value="relax"${draft.changeKind === "relax" ? " selected" : ""}>Relax</option>
+            <option value="break_glass"${draft.changeKind === "break_glass" ? " selected" : ""}>Break-Glass</option>
+            <option value="transport_review"${draft.changeKind === "transport_review" ? " selected" : ""}>Transport Review</option>
+          </select>
+        </label>
+        <label class="field">
+          <span class="label">Target Scope</span>
+          <input class="filter-input" type="text" value="${escapeHTML(draft.targetScope || "")}" data-guardrailops-draft-field="targetScope" />
+        </label>
+        <label class="field">
+          <span class="label">Execution Profile</span>
+          <input class="filter-input" type="text" value="${escapeHTML(draft.executionProfile || "")}" data-guardrailops-draft-field="executionProfile" />
+        </label>
+        <label class="field">
+          <span class="label">Safety Boundary</span>
+          <input class="filter-input" type="text" value="${escapeHTML(draft.safetyBoundary || "")}" data-guardrailops-draft-field="safetyBoundary" />
+        </label>
+        <label class="field">
+          <span class="label">Proposed State</span>
+          <input class="filter-input" type="text" value="${escapeHTML(draft.proposedState || "")}" data-guardrailops-draft-field="proposedState" />
+        </label>
+        <label class="field guardrailops-field-wide">
+          <span class="label">Reason</span>
+          <textarea class="composer-textarea" rows="3" data-guardrailops-draft-field="reason">${escapeHTML(draft.reason || "")}</textarea>
+        </label>
+      </div>
+      ${renderGuardrailAdminActionRow()}
+    </article>
+  `;
+}
+
+function renderExecutionScopeBoundaryBoard(snapshot) {
+  const admin = snapshot.admin || {};
+  const draft = admin.draft || {};
+  const currentScope = admin.currentScope || {};
+  const rows = [
+    {
+      label: "Current Execution Scope",
+      value: renderValuePills([
+        { label: "scope", value: currentScope.targetScope || "-", code: true },
+        { label: "profile", value: currentScope.executionProfile || "-", code: true },
+        { label: "terminal", value: currentScope.terminalMode || "-" },
+        { label: "restricted host", value: currentScope.restrictedHostMode || "-" }
+      ])
+    },
+    {
+      label: "Draft Boundary",
+      value: renderValuePills([
+        { label: "change", value: draft.changeKind || "-" },
+        { label: "scope", value: draft.targetScope || "-", code: true },
+        { label: "boundary", value: draft.safetyBoundary || "-", code: true },
+        { label: "state", value: draft.proposedState || "-" }
+      ])
+    },
+    {
+      label: "Safety Signals",
+      value: renderValuePills([
+        { label: "pending approvals", value: String(currentScope.pendingApprovalCount || 0) },
+        { label: "hard stops", value: String(currentScope.currentHardStopCount || 0) },
+        { label: "break-glass gates", value: String(currentScope.breakGlassGateCount || 0) },
+        { label: "quota gates", value: String(currentScope.quotaGateCount || 0) }
+      ])
+    },
+    {
+      label: "Transport And Redaction",
+      value: renderValuePills([
+        { label: "redaction boundary", value: currentScope.redactionBoundaryPresent ? "present" : "not declared" },
+        { label: "channel", value: currentScope.firstDeliveryChannel || "-", code: true },
+        { label: "provider transport", value: currentScope.selectedProviderTransport || "-" },
+        { label: "run", value: currentScope.latestRunId || "-", code: true }
+      ])
+    }
+  ];
+  return `
+    <article class="metric guardrailops-card" data-domain-root="guardrailops" data-guardrailops-panel="execution-scope-boundary">
+      <div class="metric-title-row">
+        <div class="title">Execution Scope And Safety Boundary</div>
+        <span class="chip chip-neutral chip-compact">bounded target</span>
+      </div>
+      <div class="guardrailops-kv-list">${renderKeyValueRows(rows)}</div>
+    </article>
+  `;
+}
+
+function renderImpactPreviewBoard(snapshot) {
+  const simulation = snapshot?.admin?.latestSimulation;
+  if (!simulation) {
+    return `
+      <article class="metric guardrailops-card" data-domain-root="guardrailops" data-guardrailops-panel="impact-preview">
+        <div class="metric-title-row">
+          <div class="title">Impact Preview</div>
+          <span class="chip chip-neutral chip-compact">dry-run pending</span>
+        </div>
+        <div class="guardrailops-kv-list">
+          <div class="guardrailops-row">
+            <div class="guardrailops-row-label">Preview</div>
+            <div class="guardrailops-row-value"><span class="guardrailops-empty">Run a bounded dry-run from the active guardrail draft before routing it to GovernanceOps.</span></div>
+          </div>
+        </div>
+      </article>
+    `;
+  }
+  const findings = Array.isArray(simulation.findings) ? simulation.findings : [];
+  const rows = [
+    {
+      label: "Dry-Run Summary",
+      value: escapeHTML(simulation.summary || "-")
+    },
+    {
+      label: "Impact Facts",
+      value: renderValuePills(simulation.facts || [])
+    },
+    {
+      label: "Updated",
+      value: escapeHTML(String(simulation.updatedAt || "").trim() || "-")
+    }
+  ];
+  return `
+    <article class="metric guardrailops-card" data-domain-root="guardrailops" data-guardrailops-panel="impact-preview">
+      <div class="metric-title-row">
+        <div class="title">Impact Preview</div>
+        <span class="${chipClassForTone(simulation.tone)}">${escapeHTML(simulation.tone || "info")}</span>
+      </div>
+      <div class="guardrailops-chip-row">
+        <span class="chip chip-neutral chip-compact">change=${escapeHTML(simulation.kind || "guardrail")}</span>
+        <span class="chip chip-neutral chip-compact">proposal=${escapeHTML(simulation.changeId || "pending")}</span>
+      </div>
+      <div class="guardrailops-kv-list">${renderKeyValueRows(rows)}</div>
+      <div class="guardrailops-findings">
+        <div class="guardrailops-row-label">Findings</div>
+        ${
+          findings.length > 0
+            ? `<ul class="guardrailops-findings-list">${findings.map((item) => `<li>${escapeHTML(item)}</li>`).join("")}</ul>`
+            : '<div class="guardrailops-empty">not available</div>'
+        }
+      </div>
+    </article>
+  `;
+}
+
+function renderGuardrailGovernanceRouteReceiptBoard(snapshot) {
+  const item = snapshot?.admin?.selectedQueueItem || null;
+  if (!item) {
+    return `
+      <article class="metric guardrailops-card guardrailops-card-wide" data-domain-root="guardrailops" data-guardrailops-panel="governance-route-receipt">
+        <div class="metric-title-row">
+          <div class="title">Governance Route And Receipt</div>
+          <span class="chip chip-neutral chip-compact">idle</span>
+        </div>
+        <div class="guardrailops-kv-list">
+          <div class="guardrailops-row">
+            <div class="guardrailops-row-label">Status</div>
+            <div class="guardrailops-row-value"><span class="guardrailops-empty">Select or queue a guardrail admin proposal to review governance status, apply posture, and receipt state.</span></div>
+          </div>
+        </div>
+      </article>
+    `;
+  }
+
+  const decision = item.decision || null;
+  const execution = item.execution || null;
+  const receipt = item.receipt || null;
+  const rollback = item.rollback || null;
+  const status = String(item.status || "").trim().toLowerCase() || "draft";
+  const canApply = status === "approved" && Boolean(decision?.approvalReceiptId) && !receipt?.receiptId;
+
+  const rows = [
+    {
+      label: "Route Status",
+      value: renderValuePills([
+        { label: "routed", value: item.routedAt },
+        { label: "summary", value: item.summary },
+        { label: "simulation", value: item.simulationSummary }
+      ])
+    },
+    {
+      label: "Governance Decision",
+      value: renderValuePills([
+        { label: "decision", value: decision?.status },
+        { label: "decision id", value: decision?.decisionId, code: true },
+        { label: "approval receipt", value: decision?.approvalReceiptId, code: true },
+        { label: "decided", value: decision?.decidedAt }
+      ])
+    },
+    {
+      label: "Decision Reason",
+      value: escapeHTML(String(decision?.reason || item.reason || "").trim() || "-")
+    },
+    {
+      label: "Execution",
+      value: renderValuePills([
+        { label: "execution", value: execution?.executionId, code: true },
+        { label: "status", value: execution?.status },
+        { label: "executed", value: execution?.executedAt },
+        { label: "actor", value: execution?.actorRef, code: true }
+      ])
+    },
+    {
+      label: "Admin Receipt",
+      value: renderValuePills([
+        { label: "receipt", value: receipt?.receiptId, code: true },
+        { label: "issued", value: receipt?.issuedAt },
+        { label: "stable ref", value: receipt?.stableRef, code: true },
+        { label: "approval receipt", value: receipt?.approvalReceiptId, code: true }
+      ])
+    },
+    {
+      label: "Rollback",
+      value: renderValuePills([
+        { label: "action", value: rollback?.action },
+        { label: "status", value: rollback?.status },
+        { label: "record", value: rollback?.rollbackId, code: true },
+        { label: "at", value: rollback?.rolledBackAt }
+      ])
+    }
+  ];
+
+  return `
+    <article class="metric guardrailops-card guardrailops-card-wide" data-domain-root="guardrailops" data-guardrailops-panel="governance-route-receipt">
+      <div class="metric-title-row">
+        <div class="title">Governance Route And Receipt</div>
+        <span class="${guardrailAdminStatusChipClass(status)}">${escapeHTML(status)}</span>
+      </div>
+      <div class="guardrailops-chip-row">
+        <span class="chip chip-neutral chip-compact">change=${escapeHTML(item.id)}</span>
+        <span class="chip chip-neutral chip-compact">kind=${escapeHTML(item.kind || "guardrail")}</span>
+        ${decision?.approvalReceiptId ? '<span class="chip chip-ok chip-compact">approval receipt</span>' : '<span class="chip chip-neutral chip-compact">decision pending</span>'}
+        ${receipt?.receiptId ? '<span class="chip chip-ok chip-compact">admin receipt</span>' : '<span class="chip chip-neutral chip-compact">apply pending</span>'}
+        ${rollback?.rollbackId ? `<span class="${guardrailAdminStatusChipClass(rollback.status)}">${escapeHTML(rollback.action || "rollback")}</span>` : '<span class="chip chip-neutral chip-compact">recovery pending</span>'}
+      </div>
+      <div class="guardrailops-kv-list">${renderKeyValueRows(rows)}</div>
+      <div class="guardrailops-action-row">
+        <button class="btn btn-secondary btn-small" type="button" data-guardrailops-admin-action="open-governance" data-guardrailops-admin-id="${escapeHTML(item.id)}">Open GovernanceOps</button>
+        <button class="btn btn-ok btn-small" type="button" data-guardrailops-admin-action="apply-approved-change" data-guardrailops-admin-id="${escapeHTML(item.id)}"${canApply ? "" : " disabled"}>Apply Approved Change</button>
+        <button class="btn btn-secondary btn-small" type="button" data-guardrailops-admin-action="copy-governance-receipt" data-guardrailops-admin-id="${escapeHTML(item.id)}"${decision?.approvalReceiptId ? "" : " disabled"}>Copy Governance Receipt</button>
+        <button class="btn btn-secondary btn-small" type="button" data-guardrailops-admin-action="copy-admin-receipt" data-guardrailops-admin-id="${escapeHTML(item.id)}"${receipt?.receiptId ? "" : " disabled"}>Copy Admin Receipt</button>
+      </div>
+    </article>
+  `;
+}
+
+function renderGuardrailRollbackHistoryBoard(snapshot) {
+  const item = snapshot?.admin?.selectedQueueItem || null;
+  if (!item) {
+    return `
+      <article class="metric guardrailops-card guardrailops-card-wide" data-domain-root="guardrailops" data-guardrailops-panel="rollback-history">
+        <div class="metric-title-row">
+          <div class="title">Rollback And History</div>
+          <span class="chip chip-neutral chip-compact">idle</span>
+        </div>
+        <div class="guardrailops-kv-list">
+          <div class="guardrailops-row">
+            <div class="guardrailops-row-label">Status</div>
+            <div class="guardrailops-row-value"><span class="guardrailops-empty">Select an applied guardrail admin proposal to review recovery posture, bounded history, and rollback actions.</span></div>
+          </div>
+        </div>
+      </article>
+    `;
+  }
+
+  const decision = item.decision || null;
+  const execution = item.execution || null;
+  const receipt = item.receipt || null;
+  const rollback = item.rollback || null;
+  const status = String(item.status || "").trim().toLowerCase() || "draft";
+  const canRollback = status === "applied" && Boolean(receipt?.receiptId) && !rollback?.rollbackId;
+  const recoveryReason = String(snapshot?.admin?.recoveryReason || "").trim();
+  const historyItems = [
+    {
+      label: "Proposal",
+      at: item.createdAt || item.updatedAt,
+      summary: item.summary
+    },
+    {
+      label: "Dry-Run",
+      at: item.simulatedAt,
+      summary: item.simulationSummary
+    },
+    {
+      label: "Governance Route",
+      at: item.routedAt,
+      summary: item.routedAt ? "Routed to GovernanceOps." : ""
+    },
+    {
+      label: "Governance Decision",
+      at: decision?.decidedAt,
+      summary: decision?.status ? `${decision.status}: ${decision.reason || "-"}` : ""
+    },
+    {
+      label: "Execution",
+      at: execution?.executedAt,
+      summary: execution?.summary
+    },
+    {
+      label: "Admin Receipt",
+      at: receipt?.issuedAt,
+      summary: receipt?.stableRef
+    },
+    {
+      label: "Rollback",
+      at: rollback?.rolledBackAt,
+      summary: rollback?.summary
+    }
+  ].filter((entry) => entry.at || entry.summary);
+  const historyMarkup =
+    historyItems.length > 0
+      ? `<div class="guardrailops-history-list">${historyItems
+          .map(
+            (entry) => `
+              <div class="guardrailops-history-item">
+                <div class="guardrailops-history-stage">${escapeHTML(entry.label)}</div>
+                <div class="guardrailops-history-time">${escapeHTML(entry.at || "-")}</div>
+                <div class="guardrailops-history-summary">${escapeHTML(entry.summary || "-")}</div>
+              </div>
+            `
+          )
+          .join("")}</div>`
+      : '<div class="guardrailops-empty">No bounded guardrail admin history is available yet.</div>';
+
+  return `
+    <article class="metric guardrailops-card guardrailops-card-wide" data-domain-root="guardrailops" data-guardrailops-panel="rollback-history">
+      <div class="metric-title-row">
+        <div class="title">Rollback And History</div>
+        <span class="${guardrailAdminStatusChipClass(status)}">${escapeHTML(status)}</span>
+      </div>
+      <div class="guardrailops-chip-row">
+        <span class="chip chip-neutral chip-compact">change=${escapeHTML(item.id)}</span>
+        <span class="chip chip-neutral chip-compact">kind=${escapeHTML(item.kind || "guardrail")}</span>
+        ${rollback?.rollbackId ? `<span class="${guardrailAdminStatusChipClass(rollback.status)}">${escapeHTML(rollback.action || "rollback")}</span>` : `<span class="chip chip-neutral chip-compact">${escapeHTML(canRollback ? "rollback available" : "recovery pending")}</span>`}
+      </div>
+      <div class="guardrailops-kv-list">
+        ${renderKeyValueRows([
+          {
+            label: "Recovery Posture",
+            value: renderValuePills([
+              { label: "state", value: rollback?.status || (canRollback ? "rollback available" : "recovery pending") },
+              { label: "action", value: rollback?.action || (canRollback ? "rollback" : "") },
+              { label: "record", value: rollback?.rollbackId, code: true },
+              { label: "stable ref", value: rollback?.stableRef, code: true }
+            ])
+          },
+          {
+            label: "Recovery Reason",
+            value: rollback?.reason ? escapeHTML(rollback.reason) : '<span class="guardrailops-empty">A bounded reason is required before rollback can execute.</span>'
+          },
+          {
+            label: "Stable History",
+            value: historyMarkup
+          }
+        ])}
+      </div>
+      <label class="field guardrailops-field-wide">
+        <span class="label">Rollback Reason</span>
+        <input
+          class="filter-input"
+          type="text"
+          value="${escapeHTML(recoveryReason)}"
+          placeholder="required; explain the rollback action"
+          data-guardrailops-admin-recovery-reason
+        />
+      </label>
+      <div class="guardrailops-action-row">
+        <button class="btn btn-secondary btn-small" type="button" data-guardrailops-admin-action="rollback-applied-change" data-guardrailops-admin-id="${escapeHTML(item.id)}"${canRollback ? "" : " disabled"}>Rollback Applied Change</button>
+        <button class="btn btn-secondary btn-small" type="button" data-guardrailops-admin-action="copy-rollback-receipt" data-guardrailops-admin-id="${escapeHTML(item.id)}"${rollback?.rollbackId ? "" : " disabled"}>Copy Rollback Receipt</button>
+      </div>
+    </article>
+  `;
+}
+
 export function renderGuardrailWorkspace(context = {}) {
   const snapshot = createGuardrailWorkspaceSnapshot(context);
   return `
     <div class="guardrailops-workspace" data-domain-root="guardrailops">
+      ${renderOperationalFeedback(snapshot)}
       <div class="guardrailops-primary-grid">
         ${renderGuardrailPostureBoard(snapshot)}
         ${renderSandboxCapabilityBoard(snapshot)}
@@ -448,6 +974,14 @@ export function renderGuardrailWorkspace(context = {}) {
         ${renderRedactionAndTransportBoard(snapshot)}
         ${renderBreakGlassPostureBoard(snapshot)}
         ${renderExecutionGatesBoard(snapshot)}
+      </div>
+      <div class="guardrailops-admin-grid">
+        ${renderGuardrailAdminQueueBoard(snapshot)}
+        ${renderGuardrailChangeDraftBoard(snapshot)}
+        ${renderExecutionScopeBoundaryBoard(snapshot)}
+        ${renderImpactPreviewBoard(snapshot)}
+        ${renderGuardrailGovernanceRouteReceiptBoard(snapshot)}
+        ${renderGuardrailRollbackHistoryBoard(snapshot)}
       </div>
     </div>
   `;

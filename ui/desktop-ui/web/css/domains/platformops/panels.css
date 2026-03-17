@@ -13,11 +13,23 @@
   min-width: 0;
 }
 
+.platformops-admin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(22rem, 100%), 1fr));
+  gap: var(--space-3);
+  width: 100%;
+  min-width: 0;
+}
+
 .platformops-card {
   display: grid;
   gap: var(--space-3);
   min-width: 0;
   align-content: start;
+}
+
+.platformops-card-wide {
+  grid-column: 1 / -1;
 }
 
 .platformops-chip-row {
@@ -98,8 +110,95 @@
   font-size: var(--font-size-sm);
 }
 
+.platformops-feedback-shell {
+  display: grid;
+}
+
+.platformops-draft-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(14rem, 100%), 1fr));
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.platformops-field-wide {
+  grid-column: 1 / -1;
+}
+
+.platformops-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.platformops-queue-grid {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.platformops-queue-card {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--panel) 88%, var(--surface));
+}
+
+.platformops-queue-card-selected {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--line));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.platformops-findings {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.platformops-findings-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--ink);
+}
+
+.platformops-history-list {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.platformops-history-item {
+  display: grid;
+  gap: 0.15rem;
+  padding: var(--space-2);
+  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface) 92%, var(--panel));
+}
+
+.platformops-history-stage {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.platformops-history-time {
+  font-size: var(--font-size-2xs);
+  color: var(--ink-soft);
+}
+
+.platformops-history-summary {
+  font-size: var(--font-size-sm);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
 @media (min-width: 960px) and (max-width: 1339px) {
   .platformops-primary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .platformops-admin-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -107,5 +206,9 @@
 @media (min-width: 1340px) {
   .platformops-primary-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .platformops-admin-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

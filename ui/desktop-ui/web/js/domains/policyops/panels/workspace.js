@@ -110,6 +110,507 @@ function renderFeedbackPanel(snapshot) {
   `;
 }
 
+function policyAdminStatusChipClass(status = "") {
+  const normalized = String(status || "").trim().toLowerCase();
+  if (normalized === "approved" || normalized === "applied") {
+    return "chip chip-ok chip-compact";
+  }
+  if (normalized === "rolled_back") {
+    return "chip chip-warn chip-compact";
+  }
+  if (normalized === "denied") {
+    return "chip chip-danger chip-compact";
+  }
+  if (normalized === "deferred" || normalized === "escalated" || normalized === "routed" || normalized === "simulated") {
+    return "chip chip-warn chip-compact";
+  }
+  return "chip chip-neutral chip-compact";
+}
+
+function renderPolicyAdminActionRow(changeId = "") {
+  const attrs = changeId ? ` data-policyops-admin-id="${escapeHTML(changeId)}"` : "";
+  return `
+    <div class="policyops-action-row">
+      <button class="btn btn-secondary btn-small" type="button" data-policyops-admin-action="save-draft"${attrs}>Save Draft</button>
+      <button class="btn btn-secondary btn-small" type="button" data-policyops-admin-action="simulate-draft"${attrs}>Run Dry-Run</button>
+      <button class="btn btn-secondary btn-small" type="button" data-policyops-admin-action="route-draft"${attrs}>Route To Governance</button>
+    </div>
+  `;
+}
+
+function renderAdminChangeQueueBoard(snapshot) {
+  const board = snapshot.admin;
+  if (!Array.isArray(board.queueItems) || board.queueItems.length === 0) {
+    return `
+      <article class="metric policyops-card policyops-card-wide" data-domain-root="policyops" data-policyops-panel="admin-change-queue">
+        <div class="metric-title-row">
+          <div class="title">Admin Change Queue</div>
+          <span class="chip chip-neutral chip-compact">idle</span>
+        </div>
+        <div class="policyops-kv-list">
+          <div class="policyops-row">
+            <div class="policyops-row-label">Status</div>
+            <div class="policyops-row-value"><span class="policyops-empty">No PolicyOps admin proposal is queued yet.</span></div>
+          </div>
+        </div>
+      </article>
+    `;
+  }
+
+  const cards = board.queueItems
+    .map((item) => `
+      <article class="policyops-queue-card">
+        <div class="metric-title-row">
+          <div class="title"><code>${escapeHTML(item.id)}</code></div>
+          <span class="${policyAdminStatusChipClass(item.status)}">${escapeHTML(item.status)}</span>
+        </div>
+        <div class="policyops-chip-row">
+          <span class="chip chip-neutral chip-compact">${escapeHTML(item.changeKind || "load")}</span>
+          <span class="chip chip-neutral chip-compact">${escapeHTML(item.packId || item.subjectId || "-")}</span>
+          <span class="chip chip-neutral chip-compact">${escapeHTML(item.providerId || "-")}</span>
+        </div>
+        <div class="policyops-kv-list">
+          ${renderKeyValueRows([
+            {
+              label: "Scope",
+              value: renderValuePills([
+                { label: item.subjectLabel || "pack", value: item.subjectId || "-", code: true },
+                { label: item.targetLabel || "scope", value: item.targetScope || "-", code: true },
+                { label: "updated", value: item.updatedAt || "-" },
+                { label: "routed", value: item.routedAt || "-" }
+              ])
+            },
+            {
+              label: "Summary",
+              value: escapeHTML(item.summary || "-")
+            },
+            {
+              label: "Preview",
+              value: escapeHTML(item.simulationSummary || "-")
+            }
+          ])}
+        </div>
+        <div class="policyops-action-row">
+          <button class="btn btn-secondary btn-small" type="button" data-policyops-admin-action="select-queue-item" data-policyops-admin-id="${escapeHTML(item.id)}">Select</button>
+          <button class="btn btn-secondary btn-small" type="button" data-policyops-admin-action="simulate-queue-item" data-policyops-admin-id="${escapeHTML(item.id)}">Run Dry-Run</button>
+          <button class="btn btn-secondary btn-small" type="button" data-policyops-admin-action="route-queue-item" data-policyops-admin-id="${escapeHTML(item.id)}">Route To Governance</button>
+          <button class="btn btn-secondary btn-small" type="button" data-policyops-admin-action="open-governance" data-policyops-admin-id="${escapeHTML(item.id)}">Open GovernanceOps</button>
+        </div>
+      </article>
+    `)
+    .join("");
+
+  return `
+    <article class="metric policyops-card policyops-card-wide" data-domain-root="policyops" data-policyops-panel="admin-change-queue">
+      <div class="metric-title-row">
+        <div class="title">Admin Change Queue</div>
+        <span class="chip chip-neutral chip-compact">total=${escapeHTML(String(board.queueItems.length))}</span>
+      </div>
+      <div class="policyops-queue-list">${cards}</div>
+    </article>
+  `;
+}
+
+function renderPolicyPackDraftBoard(snapshot) {
+  const board = snapshot.admin;
+  const draft = board.draft || {};
+  const selectedChangeId = String(board.selectedChangeId || "").trim();
+  const packOptions = (Array.isArray(snapshot.policyCatalogItems) ? snapshot.policyCatalogItems : [])
+    .map((item) => {
+      const packId = String(item?.packId || "").trim();
+      const label = String(item?.label || "").trim();
+      if (!packId) {
+        return "";
+      }
+      return `<option value="${escapeHTML(packId)}"${packId === draft.packId ? " selected" : ""}>${escapeHTML(label || packId)}</option>`;
+    })
+    .filter(Boolean)
+    .join("");
+  const providerOptions = (Array.isArray(board.currentScope?.providerOptions) ? board.currentScope.providerOptions : [])
+    .map((providerId) => `<option value="${escapeHTML(providerId)}"${providerId === draft.providerId ? " selected" : ""}>${escapeHTML(providerId)}</option>`)
+    .join("");
+
+  return `
+    <article class="metric policyops-card policyops-card-wide" data-domain-root="policyops" data-policyops-panel="policy-pack-load-activation-draft">
+      <div class="metric-title-row">
+        <div class="title">Policy Pack Load And Activation Draft</div>
+        <span class="${policyAdminStatusChipClass(board.selectedQueueItem?.status || "draft")}">${escapeHTML(board.selectedQueueItem?.status || "draft")}</span>
+      </div>
+      ${renderPolicyAdminActionRow(selectedChangeId)}
+      <div class="policyops-admin-form">
+        <label class="field">
+          <span class="label">Change Kind</span>
+          <select class="filter-input" data-policyops-draft-field="changeKind">
+            <option value="load"${draft.changeKind === "load" ? " selected" : ""}>Load Pack</option>
+            <option value="activate"${draft.changeKind === "activate" ? " selected" : ""}>Activate Pack</option>
+          </select>
+        </label>
+        <label class="field">
+          <span class="label">Policy Pack</span>
+          <select class="filter-input" data-policyops-draft-field="packId">
+            <option value="">Select a loaded pack</option>
+            ${packOptions}
+          </select>
+        </label>
+        <label class="field">
+          <span class="label">Decision Provider</span>
+          <select class="filter-input" data-policyops-draft-field="providerId">
+            <option value="">Select a provider</option>
+            ${providerOptions}
+          </select>
+        </label>
+        <label class="field">
+          <span class="label">Applicability Scope</span>
+          <input class="filter-input" type="text" value="${escapeHTML(draft.targetScope || "")}" data-policyops-draft-field="targetScope" placeholder="tenant / project or equivalent bounded scope" />
+        </label>
+        <label class="field policyops-field-wide">
+          <span class="label">Reason</span>
+          <textarea class="filter-input policyops-textarea" rows="3" data-policyops-draft-field="reason" placeholder="required; explain why this bounded policy pack change is needed">${escapeHTML(draft.reason || "")}</textarea>
+        </label>
+      </div>
+    </article>
+  `;
+}
+
+function renderDecisionProviderScopeBoard(snapshot) {
+  const board = snapshot.admin;
+  const currentScope = board.currentScope || {};
+  const draft = board.draft || {};
+  const rows = [
+    {
+      label: "Current Policy Posture",
+      value: renderValuePills([
+        { label: "pack", value: currentScope.currentPackId || currentScope.currentPackLabel || "-", code: true },
+        { label: "provider", value: currentScope.currentProviderId || "-", code: true },
+        { label: "contract", value: currentScope.contractId || "-", code: true },
+        { label: "decision", value: currentScope.latestDecision || "-" }
+      ])
+    },
+    {
+      label: "Draft Target",
+      value: renderValuePills([
+        { label: "change", value: draft.changeKind || "load" },
+        { label: "pack", value: draft.packId || "-", code: true },
+        { label: "provider", value: draft.providerId || "-", code: true },
+        { label: "scope", value: draft.targetScope || "-", code: true }
+      ])
+    },
+    {
+      label: "Applicability Signals",
+      value: renderValuePills([
+        { label: "boundary", value: currentScope.boundaryClass || "-" },
+        { label: "risk", value: currentScope.riskTier || "-" },
+        { label: "surfaces", value: String(currentScope.decisionSurfaceCount || 0) },
+        { label: "requirements", value: String(currentScope.boundaryRequirementCount || 0) }
+      ])
+    },
+    {
+      label: "Catalog Quality",
+      value: renderValuePills([
+        { label: "packs", value: String(currentScope.packCount || 0) },
+        { label: "source", value: currentScope.catalogSource || "-" },
+        { label: "missing surfaces", value: String(currentScope.packsMissingDecisionSurfaces || 0) },
+        { label: "missing boundaries", value: String(currentScope.packsMissingBoundaryRequirements || 0) }
+      ])
+    }
+  ];
+
+  return `
+    <article class="metric policyops-card" data-domain-root="policyops" data-policyops-panel="decision-provider-scope">
+      <div class="metric-title-row">
+        <div class="title">Decision Provider And Applicability Scope</div>
+        <span class="${toneChipClass(snapshot.policyCoverage?.tone || "neutral")}">${escapeHTML(snapshot.policyCoverage?.tone || "neutral")}</span>
+      </div>
+      <div class="policyops-kv-list">${renderKeyValueRows(rows)}</div>
+    </article>
+  `;
+}
+
+function renderSemanticImpactPreviewBoard(snapshot) {
+  const board = snapshot.admin;
+  const preview = board.latestSimulation;
+  if (!preview) {
+    return `
+      <article class="metric policyops-card" data-domain-root="policyops" data-policyops-panel="semantic-impact-preview">
+        <div class="metric-title-row">
+          <div class="title">Semantic Impact Preview</div>
+          <span class="chip chip-neutral chip-compact">idle</span>
+        </div>
+        <div class="policyops-kv-list">
+          <div class="policyops-row">
+            <div class="policyops-row-label">Status</div>
+            <div class="policyops-row-value"><span class="policyops-empty">Run a bounded dry-run to preview semantic impact before routing the proposal to GovernanceOps.</span></div>
+          </div>
+        </div>
+      </article>
+    `;
+  }
+
+  const findings = Array.isArray(preview.findings) ? preview.findings : [];
+  return `
+    <article class="metric policyops-card" data-domain-root="policyops" data-policyops-panel="semantic-impact-preview">
+      <div class="metric-title-row">
+        <div class="title">Semantic Impact Preview</div>
+        <span class="${toneChipClass(preview.tone)}">${escapeHTML(preview.tone || "info")}</span>
+      </div>
+      <div class="policyops-chip-row">
+        <span class="chip chip-neutral chip-compact">change=${escapeHTML(preview.changeId || "-")}</span>
+        <span class="chip chip-neutral chip-compact">updated=${escapeHTML(preview.updatedAt || "-")}</span>
+      </div>
+      <div class="policyops-kv-list">
+        ${renderKeyValueRows([
+          {
+            label: "Summary",
+            value: escapeHTML(preview.summary || "-")
+          },
+          {
+            label: "Preview Facts",
+            value: renderValuePills(preview.facts || [])
+          },
+          {
+            label: "Findings",
+            value:
+              findings.length > 0
+                ? `<ul class="policyops-finding-list">${findings.map((entry) => `<li>${escapeHTML(entry)}</li>`).join("")}</ul>`
+                : '<span class="policyops-empty">No additional bounded findings were produced.</span>'
+          }
+        ])}
+      </div>
+      <div class="policyops-action-row">
+        <button class="btn btn-secondary btn-small" type="button" data-policyops-admin-action="open-governance"${board.selectedChangeId ? ` data-policyops-admin-id="${escapeHTML(board.selectedChangeId)}"` : ""}>Open GovernanceOps</button>
+      </div>
+    </article>
+  `;
+}
+
+function renderPolicyGovernanceRouteReceiptBoard(snapshot) {
+  const item = snapshot?.admin?.selectedQueueItem || null;
+  if (!item) {
+    return `
+      <article class="metric policyops-card policyops-card-wide" data-domain-root="policyops" data-policyops-panel="governance-route-receipt">
+        <div class="metric-title-row">
+          <div class="title">Governance Route And Receipt</div>
+          <span class="chip chip-neutral chip-compact">idle</span>
+        </div>
+        <div class="policyops-kv-list">
+          <div class="policyops-row">
+            <div class="policyops-row-label">Status</div>
+            <div class="policyops-row-value"><span class="policyops-empty">Select or queue a policy admin proposal to review governance status, apply posture, and receipt state.</span></div>
+          </div>
+        </div>
+      </article>
+    `;
+  }
+
+  const decision = item.decision || null;
+  const execution = item.execution || null;
+  const receipt = item.receipt || null;
+  const rollback = item.rollback || null;
+  const status = String(item.status || "").trim().toLowerCase() || "draft";
+  const canApply = status === "approved" && Boolean(decision?.approvalReceiptId) && !receipt?.receiptId;
+  const rows = [
+    {
+      label: "Route Status",
+      value: renderValuePills([
+        { label: "routed", value: item.routedAt },
+        { label: "summary", value: item.summary },
+        { label: "simulation", value: item.simulationSummary }
+      ])
+    },
+    {
+      label: "Governance Decision",
+      value: renderValuePills([
+        { label: "decision", value: decision?.status },
+        { label: "decision id", value: decision?.decisionId, code: true },
+        { label: "approval receipt", value: decision?.approvalReceiptId, code: true },
+        { label: "decided", value: decision?.decidedAt }
+      ])
+    },
+    {
+      label: "Decision Reason",
+      value: escapeHTML(String(decision?.reason || item.reason || "").trim() || "-")
+    },
+    {
+      label: "Execution",
+      value: renderValuePills([
+        { label: "execution", value: execution?.executionId, code: true },
+        { label: "status", value: execution?.status },
+        { label: "executed", value: execution?.executedAt },
+        { label: "actor", value: execution?.actorRef, code: true }
+      ])
+    },
+    {
+      label: "Admin Receipt",
+      value: renderValuePills([
+        { label: "receipt", value: receipt?.receiptId, code: true },
+        { label: "issued", value: receipt?.issuedAt },
+        { label: "stable ref", value: receipt?.stableRef, code: true },
+        { label: "approval receipt", value: receipt?.approvalReceiptId, code: true }
+      ])
+    },
+    {
+      label: "Rollback",
+      value: renderValuePills([
+        { label: "action", value: rollback?.action },
+        { label: "status", value: rollback?.status },
+        { label: "record", value: rollback?.rollbackId, code: true },
+        { label: "at", value: rollback?.rolledBackAt }
+      ])
+    }
+  ];
+
+  return `
+    <article class="metric policyops-card policyops-card-wide" data-domain-root="policyops" data-policyops-panel="governance-route-receipt">
+      <div class="metric-title-row">
+        <div class="title">Governance Route And Receipt</div>
+        <span class="${policyAdminStatusChipClass(status)}">${escapeHTML(status)}</span>
+      </div>
+      <div class="policyops-chip-row">
+        <span class="chip chip-neutral chip-compact">change=${escapeHTML(item.id)}</span>
+        <span class="chip chip-neutral chip-compact">kind=${escapeHTML(item.kind || "policy")}</span>
+        ${decision?.approvalReceiptId ? '<span class="chip chip-ok chip-compact">approval receipt</span>' : '<span class="chip chip-neutral chip-compact">decision pending</span>'}
+        ${receipt?.receiptId ? '<span class="chip chip-ok chip-compact">admin receipt</span>' : '<span class="chip chip-neutral chip-compact">apply pending</span>'}
+        ${rollback?.rollbackId ? `<span class="${policyAdminStatusChipClass(rollback.status)}">${escapeHTML(rollback.action || "rollback")}</span>` : '<span class="chip chip-neutral chip-compact">recovery pending</span>'}
+      </div>
+      <div class="policyops-kv-list">${renderKeyValueRows(rows)}</div>
+      <div class="policyops-action-row">
+        <button class="btn btn-secondary btn-small" type="button" data-policyops-admin-action="open-governance" data-policyops-admin-id="${escapeHTML(item.id)}">Open GovernanceOps</button>
+        <button class="btn btn-ok btn-small" type="button" data-policyops-admin-action="apply-approved-change" data-policyops-admin-id="${escapeHTML(item.id)}"${canApply ? "" : " disabled"}>Apply Approved Change</button>
+        <button class="btn btn-secondary btn-small" type="button" data-policyops-admin-action="copy-governance-receipt" data-policyops-admin-id="${escapeHTML(item.id)}"${decision?.approvalReceiptId ? "" : " disabled"}>Copy Governance Receipt</button>
+        <button class="btn btn-secondary btn-small" type="button" data-policyops-admin-action="copy-admin-receipt" data-policyops-admin-id="${escapeHTML(item.id)}"${receipt?.receiptId ? "" : " disabled"}>Copy Admin Receipt</button>
+      </div>
+    </article>
+  `;
+}
+
+function renderPolicyRollbackHistoryBoard(snapshot) {
+  const item = snapshot?.admin?.selectedQueueItem || null;
+  if (!item) {
+    return `
+      <article class="metric policyops-card policyops-card-wide" data-domain-root="policyops" data-policyops-panel="rollback-history">
+        <div class="metric-title-row">
+          <div class="title">Rollback And History</div>
+          <span class="chip chip-neutral chip-compact">idle</span>
+        </div>
+        <div class="policyops-kv-list">
+          <div class="policyops-row">
+            <div class="policyops-row-label">Status</div>
+            <div class="policyops-row-value"><span class="policyops-empty">Select an applied policy admin proposal to review recovery posture, bounded history, and rollback actions.</span></div>
+          </div>
+        </div>
+      </article>
+    `;
+  }
+
+  const decision = item.decision || null;
+  const execution = item.execution || null;
+  const receipt = item.receipt || null;
+  const rollback = item.rollback || null;
+  const status = String(item.status || "").trim().toLowerCase() || "draft";
+  const canRollback = status === "applied" && Boolean(receipt?.receiptId) && !rollback?.rollbackId;
+  const recoveryReason = String(snapshot?.admin?.recoveryReason || "").trim();
+  const historyItems = [
+    {
+      label: "Proposal",
+      at: item.createdAt || item.updatedAt,
+      summary: item.summary
+    },
+    {
+      label: "Dry-Run",
+      at: item.simulatedAt,
+      summary: item.simulationSummary
+    },
+    {
+      label: "Governance Route",
+      at: item.routedAt,
+      summary: item.routedAt ? "Routed to GovernanceOps." : ""
+    },
+    {
+      label: "Governance Decision",
+      at: decision?.decidedAt,
+      summary: decision?.status ? `${decision.status}: ${decision.reason || "-"}` : ""
+    },
+    {
+      label: "Execution",
+      at: execution?.executedAt,
+      summary: execution?.summary
+    },
+    {
+      label: "Admin Receipt",
+      at: receipt?.issuedAt,
+      summary: receipt?.stableRef
+    },
+    {
+      label: "Rollback",
+      at: rollback?.rolledBackAt,
+      summary: rollback?.summary
+    }
+  ].filter((entry) => entry.at || entry.summary);
+  const historyMarkup =
+    historyItems.length > 0
+      ? `<div class="policyops-history-list">${historyItems
+          .map(
+            (entry) => `
+              <div class="policyops-history-item">
+                <div class="policyops-history-stage">${escapeHTML(entry.label)}</div>
+                <div class="policyops-history-time">${escapeHTML(entry.at || "-")}</div>
+                <div class="policyops-history-summary">${escapeHTML(entry.summary || "-")}</div>
+              </div>
+            `
+          )
+          .join("")}</div>`
+      : '<div class="policyops-empty">No bounded policy admin history is available yet.</div>';
+
+  return `
+    <article class="metric policyops-card policyops-card-wide" data-domain-root="policyops" data-policyops-panel="rollback-history">
+      <div class="metric-title-row">
+        <div class="title">Rollback And History</div>
+        <span class="${policyAdminStatusChipClass(status)}">${escapeHTML(status)}</span>
+      </div>
+      <div class="policyops-chip-row">
+        <span class="chip chip-neutral chip-compact">change=${escapeHTML(item.id)}</span>
+        <span class="chip chip-neutral chip-compact">kind=${escapeHTML(item.kind || "policy")}</span>
+        ${rollback?.rollbackId ? `<span class="${policyAdminStatusChipClass(rollback.status)}">${escapeHTML(rollback.action || "rollback")}</span>` : `<span class="chip chip-neutral chip-compact">${escapeHTML(canRollback ? "rollback available" : "recovery pending")}</span>`}
+      </div>
+      <div class="policyops-kv-list">
+        ${renderKeyValueRows([
+          {
+            label: "Recovery Posture",
+            value: renderValuePills([
+              { label: "state", value: rollback?.status || (canRollback ? "rollback available" : "recovery pending") },
+              { label: "action", value: rollback?.action || (canRollback ? "rollback" : "") },
+              { label: "record", value: rollback?.rollbackId, code: true },
+              { label: "stable ref", value: rollback?.stableRef, code: true }
+            ])
+          },
+          {
+            label: "Recovery Reason",
+            value: rollback?.reason ? escapeHTML(rollback.reason) : '<span class="policyops-empty">A bounded reason is required before rollback can execute.</span>'
+          },
+          {
+            label: "Stable History",
+            value: historyMarkup
+          }
+        ])}
+      </div>
+      <label class="field policyops-field-wide">
+        <span class="label">Rollback Reason</span>
+        <input
+          class="filter-input"
+          type="text"
+          value="${escapeHTML(recoveryReason)}"
+          placeholder="required; explain the rollback action"
+          data-policyops-admin-recovery-reason
+        />
+      </label>
+      <div class="policyops-action-row">
+        <button class="btn btn-secondary btn-small" type="button" data-policyops-admin-action="rollback-applied-change" data-policyops-admin-id="${escapeHTML(item.id)}"${canRollback ? "" : " disabled"}>Rollback Applied Change</button>
+        <button class="btn btn-secondary btn-small" type="button" data-policyops-admin-action="copy-rollback-receipt" data-policyops-admin-id="${escapeHTML(item.id)}"${rollback?.rollbackId ? "" : " disabled"}>Copy Rollback Receipt</button>
+      </div>
+    </article>
+  `;
+}
+
 function renderDecisionExplanationBoard(snapshot) {
   const board = snapshot.decisionExplanation;
   if (!board.available || !board.richness || !board.outcome) {
@@ -401,6 +902,14 @@ export function renderPolicyWorkspace(context = {}) {
   return `
     <div class="policyops-workspace" data-domain-root="policyops">
       ${renderFeedbackPanel(snapshot)}
+      <div class="policyops-admin-grid">
+        ${renderAdminChangeQueueBoard(snapshot)}
+        ${renderPolicyPackDraftBoard(snapshot)}
+        ${renderDecisionProviderScopeBoard(snapshot)}
+        ${renderSemanticImpactPreviewBoard(snapshot)}
+        ${renderPolicyGovernanceRouteReceiptBoard(snapshot)}
+        ${renderPolicyRollbackHistoryBoard(snapshot)}
+      </div>
       <div class="policyops-primary-grid">
         ${renderCurrentPolicyContractPanel(snapshot.settings)}
         ${renderDecisionExplanationBoard(snapshot)}

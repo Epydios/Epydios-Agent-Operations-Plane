@@ -142,11 +142,13 @@ export function createAuditWorkspaceSnapshot(context = {}) {
   const approvals = Array.isArray(context?.approvals?.items) ? context.approvals.items : [];
   const incidentHistory = Array.isArray(context?.incidentHistory?.items) ? context.incidentHistory.items : [];
   const selectedRun = summarizeRun(context?.selectedRunDetail || {});
-  const filteredItems = getFilteredAuditEvents(audit, filters);
+  const nowMs = parseTime(context?.now || "");
+  const filterOptions = nowMs > 0 ? { nowMs } : {};
+  const filteredItems = getFilteredAuditEvents(audit, filters, filterOptions);
   const bundle = buildAuditFilingBundle(audit, filters, {
     actor,
     source: normalizeString(audit?.source)
-  });
+  }, filterOptions);
   const csvText = buildAuditCsv(bundle?.items || []);
   const handoffText = buildAuditHandoffText(bundle);
   const latestEvent = pickLatest(filteredItems, ["ts"]);
