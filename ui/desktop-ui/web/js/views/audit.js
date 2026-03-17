@@ -33,8 +33,13 @@ export function readAuditFilters(ui) {
   };
 }
 
-function filterAuditEvents(items, filters) {
-  const timeBounds = resolveTimeBounds(filters.timeRange, filters.timeFrom, filters.timeTo);
+function filterAuditEvents(items, filters, options = {}) {
+  const timeBounds = resolveTimeBounds(
+    filters.timeRange,
+    filters.timeFrom,
+    filters.timeTo,
+    Number.isFinite(options?.nowMs) ? options.nowMs : undefined
+  );
   return (items || []).filter((item) => {
     if (!containsCaseInsensitive(item.tenantId, filters.tenant)) {
       return false;
@@ -58,8 +63,8 @@ function filterAuditEvents(items, filters) {
   });
 }
 
-export function getFilteredAuditEvents(auditPayload, filters) {
-  return filterAuditEvents(auditPayload?.items || [], filters || {});
+export function getFilteredAuditEvents(auditPayload, filters, options = {}) {
+  return filterAuditEvents(auditPayload?.items || [], filters || {}, options);
 }
 
 function summarizeTopValues(items, key, limit = 3) {
@@ -82,8 +87,8 @@ function csvEscape(value) {
   return text;
 }
 
-export function buildAuditFilingBundle(auditPayload, filters, context = {}) {
-  const items = getFilteredAuditEvents(auditPayload, filters).map((item) => ({
+export function buildAuditFilingBundle(auditPayload, filters, context = {}, options = {}) {
+  const items = getFilteredAuditEvents(auditPayload, filters, options).map((item) => ({
     ts: String(item?.ts || "").trim(),
     event: String(item?.event || "").trim(),
     tenantId: String(item?.tenantId || "").trim(),
@@ -188,13 +193,14 @@ function formatAuditTimeWindow(filters) {
 }
 
 export function renderAudit(ui, auditPayload, filters, context = {}) {
-  const filteredItems = getFilteredAuditEvents(auditPayload, filters);
+  const nowMs = Number.isFinite(new Date(context?.now || "").getTime()) ? new Date(context.now).getTime() : undefined;
+  const filteredItems = getFilteredAuditEvents(auditPayload, filters, { nowMs });
   const pageState = paginateItems(filteredItems, filters?.pageSize, filters?.page);
   const items = pageState.items;
   const warning = auditPayload?.warning
     ? renderPanelStateMetric("warn", "Audit Source", auditPayload.warning)
     : "";
-  const traceBundle = buildAuditFilingBundle(auditPayload, filters, context);
+  const traceBundle = buildAuditFilingBundle(auditPayload, filters, context, { nowMs });
   const traceabilityMetric = renderTraceabilityMetric(
     "Audit Export Traceability",
     [

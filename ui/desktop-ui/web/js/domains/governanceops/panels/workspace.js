@@ -76,6 +76,194 @@ function renderOperationalFeedback(snapshot) {
   `;
 }
 
+function governanceAdminStatusChipClass(status = "") {
+  const normalized = String(status || "").trim().toLowerCase();
+  if (normalized === "approved" || normalized === "applied") {
+    return "chip chip-ok chip-compact";
+  }
+  if (normalized === "denied") {
+    return "chip chip-danger chip-compact";
+  }
+  if (normalized === "deferred" || normalized === "escalated" || normalized === "routed") {
+    return "chip chip-warn chip-compact";
+  }
+  return "chip chip-neutral chip-compact";
+}
+
+function ownerDomainLabel(ownerDomain = "") {
+  const normalized = String(ownerDomain || "").trim().toLowerCase();
+  if (normalized === "complianceops") {
+    return "ComplianceOps";
+  }
+  if (normalized === "platformops") {
+    return "PlatformOps";
+  }
+  if (normalized === "guardrailops") {
+    return "GuardrailOps";
+  }
+  if (normalized === "policyops") {
+    return "PolicyOps";
+  }
+  if (normalized === "networkops") {
+    return "NetworkOps";
+  }
+  if (normalized === "identityops") {
+    return "IdentityOps";
+  }
+  return normalized ? `${normalized}` : "Owner";
+}
+
+function renderAdminProposalReviewBoard(snapshot) {
+  const board = snapshot.adminProposalReview;
+  if (!board?.available) {
+    return `
+      <article class="metric governanceops-card governanceops-card-wide" data-domain-root="governanceops" data-governanceops-panel="admin-proposal-review">
+        <div class="metric-title-row">
+          <div class="title">Admin Proposal Review</div>
+          <span class="chip chip-neutral chip-compact">idle</span>
+        </div>
+        <div class="governanceops-kv-list">
+          <div class="governanceops-row">
+            <div class="governanceops-row-label">Status</div>
+            <div class="governanceops-row-value"><span class="governanceops-empty">No routed high-risk admin proposal is currently waiting for governance review.</span></div>
+          </div>
+        </div>
+      </article>
+    `;
+  }
+
+  const rows = [
+    {
+      label: "Proposal",
+      value: renderValuePills([
+        { label: "change", value: board.changeId, code: true },
+        { label: "kind", value: board.kind },
+        { label: "action", value: board.requestedAction },
+        { label: "status", value: board.status }
+      ])
+    },
+    {
+      label: "Scope",
+      value: renderValuePills([
+        { label: board.subjectLabel || "subject", value: board.subjectId, code: true },
+        { label: board.targetLabel || "target", value: board.targetScope, code: true },
+        { label: "routed", value: board.routedAt },
+        { label: "updated", value: board.updatedAt }
+      ])
+    },
+    {
+      label: "Summary",
+      value: escapeHTML(board.summary || "-")
+    },
+    {
+      label: "Simulation",
+      value: escapeHTML(board.simulationSummary || "-")
+    },
+    {
+      label: "Decision",
+      value: renderValuePills([
+        { label: "decision", value: board.decision?.status },
+        { label: "decision id", value: board.decision?.decisionId, code: true },
+        { label: "approval receipt", value: board.decision?.approvalReceiptId, code: true },
+        { label: "decided", value: board.decision?.decidedAt }
+      ])
+    },
+    {
+      label: "Decision Reason",
+      value: escapeHTML(board.decision?.reason || board.reason || "-")
+    },
+    {
+      label: "Receipt",
+      value: renderValuePills([
+        { label: "admin receipt", value: board.receipt?.receiptId, code: true },
+        { label: "issued", value: board.receipt?.issuedAt },
+        { label: "stable ref", value: board.receipt?.stableRef, code: true }
+      ])
+    }
+  ];
+  const ownerLabel = ownerDomainLabel(board.ownerDomain);
+  const openOwnerButton =
+    String(board.ownerDomain || "").trim().toLowerCase() === "identityops"
+      ? `
+          <button
+            class="btn btn-secondary btn-small"
+            type="button"
+            data-governanceops-open-identity-admin-change-id="${escapeHTML(board.changeId)}"
+          >Open ${escapeHTML(ownerLabel)}</button>
+        `
+      : `
+          <button
+            class="btn btn-secondary btn-small"
+            type="button"
+            data-governanceops-open-admin-owner-domain="${escapeHTML(String(board.ownerDomain || "").trim().toLowerCase())}"
+            data-governanceops-open-admin-change-id="${escapeHTML(board.changeId)}"
+          >Open ${escapeHTML(ownerLabel)}</button>
+        `;
+
+  return `
+    <article class="metric governanceops-card governanceops-card-wide" data-domain-root="governanceops" data-governanceops-panel="admin-proposal-review">
+      <div class="metric-title-row">
+        <div class="title">Admin Proposal Review</div>
+        <span class="${governanceAdminStatusChipClass(board.status)}">${escapeHTML(board.status)}</span>
+      </div>
+      <div class="governanceops-chip-row">
+        <span class="chip chip-neutral chip-compact">owner=${escapeHTML(String(board.ownerDomain || "").trim() || "unknown")}</span>
+        <span class="chip chip-neutral chip-compact">source=${escapeHTML(board.source)}</span>
+        ${board.decision?.approvalReceiptId && board.decision.approvalReceiptId !== "-" ? '<span class="chip chip-ok chip-compact">receipt issued</span>' : '<span class="chip chip-neutral chip-compact">receipt pending</span>'}
+      </div>
+      <div class="governanceops-kv-list">${renderKeyValueRows(rows)}</div>
+      <div class="governanceops-action-layout">
+        <label class="field governanceops-reason-field">
+          <span class="label">Admin Decision Reason</span>
+          <input
+            class="filter-input"
+            type="text"
+            placeholder="required; explain the governance decision or handoff"
+            data-governanceops-admin-decision-reason
+          />
+        </label>
+        <div class="governanceops-action-row">
+          <button
+            class="btn btn-ok"
+            type="button"
+            data-governanceops-decision-admin-change-id="${escapeHTML(board.changeId)}"
+            data-governanceops-decision="APPROVE"
+            ${board.canApproveDeny ? "" : "disabled"}
+          >Approve</button>
+          <button
+            class="btn btn-danger"
+            type="button"
+            data-governanceops-decision-admin-change-id="${escapeHTML(board.changeId)}"
+            data-governanceops-decision="DENY"
+            ${board.canApproveDeny ? "" : "disabled"}
+          >Deny</button>
+          <button
+            class="btn btn-secondary"
+            type="button"
+            data-governanceops-routing-admin-change-id="${escapeHTML(board.changeId)}"
+            data-governanceops-routing-action="DEFER"
+            ${board.canRoute ? "" : "disabled"}
+          >Defer</button>
+          <button
+            class="btn btn-secondary"
+            type="button"
+            data-governanceops-routing-admin-change-id="${escapeHTML(board.changeId)}"
+            data-governanceops-routing-action="ESCALATE"
+            ${board.canRoute ? "" : "disabled"}
+          >Escalate</button>
+          ${openOwnerButton}
+          <button
+            class="btn btn-secondary btn-small"
+            type="button"
+            data-governanceops-copy-admin-receipt-change-id="${escapeHTML(board.changeId)}"
+            ${board.canCopyReceipt ? "" : "disabled"}
+          >Copy Decision Receipt</button>
+        </div>
+      </div>
+    </article>
+  `;
+}
+
 function renderActionReviewBoard(snapshot) {
   const board = snapshot.actionReview;
   if (!board?.available) {
@@ -648,6 +836,7 @@ export function renderGovernanceWorkspace(context = {}) {
   return `
     <section class="governanceops-workspace" data-domain-root="governanceops">
       ${renderOperationalFeedback(snapshot)}
+      ${renderAdminProposalReviewBoard(snapshot)}
       ${renderActionReviewBoard(snapshot)}
       <div class="governanceops-primary-grid">
         ${renderApprovalQueueBoard(snapshot)}

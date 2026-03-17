@@ -196,6 +196,206 @@ function postureTone(...signals) {
   return "neutral";
 }
 
+function normalizeGuardrailAdminFeedback(feedback = null) {
+  if (!feedback || typeof feedback !== "object") {
+    return null;
+  }
+  const message = normalizeString(feedback.message);
+  if (!message) {
+    return null;
+  }
+  return {
+    tone: normalizeString(feedback.tone, "info").toLowerCase(),
+    message
+  };
+}
+
+function normalizeGuardrailAdminDecision(decision = null) {
+  if (!decision || typeof decision !== "object") {
+    return null;
+  }
+  const decisionId = normalizeString(decision.decisionId);
+  const status = normalizeString(decision.status).toLowerCase();
+  const reason = normalizeString(decision.reason);
+  const decidedAt = normalizeString(decision.decidedAt);
+  const approvalReceiptId = normalizeString(decision.approvalReceiptId);
+  if (!decisionId && !status && !reason && !decidedAt && !approvalReceiptId) {
+    return null;
+  }
+  return {
+    decisionId,
+    status,
+    reason,
+    decidedAt,
+    approvalReceiptId,
+    actorRef: normalizeString(decision.actorRef)
+  };
+}
+
+function normalizeGuardrailAdminReceipt(receipt = null) {
+  if (!receipt || typeof receipt !== "object") {
+    return null;
+  }
+  const receiptId = normalizeString(receipt.receiptId);
+  const issuedAt = normalizeString(receipt.issuedAt);
+  const summary = normalizeString(receipt.summary);
+  const stableRef = normalizeString(receipt.stableRef);
+  if (!receiptId && !issuedAt && !summary && !stableRef) {
+    return null;
+  }
+  return {
+    receiptId,
+    issuedAt,
+    summary,
+    stableRef,
+    approvalReceiptId: normalizeString(receipt.approvalReceiptId),
+    executionId: normalizeString(receipt.executionId)
+  };
+}
+
+function normalizeGuardrailAdminExecution(execution = null) {
+  if (!execution || typeof execution !== "object") {
+    return null;
+  }
+  const executionId = normalizeString(execution.executionId);
+  const executedAt = normalizeString(execution.executedAt);
+  const status = normalizeString(execution.status).toLowerCase();
+  const summary = normalizeString(execution.summary);
+  if (!executionId && !executedAt && !status && !summary) {
+    return null;
+  }
+  return {
+    executionId,
+    executedAt,
+    status,
+    summary,
+    actorRef: normalizeString(execution.actorRef)
+  };
+}
+
+function normalizeGuardrailAdminRollback(rollback = null) {
+  if (!rollback || typeof rollback !== "object") {
+    return null;
+  }
+  const rollbackId = normalizeString(rollback.rollbackId);
+  const action = normalizeString(rollback.action).toLowerCase();
+  const status = normalizeString(rollback.status).toLowerCase();
+  const rolledBackAt = normalizeString(rollback.rolledBackAt);
+  const summary = normalizeString(rollback.summary);
+  const stableRef = normalizeString(rollback.stableRef);
+  if (!rollbackId && !action && !status && !rolledBackAt && !summary && !stableRef) {
+    return null;
+  }
+  return {
+    rollbackId,
+    action,
+    status,
+    rolledBackAt,
+    summary,
+    stableRef,
+    reason: normalizeString(rollback.reason),
+    actorRef: normalizeString(rollback.actorRef),
+    approvalReceiptId: normalizeString(rollback.approvalReceiptId),
+    adminReceiptId: normalizeString(rollback.adminReceiptId),
+    executionId: normalizeString(rollback.executionId)
+  };
+}
+
+function normalizeGuardrailDraft(draft = null, defaults = {}) {
+  const input = draft && typeof draft === "object" ? draft : {};
+  return {
+    changeKind: normalizeString(input.changeKind || defaults.changeKind, "tighten").toLowerCase(),
+    targetScope: normalizeString(input.targetScope || defaults.targetScope, "workspace"),
+    executionProfile: normalizeString(input.executionProfile || defaults.executionProfile, "managed_codex_worker"),
+    safetyBoundary: normalizeString(input.safetyBoundary || defaults.safetyBoundary, "tenant_project_scope"),
+    proposedState: normalizeString(input.proposedState || defaults.proposedState, "approval_required"),
+    reason: normalizeString(input.reason)
+  };
+}
+
+function normalizeGuardrailAdminQueueItems(items = []) {
+  if (!Array.isArray(items)) {
+    return [];
+  }
+  return items
+    .map((item) => {
+      const entry = item && typeof item === "object" ? item : {};
+      const id = normalizeString(entry.id);
+      if (!id) {
+        return null;
+      }
+      return {
+        id,
+        ownerDomain: normalizeString(entry.ownerDomain || entry.domain, "guardrailops").toLowerCase(),
+        kind: normalizeString(entry.kind, "guardrail").toLowerCase(),
+        label: normalizeString(entry.label, "Guardrail Change Draft"),
+        requestedAction: normalizeString(entry.requestedAction, "proposal"),
+        subjectId: normalizeString(entry.subjectId, "-"),
+        subjectLabel: normalizeString(entry.subjectLabel, "profile").toLowerCase(),
+        targetScope: normalizeString(entry.targetScope, "-"),
+        targetLabel: normalizeString(entry.targetLabel, "scope").toLowerCase(),
+        changeKind: normalizeString(entry.changeKind, "tighten").toLowerCase(),
+        executionProfile: normalizeString(entry.executionProfile, "-"),
+        safetyBoundary: normalizeString(entry.safetyBoundary, "-"),
+        proposedState: normalizeString(entry.proposedState, "-"),
+        status: normalizeString(entry.status, "draft").toLowerCase(),
+        reason: normalizeString(entry.reason),
+        summary: normalizeString(entry.summary),
+        simulationSummary: normalizeString(entry.simulationSummary),
+        createdAt: normalizeString(entry.createdAt),
+        simulatedAt: normalizeString(entry.simulatedAt),
+        updatedAt: normalizeString(entry.updatedAt),
+        routedAt: normalizeString(entry.routedAt),
+        decision: normalizeGuardrailAdminDecision(entry.decision || null),
+        execution: normalizeGuardrailAdminExecution(entry.execution || null),
+        receipt: normalizeGuardrailAdminReceipt(entry.receipt || null),
+        rollback: normalizeGuardrailAdminRollback(entry.rollback || null)
+      };
+    })
+    .filter(Boolean);
+}
+
+function normalizeGuardrailAdminSimulation(simulation = null) {
+  if (!simulation || typeof simulation !== "object") {
+    return null;
+  }
+  const title = normalizeString(simulation.title);
+  const summary = normalizeString(simulation.summary);
+  const facts = Array.isArray(simulation.facts)
+    ? simulation.facts
+        .map((fact) => {
+          const item = fact && typeof fact === "object" ? fact : {};
+          const label = normalizeString(item.label);
+          const value = normalizeString(item.value);
+          if (!label || !value) {
+            return null;
+          }
+          return {
+            label,
+            value,
+            code: Boolean(item.code)
+          };
+        })
+        .filter(Boolean)
+    : [];
+  const findings = Array.isArray(simulation.findings)
+    ? simulation.findings.map((entry) => normalizeString(entry)).filter(Boolean)
+    : [];
+  if (!title && !summary && facts.length === 0 && findings.length === 0) {
+    return null;
+  }
+  return {
+    changeId: normalizeString(simulation.changeId),
+    kind: normalizeString(simulation.kind, "guardrail").toLowerCase(),
+    tone: normalizeString(simulation.tone, "info").toLowerCase(),
+    title: title || "Guardrail admin dry-run",
+    summary,
+    updatedAt: normalizeString(simulation.updatedAt),
+    facts,
+    findings
+  };
+}
+
 export function createGuardrailWorkspaceSnapshot(context = {}) {
   const settings = context?.settings && typeof context.settings === "object" ? context.settings : {};
   const runs = context?.runs && typeof context.runs === "object" ? context.runs : {};
@@ -208,6 +408,7 @@ export function createGuardrailWorkspaceSnapshot(context = {}) {
     context?.exportProfiles && typeof context.exportProfiles === "object" ? context.exportProfiles : {};
   const orgAdminProfiles =
     context?.orgAdminProfiles && typeof context.orgAdminProfiles === "object" ? context.orgAdminProfiles : {};
+  const viewState = context?.viewState && typeof context.viewState === "object" ? context.viewState : {};
 
   const latestRun = pickLatestGuardrailRun(runs);
   const latestApproval = pickLatestPendingApproval(approvals);
@@ -290,6 +491,21 @@ export function createGuardrailWorkspaceSnapshot(context = {}) {
     readOnlyStopPresent,
     policyBlockedPresent
   ].filter(Boolean).length;
+  const defaultTargetScope =
+    [latestRunTenant, latestRunProject].filter((value) => value && value !== "-").join(" / ") ||
+    normalizeString(settings?.environment, "workspace");
+  const adminDefaults = {
+    changeKind: breakGlassGateCount > 0 ? "tighten" : "tighten",
+    targetScope: defaultTargetScope || "workspace",
+    executionProfile: latestExecutionProfile !== "-" ? latestExecutionProfile : "managed_codex_worker",
+    safetyBoundary: boundarySummary.firstRequirement !== "-" ? boundarySummary.firstRequirement : "tenant_project_scope",
+    proposedState: approvalHoldPresent ? "approval_required" : "governed",
+    reason: ""
+  };
+  const adminQueueItems = normalizeGuardrailAdminQueueItems(viewState.queueItems || []);
+  const selectedAdminChangeId = normalizeString(viewState.selectedAdminChangeId);
+  const selectedAdminQueueItem =
+    adminQueueItems.find((item) => item.id === selectedAdminChangeId) || adminQueueItems[0] || null;
 
   return {
     guardrailPosture: {
@@ -449,6 +665,30 @@ export function createGuardrailWorkspaceSnapshot(context = {}) {
         timeboxedGateCount > 0 ? "active" : "unknown",
         latestApproval?.expiresAt ? "pending" : "clear"
       )
+    },
+    admin: {
+      feedback: normalizeGuardrailAdminFeedback(viewState?.feedback || null),
+      recoveryReason: normalizeString(viewState?.recoveryReason),
+      selectedChangeId: selectedAdminQueueItem ? selectedAdminQueueItem.id : selectedAdminChangeId,
+      selectedQueueItem: selectedAdminQueueItem,
+      queueItems: adminQueueItems,
+      draft: normalizeGuardrailDraft(viewState?.guardrailDraft || {}, adminDefaults),
+      latestSimulation: normalizeGuardrailAdminSimulation(viewState?.latestSimulation || null),
+      currentScope: {
+        targetScope: defaultTargetScope || "-",
+        executionProfile: latestExecutionProfile,
+        safetyBoundary: boundarySummary.firstRequirement,
+        terminalMode,
+        restrictedHostMode,
+        pendingApprovalCount,
+        currentHardStopCount,
+        breakGlassGateCount,
+        quotaGateCount,
+        redactionBoundaryPresent: boundarySummary.exportRedactionPresent,
+        firstDeliveryChannel: desktopDeliveryChannels[0] || deliveryChannels[0] || "-",
+        selectedProviderTransport: selectedProviderContract.transport,
+        latestRunId: normalizeString(latestRun?.runId, "-")
+      }
     }
   };
 }

@@ -113,12 +113,62 @@ test("policyops page renders the first inspect-only policy boards", () => {
         tone: "ok",
         message: "PolicyOps action feedback is visible."
       },
-      simulationRefreshedAt: "2026-03-14T21:05:00Z"
+      simulationRefreshedAt: "2026-03-14T21:05:00Z",
+      selectedAdminChangeId: "policy-change-001",
+      adminDraft: {
+        changeKind: "activate",
+        packId: "finance_supervisor_review",
+        providerId: "aimxs-policy-primary",
+        targetScope: "tenant-demo / project-finance",
+        reason: "Finance policy pack needs bounded activation preview."
+      },
+      queueItems: [
+        {
+          id: "policy-change-001",
+          ownerDomain: "policyops",
+          kind: "policy",
+          label: "Policy Pack Load And Activation Draft",
+          requestedAction: "activate finance_supervisor_review",
+          subjectId: "finance_supervisor_review",
+          subjectLabel: "pack",
+          targetScope: "tenant-demo / project-finance",
+          targetLabel: "scope",
+          changeKind: "activate",
+          packId: "finance_supervisor_review",
+          providerId: "aimxs-policy-primary",
+          status: "simulated",
+          reason: "Finance policy pack needs bounded activation preview.",
+          summary: "Activate finance_supervisor_review for tenant-demo / project-finance @ aimxs-policy-primary",
+          simulationSummary: "Preview only. This activate proposal requires GovernanceOps approval before any live policy-pack change can execute.",
+          updatedAt: "2026-03-14T21:07:00Z"
+        }
+      ],
+      latestSimulation: {
+        changeId: "policy-change-001",
+        kind: "policy",
+        tone: "warn",
+        title: "Policy admin dry-run",
+        summary: "Preview only. This activate proposal requires GovernanceOps approval before any live policy-pack change can execute.",
+        updatedAt: "2026-03-14T21:08:00Z",
+        facts: [
+          { label: "pack", value: "finance_supervisor_review", code: true },
+          { label: "provider", value: "aimxs-policy-primary", code: true },
+          { label: "scope", value: "tenant-demo / project-finance", code: true }
+        ],
+        findings: [
+          "Execution remains blocked until GovernanceOps records an explicit approved decision receipt for this policy proposal."
+        ]
+      }
     }
   });
 
   assert.match(ui.policyOpsContent.innerHTML, /data-domain-root="policyops"/);
   assert.match(ui.policyOpsContent.innerHTML, /PolicyOps action feedback is visible\./);
+  assert.match(ui.policyOpsContent.innerHTML, /Admin Change Queue/);
+  assert.match(ui.policyOpsContent.innerHTML, /Policy Pack Load And Activation Draft/);
+  assert.match(ui.policyOpsContent.innerHTML, /Decision Provider And Applicability Scope/);
+  assert.match(ui.policyOpsContent.innerHTML, /Semantic Impact Preview/);
+  assert.match(ui.policyOpsContent.innerHTML, /Governance Route And Receipt/);
   assert.match(ui.policyOpsContent.innerHTML, /Current Policy Contract/);
   assert.match(ui.policyOpsContent.innerHTML, /Policy Pack Catalog/);
   assert.match(ui.policyOpsContent.innerHTML, /Decision Explanation/);
@@ -137,6 +187,9 @@ test("policyops page renders the first inspect-only policy boards", () => {
   assert.match(ui.policyOpsContent.innerHTML, /latest governed run replay/);
   assert.match(ui.policyOpsContent.innerHTML, /required grants/);
   assert.match(ui.policyOpsContent.innerHTML, /blockers=3/);
+  assert.match(ui.policyOpsContent.innerHTML, /policy-change-001/);
+  assert.match(ui.policyOpsContent.innerHTML, /tenant-demo \/ project-finance/);
+  assert.match(ui.policyOpsContent.innerHTML, /Finance policy pack needs bounded activation preview\./);
   assert.match(ui.policyOpsContent.innerHTML, /decision surfaces/);
   assert.match(ui.policyOpsContent.innerHTML, /catalog/);
   assert.match(ui.policyOpsContent.innerHTML, /Export Decision Explanation/);
@@ -153,6 +206,213 @@ test("policyops page renders the first inspect-only policy boards", () => {
   assert.match(ui.policyOpsContent.innerHTML, /data-policyops-action="open-auditops"/);
   assert.match(ui.policyOpsContent.innerHTML, /data-policyops-action="open-evidenceops"/);
   assert.match(ui.policyOpsContent.innerHTML, /data-policyops-action="open-complianceops"/);
+  assert.match(ui.policyOpsContent.innerHTML, /data-policyops-admin-action="save-draft"/);
+  assert.match(ui.policyOpsContent.innerHTML, /data-policyops-admin-action="simulate-draft"/);
+  assert.match(ui.policyOpsContent.innerHTML, /data-policyops-admin-action="route-draft"/);
+  assert.match(ui.policyOpsContent.innerHTML, /data-policyops-admin-action="select-queue-item"/);
+  assert.match(ui.policyOpsContent.innerHTML, /data-policyops-admin-action="simulate-queue-item"/);
+  assert.match(ui.policyOpsContent.innerHTML, /data-policyops-admin-action="route-queue-item"/);
+  assert.match(ui.policyOpsContent.innerHTML, /data-policyops-admin-action="open-governance"/);
+  assert.match(ui.policyOpsContent.innerHTML, /data-policyops-draft-field="changeKind"/);
+  assert.match(ui.policyOpsContent.innerHTML, /data-policyops-draft-field="packId"/);
+  assert.match(ui.policyOpsContent.innerHTML, /data-policyops-draft-field="providerId"/);
+  assert.match(ui.policyOpsContent.innerHTML, /data-policyops-draft-field="targetScope"/);
+  assert.match(ui.policyOpsContent.innerHTML, /data-policyops-draft-field="reason"/);
+  assert.match(ui.policyOpsContent.innerHTML, /Open GovernanceOps/);
+});
+
+test("policyops page renders apply and receipt actions for approved policy admin proposals", () => {
+  const ui = { policyOpsContent: { innerHTML: "" } };
+  renderPolicyOpsPage(ui, {
+    settings: {
+      aimxs: {
+        mode: "aimxs-full",
+        activation: {
+          selectedProviderId: "aimxs-policy-primary"
+        }
+      },
+      identity: {
+        source: "runtime.auth.context",
+        policyMatrixRequired: true,
+        policyRuleCount: 6
+      },
+      policyCatalog: {
+        source: "runtime-endpoint",
+        count: 1,
+        items: [
+          {
+            packId: "read_only_review",
+            label: "Read Only Review",
+            roleBundles: ["enterprise.operator"],
+            decisionSurfaces: ["governed_tool_action"],
+            boundaryRequirements: ["tenant_project_scope"]
+          }
+        ]
+      }
+    },
+    runs: { items: [] },
+    viewState: {
+      selectedAdminChangeId: "policy-change-apply-001",
+      adminDraft: {
+        changeKind: "activate",
+        packId: "read_only_review",
+        providerId: "aimxs-policy-primary",
+        targetScope: "tenant-demo / workspace",
+        reason: "Activate the reviewed pack after governance approval."
+      },
+      queueItems: [
+        {
+          id: "policy-change-apply-001",
+          ownerDomain: "policyops",
+          kind: "policy",
+          label: "Policy Pack Load And Activation Draft",
+          requestedAction: "activate read_only_review",
+          subjectId: "read_only_review",
+          subjectLabel: "pack",
+          targetScope: "tenant-demo / workspace",
+          targetLabel: "scope",
+          changeKind: "activate",
+          packId: "read_only_review",
+          providerId: "aimxs-policy-primary",
+          status: "approved",
+          reason: "Activate the reviewed pack after governance approval.",
+          summary: "Activate read_only_review for tenant-demo / workspace @ aimxs-policy-primary",
+          simulationSummary: "Preview only. This activate proposal requires GovernanceOps approval before any live policy-pack change can execute.",
+          updatedAt: "2026-03-16T23:20:00Z",
+          routedAt: "2026-03-16T23:10:00Z",
+          decision: {
+            decisionId: "admin-decision-policy-001",
+            status: "approved",
+            reason: "Policy simulation and governance review are green.",
+            decidedAt: "2026-03-16T23:12:00Z",
+            approvalReceiptId: "approval-receipt-policy-001",
+            actorRef: "governance-reviewer"
+          }
+        }
+      ],
+      latestSimulation: {
+        changeId: "policy-change-apply-001",
+        kind: "policy",
+        tone: "info",
+        title: "Policy admin dry-run",
+        summary: "Preview only. This activate proposal requires GovernanceOps approval before any live policy-pack change can execute.",
+        updatedAt: "2026-03-16T23:09:00Z",
+        facts: [
+          { label: "pack", value: "read_only_review", code: true },
+          { label: "provider", value: "aimxs-policy-primary", code: true }
+        ],
+        findings: []
+      }
+    }
+  });
+
+  assert.match(ui.policyOpsContent.innerHTML, /Governance Route And Receipt/);
+  assert.match(ui.policyOpsContent.innerHTML, /Rollback And History/);
+  assert.match(ui.policyOpsContent.innerHTML, /Apply Approved Change/);
+  assert.match(ui.policyOpsContent.innerHTML, /Copy Governance Receipt/);
+  assert.match(ui.policyOpsContent.innerHTML, /Copy Admin Receipt/);
+  assert.match(ui.policyOpsContent.innerHTML, /approval-receipt-policy-001/);
+  assert.match(ui.policyOpsContent.innerHTML, /Policy simulation and governance review are green\./);
+});
+
+test("policyops page renders rollback and bounded history for applied policy admin proposals", () => {
+  const ui = { policyOpsContent: { innerHTML: "" } };
+  renderPolicyOpsPage(ui, {
+    settings: {
+      aimxs: {
+        mode: "aimxs-full",
+        activation: {
+          selectedProviderId: "aimxs-policy-primary"
+        }
+      },
+      identity: {
+        source: "runtime.auth.context",
+        policyMatrixRequired: true,
+        policyRuleCount: 6
+      },
+      policyCatalog: {
+        source: "runtime-endpoint",
+        count: 1,
+        items: [
+          {
+            packId: "read_only_review",
+            label: "Read Only Review",
+            roleBundles: ["enterprise.operator"],
+            decisionSurfaces: ["governed_tool_action"],
+            boundaryRequirements: ["tenant_project_scope"]
+          }
+        ]
+      }
+    },
+    runs: { items: [] },
+    viewState: {
+      selectedAdminChangeId: "policy-change-rollback-001",
+      recoveryReason: "Policy regression surfaced during bounded tenant replay.",
+      adminDraft: {
+        changeKind: "activate",
+        packId: "read_only_review",
+        providerId: "aimxs-policy-primary",
+        targetScope: "tenant-demo / workspace",
+        reason: "Activate the reviewed pack after governance approval."
+      },
+      queueItems: [
+        {
+          id: "policy-change-rollback-001",
+          ownerDomain: "policyops",
+          kind: "policy",
+          label: "Policy Pack Load And Activation Draft",
+          requestedAction: "activate read_only_review",
+          subjectId: "read_only_review",
+          subjectLabel: "pack",
+          targetScope: "tenant-demo / workspace",
+          targetLabel: "scope",
+          changeKind: "activate",
+          packId: "read_only_review",
+          providerId: "aimxs-policy-primary",
+          status: "applied",
+          reason: "Activate the reviewed pack after governance approval.",
+          summary: "Activate read_only_review for tenant-demo / workspace @ aimxs-policy-primary",
+          simulationSummary: "Preview only. This activate proposal requires GovernanceOps approval before any live policy-pack change can execute.",
+          createdAt: "2026-03-16T23:08:00Z",
+          simulatedAt: "2026-03-16T23:09:00Z",
+          routedAt: "2026-03-16T23:10:00Z",
+          updatedAt: "2026-03-16T23:20:00Z",
+          decision: {
+            decisionId: "admin-decision-policy-rollback-001",
+            status: "approved",
+            reason: "Policy simulation and governance review are green.",
+            decidedAt: "2026-03-16T23:12:00Z",
+            approvalReceiptId: "approval-receipt-policy-rollback-001",
+            actorRef: "governance-reviewer"
+          },
+          execution: {
+            executionId: "admin-execution-policy-rollback-001",
+            executedAt: "2026-03-16T23:14:00Z",
+            status: "applied",
+            summary: "Activate read_only_review for tenant-demo / workspace @ aimxs-policy-primary.",
+            actorRef: "policy-operator"
+          },
+          receipt: {
+            receiptId: "admin-receipt-policy-rollback-001",
+            issuedAt: "2026-03-16T23:14:00Z",
+            summary: "Activate read_only_review for tenant-demo / workspace @ aimxs-policy-primary.",
+            stableRef: "policy-change-rollback-001/admin-receipt-policy-rollback-001",
+            approvalReceiptId: "approval-receipt-policy-rollback-001",
+            executionId: "admin-execution-policy-rollback-001"
+          }
+        }
+      ]
+    }
+  });
+
+  assert.match(ui.policyOpsContent.innerHTML, /Rollback And History/);
+  assert.match(ui.policyOpsContent.innerHTML, /rollback available/);
+  assert.match(ui.policyOpsContent.innerHTML, /Policy regression surfaced during bounded tenant replay\./);
+  assert.match(ui.policyOpsContent.innerHTML, /Rollback Applied Change/);
+  assert.match(ui.policyOpsContent.innerHTML, /Copy Rollback Receipt/);
+  assert.match(ui.policyOpsContent.innerHTML, /data-policyops-admin-recovery-reason/);
+  assert.match(ui.policyOpsContent.innerHTML, /admin-receipt-policy-rollback-001/);
+  assert.match(ui.policyOpsContent.innerHTML, /approval-receipt-policy-rollback-001/);
 });
 
 test("policyops empty state renders without loaded policy context", () => {

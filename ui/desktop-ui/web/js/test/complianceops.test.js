@@ -166,15 +166,148 @@ test("complianceops page renders bounded control, obligation, and attestation bo
           ]
         }
       ]
+    },
+    viewState: {
+      selectedAdminChangeId: "compliance-change-002",
+      recoveryReason: "Renew after the bounded exception review confirms the scope is still required.",
+      adminDraft: {
+        changeKind: "exception",
+        subjectId: "Centralized Enterprise Admin Residency Exception",
+        targetScope: "tenant-demo/project-core",
+        controlBoundary: "financial_control",
+        reason: "Preview a bounded compliance exception before routing it to GovernanceOps."
+      },
+      queueItems: [
+        {
+          id: "compliance-change-001",
+          ownerDomain: "complianceops",
+          kind: "compliance",
+          label: "Attestation And Exception Draft",
+          requestedAction: "exception_proposal",
+          subjectId: "Centralized Enterprise Admin Residency Exception",
+          subjectLabel: "exception",
+          targetScope: "tenant-demo/project-core",
+          targetLabel: "scope",
+          changeKind: "exception",
+          controlBoundary: "financial_control",
+          status: "simulated",
+          reason: "Preview a bounded compliance exception before routing it to GovernanceOps.",
+          summary: "Exception Centralized Enterprise Admin Residency Exception for tenant-demo/project-core @ financial_control",
+          simulationSummary: "Preview only. This exception proposal requires GovernanceOps approval before any live compliance change can execute.",
+          createdAt: "2026-03-15T02:04:00Z",
+          simulatedAt: "2026-03-15T02:05:00Z",
+          updatedAt: "2026-03-15T02:05:00Z"
+        },
+        {
+          id: "compliance-change-002",
+          ownerDomain: "complianceops",
+          kind: "compliance",
+          label: "Attestation And Exception Draft",
+          requestedAction: "exception_proposal",
+          subjectId: "Centralized Enterprise Admin Residency Exception",
+          subjectLabel: "exception",
+          targetScope: "tenant-demo/project-payments",
+          targetLabel: "scope",
+          changeKind: "exception",
+          controlBoundary: "external_actuator",
+          status: "expired",
+          reason: "Apply an approved bounded compliance exception after governance review.",
+          summary: "Exception Centralized Enterprise Admin Residency Exception for tenant-demo/project-payments @ external_actuator",
+          simulationSummary: "Preview only. This exception proposal requires GovernanceOps approval before any live compliance change can execute.",
+          createdAt: "2026-03-15T02:06:00Z",
+          simulatedAt: "2026-03-15T02:07:00Z",
+          routedAt: "2026-03-15T02:08:00Z",
+          updatedAt: "2026-03-15T02:10:00Z",
+          decision: {
+            status: "approved",
+            decisionId: "governance-decision-001",
+            approvalReceiptId: "approval-receipt-001",
+            decidedAt: "2026-03-15T02:08:30Z",
+            reason: "Explicitly approved after review.",
+            actorRef: "governance-reviewer"
+          },
+          execution: {
+            executionId: "admin-execution-001",
+            executedAt: "2026-03-15T02:09:00Z",
+            status: "applied",
+            summary: "exception_proposal applied for tenant-demo/project-payments @ external_actuator.",
+            actorRef: "compliance-operator"
+          },
+          receipt: {
+            receiptId: "admin-receipt-001",
+            issuedAt: "2026-03-15T02:09:30Z",
+            summary: "exception_proposal applied for tenant-demo/project-payments @ external_actuator.",
+            stableRef: "compliance-change-002/admin-receipt-001",
+            approvalReceiptId: "approval-receipt-001",
+            executionId: "admin-execution-001"
+          },
+          rollback: {
+            rollbackId: "admin-expiry-001",
+            action: "expiry",
+            status: "expired",
+            rolledBackAt: "2026-03-15T02:12:00Z",
+            summary: "Expired exception_proposal for tenant-demo/project-payments @ external_actuator.",
+            stableRef: "compliance-change-002/admin-expiry-001",
+            reason: "The previous exception window elapsed and requires explicit renewal.",
+            actorRef: "compliance-operator",
+            approvalReceiptId: "approval-receipt-001",
+            adminReceiptId: "admin-receipt-001",
+            executionId: "admin-execution-001"
+          },
+          history: [
+            {
+              label: "Expiry",
+              at: "2026-03-15T02:12:00Z",
+              summary: "Expired exception_proposal for tenant-demo/project-payments @ external_actuator."
+            }
+          ]
+        }
+      ],
+      latestSimulation: {
+        changeId: "compliance-change-001",
+        kind: "compliance",
+        tone: "warn",
+        title: "Compliance admin dry-run",
+        summary: "Preview only. This exception proposal requires GovernanceOps approval before any live compliance change can execute.",
+        updatedAt: "2026-03-15T02:05:00Z",
+        facts: [
+          { label: "change", value: "exception" },
+          { label: "proposal", value: "Centralized Enterprise Admin Residency Exception", code: true },
+          { label: "scope", value: "tenant-demo/project-core", code: true },
+          { label: "boundary", value: "financial_control", code: true }
+        ],
+        findings: [
+          "Execution remains blocked until GovernanceOps records an explicit approved decision receipt for this compliance proposal."
+        ]
+      }
     }
   });
 
   assert.match(ui.complianceOpsContent.innerHTML, /data-domain-root="complianceops"/);
+  assert.match(ui.complianceOpsContent.innerHTML, /Admin Change Queue/);
+  assert.match(ui.complianceOpsContent.innerHTML, /Attestation And Exception Draft/);
+  assert.match(ui.complianceOpsContent.innerHTML, /Control Scope And Obligation Boundary/);
+  assert.match(ui.complianceOpsContent.innerHTML, /Impact Preview/);
+  assert.match(ui.complianceOpsContent.innerHTML, /Governance Route And Receipt/);
+  assert.match(ui.complianceOpsContent.innerHTML, /Expiry And History/);
   assert.match(ui.complianceOpsContent.innerHTML, /Control Coverage Board/);
   assert.match(ui.complianceOpsContent.innerHTML, /Obligation Board/);
   assert.match(ui.complianceOpsContent.innerHTML, /Attestation Board/);
   assert.match(ui.complianceOpsContent.innerHTML, /Gap And Exception Board/);
   assert.match(ui.complianceOpsContent.innerHTML, /Retention And Disclosure Board/);
+  assert.match(ui.complianceOpsContent.innerHTML, /compliance-change-001/);
+  assert.match(ui.complianceOpsContent.innerHTML, /compliance-change-002/);
+  assert.match(ui.complianceOpsContent.innerHTML, /Route To Governance/);
+  assert.match(ui.complianceOpsContent.innerHTML, /Open GovernanceOps/);
+  assert.match(ui.complianceOpsContent.innerHTML, /Apply Approved Change/);
+  assert.match(ui.complianceOpsContent.innerHTML, /Copy Governance Receipt/);
+  assert.match(ui.complianceOpsContent.innerHTML, /Copy Admin Receipt/);
+  assert.match(ui.complianceOpsContent.innerHTML, /Renew Expired Change/);
+  assert.match(ui.complianceOpsContent.innerHTML, /Copy Recovery Receipt/);
+  assert.match(ui.complianceOpsContent.innerHTML, /approval-receipt-001/);
+  assert.match(ui.complianceOpsContent.innerHTML, /admin-receipt-001/);
+  assert.match(ui.complianceOpsContent.innerHTML, /admin-expiry-001/);
+  assert.match(ui.complianceOpsContent.innerHTML, /The previous exception window elapsed and requires explicit renewal/);
   assert.match(ui.complianceOpsContent.innerHTML, /financial_control/);
   assert.match(ui.complianceOpsContent.innerHTML, /external_actuator/);
   assert.match(ui.complianceOpsContent.innerHTML, /grant\.finance\.transfer/);

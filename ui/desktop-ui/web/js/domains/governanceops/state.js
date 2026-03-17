@@ -163,6 +163,97 @@ function summarizeOperationalFeedback(viewState = {}) {
   };
 }
 
+function normalizeAdminProposalItems(items = []) {
+  return (Array.isArray(items) ? items : [])
+    .map((item) => {
+      const entry = item && typeof item === "object" ? item : {};
+      const changeId = normalizeString(entry?.id);
+      if (!changeId) {
+        return null;
+      }
+      const decision = readObject(entry?.decision);
+      const receipt = readObject(entry?.receipt);
+      return {
+        changeId,
+        ownerDomain: normalizeString(entry?.ownerDomain || entry?.domain, "identityops").toLowerCase(),
+        kind: normalizeString(entry?.kind, "identity"),
+        label: normalizeString(entry?.label, "Queued proposal"),
+        requestedAction: normalizeString(entry?.requestedAction, "proposal"),
+        subjectId: normalizeString(entry?.subjectId, "-"),
+        subjectLabel: normalizeString(entry?.subjectLabel, "subject").toLowerCase(),
+        targetScope: normalizeString(entry?.targetScope, "-"),
+        targetLabel: normalizeString(entry?.targetLabel, "target").toLowerCase(),
+        status: normalizeString(entry?.status, "draft").toLowerCase(),
+        reason: normalizeString(entry?.reason, "-"),
+        summary: normalizeString(entry?.summary, "-"),
+        simulationSummary: normalizeString(entry?.simulationSummary, "-"),
+        updatedAt: normalizeString(entry?.updatedAt, "-"),
+        routedAt: normalizeString(entry?.routedAt, "-"),
+        decision: {
+          decisionId: normalizeString(decision?.decisionId, "-"),
+          status: normalizeString(decision?.status, "-").toLowerCase(),
+          reason: normalizeString(decision?.reason, "-"),
+          decidedAt: normalizeString(decision?.decidedAt, "-"),
+          approvalReceiptId: normalizeString(decision?.approvalReceiptId, "-"),
+          actorRef: normalizeString(decision?.actorRef, "-")
+        },
+        receipt: {
+          receiptId: normalizeString(receipt?.receiptId, "-"),
+          issuedAt: normalizeString(receipt?.issuedAt, "-"),
+          stableRef: normalizeString(receipt?.stableRef, "-"),
+          approvalReceiptId: normalizeString(receipt?.approvalReceiptId, "-")
+        }
+      };
+    })
+    .filter(Boolean);
+}
+
+function summarizeAdminProposalReview(adminQueueItems = [], viewState = {}) {
+  const items = normalizeAdminProposalItems(adminQueueItems);
+  const selectedChangeId = normalizeString(viewState?.selectedAdminChangeId);
+  const selectedItem =
+    items.find((item) => item.changeId === selectedChangeId) ||
+    items.find((item) => item.status === "routed") ||
+    items.find((item) => item.status === "approved") ||
+    items.find((item) => item.status === "applied") ||
+    items.find((item) => item.status === "deferred" || item.status === "escalated") ||
+    items[0] ||
+    null;
+  if (!selectedItem) {
+    return {
+      available: false
+    };
+  }
+
+  const actionable = selectedItem.status === "routed";
+  return {
+    available: true,
+    source: `${selectedItem.ownerDomain}-admin`,
+    ownerDomain: selectedItem.ownerDomain,
+    selectedChangeId: selectedItem.changeId,
+    changeId: selectedItem.changeId,
+    kind: selectedItem.kind,
+    label: selectedItem.label,
+    requestedAction: selectedItem.requestedAction,
+    subjectId: selectedItem.subjectId,
+    subjectLabel: selectedItem.subjectLabel,
+    targetScope: selectedItem.targetScope,
+    targetLabel: selectedItem.targetLabel,
+    status: selectedItem.status,
+    reason: selectedItem.reason,
+    summary: selectedItem.summary,
+    simulationSummary: selectedItem.simulationSummary,
+    updatedAt: selectedItem.updatedAt,
+    routedAt: selectedItem.routedAt,
+    decision: selectedItem.decision,
+    receipt: selectedItem.receipt,
+    canApproveDeny: actionable,
+    canRoute: actionable,
+    canCopyReceipt: selectedItem.decision.approvalReceiptId !== "-",
+    canOpenIdentity: true
+  };
+}
+
 function summarizeActionReview(approvals = {}, runs = {}, nowValue = new Date(), viewState = {}) {
   const approvalItems = Array.isArray(approvals?.items) ? approvals.items : [];
   const selectedRunId = normalizeString(viewState?.selectedRunId);
@@ -670,6 +761,7 @@ export function createGovernanceWorkspaceSnapshot(context = {}) {
 
   return {
     operationalFeedback: summarizeOperationalFeedback(viewState),
+    adminProposalReview: summarizeAdminProposalReview(context?.adminQueueItems, viewState),
     actionReview: summarizeActionReview(approvals, runs, nowValue, viewState),
     approvalQueue: summarizeApprovalQueue(approvals, nowValue),
     authorityLadder: summarizeAuthorityLadder(settings, approvals, runs, session),

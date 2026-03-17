@@ -69,12 +69,14 @@
   gap: var(--space-4);
 }
 
+.policyops-admin-grid,
 .policyops-primary-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: var(--space-3);
 }
 
+.policyops-admin-grid > .policyops-card-wide,
 .policyops-primary-grid > .settings-metric-policy-packs,
 .policyops-card-wide {
   grid-column: 1 / -1;
@@ -102,6 +104,21 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
+}
+
+.policyops-admin-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-3);
+}
+
+.policyops-field-wide {
+  grid-column: 1 / -1;
+}
+
+.policyops-textarea {
+  min-height: 5.5rem;
+  resize: vertical;
 }
 
 .policyops-kv-list {
@@ -175,4 +192,63 @@
 .policyops-empty {
   color: var(--ink-soft);
   font-size: var(--font-size-sm);
+}
+
+.policyops-queue-list {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.policyops-queue-card {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+  border-radius: var(--radius-2);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface) 94%, transparent), color-mix(in srgb, var(--panel) 82%, transparent)),
+    var(--surface-raised);
+  box-shadow: var(--shadow-1), var(--shadow-inset);
+}
+
+.policyops-finding-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: var(--space-1);
+  color: var(--ink);
+}
+
+.policyops-history-list {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.policyops-history-item {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+  border-radius: var(--radius-2);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface) 94%, transparent), color-mix(in srgb, var(--panel) 82%, transparent)),
+    var(--surface-raised);
+  box-shadow: var(--shadow-inset);
+}
+
+.policyops-history-stage {
+  font-size: var(--font-size-2xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.policyops-history-time {
+  font-size: var(--font-size-xs);
+  color: var(--ink-soft);
+}
+
+.policyops-history-summary {
+  color: var(--ink);
+  overflow-wrap: anywhere;
 }

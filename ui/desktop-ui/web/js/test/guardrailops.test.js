@@ -164,10 +164,109 @@ test("guardrailops page renders the first inspect-only guardrail boards", () => 
           ]
         }
       ]
+    },
+    viewState: {
+      feedback: {
+        tone: "ok",
+        message: "Rollback recorded for guardrailops admin proposal guardrail-change-001. Recovery receipt admin-rollback-guardrail-001 is now available."
+      },
+      selectedAdminChangeId: "guardrail-change-001",
+      recoveryReason: "Return tenant-demo / project-core to governed posture after the bounded acceptance run.",
+      guardrailDraft: {
+        changeKind: "tighten",
+        targetScope: "tenant-demo / project-core",
+        executionProfile: "sandbox_vm_autonomous",
+        safetyBoundary: "tenant_project_scope",
+        proposedState: "approval_required",
+        reason: "Keep sandbox actuation scoped while approvals remain pending."
+      },
+      queueItems: [
+        {
+          id: "guardrail-change-001",
+          ownerDomain: "guardrailops",
+          kind: "guardrail",
+          label: "Guardrail Change Draft",
+          requestedAction: "tighten approval_required",
+          subjectId: "sandbox_vm_autonomous",
+          subjectLabel: "profile",
+          targetScope: "tenant-demo / project-core",
+          targetLabel: "scope",
+          changeKind: "tighten",
+          executionProfile: "sandbox_vm_autonomous",
+          safetyBoundary: "tenant_project_scope",
+          proposedState: "approval_required",
+          status: "rolled_back",
+          reason: "Keep sandbox actuation scoped while approvals remain pending.",
+          summary: "tighten approval_required for tenant-demo / project-core @ sandbox_vm_autonomous",
+          simulationSummary: "Preview only. This tighten guardrail proposal requires GovernanceOps approval before any live guardrail change can execute.",
+          updatedAt: "2026-03-16T22:10:00Z",
+          routedAt: "2026-03-16T22:11:00Z",
+          decision: {
+            decisionId: "admin-decision-guardrail-001",
+            status: "approved",
+            reason: "Guardrail change is bounded to tenant-demo / project-core and may proceed.",
+            decidedAt: "2026-03-16T22:12:00Z",
+            approvalReceiptId: "approval-receipt-guardrail-001",
+            actorRef: "governance-reviewer"
+          },
+          execution: {
+            executionId: "admin-execution-guardrail-001",
+            executedAt: "2026-03-16T22:13:00Z",
+            status: "applied",
+            summary: "tighten approval_required applied for tenant-demo / project-core on sandbox_vm_autonomous.",
+            actorRef: "guardrail-operator"
+          },
+          receipt: {
+            receiptId: "admin-receipt-guardrail-001",
+            issuedAt: "2026-03-16T22:13:00Z",
+            summary: "tighten approval_required applied for tenant-demo / project-core on sandbox_vm_autonomous.",
+            stableRef: "guardrail-change-001/admin-receipt-guardrail-001",
+            approvalReceiptId: "approval-receipt-guardrail-001",
+            executionId: "admin-execution-guardrail-001"
+          },
+          rollback: {
+            rollbackId: "admin-rollback-guardrail-001",
+            action: "rollback",
+            status: "rolled_back",
+            rolledBackAt: "2026-03-16T22:14:00Z",
+            summary: "Rolled back tighten approval_required for tenant-demo / project-core on sandbox_vm_autonomous.",
+            stableRef: "guardrail-change-001/admin-rollback-guardrail-001",
+            reason: "Return tenant-demo / project-core to governed posture after the bounded acceptance run.",
+            actorRef: "guardrail-operator",
+            approvalReceiptId: "approval-receipt-guardrail-001",
+            adminReceiptId: "admin-receipt-guardrail-001",
+            executionId: "admin-execution-guardrail-001"
+          }
+        }
+      ],
+      latestSimulation: {
+        changeId: "guardrail-change-001",
+        kind: "guardrail",
+        tone: "warn",
+        title: "Guardrail admin dry-run",
+        summary: "Preview only. This tighten guardrail proposal requires GovernanceOps approval before any live guardrail change can execute.",
+        updatedAt: "2026-03-16T22:09:00Z",
+        facts: [
+          { label: "scope", value: "tenant-demo / project-core", code: true },
+          { label: "profile", value: "sandbox_vm_autonomous", code: true },
+          { label: "boundary", value: "tenant_project_scope", code: true },
+          { label: "state", value: "approval_required", code: true }
+        ],
+        findings: [
+          "Execution remains blocked in this slice. GovernanceOps approval is required before any live guardrail change can execute.",
+          "Existing pending approvals mean guardrail changes will land on an already constrained execution surface."
+        ]
+      }
     }
   });
 
   assert.match(ui.guardrailOpsContent.innerHTML, /data-domain-root="guardrailops"/);
+  assert.match(ui.guardrailOpsContent.innerHTML, /Admin Change Queue/);
+  assert.match(ui.guardrailOpsContent.innerHTML, /Guardrail Change Draft/);
+  assert.match(ui.guardrailOpsContent.innerHTML, /Execution Scope And Safety Boundary/);
+  assert.match(ui.guardrailOpsContent.innerHTML, /Impact Preview/);
+  assert.match(ui.guardrailOpsContent.innerHTML, /Governance Route And Receipt/);
+  assert.match(ui.guardrailOpsContent.innerHTML, /Rollback And History/);
   assert.match(ui.guardrailOpsContent.innerHTML, /Guardrail Posture/);
   assert.match(ui.guardrailOpsContent.innerHTML, /Sandbox And Capability/);
   assert.match(ui.guardrailOpsContent.innerHTML, /Quota And Timeout/);
@@ -204,6 +303,23 @@ test("guardrailops page renders the first inspect-only guardrail boards", () => 
   assert.match(ui.guardrailOpsContent.innerHTML, /OpenAI Codex/);
   assert.match(ui.guardrailOpsContent.innerHTML, /enterprise.break_glass_admin/);
   assert.match(ui.guardrailOpsContent.innerHTML, /break_glass_activation/);
+  assert.match(ui.guardrailOpsContent.innerHTML, /guardrail-change-001/);
+  assert.match(ui.guardrailOpsContent.innerHTML, /Save Draft/);
+  assert.match(ui.guardrailOpsContent.innerHTML, /Run Dry-Run/);
+  assert.match(ui.guardrailOpsContent.innerHTML, /Route To Governance/);
+  assert.match(ui.guardrailOpsContent.innerHTML, /Open GovernanceOps/);
+  assert.match(ui.guardrailOpsContent.innerHTML, /Apply Approved Change/);
+  assert.match(ui.guardrailOpsContent.innerHTML, /Copy Governance Receipt/);
+  assert.match(ui.guardrailOpsContent.innerHTML, /Copy Admin Receipt/);
+  assert.match(ui.guardrailOpsContent.innerHTML, /Rollback Applied Change/);
+  assert.match(ui.guardrailOpsContent.innerHTML, /Copy Rollback Receipt/);
+  assert.match(ui.guardrailOpsContent.innerHTML, /apply-gated/);
+  assert.match(ui.guardrailOpsContent.innerHTML, /approval_required/);
+  assert.match(ui.guardrailOpsContent.innerHTML, /approval-receipt-guardrail-001/);
+  assert.match(ui.guardrailOpsContent.innerHTML, /admin-receipt-guardrail-001/);
+  assert.match(ui.guardrailOpsContent.innerHTML, /admin-rollback-guardrail-001/);
+  assert.match(ui.guardrailOpsContent.innerHTML, /Return tenant-demo \/ project-core to governed posture/);
+  assert.match(ui.guardrailOpsContent.innerHTML, /Keep sandbox actuation scoped while approvals remain pending/);
 });
 
 test("guardrailops empty state renders without loaded guardrail context", () => {

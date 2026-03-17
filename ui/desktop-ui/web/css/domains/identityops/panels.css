@@ -13,7 +13,8 @@
 }
 
 .identityops-primary-grid,
-.identityops-secondary-grid {
+.identityops-secondary-grid,
+.identityops-admin-grid {
   display: grid;
   gap: var(--space-3);
 }
@@ -24,6 +25,19 @@
 
 .identityops-secondary-grid {
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.identityops-admin-section {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.identityops-admin-grid {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.identityops-section-title-row {
+  align-items: center;
 }
 
 .identityops-card {
@@ -132,10 +146,145 @@
   color: var(--muted);
 }
 
+.identityops-feedback-shell {
+  display: grid;
+}
+
+.identityops-feedback {
+  gap: var(--space-2);
+}
+
+.identityops-feedback-message {
+  margin: 0;
+  color: var(--text);
+}
+
+.identityops-feedback-ok {
+  border-color: color-mix(in srgb, var(--ok) 42%, var(--border-subtle));
+}
+
+.identityops-feedback-warn {
+  border-color: color-mix(in srgb, var(--warn) 42%, var(--border-subtle));
+}
+
+.identityops-feedback-error {
+  border-color: color-mix(in srgb, var(--danger) 42%, var(--border-subtle));
+}
+
+.identityops-admin-card {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.identityops-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.identityops-field {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.identityops-field-wide {
+  grid-column: 1 / -1;
+}
+
+.identityops-field-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.identityops-textarea {
+  resize: vertical;
+  min-height: 5.5rem;
+}
+
+.identityops-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.identityops-queue-list {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.identityops-queue-card {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-2);
+  border: 1px solid color-mix(in srgb, var(--border-subtle) 82%, transparent);
+  background: color-mix(in srgb, var(--surface) 94%, var(--secondary-bg) 6%);
+}
+
+.identityops-queue-card-selected {
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--border-subtle));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.identityops-list {
+  margin: 0;
+  padding-left: 1rem;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.identityops-history-list {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.identityops-history-item {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: var(--radius-2);
+  border: 1px solid color-mix(in srgb, var(--border-subtle) 80%, transparent);
+  background: color-mix(in srgb, var(--surface) 92%, var(--secondary-bg) 8%);
+}
+
+.identityops-history-stage {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.identityops-history-time {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.identityops-history-summary {
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
 @media (min-width: 900px) {
   .identityops-row {
     grid-template-columns: minmax(124px, 148px) 1fr;
     align-items: start;
     gap: var(--space-3);
+  }
+}
+
+@media (max-width: 699px) {
+  .identityops-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .identityops-field-wide {
+    grid-column: auto;
   }
 }

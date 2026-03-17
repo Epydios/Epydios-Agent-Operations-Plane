@@ -371,30 +371,227 @@ function buildTopologyBoard(settings, providers, runs, runtimeWorkerCapabilities
   };
 }
 
+function normalizeNetworkAdminFeedback(feedback = null) {
+  if (!feedback || typeof feedback !== "object") {
+    return null;
+  }
+  const message = normalizeString(feedback.message);
+  if (!message) {
+    return null;
+  }
+  return {
+    tone: normalizeString(feedback.tone, "info").toLowerCase(),
+    message
+  };
+}
+
+function normalizeNetworkAdminDraft(draft = null, defaults = {}) {
+  const input = draft && typeof draft === "object" ? draft : {};
+  return {
+    changeKind: "probe",
+    boundaryPathId: normalizeString(input.boundaryPathId || defaults.boundaryPathId),
+    targetScope: normalizeString(input.targetScope || defaults.targetScope, "workspace"),
+    targetEndpointId: normalizeString(input.targetEndpointId || defaults.targetEndpointId),
+    reason: normalizeString(input.reason)
+  };
+}
+
+function normalizeNetworkAdminQueueItems(items = []) {
+  if (!Array.isArray(items)) {
+    return [];
+  }
+  return items
+    .map((item) => {
+      const entry = item && typeof item === "object" ? item : {};
+      const id = normalizeString(entry.id);
+      if (!id) {
+        return null;
+      }
+      return {
+        id,
+        ownerDomain: normalizeString(entry.ownerDomain || entry.domain, "networkops").toLowerCase(),
+        kind: normalizeString(entry.kind, "network").toLowerCase(),
+        label: normalizeString(entry.label, "Probe Request Draft"),
+        requestedAction: normalizeString(entry.requestedAction, "probe_request"),
+        subjectId: normalizeString(entry.subjectId || entry.boundaryPathId, "-"),
+        subjectLabel: normalizeString(entry.subjectLabel, "boundary").toLowerCase(),
+        targetScope: normalizeString(entry.targetScope, "-"),
+        targetLabel: normalizeString(entry.targetLabel, "scope").toLowerCase(),
+        changeKind: normalizeString(entry.changeKind, "probe").toLowerCase(),
+        boundaryPathId: normalizeString(entry.boundaryPathId),
+        boundaryPathLabel: normalizeString(entry.boundaryPathLabel),
+        targetEndpointId: normalizeString(entry.targetEndpointId),
+        targetEndpointLabel: normalizeString(entry.targetEndpointLabel),
+        status: normalizeString(entry.status, "draft").toLowerCase(),
+        reason: normalizeString(entry.reason),
+        summary: normalizeString(entry.summary),
+        simulationSummary: normalizeString(entry.simulationSummary),
+        createdAt: normalizeString(entry.createdAt),
+        simulatedAt: normalizeString(entry.simulatedAt),
+        updatedAt: normalizeString(entry.updatedAt),
+        routedAt: normalizeString(entry.routedAt),
+        decision: entry.decision && typeof entry.decision === "object" ? entry.decision : null,
+        execution: entry.execution && typeof entry.execution === "object" ? entry.execution : null,
+        receipt: entry.receipt && typeof entry.receipt === "object" ? entry.receipt : null,
+        rollback: entry.rollback && typeof entry.rollback === "object" ? entry.rollback : null
+      };
+    })
+    .filter(Boolean);
+}
+
+function normalizeNetworkAdminSimulation(simulation = null) {
+  if (!simulation || typeof simulation !== "object") {
+    return null;
+  }
+  const title = normalizeString(simulation.title);
+  const summary = normalizeString(simulation.summary);
+  const facts = Array.isArray(simulation.facts)
+    ? simulation.facts
+        .map((fact) => {
+          const item = fact && typeof fact === "object" ? fact : {};
+          const label = normalizeString(item.label);
+          const value = normalizeString(item.value);
+          if (!label || !value) {
+            return null;
+          }
+          return {
+            label,
+            value,
+            code: Boolean(item.code)
+          };
+        })
+        .filter(Boolean)
+    : [];
+  const findings = Array.isArray(simulation.findings)
+    ? simulation.findings.map((entry) => normalizeString(entry)).filter(Boolean)
+    : [];
+  if (!title && !summary && facts.length === 0 && findings.length === 0) {
+    return null;
+  }
+  return {
+    changeId: normalizeString(simulation.changeId),
+    kind: normalizeString(simulation.kind, "network").toLowerCase(),
+    tone: normalizeString(simulation.tone, "info").toLowerCase(),
+    title: title || "Network admin dry-run",
+    summary,
+    updatedAt: normalizeString(simulation.updatedAt),
+    facts,
+    findings
+  };
+}
+
+function slugifyBoundaryPath(value = "") {
+  const normalized = normalizeString(value).toLowerCase();
+  if (!normalized) {
+    return "";
+  }
+  if (normalized.includes("gateway")) {
+    return "gateway_path";
+  }
+  if (normalized.includes("policy")) {
+    return "policy_path";
+  }
+  if (normalized.includes("desktop")) {
+    return "desktop_path";
+  }
+  return normalized.replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+}
+
 export function createNetworkWorkspaceSnapshot(context = {}) {
   const settings = context?.settings && typeof context.settings === "object" ? context.settings : {};
   const health = context?.health && typeof context.health === "object" ? context.health : {};
+  const viewState = context?.viewState && typeof context.viewState === "object" ? context.viewState : {};
+  const networkBoundary = buildBoundaryBoard(
+    settings,
+    health,
+    context.providers || {},
+    context.runs || {},
+    context.runtimeWorkerCapabilities || {}
+  );
+  const endpointReachability = buildEndpointBoard(settings, context.providers || {});
+  const trustAndCertificate = buildTrustBoard(settings, health);
+  const ingressEgressPosture = buildIngressEgressBoard(
+    settings,
+    health,
+    context.runs || {},
+    context.runtimeWorkerCapabilities || {}
+  );
+  const connectivityTopology = buildTopologyBoard(
+    settings,
+    context.providers || {},
+    context.runs || {},
+    context.runtimeWorkerCapabilities || {}
+  );
+  const boundaryPathOptions = connectivityTopology.topologyPaths.map((item) => ({
+    value: slugifyBoundaryPath(item?.label),
+    label: normalizeString(item?.label, "boundary path"),
+    route: normalizeString(item?.route, "-"),
+    endpoint: normalizeString(item?.endpoint, "-"),
+    transport: normalizeString(item?.transport, "-")
+  }));
+  const endpointOptions = (Array.isArray(settings?.endpoints) ? settings.endpoints : []).map((item) => ({
+    value: normalizeString(item?.id || item?.label),
+    label: normalizeString(item?.label || item?.id, "endpoint"),
+    state: classifyEndpointState(item?.state),
+    path: normalizeString(item?.path, "-")
+  }));
+  const adminDefaults = {
+    boundaryPathId: boundaryPathOptions[0]?.value || "gateway_path",
+    targetScope:
+      normalizeString(settings?.environment, "workspace") +
+      " / " +
+      normalizeString(
+        networkBoundary.selectedProviderId !== "-" ? networkBoundary.selectedProviderId : networkBoundary.gatewayProviderId,
+        "network-scope"
+      ),
+    targetEndpointId: endpointOptions[0]?.value || ""
+  };
+  const adminQueueItems = normalizeNetworkAdminQueueItems(viewState.queueItems);
+  const selectedAdminChangeId = normalizeString(viewState.selectedAdminChangeId);
+  const selectedAdminQueueItem =
+    adminQueueItems.find((item) => item.id === selectedAdminChangeId) || adminQueueItems[0] || null;
+  const currentBoundaryPathOption = boundaryPathOptions[0] || null;
   return {
-    networkBoundary: buildBoundaryBoard(
-      settings,
-      health,
-      context.providers || {},
-      context.runs || {},
-      context.runtimeWorkerCapabilities || {}
-    ),
-    endpointReachability: buildEndpointBoard(settings, context.providers || {}),
-    trustAndCertificate: buildTrustBoard(settings, health),
-    ingressEgressPosture: buildIngressEgressBoard(
-      settings,
-      health,
-      context.runs || {},
-      context.runtimeWorkerCapabilities || {}
-    ),
-    connectivityTopology: buildTopologyBoard(
-      settings,
-      context.providers || {},
-      context.runs || {},
-      context.runtimeWorkerCapabilities || {}
-    )
+    networkBoundary,
+    endpointReachability,
+    trustAndCertificate,
+    ingressEgressPosture,
+    connectivityTopology,
+    admin: {
+      feedback: normalizeNetworkAdminFeedback(viewState.feedback || null),
+      selectedChangeId: selectedAdminQueueItem ? selectedAdminQueueItem.id : selectedAdminChangeId,
+      recoveryReason: normalizeString(viewState.recoveryReason),
+      selectedQueueItem: selectedAdminQueueItem,
+      queueItems: adminQueueItems,
+      draft: normalizeNetworkAdminDraft(viewState.adminDraft || {}, adminDefaults),
+      latestSimulation: normalizeNetworkAdminSimulation(viewState.latestSimulation || null),
+      currentScope: {
+        currentBoundaryPath: currentBoundaryPathOption?.value || "-",
+        currentBoundaryLabel: currentBoundaryPathOption?.label || "-",
+        currentBoundaryRoute: currentBoundaryPathOption?.route || "-",
+        currentBoundaryEndpoint: currentBoundaryPathOption?.endpoint || "-",
+        defaultTargetScope: adminDefaults.targetScope,
+        boundaryPathOptions,
+        endpointOptions,
+        selectedProviderId: networkBoundary.selectedProviderId,
+        environment: networkBoundary.environment,
+        firstBoundaryRequirement: networkBoundary.firstBoundaryRequirement,
+        firstTransport: ingressEgressPosture.firstTransport,
+        transportCount: connectivityTopology.transportCount,
+        endpointCount: endpointReachability.totalCount,
+        okCount: endpointReachability.okCount,
+        warnCount: endpointReachability.warnCount,
+        errorCount: endpointReachability.errorCount,
+        reachableEndpointCount: connectivityTopology.reachableEndpointCount,
+        readyProviderCount: connectivityTopology.readyProviderCount,
+        degradedProviderCount: connectivityTopology.degradedProviderCount,
+        directFallbackState: ingressEgressPosture.directFallbackState,
+        secureMode: trustAndCertificate.activeMode,
+        trustWarningCount: trustAndCertificate.warningCount,
+        secureSecretMissingCount: trustAndCertificate.secureSecretMissingCount,
+        latestPolicyRoute: ingressEgressPosture.latestPolicyRoute,
+        latestDesktopRoute: ingressEgressPosture.latestDesktopRoute
+      }
+    }
   };
 }

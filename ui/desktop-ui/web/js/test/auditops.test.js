@@ -5,6 +5,7 @@ import { renderAuditOpsEmptyState, renderAuditOpsPage } from "../domains/auditop
 test("auditops page renders bounded audit event, actor activity, and decision trace boards", () => {
   const ui = { auditOpsContent: { innerHTML: "" } };
   renderAuditOpsPage(ui, {
+    now: "2026-03-15T01:20:00Z",
     actor: "demo.operator",
     filters: {
       tenant: "tenant-demo",

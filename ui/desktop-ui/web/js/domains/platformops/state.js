@@ -31,6 +31,205 @@ function countProbedProviders(items = []) {
   return values.filter((item) => item?.probed === true).length;
 }
 
+function normalizePlatformAdminFeedback(feedback = null) {
+  if (!feedback || typeof feedback !== "object") {
+    return null;
+  }
+  const message = normalizeString(feedback.message);
+  if (!message) {
+    return null;
+  }
+  return {
+    tone: normalizeString(feedback.tone, "info").toLowerCase(),
+    message
+  };
+}
+
+function normalizePlatformDraft(draft = {}, defaults = {}) {
+  const input = draft && typeof draft === "object" ? draft : {};
+  const changeKind = normalizeString(input.changeKind || defaults.changeKind || "promote", "promote").toLowerCase();
+  return {
+    changeKind: changeKind === "rollback" ? "rollback" : "promote",
+    environment: normalizeString(input.environment || defaults.environment, "local"),
+    deploymentTarget: normalizeString(input.deploymentTarget || defaults.deploymentTarget, "desktop-local"),
+    releaseRef: normalizeString(input.releaseRef || defaults.releaseRef),
+    reason: normalizeString(input.reason)
+  };
+}
+
+function normalizePlatformAdminDecision(decision = null) {
+  if (!decision || typeof decision !== "object") {
+    return null;
+  }
+  const decisionId = normalizeString(decision.decisionId);
+  const status = normalizeString(decision.status).toLowerCase();
+  const decidedAt = normalizeString(decision.decidedAt);
+  const reason = normalizeString(decision.reason);
+  const approvalReceiptId = normalizeString(decision.approvalReceiptId);
+  if (!decisionId && !status && !decidedAt && !reason && !approvalReceiptId) {
+    return null;
+  }
+  return {
+    decisionId,
+    status,
+    decidedAt,
+    reason,
+    approvalReceiptId,
+    actorRef: normalizeString(decision.actorRef)
+  };
+}
+
+function normalizePlatformAdminExecution(execution = null) {
+  if (!execution || typeof execution !== "object") {
+    return null;
+  }
+  const executionId = normalizeString(execution.executionId);
+  const executedAt = normalizeString(execution.executedAt);
+  const status = normalizeString(execution.status).toLowerCase();
+  const summary = normalizeString(execution.summary);
+  if (!executionId && !executedAt && !status && !summary) {
+    return null;
+  }
+  return {
+    executionId,
+    executedAt,
+    status,
+    summary,
+    actorRef: normalizeString(execution.actorRef)
+  };
+}
+
+function normalizePlatformAdminReceipt(receipt = null) {
+  if (!receipt || typeof receipt !== "object") {
+    return null;
+  }
+  const receiptId = normalizeString(receipt.receiptId);
+  const issuedAt = normalizeString(receipt.issuedAt);
+  const summary = normalizeString(receipt.summary);
+  const stableRef = normalizeString(receipt.stableRef);
+  if (!receiptId && !issuedAt && !summary && !stableRef) {
+    return null;
+  }
+  return {
+    receiptId,
+    issuedAt,
+    summary,
+    stableRef,
+    approvalReceiptId: normalizeString(receipt.approvalReceiptId),
+    executionId: normalizeString(receipt.executionId)
+  };
+}
+
+function normalizePlatformAdminRollback(rollback = null) {
+  if (!rollback || typeof rollback !== "object") {
+    return null;
+  }
+  const rollbackId = normalizeString(rollback.rollbackId);
+  const action = normalizeString(rollback.action).toLowerCase();
+  const status = normalizeString(rollback.status).toLowerCase();
+  const rolledBackAt = normalizeString(rollback.rolledBackAt);
+  const summary = normalizeString(rollback.summary);
+  const stableRef = normalizeString(rollback.stableRef);
+  if (!rollbackId && !action && !status && !rolledBackAt && !summary && !stableRef) {
+    return null;
+  }
+  return {
+    rollbackId,
+    action,
+    status,
+    rolledBackAt,
+    summary,
+    stableRef,
+    reason: normalizeString(rollback.reason),
+    actorRef: normalizeString(rollback.actorRef),
+    approvalReceiptId: normalizeString(rollback.approvalReceiptId),
+    adminReceiptId: normalizeString(rollback.adminReceiptId),
+    executionId: normalizeString(rollback.executionId)
+  };
+}
+
+function normalizePlatformAdminQueueItems(items = []) {
+  if (!Array.isArray(items)) {
+    return [];
+  }
+  return items
+    .map((item) => {
+      const entry = item && typeof item === "object" ? item : {};
+      const id = normalizeString(entry.id);
+      if (!id) {
+        return null;
+      }
+      return {
+        id,
+        ownerDomain: normalizeString(entry.ownerDomain || entry.domain, "platformops").toLowerCase(),
+        kind: normalizeString(entry.kind, "platform").toLowerCase(),
+        label: normalizeString(entry.label, "Promotion Draft"),
+        requestedAction: normalizeString(entry.requestedAction, "proposal"),
+        subjectId: normalizeString(entry.subjectId || entry.releaseRef),
+        subjectLabel: normalizeString(entry.subjectLabel, "release"),
+        targetScope: normalizeString(entry.targetScope),
+        targetLabel: normalizeString(entry.targetLabel, "target"),
+        environment: normalizeString(entry.environment),
+        deploymentTarget: normalizeString(entry.deploymentTarget),
+        releaseRef: normalizeString(entry.releaseRef),
+        status: normalizeString(entry.status, "draft").toLowerCase(),
+        reason: normalizeString(entry.reason),
+        summary: normalizeString(entry.summary),
+        simulationSummary: normalizeString(entry.simulationSummary),
+        createdAt: normalizeString(entry.createdAt),
+        simulatedAt: normalizeString(entry.simulatedAt),
+        updatedAt: normalizeString(entry.updatedAt),
+        routedAt: normalizeString(entry.routedAt),
+        decision: normalizePlatformAdminDecision(entry.decision || null),
+        execution: normalizePlatformAdminExecution(entry.execution || null),
+        receipt: normalizePlatformAdminReceipt(entry.receipt || null),
+        rollback: normalizePlatformAdminRollback(entry.rollback || null)
+      };
+    })
+    .filter(Boolean);
+}
+
+function normalizePlatformAdminSimulation(simulation = null) {
+  if (!simulation || typeof simulation !== "object") {
+    return null;
+  }
+  const title = normalizeString(simulation.title);
+  const summary = normalizeString(simulation.summary);
+  const facts = Array.isArray(simulation.facts)
+    ? simulation.facts
+        .map((fact) => {
+          const item = fact && typeof fact === "object" ? fact : {};
+          const label = normalizeString(item.label);
+          const value = normalizeString(item.value);
+          if (!label || !value) {
+            return null;
+          }
+          return {
+            label,
+            value,
+            code: Boolean(item.code)
+          };
+        })
+        .filter(Boolean)
+    : [];
+  const findings = Array.isArray(simulation.findings)
+    ? simulation.findings.map((entry) => normalizeString(entry)).filter(Boolean)
+    : [];
+  if (!title && !summary && facts.length === 0 && findings.length === 0) {
+    return null;
+  }
+  return {
+    changeId: normalizeString(simulation.changeId),
+    kind: normalizeString(simulation.kind, "platform").toLowerCase(),
+    tone: normalizeString(simulation.tone, "info").toLowerCase(),
+    title: title || "Platform admin dry-run",
+    summary,
+    updatedAt: normalizeString(simulation.updatedAt),
+    facts,
+    findings
+  };
+}
+
 function postureTone(...statuses) {
   const values = statuses.map((value) => normalizeString(value).toLowerCase()).filter(Boolean);
   if (values.some((value) => ["error", "failed", "blocked", "degraded"].includes(value))) {
@@ -51,6 +250,7 @@ export function createPlatformWorkspaceSnapshot(context = {}) {
   const providers = context?.providers && typeof context.providers === "object" ? context.providers : {};
   const aimxsActivation =
     context?.aimxsActivation && typeof context.aimxsActivation === "object" ? context.aimxsActivation : {};
+  const viewState = context?.viewState && typeof context.viewState === "object" ? context.viewState : {};
   const providerCounts = countProviderReadiness(providers.items || []);
   const providerItems = Array.isArray(providers.items) ? providers.items : [];
   const probedProviderCount = countProbedProviders(providerItems);
@@ -70,6 +270,19 @@ export function createPlatformWorkspaceSnapshot(context = {}) {
   const deploymentIssueCount = 3 - deploymentHealthyCount;
   const supportSignalCount =
     providerCounts.degradedCount + providerCounts.unknownCount + secretCounts.missingCount + warnings.length;
+  const adminDefaults = {
+    changeKind: "promote",
+    environment,
+    deploymentTarget: normalizeString(aimxsActivation.selectedProviderId || aimxsActivation.activeMode, "desktop-local"),
+    releaseRef:
+      environment === "prod"
+        ? normalizeString(pipeline.latestProdGate || pipeline.latestStagingGate)
+        : normalizeString(pipeline.latestStagingGate || pipeline.latestProdGate)
+  };
+  const adminQueueItems = normalizePlatformAdminQueueItems(viewState.queueItems || []);
+  const selectedAdminChangeId = normalizeString(viewState.selectedAdminChangeId);
+  const selectedAdminQueueItem =
+    adminQueueItems.find((item) => item.id === selectedAdminChangeId) || adminQueueItems[0] || null;
 
   return {
     environmentOverview: {
@@ -196,6 +409,27 @@ export function createPlatformWorkspaceSnapshot(context = {}) {
         health.providers?.status,
         health.policy?.status
       )
+    },
+    admin: {
+      feedback: normalizePlatformAdminFeedback(viewState.feedback || null),
+      draft: normalizePlatformDraft(viewState.promotionDraft || {}, adminDefaults),
+      recoveryReason: normalizeString(viewState.recoveryReason),
+      selectedChangeId: selectedAdminQueueItem ? selectedAdminQueueItem.id : "",
+      queueItems: adminQueueItems,
+      selectedQueueItem: selectedAdminQueueItem,
+      latestSimulation: normalizePlatformAdminSimulation(viewState.latestSimulation || null),
+      defaults: adminDefaults,
+      currentScope: {
+        environment,
+        deploymentTarget: adminDefaults.deploymentTarget,
+        pipelineStatus: normalizeString(pipeline.status, "unknown"),
+        latestStagingGate: normalizeString(pipeline.latestStagingGate, "-"),
+        latestProdGate: normalizeString(pipeline.latestProdGate, "-"),
+        deploymentIssueCount,
+        providerDegradedCount: providerCounts.degradedCount,
+        warningCount: warnings.length,
+        secretMissingCount: secretCounts.missingCount
+      }
     }
   };
 }
