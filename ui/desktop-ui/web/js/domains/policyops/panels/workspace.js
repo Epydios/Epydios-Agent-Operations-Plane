@@ -66,6 +66,53 @@ function toneChipClass(tone) {
   return `${chipClassForStatus(normalized)} chip-compact`;
 }
 
+function normalizePolicyAdminVerification(verification = null) {
+  return verification && typeof verification === "object" ? verification : null;
+}
+
+function resolvePolicyAdminVerification(item = null, latestVerification = null) {
+  const normalizedLatest = normalizePolicyAdminVerification(latestVerification);
+  const itemId = String(item?.id || "").trim();
+  if (normalizedLatest && String(normalizedLatest.changeId || "").trim() === itemId) {
+    return normalizedLatest;
+  }
+  return normalizePolicyAdminVerification(item?.verification || null);
+}
+
+function policyAdminVerificationPassed(verification = null) {
+  return Boolean(verification?.passing === true);
+}
+
+function verificationChipClass(status = "") {
+  const normalized = String(status || "").trim().toLowerCase();
+  if (!normalized) {
+    return "chip chip-neutral chip-compact";
+  }
+  return `${chipClassForStatus(normalized)} chip-compact`;
+}
+
+function renderVerificationCases(verification = null) {
+  const cases = Array.isArray(verification?.cases) ? verification.cases : [];
+  if (cases.length === 0) {
+    return '<span class="policyops-empty">Run Verify Gate to capture bounded compile, lint, and golden-case posture.</span>';
+  }
+  return `
+    <div class="policyops-history-list">
+      ${cases
+        .map(
+          (entry) => `
+            <div class="policyops-history-item">
+              <div class="policyops-history-stage">${escapeHTML(entry.label || "case")}</div>
+              <div class="policyops-history-time"><span class="${verificationChipClass(entry.status)}">${escapeHTML(entry.status || "unknown")}</span></div>
+              <div class="policyops-history-summary">${escapeHTML(entry.detail || "-")}</div>
+            </div>
+          `
+        )
+        .join("")}
+    </div>
+  `;
+}
+
 function renderActionButtons(actions = []) {
   const buttons = (Array.isArray(actions) ? actions : [])
     .map((action) => {
@@ -113,8 +160,11 @@ function renderFeedbackPanel(snapshot) {
 
 function policyAdminStatusChipClass(status = "") {
   const normalized = String(status || "").trim().toLowerCase();
-  if (normalized === "approved" || normalized === "applied") {
+  if (normalized === "approved" || normalized === "applied" || normalized === "verified") {
     return "chip chip-ok chip-compact";
+  }
+  if (normalized === "verification_failed") {
+    return "chip chip-danger chip-compact";
   }
   if (normalized === "rolled_back") {
     return "chip chip-warn chip-compact";
@@ -128,13 +178,16 @@ function policyAdminStatusChipClass(status = "") {
   return "chip chip-neutral chip-compact";
 }
 
-function renderPolicyAdminActionRow(changeId = "") {
+function renderPolicyAdminActionRow(changeId = "", item = null, latestVerification = null) {
   const attrs = changeId ? ` data-policyops-admin-id="${escapeHTML(changeId)}"` : "";
+  const verification = resolvePolicyAdminVerification(item, latestVerification);
+  const canRoute = policyAdminVerificationPassed(verification);
   return `
     <div class="policyops-action-row">
       <button class="btn btn-secondary btn-small" type="button" data-policyops-admin-action="save-draft"${attrs}>Save Draft</button>
       <button class="btn btn-secondary btn-small" type="button" data-policyops-admin-action="simulate-draft"${attrs}>Run Dry-Run</button>
-      <button class="btn btn-secondary btn-small" type="button" data-policyops-admin-action="route-draft"${attrs}>Route To Governance</button>
+      <button class="btn btn-secondary btn-small" type="button" data-policyops-admin-action="verify-draft"${attrs}>Run Verify Gate</button>
+      <button class="btn btn-secondary btn-small" type="button" data-policyops-admin-action="route-draft"${attrs}${canRoute ? "" : " disabled"}>Route To Governance</button>
     </div>
   `;
 }
@@ -159,7 +212,10 @@ function renderAdminChangeQueueBoard(snapshot) {
   }
 
   const cards = board.queueItems
-    .map((item) => `
+    .map((item) => {
+      const verification = resolvePolicyAdminVerification(item, board.latestVerification);
+      const canRoute = policyAdminVerificationPassed(verification);
+      return `
       <article class="policyops-queue-card">
         <div class="metric-title-row">
           <div class="title"><code>${escapeHTML(item.id)}</code></div>
@@ -169,6 +225,9 @@ function renderAdminChangeQueueBoard(snapshot) {
           <span class="chip chip-neutral chip-compact">${escapeHTML(item.changeKind || "load")}</span>
           <span class="chip chip-neutral chip-compact">${escapeHTML(item.packId || item.subjectId || "-")}</span>
           <span class="chip chip-neutral chip-compact">${escapeHTML(item.providerId || "-")}</span>
+          <span class="${verificationChipClass(verification?.passing ? "pass" : verification ? "fail" : "unknown")}">${escapeHTML(
+            verification?.passing ? "verified" : verification ? "verify failed" : "verify pending"
+          )}</span>
         </div>
         <div class="policyops-kv-list">
           ${renderKeyValueRows([
@@ -188,17 +247,23 @@ function renderAdminChangeQueueBoard(snapshot) {
             {
               label: "Preview",
               value: escapeHTML(item.simulationSummary || "-")
+            },
+            {
+              label: "Verify Gate",
+              value: escapeHTML(verification?.summary || "Run Verify Gate before routing this proposal to GovernanceOps.")
             }
           ])}
         </div>
         <div class="policyops-action-row">
           <button class="btn btn-secondary btn-small" type="button" data-policyops-admin-action="select-queue-item" data-policyops-admin-id="${escapeHTML(item.id)}">Select</button>
           <button class="btn btn-secondary btn-small" type="button" data-policyops-admin-action="simulate-queue-item" data-policyops-admin-id="${escapeHTML(item.id)}">Run Dry-Run</button>
-          <button class="btn btn-secondary btn-small" type="button" data-policyops-admin-action="route-queue-item" data-policyops-admin-id="${escapeHTML(item.id)}">Route To Governance</button>
+          <button class="btn btn-secondary btn-small" type="button" data-policyops-admin-action="verify-queue-item" data-policyops-admin-id="${escapeHTML(item.id)}">Run Verify Gate</button>
+          <button class="btn btn-secondary btn-small" type="button" data-policyops-admin-action="route-queue-item" data-policyops-admin-id="${escapeHTML(item.id)}"${canRoute ? "" : " disabled"}>Route To Governance</button>
           <button class="btn btn-secondary btn-small" type="button" data-policyops-admin-action="open-governance" data-policyops-admin-id="${escapeHTML(item.id)}">Open GovernanceOps</button>
         </div>
       </article>
-    `)
+    `;
+    })
     .join("");
 
   return `
@@ -220,10 +285,12 @@ function renderPolicyPackDraftBoard(snapshot) {
     .map((item) => {
       const packId = String(item?.packId || "").trim();
       const label = String(item?.label || "").trim();
+      const version = String(item?.version || "").trim();
       if (!packId) {
         return "";
       }
-      return `<option value="${escapeHTML(packId)}"${packId === draft.packId ? " selected" : ""}>${escapeHTML(label || packId)}</option>`;
+      const optionLabel = [label || packId, version ? `(${version})` : ""].filter(Boolean).join(" ");
+      return `<option value="${escapeHTML(packId)}"${packId === draft.packId ? " selected" : ""}>${escapeHTML(optionLabel)}</option>`;
     })
     .filter(Boolean)
     .join("");
@@ -237,7 +304,7 @@ function renderPolicyPackDraftBoard(snapshot) {
         <div class="title">Policy Pack Load And Activation Draft</div>
         <span class="${policyAdminStatusChipClass(board.selectedQueueItem?.status || "draft")}">${escapeHTML(board.selectedQueueItem?.status || "draft")}</span>
       </div>
-      ${renderPolicyAdminActionRow(selectedChangeId)}
+      ${renderPolicyAdminActionRow(selectedChangeId, board.selectedQueueItem, board.latestVerification)}
       <div class="policyops-admin-form">
         <label class="field">
           <span class="label">Change Kind</span>
@@ -282,7 +349,10 @@ function renderDecisionProviderScopeBoard(snapshot) {
       label: "Current Policy Posture",
       value: renderValuePills([
         { label: "pack", value: currentScope.currentPackId || currentScope.currentPackLabel || "-", code: true },
+        { label: "version", value: currentScope.currentPackVersion || "unversioned", code: true },
         { label: "provider", value: currentScope.currentProviderId || "-", code: true },
+        { label: "posture", value: currentScope.currentActivationPosture || "-" },
+        { label: "target", value: currentScope.currentActivationTarget || "-", code: true },
         { label: "contract", value: currentScope.contractId || "-", code: true },
         { label: "decision", value: currentScope.latestDecision || "-" }
       ])
@@ -291,9 +361,12 @@ function renderDecisionProviderScopeBoard(snapshot) {
       label: "Draft Target",
       value: renderValuePills([
         { label: "change", value: draft.changeKind || "load" },
-        { label: "pack", value: draft.packId || "-", code: true },
+        { label: "pack", value: currentScope.targetPackId || draft.packId || "-", code: true },
+        { label: "version", value: currentScope.targetPackVersion || "unversioned", code: true },
         { label: "provider", value: draft.providerId || "-", code: true },
-        { label: "scope", value: draft.targetScope || "-", code: true }
+        { label: "scope", value: currentScope.targetActivationTarget || draft.targetScope || "-", code: true },
+        { label: "schema", value: currentScope.targetSchemaReadiness || "-" },
+        { label: "compile", value: currentScope.targetCompileReadiness || "-" }
       ])
     },
     {
@@ -306,10 +379,23 @@ function renderDecisionProviderScopeBoard(snapshot) {
       ])
     },
     {
-      label: "Catalog Quality",
+      label: "Stable References",
+      value: renderValuePills([
+        { label: "current stable", value: currentScope.currentPackStableRef || "-", code: true },
+        { label: "target stable", value: currentScope.targetPackStableRef || "-", code: true },
+        { label: "current source", value: currentScope.currentPackSourceRef || "-", code: true },
+        { label: "target source", value: currentScope.targetPackSourceRef || "-", code: true }
+      ])
+    },
+    {
+      label: "Catalog Rigor",
       value: renderValuePills([
         { label: "packs", value: String(currentScope.packCount || 0) },
         { label: "source", value: currentScope.catalogSource || "-" },
+        { label: "schema ready", value: String(currentScope.schemaReadyCount || 0) },
+        { label: "compile ready", value: String(currentScope.compileReadyCount || 0) },
+        { label: "missing stable refs", value: String(currentScope.packsMissingStableRefs || 0) },
+        { label: "missing versions", value: String(currentScope.packsMissingVersions || 0) },
         { label: "missing surfaces", value: String(currentScope.packsMissingDecisionSurfaces || 0) },
         { label: "missing boundaries", value: String(currentScope.packsMissingBoundaryRequirements || 0) }
       ])
@@ -330,6 +416,7 @@ function renderDecisionProviderScopeBoard(snapshot) {
 function renderSemanticImpactPreviewBoard(snapshot) {
   const board = snapshot.admin;
   const preview = board.latestSimulation;
+  const verification = resolvePolicyAdminVerification(board.selectedQueueItem, board.latestVerification);
   if (!preview) {
     return `
       <article class="metric policyops-card" data-domain-root="policyops" data-policyops-panel="semantic-impact-preview">
@@ -367,6 +454,37 @@ function renderSemanticImpactPreviewBoard(snapshot) {
           {
             label: "Preview Facts",
             value: renderValuePills(preview.facts || [])
+          },
+          {
+            label: "Rigor Gate",
+            value: renderValuePills([
+              { label: "pack", value: board.currentScope?.targetPackId || board.draft?.packId || "-", code: true },
+              { label: "version", value: board.currentScope?.targetPackVersion || "unversioned", code: true },
+              { label: "schema", value: board.currentScope?.targetSchemaReadiness || "-" },
+              { label: "compile", value: board.currentScope?.targetCompileReadiness || "-" },
+              { label: "stable ref", value: board.currentScope?.targetPackStableRef || "-", code: true }
+            ])
+          },
+          {
+            label: "Verification Gate",
+            value: renderValuePills([
+              { label: "gate", value: verification?.passing ? "passed" : verification ? "failed" : "pending" },
+              { label: "compile", value: verification?.compileStatus || "-" },
+              { label: "lint", value: verification?.lintStatus || "-" },
+              { label: "golden", value: verification?.goldenStatus || "-" },
+              { label: "verified", value: verification?.verifiedAt || "-" }
+            ])
+          },
+          {
+            label: "Simulation Diff Summary",
+            value: escapeHTML(
+              verification?.diffSummary ||
+                "Run Verify Gate to capture the bounded current-versus-target pack diff and golden simulation posture."
+            )
+          },
+          {
+            label: "Golden Simulation Set",
+            value: renderVerificationCases(verification)
           },
           {
             label: "Findings",
@@ -407,6 +525,7 @@ function renderPolicyGovernanceRouteReceiptBoard(snapshot) {
   const execution = item.execution || null;
   const receipt = item.receipt || null;
   const rollback = item.rollback || null;
+  const verification = resolvePolicyAdminVerification(item, snapshot?.admin?.latestVerification);
   const status = String(item.status || "").trim().toLowerCase() || "draft";
   const canApply = status === "approved" && Boolean(decision?.approvalReceiptId) && !receipt?.receiptId;
   const rows = [
@@ -417,6 +536,20 @@ function renderPolicyGovernanceRouteReceiptBoard(snapshot) {
         { label: "summary", value: item.summary },
         { label: "simulation", value: item.simulationSummary }
       ])
+    },
+    {
+      label: "Verification",
+      value: renderValuePills([
+        { label: "gate", value: verification?.passing ? "passed" : verification ? "failed" : "pending" },
+        { label: "compile", value: verification?.compileStatus || "-" },
+        { label: "lint", value: verification?.lintStatus || "-" },
+        { label: "golden", value: verification?.goldenStatus || "-" },
+        { label: "verified", value: verification?.verifiedAt || "-" }
+      ])
+    },
+    {
+      label: "Verification Diff",
+      value: escapeHTML(verification?.diffSummary || "Run Verify Gate before routing this proposal to GovernanceOps.")
     },
     {
       label: "Governance Decision",
@@ -469,6 +602,9 @@ function renderPolicyGovernanceRouteReceiptBoard(snapshot) {
       <div class="policyops-chip-row">
         <span class="chip chip-neutral chip-compact">change=${escapeHTML(item.id)}</span>
         <span class="chip chip-neutral chip-compact">kind=${escapeHTML(item.kind || "policy")}</span>
+        <span class="${verificationChipClass(verification?.passing ? "pass" : verification ? "fail" : "unknown")}">${escapeHTML(
+          verification?.passing ? "verify passed" : verification ? "verify failed" : "verify pending"
+        )}</span>
         ${decision?.approvalReceiptId ? '<span class="chip chip-ok chip-compact">approval receipt</span>' : '<span class="chip chip-neutral chip-compact">decision pending</span>'}
         ${receipt?.receiptId ? '<span class="chip chip-ok chip-compact">admin receipt</span>' : '<span class="chip chip-neutral chip-compact">apply pending</span>'}
         ${rollback?.rollbackId ? `<span class="${policyAdminStatusChipClass(rollback.status)}">${escapeHTML(rollback.action || "rollback")}</span>` : '<span class="chip chip-neutral chip-compact">recovery pending</span>'}

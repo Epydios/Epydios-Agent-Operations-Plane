@@ -24,6 +24,13 @@ test("policyops page renders the first inspect-only policy boards", () => {
           {
             packId: "managed_codex_worker_operator",
             label: "Managed Codex Worker Operator",
+            version: "2026.03.14",
+            sourceRef: "bundle://aimxs/managed_codex_worker_operator/2026.03.14",
+            stableRef: "policy-pack://managed_codex_worker_operator@2026.03.14",
+            schemaReadiness: "declared",
+            compileReadiness: "ready",
+            activationTarget: "workspace",
+            activationPosture: "current",
             roleBundles: ["enterprise.operator"],
             decisionSurfaces: ["governed_tool_action"],
             boundaryRequirements: ["tenant_project_scope", "runtime_authz"]
@@ -31,6 +38,13 @@ test("policyops page renders the first inspect-only policy boards", () => {
           {
             packId: "finance_supervisor_review",
             label: "Finance Supervisor Review",
+            version: "2026.03.15",
+            sourceRef: "bundle://aimxs/finance_supervisor_review/2026.03.15",
+            stableRef: "policy-pack://finance_supervisor_review@2026.03.15",
+            schemaReadiness: "declared",
+            compileReadiness: "conditional",
+            activationTarget: "tenant-demo / project-finance",
+            activationPosture: "available",
             roleBundles: ["finance.supervisor"],
             decisionSurfaces: ["wire_transfer"],
             boundaryRequirements: ["governance.handshake_validation"]
@@ -140,9 +154,77 @@ test("policyops page renders the first inspect-only policy boards", () => {
           reason: "Finance policy pack needs bounded activation preview.",
           summary: "Activate finance_supervisor_review for tenant-demo / project-finance @ aimxs-policy-primary",
           simulationSummary: "Preview only. This activate proposal requires GovernanceOps approval before any live policy-pack change can execute.",
+          verification: {
+            changeId: "policy-change-001",
+            kind: "policy",
+            tone: "warn",
+            title: "Policy verify gate",
+            summary: "Verify gate passed with warnings for policy-change-001. GovernanceOps can review the bounded compile, lint, and golden-case posture before approval.",
+            updatedAt: "2026-03-14T21:09:00Z",
+            verifiedAt: "2026-03-14T21:09:00Z",
+            compileStatus: "warn",
+            lintStatus: "pass",
+            goldenStatus: "warn",
+            passing: true,
+            diffSummary: "pack managed_codex_worker_operator@2026.03.14 -> finance_supervisor_review@2026.03.15; provider aimxs-policy-primary -> aimxs-policy-primary; scope workspace -> tenant-demo / project-finance",
+            findings: [
+              "Golden simulation posture still carries bounded warnings or blockers; route is still allowed only if the verify gate itself passes."
+            ],
+            cases: [
+              {
+                label: "compile validation",
+                status: "warn",
+                detail: "schema=declared; compile=conditional"
+              },
+              {
+                label: "lint posture",
+                status: "pass",
+                detail: "stableRef=present; sourceRef=present; version=2026.03.15; surfaces=1; boundaries=1"
+              },
+              {
+                label: "golden simulation set",
+                status: "warn",
+                detail: "decision=DEFER; blockers=3; preview=warn"
+              }
+            ]
+          },
           updatedAt: "2026-03-14T21:07:00Z"
         }
       ],
+      latestVerification: {
+        changeId: "policy-change-001",
+        kind: "policy",
+        tone: "warn",
+        title: "Policy verify gate",
+        summary: "Verify gate passed with warnings for policy-change-001. GovernanceOps can review the bounded compile, lint, and golden-case posture before approval.",
+        updatedAt: "2026-03-14T21:09:00Z",
+        verifiedAt: "2026-03-14T21:09:00Z",
+        compileStatus: "warn",
+        lintStatus: "pass",
+        goldenStatus: "warn",
+        passing: true,
+        diffSummary: "pack managed_codex_worker_operator@2026.03.14 -> finance_supervisor_review@2026.03.15; provider aimxs-policy-primary -> aimxs-policy-primary; scope workspace -> tenant-demo / project-finance",
+        findings: [
+          "Golden simulation posture still carries bounded warnings or blockers; route is still allowed only if the verify gate itself passes."
+        ],
+        cases: [
+          {
+            label: "compile validation",
+            status: "warn",
+            detail: "schema=declared; compile=conditional"
+          },
+          {
+            label: "lint posture",
+            status: "pass",
+            detail: "stableRef=present; sourceRef=present; version=2026.03.15; surfaces=1; boundaries=1"
+          },
+          {
+            label: "golden simulation set",
+            status: "warn",
+            detail: "decision=DEFER; blockers=3; preview=warn"
+          }
+        ]
+      },
       latestSimulation: {
         changeId: "policy-change-001",
         kind: "policy",
@@ -171,6 +253,10 @@ test("policyops page renders the first inspect-only policy boards", () => {
   assert.match(ui.policyOpsContent.innerHTML, /Governance Route And Receipt/);
   assert.match(ui.policyOpsContent.innerHTML, /Current Policy Contract/);
   assert.match(ui.policyOpsContent.innerHTML, /Policy Pack Catalog/);
+  assert.match(ui.policyOpsContent.innerHTML, /policy-pack:\/\/managed_codex_worker_operator@2026\.03\.14/);
+  assert.match(ui.policyOpsContent.innerHTML, /bundle:\/\/aimxs\/managed_codex_worker_operator\/2026\.03\.14/);
+  assert.match(ui.policyOpsContent.innerHTML, /schema=declared; compile=ready/);
+  assert.match(ui.policyOpsContent.innerHTML, /activationTarget=workspace; activationPosture=current/);
   assert.match(ui.policyOpsContent.innerHTML, /Decision Explanation/);
   assert.match(ui.policyOpsContent.innerHTML, /AIMXS Identity And Posture Echo/);
   assert.match(ui.policyOpsContent.innerHTML, /governed action authority/);
@@ -186,6 +272,8 @@ test("policyops page renders the first inspect-only policy boards", () => {
   assert.match(ui.policyOpsContent.innerHTML, /aimxs-policy-primary/);
   assert.match(ui.policyOpsContent.innerHTML, /managed_codex_worker_operator/);
   assert.match(ui.policyOpsContent.innerHTML, /Finance Supervisor Review/);
+  assert.match(ui.policyOpsContent.innerHTML, /2026\.03\.15/);
+  assert.match(ui.policyOpsContent.innerHTML, /policy-pack:\/\/finance_supervisor_review@2026\.03\.15/);
   assert.match(ui.policyOpsContent.innerHTML, /run-20260314-010/);
   assert.match(ui.policyOpsContent.innerHTML, /contract-finance-transfer-v1/);
   assert.match(ui.policyOpsContent.innerHTML, /Finance supervisor approval is still required\./);
@@ -200,6 +288,18 @@ test("policyops page renders the first inspect-only policy boards", () => {
   assert.match(ui.policyOpsContent.innerHTML, /Finance policy pack needs bounded activation preview\./);
   assert.match(ui.policyOpsContent.innerHTML, /decision surfaces/);
   assert.match(ui.policyOpsContent.innerHTML, /catalog/);
+  assert.match(ui.policyOpsContent.innerHTML, /Stable References/);
+  assert.match(ui.policyOpsContent.innerHTML, /Catalog Rigor/);
+  assert.match(ui.policyOpsContent.innerHTML, /schema ready/);
+  assert.match(ui.policyOpsContent.innerHTML, /compile ready/);
+  assert.match(ui.policyOpsContent.innerHTML, /Rigor Gate/);
+  assert.match(ui.policyOpsContent.innerHTML, /Verification Gate/);
+  assert.match(ui.policyOpsContent.innerHTML, /Simulation Diff Summary/);
+  assert.match(ui.policyOpsContent.innerHTML, /Golden Simulation Set/);
+  assert.match(ui.policyOpsContent.innerHTML, /Verify gate passed with warnings/);
+  assert.match(ui.policyOpsContent.innerHTML, /compile validation/);
+  assert.match(ui.policyOpsContent.innerHTML, /lint posture/);
+  assert.match(ui.policyOpsContent.innerHTML, /golden simulation set/);
   assert.match(ui.policyOpsContent.innerHTML, /Export Decision Explanation/);
   assert.match(ui.policyOpsContent.innerHTML, /Copy Stable Policy References/);
   assert.match(ui.policyOpsContent.innerHTML, /Open Linked Governance/);
@@ -216,9 +316,11 @@ test("policyops page renders the first inspect-only policy boards", () => {
   assert.match(ui.policyOpsContent.innerHTML, /data-policyops-action="open-complianceops"/);
   assert.match(ui.policyOpsContent.innerHTML, /data-policyops-admin-action="save-draft"/);
   assert.match(ui.policyOpsContent.innerHTML, /data-policyops-admin-action="simulate-draft"/);
+  assert.match(ui.policyOpsContent.innerHTML, /data-policyops-admin-action="verify-draft"/);
   assert.match(ui.policyOpsContent.innerHTML, /data-policyops-admin-action="route-draft"/);
   assert.match(ui.policyOpsContent.innerHTML, /data-policyops-admin-action="select-queue-item"/);
   assert.match(ui.policyOpsContent.innerHTML, /data-policyops-admin-action="simulate-queue-item"/);
+  assert.match(ui.policyOpsContent.innerHTML, /data-policyops-admin-action="verify-queue-item"/);
   assert.match(ui.policyOpsContent.innerHTML, /data-policyops-admin-action="route-queue-item"/);
   assert.match(ui.policyOpsContent.innerHTML, /data-policyops-admin-action="open-governance"/);
   assert.match(ui.policyOpsContent.innerHTML, /data-policyops-draft-field="changeKind"/);
