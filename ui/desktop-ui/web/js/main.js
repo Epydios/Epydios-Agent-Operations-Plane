@@ -4396,7 +4396,8 @@ async function main() {
       reason: ""
     },
     queueItems: [],
-    latestSimulation: null
+    latestSimulation: null,
+    latestVerification: null
   };
   let complianceOpsViewState = {
     feedback: null,
@@ -8016,6 +8017,7 @@ async function main() {
       ...policyOpsViewState,
       adminDraft: nextDraft,
       latestSimulation: null,
+      latestVerification: null,
       feedback: null
     };
     renderPolicyOpsPanel();
@@ -8089,6 +8091,10 @@ async function main() {
       reason: nextDraft.reason,
       summary: `${nextDraft.changeKind === "activate" ? "Activate" : "Load"} ${nextDraft.packId || "policy-pack"} for ${nextDraft.targetScope} @ ${nextDraft.providerId || "policy-provider"}`,
       simulationSummary: String(options.simulationSummary || selectedItem?.simulationSummary || "").trim(),
+      verification:
+        options.verification === null
+          ? null
+          : options.verification || (selectedItem?.verification && typeof selectedItem.verification === "object" ? selectedItem.verification : null),
       createdAt: String(options.createdAt || selectedItem?.createdAt || new Date().toISOString()).trim(),
       simulatedAt: String(options.simulatedAt || selectedItem?.simulatedAt || "").trim(),
       updatedAt: String(options.updatedAt || new Date().toISOString()).trim(),
@@ -8207,6 +8213,119 @@ async function main() {
     };
   };
 
+  const latestPolicyOpsVerificationForChange = (changeId = "") => {
+    const normalizedChangeId = String(changeId || policyOpsViewState.selectedAdminChangeId || "").trim();
+    if (!normalizedChangeId) {
+      return null;
+    }
+    const latestVerification =
+      policyOpsViewState.latestVerification && typeof policyOpsViewState.latestVerification === "object"
+        ? policyOpsViewState.latestVerification
+        : null;
+    if (String(latestVerification?.changeId || "").trim() === normalizedChangeId) {
+      return latestVerification;
+    }
+    const queueItem = findPolicyOpsQueueItem(normalizedChangeId);
+    return queueItem?.verification && typeof queueItem.verification === "object" ? queueItem.verification : null;
+  };
+
+  const buildPolicyOpsVerification = (item, draft, simulation) => {
+    const queueItem = item && typeof item === "object" ? item : {};
+    const nextDraft = normalizePolicyOpsAdminDraft(draft);
+    const latestSimulation = simulation && typeof simulation === "object" ? simulation : null;
+    const snapshot = getCurrentPolicyOpsSnapshot();
+    const currentScope = snapshot?.admin?.currentScope && typeof snapshot.admin.currentScope === "object"
+      ? snapshot.admin.currentScope
+      : {};
+    const policyCatalogItems = Array.isArray(snapshot?.policyCatalogItems) ? snapshot.policyCatalogItems : [];
+    const selectedPack =
+      policyCatalogItems.find((entry) => String(entry?.packId || "").trim() === nextDraft.packId) || null;
+    const targetSchemaReadiness = String(currentScope.targetSchemaReadiness || "").trim().toLowerCase();
+    const targetCompileReadiness = String(currentScope.targetCompileReadiness || "").trim().toLowerCase();
+    const targetStableRef = String(currentScope.targetPackStableRef || "").trim();
+    const targetSourceRef = String(currentScope.targetPackSourceRef || "").trim();
+    const targetVersion = String(currentScope.targetPackVersion || "").trim();
+    const currentPackRef = `${String(currentScope.currentPackId || "-").trim() || "-"}@${String(currentScope.currentPackVersion || "unversioned").trim() || "unversioned"}`;
+    const targetPackRef = `${String(currentScope.targetPackId || nextDraft.packId || "-").trim() || "-"}@${targetVersion || "unversioned"}`;
+    const decisionSurfaceCount = Array.isArray(selectedPack?.decisionSurfaces) ? selectedPack.decisionSurfaces.length : 0;
+    const boundaryRequirementCount = Array.isArray(selectedPack?.boundaryRequirements) ? selectedPack.boundaryRequirements.length : 0;
+    const schemaReady = ["ready", "declared"].includes(targetSchemaReadiness);
+    const compileReady = targetCompileReadiness === "ready";
+    const compileWarn = targetCompileReadiness === "conditional";
+    const compileStatus = schemaReady && compileReady ? "pass" : schemaReady && compileWarn ? "warn" : "fail";
+    const lintSignals = [
+      Boolean(targetStableRef),
+      Boolean(targetSourceRef),
+      Boolean(targetVersion && targetVersion !== "unversioned"),
+      decisionSurfaceCount > 0,
+      boundaryRequirementCount > 0
+    ];
+    const lintReadyCount = lintSignals.filter(Boolean).length;
+    const lintStatus = lintReadyCount === lintSignals.length ? "pass" : lintReadyCount >= 3 ? "warn" : "fail";
+    const coverageGapCount = Number(snapshot?.policyCoverage?.gapCount || 0);
+    const blockerCount = Number(snapshot?.policySimulation?.blockerCount || 0);
+    const simulationTone = String(latestSimulation?.tone || "").trim().toLowerCase();
+    const goldenStatus =
+      !latestSimulation || String(latestSimulation.changeId || "").trim() !== String(queueItem.id || "").trim()
+        ? "fail"
+        : simulationTone === "danger"
+          ? "fail"
+          : simulationTone === "warn" || coverageGapCount > 0 || blockerCount > 0
+            ? "warn"
+            : "pass";
+    const cases = [
+      {
+        label: "compile validation",
+        status: compileStatus,
+        detail: `schema=${targetSchemaReadiness || "unknown"}; compile=${targetCompileReadiness || "unknown"}`
+      },
+      {
+        label: "lint posture",
+        status: lintStatus,
+        detail: `stableRef=${targetStableRef ? "present" : "missing"}; sourceRef=${targetSourceRef ? "present" : "missing"}; version=${targetVersion || "unversioned"}; surfaces=${decisionSurfaceCount}; boundaries=${boundaryRequirementCount}`
+      },
+      {
+        label: "golden simulation set",
+        status: goldenStatus,
+        detail: `decision=${String(snapshot?.policySimulation?.decision || "UNSET").trim().toUpperCase() || "UNSET"}; blockers=${String(blockerCount)}; preview=${simulationTone || "unknown"}`
+      }
+    ];
+    const failureCount = cases.filter((entry) => entry.status === "fail").length;
+    const warningCount = cases.filter((entry) => entry.status === "warn").length;
+    const passing = failureCount === 0;
+    const findings = [];
+    if (compileStatus !== "pass") {
+      findings.push("Compile validation is not fully green for the target policy pack posture.");
+    }
+    if (lintStatus !== "pass") {
+      findings.push("Policy pack lint posture still has bounded catalog hygiene gaps that should be reviewed before governance routing.");
+    }
+    if (goldenStatus !== "pass") {
+      findings.push("Golden simulation posture still carries bounded warnings or blockers; route is still allowed only if the verify gate itself passes.");
+    }
+    const now = new Date().toISOString();
+    return {
+      changeId: String(queueItem.id || "").trim(),
+      kind: "policy",
+      tone: !passing ? "error" : warningCount > 0 ? "warn" : "ok",
+      title: "Policy verify gate",
+      summary: !passing
+        ? `Verify gate failed for ${String(queueItem.id || "").trim()}. Resolve compile or lint failures before routing this policy proposal to GovernanceOps.`
+        : warningCount > 0
+          ? `Verify gate passed with warnings for ${String(queueItem.id || "").trim()}. GovernanceOps can review the bounded compile, lint, and golden-case posture before approval.`
+          : `Verify gate passed for ${String(queueItem.id || "").trim()}. The bounded policy proposal is ready for GovernanceOps review.`,
+      updatedAt: now,
+      verifiedAt: now,
+      compileStatus,
+      lintStatus,
+      goldenStatus,
+      passing,
+      diffSummary: `pack ${currentPackRef} -> ${targetPackRef}; provider ${String(currentScope.currentProviderId || "-").trim() || "-"} -> ${nextDraft.providerId || "-"}; scope ${String(currentScope.currentActivationTarget || "workspace").trim() || "workspace"} -> ${nextDraft.targetScope || "workspace"}`,
+      findings,
+      cases
+    };
+  };
+
   const loadPolicyOpsQueueItemIntoDraft = (changeId) => {
     const item = findPolicyOpsQueueItem(changeId);
     if (!item) {
@@ -8228,6 +8347,12 @@ async function main() {
         String(policyOpsViewState.latestSimulation?.changeId || "").trim() === String(item.id || "").trim()
           ? policyOpsViewState.latestSimulation
           : null,
+      latestVerification:
+        String(policyOpsViewState.latestVerification?.changeId || "").trim() === String(item.id || "").trim()
+          ? policyOpsViewState.latestVerification
+          : item?.verification && typeof item.verification === "object"
+            ? item.verification
+            : null,
       feedback: {
         tone: "info",
         message: `Loaded queued PolicyOps proposal ${String(item.id || "").trim()} into the active draft editor.`
@@ -8244,12 +8369,13 @@ async function main() {
       setPolicyOpsFeedback("warn", validationError);
       return null;
     }
-    const queueItem = buildPolicyOpsQueueItem(draft, { status: "draft" });
+    const queueItem = buildPolicyOpsQueueItem(draft, { status: "draft", verification: null });
     upsertPolicyOpsQueueItem(queueItem);
     policyOpsViewState = {
       ...policyOpsViewState,
       selectedAdminChangeId: String(queueItem.id || "").trim(),
       latestSimulation: null,
+      latestVerification: null,
       feedback: {
         tone: "ok",
         message: `PolicyOps draft saved as ${String(queueItem.id || "").trim()}.`
@@ -8272,19 +8398,22 @@ async function main() {
     }
     const queueItem = buildPolicyOpsQueueItem(draft, {
       id: selectedQueueItem?.id || String(policyOpsViewState.selectedAdminChangeId || "").trim(),
-      status: "simulated"
+      status: "simulated",
+      verification: null
     });
     const simulation = buildPolicyOpsSimulation(queueItem, draft);
     upsertPolicyOpsQueueItem({
       ...queueItem,
       status: "simulated",
       simulationSummary: simulation.summary,
-      simulatedAt: simulation.updatedAt
+      simulatedAt: simulation.updatedAt,
+      verification: null
     });
     policyOpsViewState = {
       ...policyOpsViewState,
       selectedAdminChangeId: String(queueItem.id || "").trim(),
       latestSimulation: simulation,
+      latestVerification: null,
       feedback: {
         tone: simulation.tone,
         message: `Policy dry-run is ready for ${String(queueItem.id || "").trim()}.`
@@ -8294,30 +8423,93 @@ async function main() {
     return simulation;
   };
 
+  const verifyPolicyOpsDraft = (changeId = "") => {
+    const selectedQueueItem = changeId ? findPolicyOpsQueueItem(changeId) : null;
+    if (selectedQueueItem) {
+      loadPolicyOpsQueueItemIntoDraft(selectedQueueItem.id);
+    }
+    const draft = normalizePolicyOpsAdminDraft(policyOpsViewState.adminDraft);
+    const validationError = validatePolicyOpsAdminDraft(draft);
+    if (validationError) {
+      setPolicyOpsFeedback("warn", validationError);
+      return null;
+    }
+    const simulation =
+      policyOpsViewState.latestSimulation &&
+      String(policyOpsViewState.latestSimulation.kind || "").trim().toLowerCase() === "policy" &&
+      (!selectedQueueItem ||
+        String(policyOpsViewState.latestSimulation.changeId || "").trim() === String(selectedQueueItem.id || "").trim())
+        ? policyOpsViewState.latestSimulation
+        : null;
+    if (!simulation) {
+      setPolicyOpsFeedback("warn", "Run a bounded dry-run for the active PolicyOps admin proposal before verifying it.");
+      return null;
+    }
+    const queueItem = buildPolicyOpsQueueItem(draft, {
+      id:
+        selectedQueueItem?.id ||
+        String(policyOpsViewState.selectedAdminChangeId || "").trim() ||
+        String(simulation.changeId || "").trim(),
+      status: "simulated",
+      simulationSummary: simulation.summary
+    });
+    const verification = buildPolicyOpsVerification(queueItem, draft, simulation);
+    upsertPolicyOpsQueueItem({
+      ...queueItem,
+      status: verification.passing ? "verified" : "verification_failed",
+      simulationSummary: simulation.summary,
+      simulatedAt: simulation.updatedAt,
+      verification
+    });
+    policyOpsViewState = {
+      ...policyOpsViewState,
+      selectedAdminChangeId: String(queueItem.id || "").trim(),
+      latestVerification: verification,
+      feedback: {
+        tone: verification.tone === "error" ? "error" : verification.tone,
+        message: verification.summary
+      }
+    };
+    renderPolicyOpsPanel();
+    return verification;
+  };
+
   const routePolicyOpsDraftToGovernance = (changeId = "") => {
     const selectedQueueItem = changeId ? findPolicyOpsQueueItem(changeId) : null;
-    const simulation = policyOpsViewState.latestSimulation;
-    const matchingSimulation =
-      simulation &&
-      String(simulation.kind || "").trim().toLowerCase() === "policy" &&
-      String(simulation.changeId || "").trim() &&
-      (!selectedQueueItem || String(simulation.changeId || "").trim() === String(selectedQueueItem.id || "").trim());
-    if (!matchingSimulation) {
+    const normalizedChangeId = String(changeId || selectedQueueItem?.id || policyOpsViewState.selectedAdminChangeId || "").trim();
+    const simulation =
+      policyOpsViewState.latestSimulation &&
+      String(policyOpsViewState.latestSimulation.kind || "").trim().toLowerCase() === "policy" &&
+      String(policyOpsViewState.latestSimulation.changeId || "").trim() === normalizedChangeId
+        ? policyOpsViewState.latestSimulation
+        : null;
+    const verification = latestPolicyOpsVerificationForChange(normalizedChangeId);
+    const hasSimulation = Boolean(
+      simulation ||
+        (selectedQueueItem && String(selectedQueueItem.simulationSummary || "").trim() && String(selectedQueueItem.simulatedAt || "").trim())
+    );
+    if (!hasSimulation) {
       setPolicyOpsFeedback("warn", "Run a bounded dry-run for the active PolicyOps admin proposal before routing it to GovernanceOps.");
+      return false;
+    }
+    if (!verification || verification.passing !== true) {
+      setPolicyOpsFeedback("warn", "Run Verify Gate and resolve any compile or lint failures before routing this PolicyOps proposal to GovernanceOps.");
       return false;
     }
     const queueItem =
       selectedQueueItem ||
       buildPolicyOpsQueueItem(policyOpsViewState.adminDraft, {
-        id: String(policyOpsViewState.selectedAdminChangeId || "").trim(),
+        id: normalizedChangeId,
         status: "simulated",
-        simulationSummary: simulation.summary
+        simulationSummary: simulation?.summary || String(selectedQueueItem?.simulationSummary || "").trim(),
+        verification
       });
     upsertPolicyOpsQueueItem({
       ...queueItem,
       status: "routed",
-      simulationSummary: simulation.summary,
+      simulationSummary: simulation?.summary || String(queueItem.simulationSummary || "").trim(),
       routedAt: new Date().toISOString(),
+      verification,
       decision: null,
       execution: null,
       receipt: null,
@@ -8326,6 +8518,7 @@ async function main() {
     policyOpsViewState = {
       ...policyOpsViewState,
       selectedAdminChangeId: String(queueItem.id || "").trim(),
+      latestVerification: verification,
       feedback: {
         tone: "warn",
         message: `Policy admin proposal ${String(queueItem.id || "").trim()} routed to GovernanceOps. Apply remains blocked until an explicit governance approval lands.`
@@ -14450,6 +14643,10 @@ function getCurrentIncidentOpsEntry(entryId = "") {
         simulatePolicyOpsDraft(changeId);
         return;
       }
+      if (action === "verify-draft") {
+        verifyPolicyOpsDraft(changeId);
+        return;
+      }
       if (action === "route-draft") {
         routePolicyOpsDraftToGovernance(changeId);
         return;
@@ -14460,6 +14657,10 @@ function getCurrentIncidentOpsEntry(entryId = "") {
       }
       if (action === "simulate-queue-item" && changeId) {
         simulatePolicyOpsDraft(changeId);
+        return;
+      }
+      if (action === "verify-queue-item" && changeId) {
+        verifyPolicyOpsDraft(changeId);
         return;
       }
       if (action === "route-queue-item" && changeId) {

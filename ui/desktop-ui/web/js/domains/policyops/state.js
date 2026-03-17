@@ -59,12 +59,99 @@ export function summarizePolicyDataSource(value) {
   return source || "unknown";
 }
 
+function normalizePolicyPackReadiness(value, fallback = "unknown") {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (!normalized) {
+    return fallback;
+  }
+  if (["ok", "pass", "passing", "complete", "compiled", "valid"].includes(normalized)) {
+    return "ready";
+  }
+  if (["ready", "declared", "conditional", "partial", "unknown", "missing", "incomplete", "unchecked"].includes(normalized)) {
+    return normalized;
+  }
+  return normalized;
+}
+
+function derivePolicyPackSchemaReadiness(item = {}) {
+  const surfaces = readStringArray(item?.decisionSurfaces);
+  const hasPackId = Boolean(String(item?.packId || "").trim());
+  const hasLabel = Boolean(String(item?.label || "").trim());
+  if (hasPackId && hasLabel && surfaces.length > 0) {
+    return "declared";
+  }
+  if (hasPackId || hasLabel || surfaces.length > 0) {
+    return "partial";
+  }
+  return "unknown";
+}
+
+function derivePolicyPackCompileReadiness(item = {}) {
+  const roleBundles = readStringArray(item?.roleBundles);
+  const surfaces = readStringArray(item?.decisionSurfaces);
+  const boundaryRequirements = readStringArray(item?.boundaryRequirements);
+  if (roleBundles.length > 0 && surfaces.length > 0 && boundaryRequirements.length > 0) {
+    return "ready";
+  }
+  if (surfaces.length > 0 && boundaryRequirements.length > 0) {
+    return "conditional";
+  }
+  if (roleBundles.length > 0 || surfaces.length > 0 || boundaryRequirements.length > 0) {
+    return "partial";
+  }
+  return "unknown";
+}
+
+function normalizePolicyCatalogItem(item = {}, index = 0) {
+  const packId = String(item?.packId || "").trim();
+  const label = String(item?.label || "").trim();
+  const version = String(item?.version || item?.packVersion || "").trim() || "unversioned";
+  const stableRef =
+    String(item?.stableRef || "").trim() || (packId ? `policy-pack://${packId}@${version}` : "");
+  const sourceRef =
+    String(item?.sourceRef || item?.bundleRef || item?.uri || "").trim() ||
+    (packId ? `bundle://aimxs/${packId}/${version}` : "");
+  const activationTarget = String(item?.activationTarget || item?.scope || "").trim() || "workspace";
+  const activationPosture =
+    String(item?.activationPosture || "").trim().toLowerCase() || (index === 0 ? "current" : "available");
+  const schemaReadiness = normalizePolicyPackReadiness(
+    item?.schemaReadiness || item?.schemaStatus,
+    derivePolicyPackSchemaReadiness(item)
+  );
+  const compileReadiness = normalizePolicyPackReadiness(
+    item?.compileReadiness || item?.compileStatus,
+    derivePolicyPackCompileReadiness(item)
+  );
+  return {
+    ...item,
+    packId,
+    label,
+    version,
+    sourceRef,
+    stableRef,
+    activationTarget,
+    activationPosture,
+    schemaReadiness,
+    compileReadiness,
+    roleBundles: readStringArray(item?.roleBundles),
+    decisionSurfaces: readStringArray(item?.decisionSurfaces),
+    boundaryRequirements: readStringArray(item?.boundaryRequirements)
+  };
+}
+
 export function renderPolicyPackRows(items) {
   return (items || [])
     .map((item) => `
       <tr>
         <td data-label="Pack"><code>${escapeHTML(item?.packId || "-")}</code></td>
         <td data-label="Label">${escapeHTML(item?.label || "-")}</td>
+        <td data-label="Version"><code>${escapeHTML(item?.version || "unversioned")}</code></td>
+        <td data-label="Source Ref">${item?.sourceRef ? `<code>${escapeHTML(item.sourceRef)}</code>` : "-"}</td>
+        <td data-label="Stable Ref">${item?.stableRef ? `<code>${escapeHTML(item.stableRef)}</code>` : "-"}</td>
+        <td data-label="Rigor Contract">
+          <div>schema=${escapeHTML(item?.schemaReadiness || "unknown")}; compile=${escapeHTML(item?.compileReadiness || "unknown")}</div>
+          <div>target=${escapeHTML(item?.activationTarget || "workspace")}; posture=${escapeHTML(item?.activationPosture || "available")}</div>
+        </td>
         <td data-label="Role Bundles">${renderDelimitedCodeList(item?.roleBundles || [])}</td>
         <td data-label="Decision Surfaces">${renderDelimitedCodeList(item?.decisionSurfaces || [])}</td>
         <td data-label="Boundary Requirements">${renderDelimitedCodeList(item?.boundaryRequirements || [])}</td>
@@ -78,11 +165,18 @@ export function createPolicySettingsSnapshot(settings = {}) {
     settings?.identity && typeof settings.identity === "object" ? settings.identity : {};
   const policyCatalog =
     settings?.policyCatalog && typeof settings.policyCatalog === "object" ? settings.policyCatalog : {};
-  const policyCatalogItems = Array.isArray(policyCatalog.items) ? policyCatalog.items : [];
+  const policyCatalogItems = Array.isArray(policyCatalog.items)
+    ? policyCatalog.items.map((item, index) => normalizePolicyCatalogItem(item, index))
+    : [];
+  const activePolicyPack =
+    policyCatalogItems.find((item) => ["current", "active", "applied"].includes(String(item?.activationPosture || "").trim().toLowerCase())) ||
+    policyCatalogItems[0] ||
+    {};
   return {
     runtimeIdentity,
     policyCatalog,
-    policyCatalogItems
+    policyCatalogItems,
+    activePolicyPack
   };
 }
 
@@ -222,6 +316,54 @@ function normalizePolicyAdminRollback(rollback = null) {
   };
 }
 
+function normalizePolicyAdminVerification(verification = null) {
+  if (!verification || typeof verification !== "object") {
+    return null;
+  }
+  const summary = normalizeString(verification.summary);
+  const diffSummary = normalizeString(verification.diffSummary);
+  const findings = Array.isArray(verification.findings)
+    ? verification.findings.map((entry) => normalizeString(entry)).filter(Boolean)
+    : [];
+  const cases = Array.isArray(verification.cases)
+    ? verification.cases
+        .map((entry) => {
+          const item = entry && typeof entry === "object" ? entry : {};
+          const label = normalizeString(item.label);
+          const status = normalizeString(item.status).toLowerCase();
+          const detail = normalizeString(item.detail);
+          if (!label && !status && !detail) {
+            return null;
+          }
+          return {
+            label: label || "case",
+            status: status || "unknown",
+            detail
+          };
+        })
+        .filter(Boolean)
+    : [];
+  if (!summary && !diffSummary && findings.length === 0 && cases.length === 0) {
+    return null;
+  }
+  return {
+    changeId: normalizeString(verification.changeId),
+    kind: normalizeString(verification.kind, "policy").toLowerCase(),
+    tone: normalizeString(verification.tone, "info").toLowerCase(),
+    title: normalizeString(verification.title, "Policy verify gate"),
+    summary,
+    updatedAt: normalizeString(verification.updatedAt),
+    verifiedAt: normalizeString(verification.verifiedAt),
+    compileStatus: normalizeString(verification.compileStatus, "unknown").toLowerCase(),
+    lintStatus: normalizeString(verification.lintStatus, "unknown").toLowerCase(),
+    goldenStatus: normalizeString(verification.goldenStatus, "unknown").toLowerCase(),
+    passing: verification.passing === true,
+    diffSummary,
+    findings,
+    cases
+  };
+}
+
 function normalizePolicyAdminDraft(draft = null, defaults = {}) {
   const input = draft && typeof draft === "object" ? draft : {};
   return {
@@ -261,6 +403,7 @@ function normalizePolicyAdminQueueItems(items = []) {
         reason: normalizeString(entry.reason),
         summary: normalizeString(entry.summary),
         simulationSummary: normalizeString(entry.simulationSummary),
+        verification: normalizePolicyAdminVerification(entry.verification || null),
         createdAt: normalizeString(entry.createdAt),
         simulatedAt: normalizeString(entry.simulatedAt),
         updatedAt: normalizeString(entry.updatedAt),
@@ -508,14 +651,14 @@ export function createPolicyWorkspaceSnapshot(context = {}) {
   const settings = context?.settings && typeof context.settings === "object" ? context.settings : {};
   const runs = context?.runs && typeof context.runs === "object" ? context.runs : {};
   const viewState = context?.viewState && typeof context.viewState === "object" ? context.viewState : {};
-  const { runtimeIdentity, policyCatalog, policyCatalogItems } = createPolicySettingsSnapshot(settings);
+  const { runtimeIdentity, policyCatalog, policyCatalogItems, activePolicyPack } = createPolicySettingsSnapshot(settings);
   const latestPolicyRun = selectLatestPolicyRun(runs.items || []);
   const decisionRichness = latestPolicyRun ? latestPolicyRun.richness : null;
   const decisionOutcome =
     latestPolicyRun && decisionRichness
       ? derivePolicyOutcomePresentation(latestPolicyRun.run, decisionRichness)
       : null;
-  const activePack = policyCatalogItems[0] || {};
+  const activePack = activePolicyPack || {};
   const feedbackMessage = String(viewState?.feedback?.message || "").trim();
   const simulationRefreshedAt = String(viewState?.simulationRefreshedAt || "").trim();
   const providerId = String(
@@ -541,14 +684,41 @@ export function createPolicyWorkspaceSnapshot(context = {}) {
   const selectedAdminQueueItem =
     adminQueueItems.find((item) => item.id === selectedAdminChangeId) ||
     adminQueueItems.find((item) => item.status === "routed") ||
+    adminQueueItems.find((item) => item.status === "verified") ||
+    adminQueueItems.find((item) => item.status === "verification_failed") ||
     adminQueueItems.find((item) => item.status === "simulated") ||
     adminQueueItems[0] ||
     null;
+  const latestAdminVerification =
+    normalizePolicyAdminVerification(viewState?.latestVerification || null) ||
+    normalizePolicyAdminVerification(selectedAdminQueueItem?.verification || null);
+  const targetPackId = normalizeString(selectedAdminQueueItem?.packId || viewState?.adminDraft?.packId || adminDefaults.packId);
+  const targetPolicyPack =
+    policyCatalogItems.find((item) => item.packId === targetPackId) ||
+    normalizePolicyCatalogItem(
+      {
+        packId: targetPackId,
+        label: targetPackId,
+        activationTarget: selectedAdminQueueItem?.targetScope || viewState?.adminDraft?.targetScope || adminDefaults.targetScope
+      },
+      policyCatalogItems.length
+    );
+  const schemaReadyCount = policyCatalogItems.filter((item) =>
+    ["ready", "declared"].includes(String(item?.schemaReadiness || "").trim().toLowerCase())
+  ).length;
+  const compileReadyCount = policyCatalogItems.filter((item) =>
+    ["ready", "conditional"].includes(String(item?.compileReadiness || "").trim().toLowerCase())
+  ).length;
+  const packsMissingStableRefs = policyCatalogItems.filter((item) => !normalizeString(item?.stableRef)).length;
+  const packsMissingVersions = policyCatalogItems.filter((item) => !normalizeString(item?.version) || item.version === "unversioned").length;
   const stableReferences = {
     contractId: String(decisionRichness?.contractId || "").trim(),
     runId: String(latestPolicyRun?.run?.runId || "").trim(),
     providerId: String(decisionRichness?.providerId || latestPolicyRun?.run?.selectedPolicyProvider || providerId).trim(),
     packId: String(activePack?.packId || "").trim(),
+    packVersion: String(activePack?.version || "").trim(),
+    packStableRef: String(activePack?.stableRef || "").trim(),
+    packSourceRef: String(activePack?.sourceRef || "").trim(),
     boundaryClass: String(decisionRichness?.boundaryClass || "").trim(),
     riskTier: String(decisionRichness?.riskTier || "").trim(),
     auditEventRef: String(decisionRichness?.auditEventRef || "").trim()
@@ -573,7 +743,16 @@ export function createPolicyWorkspaceSnapshot(context = {}) {
       catalogSource: summarizePolicyDataSource(policyCatalog?.source || "unknown"),
       packCount: policyCatalog?.count || policyCatalogItems.length || 0,
       policyMatrixRequired: Boolean(runtimeIdentity?.policyMatrixRequired),
-      policyRuleCount: runtimeIdentity?.policyRuleCount || 0
+      policyRuleCount: runtimeIdentity?.policyRuleCount || 0,
+      activePackId: String(activePack?.packId || "").trim(),
+      activePackLabel: String(activePack?.label || "").trim(),
+      activePackVersion: String(activePack?.version || "").trim(),
+      activePackSourceRef: String(activePack?.sourceRef || "").trim(),
+      activePackStableRef: String(activePack?.stableRef || "").trim(),
+      activePackSchemaReadiness: String(activePack?.schemaReadiness || "").trim(),
+      activePackCompileReadiness: String(activePack?.compileReadiness || "").trim(),
+      activeActivationTarget: String(activePack?.activationTarget || "").trim(),
+      activeActivationPosture: String(activePack?.activationPosture || "").trim()
     },
     decisionExplanation: {
       available: Boolean(latestPolicyRun),
@@ -595,6 +774,10 @@ export function createPolicyWorkspaceSnapshot(context = {}) {
       packsMissingRoleBundles: countItemsMissingList(policyCatalogItems, "roleBundles"),
       packsMissingDecisionSurfaces: countItemsMissingList(policyCatalogItems, "decisionSurfaces"),
       packsMissingBoundaryRequirements: countItemsMissingList(policyCatalogItems, "boundaryRequirements"),
+      schemaReadyCount,
+      compileReadyCount,
+      packsMissingStableRefs,
+      packsMissingVersions,
       latestDecisionCaptured: Boolean(decisionRichness?.decision),
       latestContractCaptured: Boolean(decisionRichness?.contractId),
       latestRationaleCaptured: Boolean(decisionRichness?.firstReason),
@@ -668,9 +851,17 @@ export function createPolicyWorkspaceSnapshot(context = {}) {
       queueItems: adminQueueItems,
       draft: normalizePolicyAdminDraft(viewState?.adminDraft || {}, adminDefaults),
       latestSimulation: normalizePolicyAdminSimulation(viewState?.latestSimulation || null),
+      latestVerification: latestAdminVerification,
       currentScope: {
         currentPackId: String(activePack?.packId || "").trim() || "-",
         currentPackLabel: String(activePack?.label || "").trim() || "-",
+        currentPackVersion: String(activePack?.version || "").trim() || "unversioned",
+        currentPackSourceRef: String(activePack?.sourceRef || "").trim() || "-",
+        currentPackStableRef: String(activePack?.stableRef || "").trim() || "-",
+        currentActivationTarget: String(activePack?.activationTarget || "").trim() || "workspace",
+        currentActivationPosture: String(activePack?.activationPosture || "").trim() || "available",
+        currentSchemaReadiness: String(activePack?.schemaReadiness || "").trim() || "unknown",
+        currentCompileReadiness: String(activePack?.compileReadiness || "").trim() || "unknown",
         currentProviderId: providerId || "-",
         currentProviderLabel: policyProviderLabel(settings),
         defaultTargetScope,
@@ -685,6 +876,24 @@ export function createPolicyWorkspaceSnapshot(context = {}) {
         boundaryRequirementCount: uniqueCountFromItems(policyCatalogItems, "boundaryRequirements"),
         packsMissingDecisionSurfaces: countItemsMissingList(policyCatalogItems, "decisionSurfaces"),
         packsMissingBoundaryRequirements: countItemsMissingList(policyCatalogItems, "boundaryRequirements"),
+        schemaReadyCount,
+        compileReadyCount,
+        packsMissingStableRefs,
+        packsMissingVersions,
+        targetPackId: String(targetPolicyPack?.packId || "").trim() || "-",
+        targetPackLabel: String(targetPolicyPack?.label || "").trim() || "-",
+        targetPackVersion: String(targetPolicyPack?.version || "").trim() || "unversioned",
+        targetPackSourceRef: String(targetPolicyPack?.sourceRef || "").trim() || "-",
+        targetPackStableRef: String(targetPolicyPack?.stableRef || "").trim() || "-",
+        targetActivationTarget:
+          normalizeString(selectedAdminQueueItem?.targetScope || viewState?.adminDraft?.targetScope) ||
+          String(targetPolicyPack?.activationTarget || "").trim() ||
+          defaultTargetScope,
+        targetActivationPosture:
+          String(targetPolicyPack?.activationPosture || "").trim() ||
+          normalizeString(selectedAdminQueueItem?.status || viewState?.adminDraft?.changeKind, "draft"),
+        targetSchemaReadiness: String(targetPolicyPack?.schemaReadiness || "").trim() || "unknown",
+        targetCompileReadiness: String(targetPolicyPack?.compileReadiness || "").trim() || "unknown",
         providerOptions: [
           ...new Set(
             [
@@ -703,10 +912,10 @@ export function createPolicyWorkspaceSnapshot(context = {}) {
 
 function policyAimxsTone(value = "") {
   const normalized = normalizeString(value).toLowerCase();
-  if (["allow", "allowed", "applied", "current", "ready"].includes(normalized)) {
+  if (["allow", "allowed", "applied", "current", "ready", "verified"].includes(normalized)) {
     return "ok";
   }
-  if (["blocked", "deny", "denied", "failed"].includes(normalized)) {
+  if (["blocked", "deny", "denied", "failed", "verification_failed"].includes(normalized)) {
     return "danger";
   }
   if (["defer", "deferred", "pending", "review", "simulated", "watch"].includes(normalized)) {

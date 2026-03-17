@@ -112,6 +112,13 @@ test("settings view persists raw response and native timeline disclosure shells"
           {
             packId: "managed_codex_worker_operator",
             label: "Managed Codex Worker Operator",
+            version: "2026.03.14",
+            sourceRef: "bundle://aimxs/managed_codex_worker_operator/2026.03.14",
+            stableRef: "policy-pack://managed_codex_worker_operator@2026.03.14",
+            schemaReadiness: "declared",
+            compileReadiness: "ready",
+            activationTarget: "workspace",
+            activationPosture: "current",
             roleBundles: ["enterprise.operator"],
             decisionSurfaces: ["governed_tool_action"],
             boundaryRequirements: ["tenant_project_scope", "runtime_authz"]
@@ -197,4 +204,8 @@ test("settings view persists raw response and native timeline disclosure shells"
   assert.match(ui.settingsContent.innerHTML, /Policy Bucket Prefix/);
   assert.match(ui.settingsContent.innerHTML, /Policy Pack Catalog/);
   assert.match(ui.settingsContent.innerHTML, /managed_codex_worker_operator/);
+  assert.match(ui.settingsContent.innerHTML, /2026\.03\.14/);
+  assert.match(ui.settingsContent.innerHTML, /bundle:\/\/aimxs\/managed_codex_worker_operator\/2026\.03\.14/);
+  assert.match(ui.settingsContent.innerHTML, /policy-pack:\/\/managed_codex_worker_operator@2026\.03\.14/);
+  assert.match(ui.settingsContent.innerHTML, /schemaReadiness=declared; compileReadiness=ready/);
 });
