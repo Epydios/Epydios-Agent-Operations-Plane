@@ -1,4 +1,6 @@
 import { chipClassForStatus, escapeHTML } from "../../../views/common.js";
+import { renderAimxsIdentityPostureBlock } from "../../../shared/components/aimxs-identity-posture.js";
+import { renderAimxsRouteBoundaryBlock } from "../../../shared/components/aimxs-route-boundary.js";
 import { createRuntimeWorkspaceSnapshot } from "../state.js";
 
 function chipClassForTone(value) {
@@ -737,6 +739,30 @@ function renderIdentityApplicationBoard(snapshot) {
   `;
 }
 
+function renderAimxsIdentityPostureEchoBoard(snapshot) {
+  return `
+    <article class="metric runtimeops-card runtimeops-card-wide" data-domain-root="runtimeops" data-runtimeops-panel="aimxs-identity-posture-echo">
+      <div class="metric-title-row">
+        <div class="title">AIMXS Identity And Posture Echo</div>
+        <span class="chip chip-neutral chip-compact">read-only</span>
+      </div>
+      ${renderAimxsIdentityPostureBlock(snapshot.aimxsIdentityPosture)}
+    </article>
+  `;
+}
+
+function renderAimxsRouteBoundaryEchoBoard(snapshot) {
+  return `
+    <article class="metric runtimeops-card runtimeops-card-wide" data-domain-root="runtimeops" data-runtimeops-panel="aimxs-route-boundary-echo">
+      <div class="metric-title-row">
+        <div class="title">AIMXS Route And Boundary Echo</div>
+        <span class="chip chip-neutral chip-compact">read-only</span>
+      </div>
+      ${renderAimxsRouteBoundaryBlock(snapshot.aimxsRouteBoundary)}
+    </article>
+  `;
+}
+
 export function renderRuntimeWorkspace(context = {}, session = {}, options = {}) {
   const snapshot = createRuntimeWorkspaceSnapshot(context, session, options);
   return `
@@ -751,7 +777,9 @@ export function renderRuntimeWorkspace(context = {}, session = {}, options = {})
         ${renderLiveSessionsBoard(snapshot)}
         ${renderWorkerFleetBoard(snapshot)}
         ${renderProviderRoutingBoard(snapshot)}
+        ${renderAimxsRouteBoundaryEchoBoard(snapshot)}
         ${renderIdentityApplicationBoard(snapshot)}
+        ${renderAimxsIdentityPostureEchoBoard(snapshot)}
         ${renderRunInventoryBoard(snapshot)}
       </div>
     </div>

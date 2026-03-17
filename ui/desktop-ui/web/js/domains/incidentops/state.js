@@ -400,6 +400,10 @@ export function createIncidentOpsWorkspaceSnapshot(context = {}) {
           message: feedbackMessage
         }
       : null,
+    aimxsDecisionBindingSpine:
+      context?.aimxsDecisionBindingSpine && typeof context.aimxsDecisionBindingSpine === "object"
+        ? context.aimxsDecisionBindingSpine
+        : { available: false },
     selectedIncidentId: latestItem?.id || "",
     incidentQueueBoard: {
       tone:

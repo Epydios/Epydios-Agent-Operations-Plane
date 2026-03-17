@@ -3,6 +3,11 @@ import {
   displayPolicyProviderLabel,
   escapeHTML
 } from "../../views/common.js";
+import {
+  createAimxsField,
+  createAimxsIdentityPostureModel,
+  inferAimxsAuthorityTierFromRoles
+} from "../../shared/aimxs/identity-posture.js";
 
 export function presentPolicyCopy(value) {
   return String(value || "")
@@ -549,7 +554,7 @@ export function createPolicyWorkspaceSnapshot(context = {}) {
     auditEventRef: String(decisionRichness?.auditEventRef || "").trim()
   };
 
-  return {
+  const snapshot = {
     feedback: feedbackMessage
       ? {
           tone: String(viewState?.feedback?.tone || "info").trim().toLowerCase(),
@@ -692,4 +697,109 @@ export function createPolicyWorkspaceSnapshot(context = {}) {
       }
     }
   };
+  snapshot.aimxsIdentityPosture = buildPolicyAimxsIdentityPosture(snapshot);
+  return snapshot;
+}
+
+function policyAimxsTone(value = "") {
+  const normalized = normalizeString(value).toLowerCase();
+  if (["allow", "allowed", "applied", "current", "ready"].includes(normalized)) {
+    return "ok";
+  }
+  if (["blocked", "deny", "denied", "failed"].includes(normalized)) {
+    return "danger";
+  }
+  if (["defer", "deferred", "pending", "review", "simulated", "watch"].includes(normalized)) {
+    return "warn";
+  }
+  return "neutral";
+}
+
+function buildPolicyAimxsIdentityPosture(snapshot = {}) {
+  const explanation = snapshot?.decisionExplanation || {};
+  const richness = explanation?.richness || {};
+  const simulation = snapshot?.policySimulation || {};
+  const admin = snapshot?.admin || {};
+  const selectedItem = admin?.selectedQueueItem || null;
+  const draft = admin?.draft || {};
+  const authorityTier = inferAimxsAuthorityTierFromRoles(
+    richness?.authorityRoles,
+    richness?.operatorApprovalRequired ? "approval_gated_supervisor" : "workspace_operator"
+  );
+  const currentBadge = normalizeString(richness?.decision, "watch").toLowerCase();
+  const targetBadge = normalizeString(selectedItem?.status, selectedItem ? "watch" : draft?.changeKind || "draft").toLowerCase();
+  const rationaleBadge = normalizeString(richness?.decision, targetBadge).toLowerCase();
+  const requiredGrants = Array.isArray(richness?.requiredGrants) ? richness.requiredGrants : [];
+  const currentScope =
+    [richness?.authorityTenantScopes?.[0], richness?.authorityProjectScopes?.[0]]
+      .filter((value) => normalizeString(value))
+      .join(" / ") ||
+    draft?.targetScope ||
+    "workspace";
+
+  return createAimxsIdentityPostureModel({
+    summary:
+      "This read-only echo makes the current governed-action authority posture and the next bounded policy-pack posture legible from PolicyOps without adding another write surface.",
+    surfaceLabel: "read-only echo",
+    identityFields: [
+      createAimxsField("identity class", "governed action authority"),
+      createAimxsField("actor", richness?.actorSubject || "-", true),
+      createAimxsField("client", richness?.actorClientId || "-", true),
+      createAimxsField("authority tier", authorityTier),
+      createAimxsField("authority basis", richness?.authorityBasis || "unknown"),
+      createAimxsField(
+        "delegation basis",
+        richness?.operatorApprovalRequired ? "governance handshake" : requiredGrants.length ? "grant-bundle gated" : "direct governed review"
+      ),
+      createAimxsField("grant basis", requiredGrants.length ? requiredGrants.join(", ") : "no additional grants declared", requiredGrants.length > 0),
+      createAimxsField(
+        "assurance posture",
+        richness?.requestContractEchoPresent && richness?.currentStatePresent ? "continuity echoed" : "partial runtime echo"
+      ),
+      createAimxsField(
+        "anomaly posture",
+        richness?.adapterStatus || richness?.adapterErrorCode ? `${richness.adapterStatus || "provider"} ${richness.adapterErrorCode || ""}`.trim() : "no anomaly flag loaded"
+      )
+    ].filter(Boolean),
+    currentPosture: {
+      badge: currentBadge,
+      tone: policyAimxsTone(currentBadge),
+      note: "Current posture is derived from the latest governed-run replay and the active AIMXS policy explanation.",
+      fields: [
+        createAimxsField("current posture", richness?.decision || "unset"),
+        createAimxsField("scope", currentScope, true),
+        createAimxsField("boundary", richness?.boundaryClass || "-", true),
+        createAimxsField("risk tier", richness?.riskTier || "-"),
+        createAimxsField("provider route", richness?.providerId || explanation?.selectedPolicyProvider || "-", true)
+      ].filter(Boolean)
+    },
+    targetPosture: {
+      badge: targetBadge,
+      tone: policyAimxsTone(targetBadge),
+      note:
+        normalizeString(selectedItem?.summary) ||
+        `Target policy posture is ${draft?.changeKind || "draft"} ${draft?.packId || "pack"} for ${draft?.targetScope || currentScope}.`,
+      fields: [
+        createAimxsField("target posture", draft?.changeKind ? `${draft.changeKind} policy pack` : "bounded policy draft"),
+        createAimxsField("target pack", draft?.packId || selectedItem?.packId || "-", true),
+        createAimxsField("decision provider", draft?.providerId || selectedItem?.providerId || explanation?.selectedPolicyProvider || "-", true),
+        createAimxsField("target scope", draft?.targetScope || selectedItem?.targetScope || currentScope, true),
+        createAimxsField("requested action", selectedItem?.requestedAction || "")
+      ].filter(Boolean)
+    },
+    rationale: {
+      badge: rationaleBadge,
+      tone: policyAimxsTone(rationaleBadge),
+      note:
+        normalizeString(simulation?.nextAction) ||
+        normalizeString(explanation?.outcome?.detail) ||
+        "The latest governed policy outcome defines whether the requested posture remains deferred, blocked, or ready.",
+      fields: [
+        createAimxsField("first reason", richness?.firstReason || ""),
+        createAimxsField("required grants", requiredGrants.join(", "), requiredGrants.length > 0),
+        createAimxsField("blocker count", String(simulation?.blockerCount || 0)),
+        createAimxsField("audit ref", richness?.auditEventRef || "", true)
+      ].filter(Boolean)
+    }
+  });
 }

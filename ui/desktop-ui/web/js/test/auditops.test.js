@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { renderAuditOpsEmptyState, renderAuditOpsPage } from "../domains/auditops/routes.js";
+import { createAimxsDecisionBindingSpine } from "../shared/aimxs/decision-binding.js";
 
 test("auditops page renders bounded audit event, actor activity, and decision trace boards", () => {
   const ui = { auditOpsContent: { innerHTML: "" } };
@@ -65,6 +66,47 @@ test("auditops page renders bounded audit event, actor activity, and decision tr
         }
       ]
     },
+    adminQueueItems: [
+      {
+        id: "network-change-aa10-001",
+        ownerDomain: "networkops",
+        kind: "network",
+        status: "rolled_back",
+        requestedAction: "probe gateway_path tasks",
+        subjectId: "gateway_path",
+        targetScope: "local / aimxs-policy-primary",
+        reason: "Trace admin lifecycle.",
+        summary: "Probe Runtime Tasks within local / aimxs-policy-primary.",
+        simulationSummary: "Preview only before live probe execution.",
+        createdAt: "2026-03-15T01:00:00Z",
+        simulatedAt: "2026-03-15T01:01:00Z",
+        routedAt: "2026-03-15T01:02:00Z",
+        updatedAt: "2026-03-15T01:05:00Z",
+        decision: {
+          decisionId: "admin-decision-aa10-001",
+          status: "approved",
+          approvalReceiptId: "approval-receipt-aa10-001",
+          decidedAt: "2026-03-15T01:03:00Z"
+        },
+        execution: {
+          executionId: "admin-execution-aa10-001",
+          executedAt: "2026-03-15T01:04:00Z",
+          status: "applied"
+        },
+        receipt: {
+          receiptId: "admin-receipt-aa10-001",
+          issuedAt: "2026-03-15T01:04:00Z",
+          stableRef: "network-change-aa10-001/admin-receipt-aa10-001"
+        },
+        rollback: {
+          rollbackId: "admin-rollback-aa10-001",
+          action: "rollback",
+          status: "rolled_back",
+          rolledBackAt: "2026-03-15T01:05:00Z",
+          stableRef: "network-change-aa10-001/admin-rollback-aa10-001"
+        }
+      }
+    ],
     selectedRunDetail: {
       runId: "run-20260315-001",
       status: "DENIED",
@@ -111,13 +153,51 @@ test("auditops page renders bounded audit event, actor activity, and decision tr
       },
       handoffPreview:
         "EpydiosOps Desktop Audit Handoff Summary\ngeneratedAt=2026-03-15T01:20:00Z\nscope=tenant-demo/project-core"
-    }
+    },
+    aimxsDecisionBindingSpine: createAimxsDecisionBindingSpine({
+      activeDomain: "auditops",
+      sourceLabel: "correlated run",
+      correlationRef: "run-20260315-001",
+      runId: "run-20260315-001",
+      approvalId: "approval-20260315-001",
+      actorRef: "demo.operator",
+      subjectRef: "task-20260315-001",
+      authorityRef: "codex",
+      authorityBasis: "bearer_token_jwt",
+      scopeRef: "tenant-demo / project-core",
+      providerRef: "aimxs-policy-primary",
+      routeRef: "managed_codex_worker",
+      boundaryRef: "agentops_gateway",
+      grantRef: "approval-20260315-001",
+      decisionStatus: "DENY",
+      receiptRef: "approval-receipt-aa10-001",
+      stableRef: "network-change-aa10-001/admin-receipt-aa10-001",
+      bundleId: "bundle-governed-audit-001",
+      recordId: "evidence-run-20260315-001",
+      replayRef: "run-20260315-001",
+      sessionRef: "session-20260315-001",
+      taskRef: "task-20260315-001",
+      evidenceRefs: ["evidence://tenant-demo/project-core/run-20260315-001"],
+      auditRefs: ["policy.decision.denied@2026-03-15T01:18:00Z"],
+      summary: "Audit traceability for the correlated run."
+    })
   });
 
   assert.match(ui.auditOpsContent.innerHTML, /data-domain-root="auditops"/);
   assert.match(ui.auditOpsContent.innerHTML, /Audit Event Board/);
   assert.match(ui.auditOpsContent.innerHTML, /Actor Activity Board/);
   assert.match(ui.auditOpsContent.innerHTML, /Decision Trace Board/);
+  assert.match(ui.auditOpsContent.innerHTML, /Admin Lifecycle Trace/);
+  assert.match(ui.auditOpsContent.innerHTML, /AIMXS Lifecycle Ribbon/);
+  assert.match(ui.auditOpsContent.innerHTML, /AIMXS Decision-Binding Spine/);
+  assert.match(ui.auditOpsContent.innerHTML, /Authority Chain/);
+  assert.match(ui.auditOpsContent.innerHTML, /Grant Chain/);
+  assert.match(ui.auditOpsContent.innerHTML, /Receipt Chain/);
+  assert.match(ui.auditOpsContent.innerHTML, /Replay Chain/);
+  assert.match(ui.auditOpsContent.innerHTML, /Evidence Chain/);
+  assert.match(ui.auditOpsContent.innerHTML, /data-aimxs-spine-action="open-workspace"/);
+  assert.match(ui.auditOpsContent.innerHTML, /Decision Binding Contract/);
+  assert.match(ui.auditOpsContent.innerHTML, /Stable Or Replay Refs/);
   assert.match(ui.auditOpsContent.innerHTML, /Export Board/);
   assert.match(ui.auditOpsContent.innerHTML, /Investigation Workspace/);
   assert.match(ui.auditOpsContent.innerHTML, /AuditOps Action Complete/);
@@ -130,6 +210,10 @@ test("auditops page renders bounded audit event, actor activity, and decision tr
   assert.match(ui.auditOpsContent.innerHTML, /policy\.decision\.denied/);
   assert.match(ui.auditOpsContent.innerHTML, /run-20260315-001/);
   assert.match(ui.auditOpsContent.innerHTML, /approval-20260315-001/);
+  assert.match(ui.auditOpsContent.innerHTML, /network-change-aa10-001/);
+  assert.match(ui.auditOpsContent.innerHTML, /approval-receipt-aa10-001/);
+  assert.match(ui.auditOpsContent.innerHTML, /admin-receipt-aa10-001/);
+  assert.match(ui.auditOpsContent.innerHTML, /admin-rollback-aa10-001/);
   assert.match(ui.auditOpsContent.innerHTML, /decisionEvents=2/);
   assert.match(ui.auditOpsContent.innerHTML, /matched=2/);
   assert.match(ui.auditOpsContent.innerHTML, /csv=3/);

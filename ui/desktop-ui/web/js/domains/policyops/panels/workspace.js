@@ -5,6 +5,7 @@ import {
   formatTime,
   renderPanelStateMetric
 } from "../../../views/common.js";
+import { renderAimxsIdentityPostureBlock } from "../../../shared/components/aimxs-identity-posture.js";
 import {
   chipClassForPolicyEffect,
   createPolicyWorkspaceSnapshot
@@ -897,6 +898,18 @@ function renderPolicySimulationBoard(snapshot) {
   `;
 }
 
+function renderAimxsIdentityPostureEchoBoard(snapshot) {
+  return `
+    <article class="metric policyops-card policyops-card-wide" data-domain-root="policyops" data-policyops-panel="aimxs-identity-posture-echo">
+      <div class="metric-title-row">
+        <div class="title">AIMXS Identity And Posture Echo</div>
+        <span class="chip chip-neutral chip-compact">read-only</span>
+      </div>
+      ${renderAimxsIdentityPostureBlock(snapshot.aimxsIdentityPosture)}
+    </article>
+  `;
+}
+
 export function renderPolicyWorkspace(context = {}) {
   const snapshot = createPolicyWorkspaceSnapshot(context);
   return `
@@ -913,6 +926,7 @@ export function renderPolicyWorkspace(context = {}) {
       <div class="policyops-primary-grid">
         ${renderCurrentPolicyContractPanel(snapshot.settings)}
         ${renderDecisionExplanationBoard(snapshot)}
+        ${renderAimxsIdentityPostureEchoBoard(snapshot)}
         ${renderPolicyCoverageBoard(snapshot)}
         ${renderPolicySimulationBoard(snapshot)}
         ${renderPolicyPackCatalogPanel(snapshot.settings)}

@@ -1,4 +1,4 @@
-import { displayPolicyProviderLabel } from "../../views/common.js";
+import { displayAimxsModeLabel, displayPolicyProviderLabel } from "../../views/common.js";
 import { createIdentityWorkspaceSnapshot } from "../identityops/state.js";
 
 function readObject(value) {
@@ -141,6 +141,20 @@ function summarizePolicy(runs = {}, settings = {}) {
       const decision = String(item?.policyDecision || "").trim().toUpperCase();
       return decision === "DENY" || decision === "DEFER";
     }).length
+  };
+}
+
+function summarizeAimxsPath(settings = {}, policy = {}) {
+  const aimxs = readObject(settings?.aimxs);
+  const activation = readObject(aimxs?.activation);
+  const mode = String(activation?.activeMode || aimxs?.mode || "oss-only").trim() || "oss-only";
+  const provider = displayPolicyProviderLabel(
+    activation?.selectedProviderId || activation?.selectedProviderName || policy?.provider || ""
+  );
+  return {
+    mode,
+    modeLabel: displayAimxsModeLabel(mode),
+    provider: provider || "-"
   };
 }
 
@@ -390,6 +404,140 @@ function createDomainPivots(context = {}) {
   ];
 }
 
+function createAimxsWorkflowSnapshot(context = {}) {
+  const runtime = summarizeRuntime(context.health, context.runs, context.approvals);
+  const platform = summarizePlatform(context.health, context.pipeline, context.providers);
+  const governance = summarizeGovernance(context.approvals);
+  const incidents = summarizeIncidents(context.incidentHistory, context.runs, context.approvals);
+  const policy = summarizePolicy(context.runs, context.settings);
+  const aimxsPath = summarizeAimxsPath(context.settings, policy);
+
+  let state = {
+    tone: "ok",
+    label: "execution-ready",
+    summary: "Runtime, provider route, and governance posture are clear for the next governed step.",
+    meta: `runtime=${runtime.status}; route=${platform.status}; policy=${policy.latestDecision}`,
+    next: {
+      title: "AgentOps",
+      summary: "Continue governed work from the active thread surface.",
+      meta: "Use AgentOps to continue the current thread or start the next governed task.",
+      action: "open-domain",
+      view: "agentops",
+      actionLabel: "Open AgentOps"
+    }
+  };
+
+  if (incidents.high > 0 || incidents.medium > 0) {
+    state = {
+      tone: incidents.high > 0 ? "danger" : "warn",
+      label: "incident-bound",
+      summary: `${incidents.total} active incident package${incidents.total === 1 ? "" : "s"} are shaping the governed path.`,
+      meta: `latest=${String(incidents.latest?.packageId || "no incident package loaded").trim() || "-"}; high=${incidents.high}; medium=${incidents.medium}`,
+      next: {
+        title: "IncidentOps",
+        summary: "Review the active incident package before continuing new governed work.",
+        meta: "Incident response is the most truthful next surface at the current posture.",
+        action: "open-incidentops-active",
+        actionLabel: "Open IncidentOps"
+      }
+    };
+  } else if (governance.pending > 0) {
+    state = {
+      tone: "warn",
+      label: "governance-gated",
+      summary: `${governance.pending} pending approval item${governance.pending === 1 ? "" : "s"} are gating the next governed step.`,
+      meta: `expiring=${governance.expiringSoon}; source=${governance.source}`,
+      next: {
+        title: "GovernanceOps",
+        summary: "Resolve the pending approval queue before continuing the current path.",
+        meta: "Governance is the active gate for the next AIMXS-controlled transition.",
+        action: "open-approvals-pending",
+        actionLabel: "Open Approval Queue"
+      }
+    };
+  } else if (platform.status !== "ok") {
+    state = {
+      tone: "warn",
+      label: "route-constrained",
+      summary: "Provider route or deployment readiness is not yet clear enough to treat the path as open.",
+      meta: `providers=${platform.readyProviders}/${platform.providerCount || 0}; gate=${platform.gateStatus}`,
+      next: {
+        title: "PlatformOps",
+        summary: "Review bridge, provider, and deployment posture before assuming the route is clear.",
+        meta: platform.latestGate,
+        action: "open-domain",
+        view: "platformops",
+        actionLabel: "Open PlatformOps"
+      }
+    };
+  } else if (runtime.status !== "ok" || runtime.attentionRuns > 0) {
+    state = {
+      tone: runtime.attentionRuns > 0 ? "danger" : "warn",
+      label: "runtime-constrained",
+      summary: "The current runtime posture still has active blocked or failed governed work.",
+      meta: `attention=${runtime.attentionRuns}; runs=${runtime.runCount}; pendingApprovals=${runtime.pendingApprovals}`,
+      next: {
+        title: "RuntimeOps",
+        summary: "Review the active attention runs before continuing the next governed thread.",
+        meta: runtime.detail,
+        action: "open-runs-attention",
+        actionLabel: "Open RuntimeOps"
+      }
+    };
+  } else if (policy.latestDecision === "DENY" || policy.latestDecision === "DEFER") {
+    state = {
+      tone: policy.latestDecision === "DENY" ? "danger" : "warn",
+      label: "policy-constrained",
+      summary: `The latest governed path is currently ${policy.latestDecision.toLowerCase()}ed at the policy surface.`,
+      meta: `provider=${policy.provider}; blocked=${policy.blockedCount}; packs=${policy.packCount}`,
+      next: {
+        title: "PolicyOps",
+        summary: "Review the latest policy outcome and bounded simulation before retrying or escalating.",
+        meta: `latest decision=${policy.latestDecision}`,
+        action: "open-domain",
+        view: "policyops",
+        actionLabel: "Open PolicyOps"
+      }
+    };
+  }
+
+  return {
+    summary: `${aimxsPath.modeLabel} via ${aimxsPath.provider} is the current bounded AIMXS path.`,
+    cards: [
+      {
+        id: "aimxs-path",
+        title: "Current AIMXS Path",
+        tone: platform.status === "ok" ? "ok" : "warn",
+        value: aimxsPath.provider,
+        summary: `mode=${aimxsPath.modeLabel}`,
+        meta: `route=${platform.status}; ready=${platform.readyProviders}/${platform.providerCount || 0}`,
+        action: "open-domain",
+        view: "platformops",
+        actionLabel: "Open PlatformOps"
+      },
+      {
+        id: "aimxs-governed-state",
+        title: "Governed State",
+        tone: state.tone,
+        value: state.label,
+        summary: state.summary,
+        meta: state.meta
+      },
+      {
+        id: "aimxs-next-action",
+        title: "Next Truthful Action",
+        tone: state.tone,
+        value: state.next.title,
+        summary: state.next.summary,
+        meta: state.next.meta,
+        action: state.next.action,
+        view: state.next.view,
+        actionLabel: state.next.actionLabel
+      }
+    ]
+  };
+}
+
 export function createEmptyHomeSnapshot() {
   return {
     session: {},
@@ -414,6 +562,7 @@ export function createHomeWorkspaceSnapshot(context = {}) {
     commandDashboard: {
       cards: createDashboardCards(snapshot)
     },
+    aimxsWorkflow: createAimxsWorkflowSnapshot(snapshot),
     identityAndScope: createIdentityAndScopeSnapshot(snapshot),
     attentionQueue: {
       items: createAttentionItems(snapshot)

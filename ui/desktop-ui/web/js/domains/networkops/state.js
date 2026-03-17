@@ -1,4 +1,8 @@
 import { resolveAimxsContractProfile } from "../../aimxs/state.js";
+import {
+  createAimxsRouteBoundaryField,
+  createAimxsRouteBoundaryModel
+} from "../../shared/aimxs/route-boundary.js";
 
 function normalizeString(value, fallback = "") {
   const normalized = String(value || "").trim();
@@ -551,7 +555,7 @@ export function createNetworkWorkspaceSnapshot(context = {}) {
   const selectedAdminQueueItem =
     adminQueueItems.find((item) => item.id === selectedAdminChangeId) || adminQueueItems[0] || null;
   const currentBoundaryPathOption = boundaryPathOptions[0] || null;
-  return {
+  const snapshot = {
     networkBoundary,
     endpointReachability,
     trustAndCertificate,
@@ -594,4 +598,85 @@ export function createNetworkWorkspaceSnapshot(context = {}) {
       }
     }
   };
+  snapshot.aimxsRouteBoundary = buildNetworkAimxsRouteBoundary(snapshot);
+  return snapshot;
+}
+
+function buildNetworkAimxsRouteBoundary(snapshot = {}) {
+  const boundary = snapshot?.networkBoundary || {};
+  const reachability = snapshot?.endpointReachability || {};
+  const trust = snapshot?.trustAndCertificate || {};
+  const posture = snapshot?.ingressEgressPosture || {};
+  const topology = snapshot?.connectivityTopology || {};
+  const scope = snapshot?.admin?.currentScope || {};
+  const constrained =
+    Number(scope?.errorCount || 0) > 0 ||
+    Number(scope?.degradedProviderCount || 0) > 0 ||
+    Number(scope?.trustWarningCount || 0) > 0 ||
+    Number(scope?.secureSecretMissingCount || 0) > 0;
+
+  return createAimxsRouteBoundaryModel({
+    summary:
+      "This primary AIMXS view correlates the active network route chain, trust boundary, and bounded probe surface. Later bounded network control remains closed.",
+    surfaceLabel: "primary network surface",
+    routeFields: [
+      createAimxsRouteBoundaryField("environment", boundary?.environment, true),
+      createAimxsRouteBoundaryField("mode", trust?.activeMode, true),
+      createAimxsRouteBoundaryField(
+        "provider",
+        boundary?.selectedProviderId !== "-" ? boundary?.selectedProviderId : boundary?.gatewayProviderId,
+        true
+      ),
+      createAimxsRouteBoundaryField("gateway", boundary?.gatewayProviderId, true),
+      createAimxsRouteBoundaryField("auth mode", trust?.authMode, true),
+      createAimxsRouteBoundaryField("transport", posture?.firstTransport, true),
+      createAimxsRouteBoundaryField("endpoint ref", reachability?.selectedProfileEndpointRef, true),
+      createAimxsRouteBoundaryField("policy route", posture?.latestPolicyRoute, true)
+    ].filter(Boolean),
+    currentBoundary: {
+      title: "Current Boundary",
+      badge: constrained ? "watch" : "current",
+      tone: constrained ? "warn" : "ok",
+      note: "Current boundary is derived from the loaded bounded path, selected endpoint, and the present provider and trust inputs.",
+      fields: [
+        createAimxsRouteBoundaryField("path", scope?.currentBoundaryPath, true),
+        createAimxsRouteBoundaryField("label", scope?.currentBoundaryLabel),
+        createAimxsRouteBoundaryField("route", scope?.currentBoundaryRoute, true),
+        createAimxsRouteBoundaryField("endpoint", scope?.currentBoundaryEndpoint, true),
+        createAimxsRouteBoundaryField("target scope", scope?.defaultTargetScope, true),
+        createAimxsRouteBoundaryField("boundary req", scope?.firstBoundaryRequirement, true)
+      ].filter(Boolean)
+    },
+    routePosture: {
+      title: "Route Posture",
+      badge: constrained ? "constrained" : "bounded",
+      tone: constrained ? "warn" : "ok",
+      note: "Network route posture is still bounded to probe-first visibility. No later bounded network control is opened by this slice.",
+      fields: [
+        createAimxsRouteBoundaryField("reachable endpoints", String(topology?.reachableEndpointCount || 0)),
+        createAimxsRouteBoundaryField("warn endpoints", String(reachability?.warnCount || 0)),
+        createAimxsRouteBoundaryField("error endpoints", String(reachability?.errorCount || 0)),
+        createAimxsRouteBoundaryField("ready providers", String(topology?.readyProviderCount || 0)),
+        createAimxsRouteBoundaryField("degraded providers", String(topology?.degradedProviderCount || 0)),
+        createAimxsRouteBoundaryField("fallback", scope?.directFallbackState),
+        createAimxsRouteBoundaryField("trust mode", scope?.secureMode, true),
+        createAimxsRouteBoundaryField("trust warnings", String(scope?.trustWarningCount || 0))
+      ].filter(Boolean)
+    },
+    rationale: {
+      title: "Allowed Or Constrained",
+      badge: constrained ? "constrained" : "bounded",
+      tone: constrained ? "warn" : "ok",
+      note:
+        "Later bounded network control remains closed. This slice only makes the active route, trust, and boundary chain legible for operator review.",
+      fields: [
+        createAimxsRouteBoundaryField("provider detail", boundary?.providersDetail),
+        createAimxsRouteBoundaryField("secure secrets missing", String(trust?.secureSecretMissingCount || 0)),
+        createAimxsRouteBoundaryField("first transport", posture?.firstTransport, true),
+        createAimxsRouteBoundaryField("policy route", posture?.latestPolicyRoute, true),
+        createAimxsRouteBoundaryField("desktop route", posture?.latestDesktopRoute, true),
+        createAimxsRouteBoundaryField("boundary count", String(boundary?.boundaryRequirementCount || 0))
+      ].filter(Boolean)
+    }
+  });
 }

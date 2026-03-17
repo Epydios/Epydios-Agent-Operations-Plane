@@ -47,6 +47,7 @@ test("homeops page renders command dashboard, attention queue, and domain pivot 
         }
       },
       aimxs: {
+        mode: "aimxs-full",
         activation: {
           selectedProviderId: "aimxs-policy-primary"
         }
@@ -112,6 +113,7 @@ test("homeops page renders command dashboard, attention queue, and domain pivot 
 
   assert.match(ui.homeOpsContent.innerHTML, /data-domain-root="homeops"/);
   assert.match(ui.homeOpsContent.innerHTML, /Command Dashboard/);
+  assert.match(ui.homeOpsContent.innerHTML, /AIMXS Posture And Readiness/);
   assert.match(ui.homeOpsContent.innerHTML, /Attention Queue/);
   assert.match(ui.homeOpsContent.innerHTML, /Identity And Scope Snapshot/);
   assert.match(ui.homeOpsContent.innerHTML, /Domain Pivot Row/);
@@ -123,6 +125,10 @@ test("homeops page renders command dashboard, attention queue, and domain pivot 
   assert.match(ui.homeOpsContent.innerHTML, /2 runs/);
   assert.match(ui.homeOpsContent.innerHTML, /2\/3 ready/);
   assert.match(ui.homeOpsContent.innerHTML, /aimxs-policy-primary/);
+  assert.match(ui.homeOpsContent.innerHTML, /mode=aimxs-full/);
+  assert.match(ui.homeOpsContent.innerHTML, /incident-bound/);
+  assert.match(ui.homeOpsContent.innerHTML, /Next Truthful Action/);
+  assert.match(ui.homeOpsContent.innerHTML, /Open IncidentOps/);
   assert.match(ui.homeOpsContent.innerHTML, /blocked=1/);
   assert.match(ui.homeOpsContent.innerHTML, /1 pending/);
   assert.match(ui.homeOpsContent.innerHTML, /1 active/);

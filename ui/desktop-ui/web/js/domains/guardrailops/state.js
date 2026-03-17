@@ -1,3 +1,8 @@
+import {
+  createAimxsField,
+  createAimxsIdentityPostureModel
+} from "../../shared/aimxs/identity-posture.js";
+
 function normalizeString(value, fallback = "") {
   const normalized = String(value || "").trim();
   return normalized || fallback;
@@ -507,7 +512,7 @@ export function createGuardrailWorkspaceSnapshot(context = {}) {
   const selectedAdminQueueItem =
     adminQueueItems.find((item) => item.id === selectedAdminChangeId) || adminQueueItems[0] || null;
 
-  return {
+  const snapshot = {
     guardrailPosture: {
       available: Boolean(latestRun?.runId || latestApproval?.approvalId || terminalMode),
       terminalMode,
@@ -691,4 +696,105 @@ export function createGuardrailWorkspaceSnapshot(context = {}) {
       }
     }
   };
+  snapshot.aimxsIdentityPosture = buildGuardrailAimxsIdentityPosture(snapshot);
+  return snapshot;
+}
+
+function guardrailAimxsTone(value = "") {
+  const normalized = normalizeString(value).toLowerCase();
+  if (["allow", "allowed", "applied", "current", "governed", "ok", "ready", "rolled_back"].includes(normalized)) {
+    return "ok";
+  }
+  if (["blocked", "deny", "denied", "failed", "hard_stop"].includes(normalized)) {
+    return "danger";
+  }
+  if (["approval_required", "pending", "review", "routed", "simulated", "tighten", "warn", "watch"].includes(normalized)) {
+    return "warn";
+  }
+  return "neutral";
+}
+
+function buildGuardrailAimxsIdentityPosture(snapshot = {}) {
+  const posture = snapshot?.guardrailPosture || {};
+  const gates = snapshot?.executionGates || {};
+  const killSwitch = snapshot?.killSwitch || {};
+  const admin = snapshot?.admin || {};
+  const selectedItem = admin?.selectedQueueItem || null;
+  const draft = admin?.draft || {};
+  const simulation = admin?.latestSimulation || null;
+  const currentBadge =
+    killSwitch?.policyBlockedPresent
+      ? "blocked"
+      : gates?.pendingApprovalCount > 0 || killSwitch?.currentHardStopCount > 0
+        ? "watch"
+        : "current";
+  const targetBadge = normalizeString(selectedItem?.status, selectedItem ? "watch" : draft?.proposedState || "draft").toLowerCase();
+  const rationaleBadge = normalizeString(selectedItem?.decision?.status, targetBadge);
+  const delegationBasis =
+    snapshot?.breakGlassPosture?.breakGlassGateCount > 0
+      ? "break-glass governed"
+      : gates?.pendingApprovalCount > 0
+        ? "scope_guard + approval_required"
+        : "bounded execution guard";
+  const rationaleSummary = normalizeString(
+    simulation?.summary ||
+      selectedItem?.decision?.reason ||
+      selectedItem?.reason,
+    "The next posture remains bounded by guardrail dry-run findings until GovernanceOps records an explicit approval."
+  );
+
+  return createAimxsIdentityPostureModel({
+    summary:
+      "Current guardrail posture and the next bounded execution posture are shown together so operators can see why a change is allowed, pending, or blocked.",
+    surfaceLabel: "primary owner surface",
+    identityFields: [
+      createAimxsField("identity class", "desktop execution posture"),
+      createAimxsField("governed surface", selectedItem?.executionProfile || posture?.latestExecutionProfile || "-", true),
+      createAimxsField("authority tier", gates?.latestApprovalTier ? `tier_${gates.latestApprovalTier}` : "scope_guard"),
+      createAimxsField("authority basis", gates?.pendingApprovalCount > 0 ? "approval gate + runtime policy" : "runtime policy gate"),
+      createAimxsField("delegation basis", delegationBasis),
+      createAimxsField("grant basis", gates?.latestGrantTokenPresent ? "grant token present" : "grant token pending"),
+      createAimxsField("assurance posture", killSwitch?.restrictedHostBlocked ? "restricted host blocked" : "sandbox-bound"),
+      createAimxsField(
+        "anomaly posture",
+        killSwitch?.currentHardStopCount > 0 ? `${killSwitch.currentHardStopCount} hard-stop signals` : "no anomaly flag loaded"
+      )
+    ].filter(Boolean),
+    currentPosture: {
+      badge: currentBadge,
+      tone: guardrailAimxsTone(currentBadge),
+      note: "Current posture is derived from the loaded guardrail profile, live approval gates, and the bounded execution-stop inventory.",
+      fields: [
+        createAimxsField("current posture", gates?.pendingApprovalCount > 0 ? "approval required" : posture?.terminalMode || "governed"),
+        createAimxsField("scope", `${posture?.latestRunTenant || "-"} / ${posture?.latestRunProject || "-"}`, true),
+        createAimxsField("latest decision", posture?.latestDecision || "-"),
+        createAimxsField("latest approval", gates?.latestApprovalId || "-", Boolean(gates?.latestApprovalId)),
+        createAimxsField("hard-stop inventory", String(killSwitch?.currentHardStopCount || 0))
+      ].filter(Boolean)
+    },
+    targetPosture: {
+      badge: targetBadge,
+      tone: guardrailAimxsTone(targetBadge),
+      note:
+        normalizeString(selectedItem?.summary) ||
+        `Target guardrail posture is ${draft?.proposedState || "draft"} for ${draft?.targetScope || admin?.currentScope?.targetScope || "workspace"}.`,
+      fields: [
+        createAimxsField("target posture", draft?.proposedState || selectedItem?.proposedState || "draft"),
+        createAimxsField("execution profile", draft?.executionProfile || selectedItem?.executionProfile || posture?.latestExecutionProfile || "-", true),
+        createAimxsField("safety boundary", draft?.safetyBoundary || selectedItem?.safetyBoundary || admin?.currentScope?.safetyBoundary || "-", true),
+        createAimxsField("target scope", draft?.targetScope || selectedItem?.targetScope || admin?.currentScope?.targetScope || "-", true),
+        createAimxsField("requested action", selectedItem?.requestedAction || "")
+      ].filter(Boolean)
+    },
+    rationale: {
+      badge: rationaleBadge,
+      tone: guardrailAimxsTone(rationaleBadge),
+      note: rationaleSummary,
+      fields: [
+        createAimxsField("guardrail finding", simulation?.findings?.[0] || selectedItem?.simulationSummary || ""),
+        createAimxsField("approval gate", gates?.latestApprovalId || (gates?.pendingApprovalCount > 0 ? "pending approval" : "clear"), Boolean(gates?.latestApprovalId)),
+        createAimxsField("boundary reason", admin?.currentScope?.safetyBoundary || selectedItem?.safetyBoundary || "", true)
+      ].filter(Boolean)
+    }
+  });
 }

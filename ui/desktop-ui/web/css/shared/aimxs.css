@@ -1,0 +1,383 @@
+.aimxs-legibility-shell {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.aimxs-section {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.aimxs-section + .aimxs-section {
+  padding-top: var(--space-2);
+  border-top: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
+}
+
+.aimxs-section-title {
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.aimxs-lifecycle-ribbon {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: var(--space-2);
+}
+
+.aimxs-stage {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: var(--space-2);
+  border: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
+  border-radius: var(--radius-2);
+  background: color-mix(in srgb, var(--surface) 90%, var(--panel));
+}
+
+.aimxs-stage-ok {
+  border-color: color-mix(in srgb, var(--ok) 35%, var(--line));
+  background: color-mix(in srgb, var(--chip-ok-bg) 72%, var(--surface));
+}
+
+.aimxs-stage-warn {
+  border-color: color-mix(in srgb, var(--warn) 35%, var(--line));
+  background: color-mix(in srgb, var(--chip-warn-bg) 68%, var(--surface));
+}
+
+.aimxs-stage-danger {
+  border-color: color-mix(in srgb, var(--danger) 35%, var(--line));
+  background: color-mix(in srgb, var(--chip-danger-bg) 68%, var(--surface));
+}
+
+.aimxs-stage-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.aimxs-stage-label {
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.aimxs-stage-state {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.12rem 0.42rem;
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-2xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+  background: var(--chip-neutral-bg);
+  color: var(--ink-soft);
+}
+
+.aimxs-stage-state-ok {
+  border-color: var(--chip-ok-line);
+  background: var(--chip-ok-bg);
+  color: var(--ok);
+}
+
+.aimxs-stage-state-warn {
+  border-color: var(--chip-warn-line);
+  background: var(--chip-warn-bg);
+  color: var(--warn);
+}
+
+.aimxs-stage-state-danger {
+  border-color: var(--chip-danger-line);
+  background: var(--chip-danger-bg);
+  color: var(--danger);
+}
+
+.aimxs-stage-value,
+.aimxs-stage-note,
+.aimxs-binding-value,
+.aimxs-ref-value,
+.aimxs-summary {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.aimxs-stage-value {
+  font-size: var(--font-size-sm);
+  color: var(--ink);
+}
+
+.aimxs-stage-value-code code,
+.aimxs-binding-value-code code,
+.aimxs-ref-value-code code {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+}
+
+.aimxs-stage-note {
+  font-size: var(--font-size-xs);
+  color: var(--ink-soft);
+}
+
+.aimxs-binding-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: var(--space-2);
+}
+
+.aimxs-binding-item {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
+  border-radius: var(--radius-2);
+  background: color-mix(in srgb, var(--surface) 90%, var(--panel));
+}
+
+.aimxs-binding-label {
+  font-size: var(--font-size-2xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.aimxs-binding-value {
+  font-size: var(--font-size-sm);
+  color: var(--ink);
+}
+
+.aimxs-ref-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.aimxs-ref-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  padding: 0.32rem 0.55rem;
+  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--surface) 90%, var(--panel));
+}
+
+.aimxs-ref-pill-stable,
+.aimxs-ref-pill-replay {
+  border-color: color-mix(in srgb, var(--primary) 28%, var(--line));
+  background: color-mix(in srgb, var(--primary-bg) 18%, var(--surface));
+}
+
+.aimxs-ref-pill-receipt,
+.aimxs-ref-pill-recovery {
+  border-color: color-mix(in srgb, var(--ok) 28%, var(--line));
+}
+
+.aimxs-ref-pill-evidence {
+  border-color: color-mix(in srgb, var(--warn) 28%, var(--line));
+}
+
+.aimxs-ref-label {
+  font-size: var(--font-size-2xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.aimxs-ref-value {
+  font-size: var(--font-size-sm);
+  color: var(--ink);
+}
+
+.aimxs-summary {
+  font-size: var(--font-size-sm);
+  color: var(--ink-soft);
+}
+
+.aimxs-posture-shell {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.aimxs-posture-summary,
+.aimxs-posture-surface {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.aimxs-posture-summary {
+  font-size: var(--font-size-sm);
+  color: var(--ink-soft);
+}
+
+.aimxs-posture-surface {
+  font-size: var(--font-size-2xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.aimxs-posture-section {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.aimxs-posture-section + .aimxs-posture-section {
+  padding-top: var(--space-2);
+  border-top: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
+}
+
+.aimxs-posture-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.aimxs-posture-title {
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.aimxs-posture-state {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.12rem 0.42rem;
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-2xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+  background: var(--chip-neutral-bg);
+  color: var(--ink-soft);
+}
+
+.aimxs-posture-state-ok {
+  border-color: var(--chip-ok-line);
+  background: var(--chip-ok-bg);
+  color: var(--ok);
+}
+
+.aimxs-posture-state-warn {
+  border-color: var(--chip-warn-line);
+  background: var(--chip-warn-bg);
+  color: var(--warn);
+}
+
+.aimxs-posture-state-danger {
+  border-color: var(--chip-danger-line);
+  background: var(--chip-danger-bg);
+  color: var(--danger);
+}
+
+.aimxs-posture-note {
+  font-size: var(--font-size-sm);
+  color: var(--ink-soft);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.aimxs-empty {
+  font-size: var(--font-size-sm);
+  color: var(--ink-soft);
+}
+
+.aimxs-spine-shell {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.aimxs-spine-topline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.aimxs-spine-grid {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.aimxs-spine-section {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.aimxs-spine-section + .aimxs-spine-section {
+  padding-top: var(--space-2);
+  border-top: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
+}
+
+.aimxs-spine-section-title {
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.aimxs-spine-chain-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: var(--space-2);
+}
+
+.aimxs-spine-chain-item {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: var(--space-2);
+  border: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
+  border-radius: var(--radius-2);
+  background: color-mix(in srgb, var(--surface) 90%, var(--panel));
+}
+
+.aimxs-spine-chain-item-ok {
+  border-color: color-mix(in srgb, var(--ok) 28%, var(--line));
+}
+
+.aimxs-spine-chain-item-warn {
+  border-color: color-mix(in srgb, var(--warn) 28%, var(--line));
+}
+
+.aimxs-spine-chain-item-danger {
+  border-color: color-mix(in srgb, var(--danger) 28%, var(--line));
+}
+
+.aimxs-spine-chain-label {
+  font-size: var(--font-size-2xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.aimxs-spine-chain-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: var(--font-size-sm);
+  color: var(--ink);
+}
+
+.aimxs-spine-chain-value-code code {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+}
+
+.aimxs-spine-pivot-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}

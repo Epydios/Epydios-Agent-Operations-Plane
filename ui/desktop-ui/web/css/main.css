@@ -2,6 +2,7 @@
 @import "./shell/nav.css";
 @import "./shell/layout.css";
 @import "./shared/primitives.css";
+@import "./shared/aimxs.css";
 @import "./domains/homeops/dashboard.css";
 @import "./domains/agentops/workspace.css";
 @import "./domains/governanceops/approval-trace.css";

@@ -1,3 +1,9 @@
+import {
+  createAimxsField,
+  createAimxsIdentityPostureModel,
+  inferAimxsAuthorityTierFromRoles
+} from "../../shared/aimxs/identity-posture.js";
+
 export function resolveAuthSummaryState(session = {}) {
   if (session.authenticated) {
     return {
@@ -291,7 +297,7 @@ export function createIdentityWorkspaceSnapshot(settings = {}, session = {}) {
   const selectedAdminQueueItem =
     adminQueueItems.find((item) => item.id === adminSelectedChangeId) || adminQueueItems[0] || null;
 
-  return {
+  const snapshot = {
     runtimeIdentity,
     identitySummary,
     authenticated,
@@ -372,4 +378,118 @@ export function createIdentityWorkspaceSnapshot(settings = {}, session = {}) {
     effectivePermissions,
     claimKeys
   };
+  snapshot.aimxsIdentityPosture = buildIdentityAimxsIdentityPosture(snapshot);
+  return snapshot;
+}
+
+function identityAimxsPostureTone(status = "") {
+  const normalized = String(status || "").trim().toLowerCase();
+  if (!normalized) {
+    return "neutral";
+  }
+  if (["approved", "applied", "authenticated", "current", "issued", "linked"].includes(normalized)) {
+    return "ok";
+  }
+  if (["blocked", "denied", "error", "failed", "unresolved", "unauthenticated"].includes(normalized)) {
+    return "danger";
+  }
+  if (["deferred", "draft", "escalated", "pending", "review", "routed", "simulated", "watch"].includes(normalized)) {
+    return "warn";
+  }
+  return "neutral";
+}
+
+function identityAimxsBadge(status = "", fallback = "watch") {
+  const normalized = String(status || "").trim().toLowerCase();
+  return normalized || fallback;
+}
+
+function buildIdentityAimxsIdentityPosture(snapshot = {}) {
+  const selectedItem = snapshot?.admin?.selectedQueueItem || null;
+  const simulation = snapshot?.admin?.latestSimulation || null;
+  const authorityDraft = snapshot?.admin?.authorityDraft || {};
+  const grantDraft = snapshot?.admin?.grantDraft || {};
+  const roles = Array.isArray(snapshot?.roles) ? snapshot.roles : [];
+  const currentAuthorityTier = inferAimxsAuthorityTierFromRoles(roles, snapshot?.authenticated ? "workspace_operator" : "unresolved");
+  const currentScope = [snapshot?.tenantIds?.[0], snapshot?.projectIds?.[0]].filter(Boolean).join(" / ") || snapshot?.environment || "workspace";
+  const delegationBasis =
+    selectedItem?.kind === "grant"
+      ? String(grantDraft?.delegationMode || "governed").trim()
+      : snapshot?.policyMatrixRequired
+        ? "governance-backed claims"
+        : "direct claim scope";
+  const grantBasis = snapshot?.traceLatestRun?.policyGrantTokenPresent ? "grant token present" : "grant token pending";
+  const currentPostureBadge = snapshot?.authenticated ? "current" : "unresolved";
+  const targetKind = String(selectedItem?.kind || "draft").trim().toLowerCase();
+  const targetBadge = identityAimxsBadge(selectedItem?.status || simulation?.kind, selectedItem ? "watch" : "draft");
+  const targetSummary =
+    targetKind === "authority"
+      ? `Set authority tier ${authorityDraft?.authorityTier || "workspace_operator"} for ${authorityDraft?.targetScope || currentScope}.`
+      : targetKind === "grant"
+        ? `${grantDraft?.changeKind || "issue"} ${grantDraft?.grantKey || "grant"} using ${grantDraft?.delegationMode || "governed"} delegation.`
+        : "Bounded identity change draft remains proposal-only until governance approval exists.";
+  const rationaleBadge = identityAimxsBadge(
+    selectedItem?.decision?.status || selectedItem?.status,
+    snapshot?.authenticated ? "watch" : "blocked"
+  );
+  const rationaleSummary =
+    String(
+      simulation?.summary ||
+        selectedItem?.decision?.reason ||
+        selectedItem?.reason ||
+        "A bounded governance review is required before any live identity mutation can proceed."
+    ).trim();
+  const rationaleItems = [
+    createAimxsField("governance gate", selectedItem?.decision?.approvalReceiptId || snapshot?.traceLatestApproval?.approvalId || "required", Boolean(selectedItem?.decision?.approvalReceiptId || snapshot?.traceLatestApproval?.approvalId)),
+    createAimxsField("latest finding", simulation?.findings?.[0] || selectedItem?.summary || ""),
+    createAimxsField("trace anchor", snapshot?.traceLatestRun?.runId || snapshot?.traceLatestAudit?.event || "", Boolean(snapshot?.traceLatestRun?.runId || snapshot?.traceLatestAudit?.event))
+  ].filter(Boolean);
+
+  return createAimxsIdentityPostureModel({
+    summary:
+      "Bounded AIMXS identity posture links the current runtime-bound subject to the next authority or delegation posture without opening new write controls.",
+    surfaceLabel: "primary owner surface",
+    identityFields: [
+      createAimxsField("identity class", snapshot?.authenticated ? "runtime-bound subject" : "identity unresolved"),
+      createAimxsField("subject", snapshot?.subject, true),
+      createAimxsField("client", snapshot?.clientId, true),
+      createAimxsField("authority tier", currentAuthorityTier),
+      createAimxsField("authority basis", snapshot?.authorityBasis || "unresolved", true),
+      createAimxsField("delegation basis", delegationBasis),
+      createAimxsField("grant basis", grantBasis),
+      createAimxsField("assurance posture", snapshot?.authenticated ? "session authenticated" : "identity unresolved"),
+      createAimxsField("anomaly posture", snapshot?.traceApprovalCount > snapshot?.traceRunCount ? "approval-heavy" : "no anomaly flag loaded")
+    ].filter(Boolean),
+    currentPosture: {
+      badge: currentPostureBadge,
+      tone: identityAimxsPostureTone(currentPostureBadge),
+      note: "Current posture is derived from runtime identity, the latest approval anchor, and the bounded audit trace.",
+      fields: [
+        createAimxsField("current posture", snapshot?.policyMatrixRequired ? "governance-backed identity" : "direct claim scope"),
+        createAimxsField("scope", currentScope, true),
+        createAimxsField("latest run", snapshot?.traceLatestRun?.runId, true),
+        createAimxsField("latest approval", snapshot?.traceLatestApproval?.approvalId, true),
+        createAimxsField("latest audit", snapshot?.traceLatestAudit?.event, true)
+      ].filter(Boolean)
+    },
+    targetPosture: {
+      badge: targetBadge,
+      tone: identityAimxsPostureTone(targetBadge),
+      note: targetSummary,
+      fields: [
+        createAimxsField("target posture", targetKind === "authority" ? "authority tier transition" : targetKind === "grant" ? "grant or delegation transition" : "bounded identity draft"),
+        createAimxsField("target authority", targetKind === "authority" ? authorityDraft?.authorityTier : ""),
+        createAimxsField("target grant", targetKind === "grant" ? grantDraft?.grantKey : "", true),
+        createAimxsField("target delegation", targetKind === "grant" ? grantDraft?.delegationMode : ""),
+        createAimxsField("target scope", selectedItem?.targetScope || authorityDraft?.targetScope || grantDraft?.targetScope || currentScope, true),
+        createAimxsField("requested action", selectedItem?.requestedAction || "")
+      ].filter(Boolean)
+    },
+    rationale: {
+      badge: rationaleBadge,
+      tone: identityAimxsPostureTone(rationaleBadge),
+      note: rationaleSummary,
+      fields: rationaleItems
+    }
+  });
 }

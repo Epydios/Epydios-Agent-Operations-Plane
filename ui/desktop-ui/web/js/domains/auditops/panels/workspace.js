@@ -4,6 +4,8 @@ import {
   formatTime,
   renderPanelStateMetric
 } from "../../../views/common.js";
+import { renderAimxsLegibilityBlock } from "../../../shared/components/aimxs-legibility.js";
+import { renderAimxsDecisionBindingSpine } from "../../../shared/components/aimxs-decision-binding-spine.js";
 import { createAuditWorkspaceSnapshot } from "../state.js";
 
 function chipClassForTone(value) {
@@ -339,6 +341,87 @@ function renderDecisionTraceBoard(snapshot) {
   `;
 }
 
+function renderAimxsDecisionBindingSpineBoard(snapshot) {
+  const board = snapshot.aimxsDecisionBindingSpine;
+  if (!board?.available) {
+    return "";
+  }
+  return `
+    <article class="metric auditops-card" data-domain-root="auditops" data-auditops-panel="aimxs-decision-binding-spine">
+      <div class="metric-title-row">
+        <div class="title">AIMXS Decision-Binding Spine</div>
+        <span class="chip chip-neutral chip-compact">correlated</span>
+      </div>
+      ${renderAimxsDecisionBindingSpine(board)}
+    </article>
+  `;
+}
+
+function renderAdminLifecycleBoard(snapshot) {
+  const board = snapshot.adminLifecycleBoard;
+  const latest = board.latestItem || {};
+  const rows = [
+    {
+      label: "Coverage",
+      value: renderValuePills([
+        { label: "queued", value: String(board.totalCount) },
+        { label: "simulated", value: String(board.simulatedCount) },
+        { label: "decided", value: String(board.decisionCount) },
+        { label: "executed", value: String(board.executionCount) },
+        { label: "recovered", value: String(board.recoveryCount) }
+      ])
+    },
+    {
+      label: "Latest Admin Trace",
+      value: renderValuePills([
+        { label: "change", value: latest.id, code: true },
+        { label: "owner", value: latest.ownerDomain, code: true },
+        { label: "action", value: latest.requestedAction },
+        { label: "status", value: latest.status }
+      ])
+    },
+    {
+      label: "Lifecycle Chain",
+      value: renderValuePills([
+        { label: "simulated", value: latest.simulatedAt ? formatTime(latest.simulatedAt) : "-" },
+        { label: "decision", value: latest.decision?.decisionId, code: true },
+        { label: "approval", value: latest.decision?.approvalReceiptId, code: true },
+        { label: "execution", value: latest.execution?.executionId, code: true },
+        { label: "receipt", value: latest.receipt?.receiptId, code: true },
+        { label: "recovery", value: latest.recovery?.recoveryId, code: true }
+      ])
+    },
+    {
+      label: "Bounded Scope",
+      value: renderValuePills([
+        { label: "subject", value: latest.subjectId, code: true },
+        { label: "scope", value: latest.targetScope, code: true },
+        { label: "reason", value: latest.reason },
+        { label: "summary", value: latest.summary }
+      ])
+    },
+    {
+      label: "Top Owners",
+      value: renderValuePills((board.ownerMix || []).map((item) => ({ label: item.value, value: String(item.count), code: true })))
+    }
+  ];
+  return `
+    <article class="metric auditops-card" data-domain-root="auditops" data-auditops-panel="admin-lifecycle-board">
+      <div class="metric-title-row">
+        <div class="title">Admin Lifecycle Trace</div>
+        <span class="${chipClassForTone(board.tone)}">${escapeHTML(board.tone)}</span>
+      </div>
+      <div class="auditops-chip-row">
+        <span class="chip chip-neutral chip-compact">queued=${escapeHTML(String(board.totalCount))}</span>
+        <span class="chip chip-neutral chip-compact">executed=${escapeHTML(String(board.executionCount))}</span>
+        <span class="chip chip-neutral chip-compact">recovered=${escapeHTML(String(board.recoveryCount))}</span>
+      </div>
+      <div class="auditops-kv-list">${renderKeyValueRows(rows)}</div>
+      ${renderAimxsLegibilityBlock(board.aimxsLegibility)}
+    </article>
+  `;
+}
+
 function renderExportBoard(snapshot) {
   const board = snapshot.exportBoard;
   const rows = [
@@ -477,9 +560,11 @@ export function renderAuditWorkspace(context = {}) {
   return `
     <div class="stack auditops-workspace" data-domain-root="auditops">
       ${renderFeedbackPanel(snapshot)}
+      ${renderAimxsDecisionBindingSpineBoard(snapshot)}
       ${renderAuditEventBoard(snapshot)}
       ${renderActorActivityBoard(snapshot)}
       ${renderDecisionTraceBoard(snapshot)}
+      ${renderAdminLifecycleBoard(snapshot)}
       ${renderExportBoard(snapshot)}
       ${renderInvestigationWorkspace(snapshot)}
     </div>

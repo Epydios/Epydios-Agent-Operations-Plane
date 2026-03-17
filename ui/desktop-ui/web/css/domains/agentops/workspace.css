@@ -17,6 +17,7 @@
 }
 
 .agentops-thread-summary,
+.agentops-thread-flow,
 .agentops-thread-heading,
 .agentops-thread-fields,
 .agentops-transcript-summary-grid,
@@ -83,6 +84,58 @@
 
 .agentops-context-drawer {
   align-content: start;
+}
+
+.agentops-thread-flow {
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+  border-radius: var(--radius-2);
+  background: color-mix(in srgb, var(--surface) 90%, var(--panel));
+}
+
+.agentops-flow-ribbon {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  gap: var(--space-2);
+}
+
+.agentops-flow-stage {
+  display: grid;
+  gap: 0.15rem;
+  padding: var(--space-2);
+  border-radius: var(--radius-2);
+  border: 1px solid color-mix(in srgb, var(--line) 76%, transparent);
+  background: color-mix(in srgb, var(--surface) 92%, var(--panel));
+}
+
+.agentops-flow-stage-ok {
+  border-color: color-mix(in srgb, var(--success) 42%, var(--line));
+}
+
+.agentops-flow-stage-warn {
+  border-color: color-mix(in srgb, var(--warning) 45%, var(--line));
+}
+
+.agentops-flow-stage-danger {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--line));
+}
+
+.agentops-flow-stage-label {
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+}
+
+.agentops-flow-stage-state {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.agentops-workflow-next {
+  display: grid;
+  gap: var(--space-2);
 }
 
 .agentops-context-panel {

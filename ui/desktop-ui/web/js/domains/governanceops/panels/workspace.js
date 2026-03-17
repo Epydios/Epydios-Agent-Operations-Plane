@@ -1,4 +1,6 @@
 import { escapeHTML, renderPanelStateMetric } from "../../../views/common.js";
+import { renderAimxsLegibilityBlock } from "../../../shared/components/aimxs-legibility.js";
+import { renderAimxsDecisionBindingSpine } from "../../../shared/components/aimxs-decision-binding-spine.js";
 import {
   createGovernanceWorkspaceSnapshot,
   governanceStatusChipClass,
@@ -73,6 +75,22 @@ function renderOperationalFeedback(snapshot) {
     <div class="governanceops-feedback-shell" data-governanceops-panel="operational-feedback">
       ${renderPanelStateMetric(tone, title, feedback.message)}
     </div>
+  `;
+}
+
+function renderAimxsDecisionBindingSpineBoard(snapshot) {
+  const board = snapshot.aimxsDecisionBindingSpine;
+  if (!board?.available) {
+    return "";
+  }
+  return `
+    <article class="metric governanceops-card governanceops-card-wide" data-domain-root="governanceops" data-governanceops-panel="aimxs-decision-binding-spine">
+      <div class="metric-title-row">
+        <div class="title">AIMXS Decision-Binding Spine</div>
+        <span class="chip chip-neutral chip-compact">correlated</span>
+      </div>
+      ${renderAimxsDecisionBindingSpine(board)}
+    </article>
   `;
 }
 
@@ -212,6 +230,7 @@ function renderAdminProposalReviewBoard(snapshot) {
         ${board.decision?.approvalReceiptId && board.decision.approvalReceiptId !== "-" ? '<span class="chip chip-ok chip-compact">receipt issued</span>' : '<span class="chip chip-neutral chip-compact">receipt pending</span>'}
       </div>
       <div class="governanceops-kv-list">${renderKeyValueRows(rows)}</div>
+      ${renderAimxsLegibilityBlock(board.aimxsLegibility)}
       <div class="governanceops-action-layout">
         <label class="field governanceops-reason-field">
           <span class="label">Admin Decision Reason</span>
@@ -836,6 +855,7 @@ export function renderGovernanceWorkspace(context = {}) {
   return `
     <section class="governanceops-workspace" data-domain-root="governanceops">
       ${renderOperationalFeedback(snapshot)}
+      ${renderAimxsDecisionBindingSpineBoard(snapshot)}
       ${renderAdminProposalReviewBoard(snapshot)}
       ${renderActionReviewBoard(snapshot)}
       <div class="governanceops-primary-grid">

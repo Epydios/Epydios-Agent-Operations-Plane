@@ -4,6 +4,7 @@ import {
   renderIncidentOpsEmptyState,
   renderIncidentOpsPage
 } from "../domains/incidentops/routes.js";
+import { createAimxsDecisionBindingSpine } from "../shared/aimxs/decision-binding.js";
 
 test("incidentops page renders bounded queue, active incident, severity, timeline, and closure boards", () => {
   const ui = { incidentOpsContent: { innerHTML: "" } };
@@ -83,7 +84,35 @@ test("incidentops page renders bounded queue, active incident, severity, timelin
         tone: "ok",
         message: "IncidentOps action feedback is visible."
       }
-    }
+    },
+    aimxsDecisionBindingSpine: createAimxsDecisionBindingSpine({
+      activeDomain: "incidentops",
+      sourceLabel: "correlated run",
+      correlationRef: "run-20260315-001",
+      runId: "run-20260315-001",
+      approvalId: "approval-20260315-001",
+      incidentEntryId: "incident-history-001",
+      actorRef: "demo.operator",
+      subjectRef: "incident-20260315T011900Z-run-20260315-001",
+      authorityRef: "codex",
+      authorityBasis: "bearer_token_jwt",
+      scopeRef: "tenant-demo / project-core",
+      providerRef: "aimxs-policy-primary",
+      routeRef: "managed_codex_worker",
+      boundaryRef: "agentops_gateway",
+      grantRef: "approval-20260315-001",
+      decisionStatus: "DENY",
+      receiptRef: "approval-receipt-incident-001",
+      stableRef: "incident-20260315T011900Z-run-20260315-001",
+      incidentPackageId: "incident-20260315T011900Z-run-20260315-001",
+      incidentStatus: "filed",
+      replayRef: "run-20260315-001",
+      sessionRef: "session-20260315-001",
+      taskRef: "task-20260315-001",
+      evidenceRefs: ["evidence://incident/run-20260315-001"],
+      auditRefs: ["incident.package.filed@2026-03-15T01:21:00Z"],
+      summary: "Incident traceability for the correlated governed run."
+    })
   });
 
   assert.match(ui.incidentOpsContent.innerHTML, /data-domain-root="incidentops"/);
@@ -93,6 +122,13 @@ test("incidentops page renders bounded queue, active incident, severity, timelin
   assert.match(ui.incidentOpsContent.innerHTML, /Severity Board/);
   assert.match(ui.incidentOpsContent.innerHTML, /Response Timeline Board/);
   assert.match(ui.incidentOpsContent.innerHTML, /Closure Board/);
+  assert.match(ui.incidentOpsContent.innerHTML, /AIMXS Decision-Binding Spine/);
+  assert.match(ui.incidentOpsContent.innerHTML, /Authority Chain/);
+  assert.match(ui.incidentOpsContent.innerHTML, /Grant Chain/);
+  assert.match(ui.incidentOpsContent.innerHTML, /Receipt Chain/);
+  assert.match(ui.incidentOpsContent.innerHTML, /Replay Chain/);
+  assert.match(ui.incidentOpsContent.innerHTML, /Evidence Chain/);
+  assert.match(ui.incidentOpsContent.innerHTML, /data-aimxs-spine-action="open-workspace"/);
   assert.match(ui.incidentOpsContent.innerHTML, /incident-20260315T011900Z-run-20260315-001/);
   assert.match(ui.incidentOpsContent.innerHTML, /tenant-demo\/project-core/);
   assert.match(ui.incidentOpsContent.innerHTML, /run-20260315-001/);

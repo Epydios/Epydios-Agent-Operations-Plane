@@ -161,6 +161,7 @@ import {
 } from "./views/terminal.js";
 import { renderSettingsOpsEmptyState, renderSettingsOpsPage } from "./domains/settingsops/routes.js";
 import { buildChatTurnGovernanceReport, resolveChatGovernedExportSelection } from "./views/chat.js";
+import { createAimxsDecisionBindingSpine } from "./shared/aimxs/decision-binding.js";
 import {
   closeManagedCodexWorkerSession,
   createOperatorChatThread,
@@ -4429,6 +4430,10 @@ async function main() {
     selectedIncidentId: "",
     feedback: null
   };
+  let aimxsSpineViewState = {
+    selectedRunId: "",
+    selectedIncidentEntryId: ""
+  };
   let identityOpsViewState = {
     feedback: null,
     selectedAdminChangeId: "",
@@ -4450,16 +4455,358 @@ async function main() {
     queueItems: [],
     latestSimulation: null
   };
+  const withAdminOwnerDomain = (items, ownerDomain) =>
+    (Array.isArray(items) ? items : []).map((item) => ({
+      ...(item && typeof item === "object" ? item : {}),
+      ownerDomain:
+        String(item?.ownerDomain || "").trim().toLowerCase() ||
+        String(ownerDomain || "").trim().toLowerCase()
+    }));
+  const getAdminLifecycleQueueItems = () => [
+    ...withAdminOwnerDomain(identityOpsViewState.queueItems, "identityops"),
+    ...withAdminOwnerDomain(platformOpsViewState.queueItems, "platformops"),
+    ...withAdminOwnerDomain(guardrailOpsViewState.queueItems, "guardrailops"),
+    ...withAdminOwnerDomain(policyOpsViewState.queueItems, "policyops"),
+    ...withAdminOwnerDomain(complianceOpsViewState.queueItems, "complianceops"),
+    ...withAdminOwnerDomain(networkOpsViewState.queueItems, "networkops")
+  ];
+  const normalizeAimxsValue = (value, fallback = "") => {
+    const normalized = String(value || "").trim();
+    return normalized || fallback;
+  };
+  const firstAimxsValue = (...values) => {
+    for (const value of values) {
+      const normalized = normalizeAimxsValue(value);
+      if (normalized && normalized !== "-") {
+        return normalized;
+      }
+    }
+    return "";
+  };
+  const aimxsScopeLabel = (...parts) => {
+    const values = parts.map((value) => normalizeAimxsValue(value)).filter(Boolean);
+    return values.join(" / ");
+  };
+  const aimxsArray = (values = []) =>
+    (Array.isArray(values) ? values : []).map((value) => normalizeAimxsValue(value)).filter(Boolean);
+  const aimxsObject = (value) => (value && typeof value === "object" ? value : {});
+  const aimxsUnique = (values = []) => Array.from(new Set(aimxsArray(values)));
+  const agentOpsCurrentProfileId = () =>
+    normalizeAimxsValue(
+      operatorChatState.agentProfileId ||
+        initialAgentID ||
+        latestSettingsSnapshot?.integrations?.selectedAgentProfileId
+    );
+  const getAimxsRunItems = () => {
+    const candidates = [
+      latestRuntimeOpsContext?.runs?.items,
+      latestGovernanceOpsContext?.runs?.items,
+      latestAuditOpsContext?.runs?.items,
+      latestEvidenceOpsContext?.runs?.items,
+      latestIncidentOpsContext?.runs?.items,
+      latestPolicyOpsContext?.runs?.items,
+      latestComplianceOpsContext?.runs?.items,
+      latestNetworkOpsContext?.runs?.items
+    ];
+    for (const items of candidates) {
+      if (Array.isArray(items) && items.length > 0) {
+        return items;
+      }
+    }
+    return [];
+  };
+  const getAimxsApprovalItems = () => {
+    const candidates = [
+      latestGovernanceOpsContext?.approvals?.items,
+      latestAuditOpsContext?.approvals?.items,
+      latestEvidenceOpsContext?.approvals?.items,
+      latestIncidentOpsContext?.approvals?.items,
+      latestComplianceOpsContext?.approvals?.items,
+      latestRuntimeOpsContext?.approvals?.items
+    ];
+    for (const items of candidates) {
+      if (Array.isArray(items) && items.length > 0) {
+        return items;
+      }
+    }
+    return [];
+  };
+  const getAimxsAuditItems = () => {
+    const candidates = [latestAuditOpsContext?.audit?.items, latestAuditPayload?.items];
+    for (const items of candidates) {
+      if (Array.isArray(items) && items.length > 0) {
+        return items;
+      }
+    }
+    return [];
+  };
+  const getAimxsIncidentItems = () => {
+    const items = store.getIncidentPackageHistory();
+    return Array.isArray(items) ? items : [];
+  };
+  const extractThreadRunReference = (thread = null) => {
+    const currentThread = thread && typeof thread === "object" ? thread : {};
+    const turns = Array.isArray(currentThread?.turns) ? currentThread.turns : [];
+    for (let turnIndex = turns.length - 1; turnIndex >= 0; turnIndex -= 1) {
+      const turn = turns[turnIndex] && typeof turns[turnIndex] === "object" ? turns[turnIndex] : {};
+      const sessionView = aimxsObject(turn?.sessionView);
+      const timeline = aimxsObject(sessionView?.timeline);
+      const toolActions = Array.isArray(timeline?.toolActions) ? timeline.toolActions : [];
+      for (let actionIndex = toolActions.length - 1; actionIndex >= 0; actionIndex -= 1) {
+        const resultPayload = aimxsObject(toolActions[actionIndex]?.resultPayload);
+        const governedRun = aimxsObject(resultPayload?.governedRun);
+        const runId = normalizeAimxsValue(governedRun?.runId);
+        if (!runId) {
+          continue;
+        }
+        const latestEvidence = Array.isArray(timeline?.evidenceRecords) && timeline.evidenceRecords.length > 0
+          ? timeline.evidenceRecords[timeline.evidenceRecords.length - 1]
+          : null;
+        const selectedWorker = aimxsObject(timeline?.selectedWorker);
+        return {
+          runId,
+          requestRef: normalizeAimxsValue(turn?.requestId),
+          sessionRef: normalizeAimxsValue(timeline?.session?.sessionId, normalizeAimxsValue(turn?.response?.sessionId)),
+          taskRef: normalizeAimxsValue(timeline?.task?.taskId, normalizeAimxsValue(turn?.taskId, normalizeAimxsValue(currentThread?.taskId))),
+          actorRef: normalizeAimxsValue(selectedWorker?.adapterId, normalizeAimxsValue(selectedWorker?.workerId)),
+          providerRef: normalizeAimxsValue(governedRun?.selectedPolicyProvider, normalizeAimxsValue(governedRun?.policyResponse?.source)),
+          routeRef: normalizeAimxsValue(turn?.response?.route),
+          boundaryRef: normalizeAimxsValue(turn?.response?.boundaryProviderId),
+          summary: normalizeAimxsValue(turn?.response?.outputText, normalizeAimxsValue(turn?.prompt)),
+          latestEvidenceRef: normalizeAimxsValue(latestEvidence?.evidenceId),
+          evidenceRefs: aimxsUnique(governedRun?.policyResponse?.evidenceRefs),
+          decisionStatus: normalizeAimxsValue(governedRun?.policyDecision, normalizeAimxsValue(governedRun?.policyResponse?.decision)),
+          grantTokenPresent: governedRun?.policyGrantTokenPresent === true
+        };
+      }
+      const proposals = listNativeToolProposals(sessionView);
+      for (let proposalIndex = proposals.length - 1; proposalIndex >= 0; proposalIndex -= 1) {
+        const governedRun = aimxsObject(proposals[proposalIndex]?.governedRun);
+        const runId = normalizeAimxsValue(governedRun?.runId);
+        if (!runId) {
+          continue;
+        }
+        return {
+          runId,
+          requestRef: normalizeAimxsValue(turn?.requestId),
+          sessionRef: normalizeAimxsValue(timeline?.session?.sessionId, normalizeAimxsValue(turn?.response?.sessionId)),
+          taskRef: normalizeAimxsValue(timeline?.task?.taskId, normalizeAimxsValue(turn?.taskId, normalizeAimxsValue(currentThread?.taskId))),
+          actorRef: normalizeAimxsValue(timeline?.selectedWorker?.adapterId, normalizeAimxsValue(timeline?.selectedWorker?.workerId)),
+          providerRef: normalizeAimxsValue(governedRun?.selectedPolicyProvider, normalizeAimxsValue(governedRun?.policyResponse?.source)),
+          routeRef: normalizeAimxsValue(turn?.response?.route),
+          boundaryRef: normalizeAimxsValue(turn?.response?.boundaryProviderId),
+          summary: normalizeAimxsValue(proposals[proposalIndex]?.summary, normalizeAimxsValue(turn?.prompt)),
+          latestEvidenceRef: "",
+          evidenceRefs: aimxsUnique(governedRun?.policyResponse?.evidenceRefs),
+          decisionStatus: normalizeAimxsValue(governedRun?.policyDecision, normalizeAimxsValue(governedRun?.policyResponse?.decision)),
+          grantTokenPresent: governedRun?.policyGrantTokenPresent === true
+        };
+      }
+    }
+    return {
+      runId: "",
+      requestRef: "",
+      sessionRef: "",
+      taskRef: normalizeAimxsValue(currentThread?.taskId),
+      actorRef: "",
+      providerRef: "",
+      routeRef: "",
+      boundaryRef: "",
+      summary: "",
+      latestEvidenceRef: "",
+      evidenceRefs: [],
+      decisionStatus: "",
+      grantTokenPresent: false
+    };
+  };
+  const latestApprovalRunId = () => {
+    const items = getAimxsApprovalItems();
+    const pending = items.find((item) => normalizeAimxsValue(item?.status).toUpperCase() === "PENDING");
+    return normalizeAimxsValue(pending?.runId, normalizeAimxsValue(items[0]?.runId));
+  };
+  const latestIncidentRunId = () => {
+    const items = getAimxsIncidentItems();
+    return normalizeAimxsValue(items[0]?.runId);
+  };
+  const getAimxsSelectedRunId = () => {
+    const selectedIncident =
+      getAimxsIncidentItems().find((item) => normalizeAimxsValue(item?.id) === normalizeAimxsValue(incidentOpsViewState.selectedIncidentId)) ||
+      null;
+    const threadRun = extractThreadRunReference(operatorChatState.thread);
+    return firstAimxsValue(
+      aimxsSpineViewState.selectedRunId,
+      normalizeAimxsValue(selectedIncident?.runId),
+      normalizeAimxsValue(governanceOpsViewState.selectedRunId),
+      normalizeAimxsValue(latestRunDetail?.runId),
+      normalizeAimxsValue(threadRun?.runId),
+      latestApprovalRunId(),
+      latestIncidentRunId(),
+      normalizeAimxsValue(getAimxsRunItems()[0]?.runId)
+    );
+  };
+  const buildAimxsDecisionBindingSpineModel = (activeDomain = "") => {
+    const selectedRunId = getAimxsSelectedRunId();
+    const threadReference = extractThreadRunReference(operatorChatState.thread);
+    const runItems = getAimxsRunItems();
+    const approvalItems = getAimxsApprovalItems();
+    const auditItems = getAimxsAuditItems();
+    const incidentItems = getAimxsIncidentItems();
+    const selectedRun =
+      runItems.find((item) => normalizeAimxsValue(item?.runId) === selectedRunId) ||
+      (normalizeAimxsValue(latestRunDetail?.runId) === selectedRunId ? latestRunDetail : null) ||
+      store.getRunById(selectedRunId) ||
+      {};
+    const selectedApproval =
+      approvalItems.find((item) => normalizeAimxsValue(item?.runId) === selectedRunId) ||
+      store.getApprovalByRunID(selectedRunId) ||
+      {};
+    const selectedIncident =
+      incidentItems.find((item) => normalizeAimxsValue(item?.id) === normalizeAimxsValue(aimxsSpineViewState.selectedIncidentEntryId)) ||
+      incidentItems.find((item) => normalizeAimxsValue(item?.runId) === selectedRunId) ||
+      null;
+    const matchedAudit = auditItems
+      .filter((item) => normalizeAimxsValue(item?.runId) === selectedRunId)
+      .slice(0, 3)
+      .map((item) =>
+        firstAimxsValue(
+          `${normalizeAimxsValue(item?.event || "audit")}@${normalizeAimxsValue(item?.ts || item?.timestamp)}`,
+          normalizeAimxsValue(item?.event)
+        )
+      );
+    const policyResponse = aimxsObject(selectedRun?.policyResponse);
+    const evidenceBundleResponse = aimxsObject(selectedRun?.evidenceBundleResponse);
+    const evidenceRecordResponse = aimxsObject(selectedRun?.evidenceRecordResponse);
+    const incidentPackageId = normalizeAimxsValue(selectedIncident?.packageId);
+    const incidentStatus = normalizeAimxsValue(selectedIncident?.filingStatus);
+    const policyReasons = Array.isArray(policyResponse?.reasons) ? policyResponse.reasons : [];
+    const scopeRef = aimxsScopeLabel(
+      selectedRun?.tenantId,
+      selectedRun?.projectId
+    ) || aimxsScopeLabel(
+      operatorChatState?.thread?.tenantId,
+      operatorChatState?.thread?.projectId
+    ) || aimxsScopeLabel(selectedIncident?.scope);
+    const evidenceRefs = aimxsUnique([
+      ...(Array.isArray(policyResponse?.evidenceRefs) ? policyResponse.evidenceRefs : []),
+      normalizeAimxsValue(evidenceRecordResponse?.evidenceId),
+      normalizeAimxsValue(threadReference?.latestEvidenceRef)
+    ]);
+    const requestedCapabilities = aimxsUnique(
+      Array.isArray(selectedApproval?.requestedCapabilities)
+        ? selectedApproval.requestedCapabilities
+        : []
+    );
+    const receiptRef = firstAimxsValue(
+      normalizeAimxsValue(selectedApproval?.approvalId),
+      normalizeAimxsValue(evidenceBundleResponse?.bundleId),
+      normalizeAimxsValue(evidenceRecordResponse?.evidenceId)
+    );
+    const stableRef = firstAimxsValue(
+      normalizeAimxsValue(evidenceBundleResponse?.bundleId),
+      normalizeAimxsValue(evidenceRecordResponse?.evidenceId),
+      incidentPackageId
+    );
+    return createAimxsDecisionBindingSpine({
+      activeDomain,
+      sourceLabel: "correlated run",
+      correlationRef: firstAimxsValue(selectedRunId, normalizeAimxsValue(selectedApproval?.approvalId), incidentPackageId),
+      runId: selectedRunId,
+      requestRef: firstAimxsValue(normalizeAimxsValue(selectedRun?.requestId), threadReference?.requestRef),
+      approvalId: normalizeAimxsValue(selectedApproval?.approvalId),
+      incidentEntryId: normalizeAimxsValue(selectedIncident?.id),
+      actorRef: firstAimxsValue(threadReference?.actorRef, normalizeAimxsValue(session?.claims?.sub || session?.claims?.email || session?.claims?.client_id)),
+      subjectRef: firstAimxsValue(threadReference?.sessionRef, threadReference?.taskRef, normalizeAimxsValue(selectedIncident?.packageId)),
+      authorityRef: firstAimxsValue(agentOpsCurrentProfileId(), normalizeAimxsValue(selectedApproval?.tier)),
+      authorityBasis: firstAimxsValue(latestSettingsSnapshot?.identity?.authorityBasis),
+      scopeRef,
+      providerRef: firstAimxsValue(normalizeAimxsValue(selectedRun?.selectedPolicyProvider), threadReference?.providerRef),
+      routeRef: firstAimxsValue(threadReference?.routeRef, normalizeAimxsValue(selectedRun?.environment)),
+      boundaryRef: firstAimxsValue(threadReference?.boundaryRef),
+      grantRef: selectedRun?.policyGrantTokenPresent === true ? "policy_grant_token" : normalizeAimxsValue(selectedApproval?.approvalId),
+      executionProfile: normalizeAimxsValue(selectedApproval?.targetExecutionProfile),
+      grantReason: firstAimxsValue(
+        normalizeAimxsValue(selectedApproval?.reason),
+        normalizeAimxsValue(policyReasons[0]?.message),
+        normalizeAimxsValue(selectedIncident?.handoffText)
+      ),
+      requestedCapabilities,
+      decisionStatus: firstAimxsValue(
+        normalizeAimxsValue(selectedApproval?.status),
+        normalizeAimxsValue(selectedRun?.policyDecision),
+        threadReference?.decisionStatus
+      ),
+      receiptRef,
+      approvalReceiptRef: normalizeAimxsValue(selectedApproval?.approvalId),
+      stableRef,
+      bundleId: normalizeAimxsValue(evidenceBundleResponse?.bundleId),
+      bundleStatus: normalizeAimxsValue(evidenceBundleResponse?.status, normalizeAimxsValue(selectedRun?.evidenceBundleStatus)),
+      recordId: normalizeAimxsValue(evidenceRecordResponse?.evidenceId),
+      recordStatus: normalizeAimxsValue(evidenceRecordResponse?.status, normalizeAimxsValue(selectedRun?.evidenceRecordStatus)),
+      incidentPackageId,
+      incidentStatus,
+      replayRef: selectedRunId,
+      sessionRef: firstAimxsValue(threadReference?.sessionRef, normalizeAimxsValue(latestRunDetail?.sessionId)),
+      taskRef: firstAimxsValue(threadReference?.taskRef, normalizeAimxsValue(operatorChatState?.thread?.taskId)),
+      evidenceRefs,
+      latestEvidenceRef: firstAimxsValue(threadReference?.latestEvidenceRef, normalizeAimxsValue(evidenceRecordResponse?.evidenceId)),
+      evidenceStatus: firstAimxsValue(
+        normalizeAimxsValue(evidenceRecordResponse?.status),
+        normalizeAimxsValue(evidenceBundleResponse?.status),
+        incidentStatus
+      ),
+      auditRefs: matchedAudit,
+      summary: firstAimxsValue(
+        normalizeAimxsValue(selectedIncident?.handoffText),
+        normalizeAimxsValue(policyReasons[0]?.message),
+        threadReference?.summary
+      )
+    });
+  };
+  let renderAgentOpsPanel = () => {};
+  const syncAimxsSpinePanels = () => {
+    renderAgentOpsPanel();
+    renderGovernanceOpsPanel();
+    renderAuditOpsPanel();
+    renderEvidenceOpsPanel();
+    renderIncidentOpsPanel();
+  };
+  const setAimxsSpineSelection = (runId = "", incidentEntryId = "", options = {}) => {
+    aimxsSpineViewState = {
+      selectedRunId: normalizeAimxsValue(runId),
+      selectedIncidentEntryId: normalizeAimxsValue(incidentEntryId)
+    };
+    if (options.render === true) {
+      syncAimxsSpinePanels();
+    }
+  };
+  const findIncidentEntryByRunId = (runId = "") =>
+    getAimxsIncidentItems().find((item) => normalizeAimxsValue(item?.runId) === normalizeAimxsValue(runId)) || null;
   syncIncidentOpsSelectionAfterHistoryChange = function syncIncidentOpsSelectionAfterHistoryChangeBound(entryId = "") {
     const items = store.getIncidentPackageHistory();
     const candidateId = String(entryId || incidentOpsViewState.selectedIncidentId || "").trim();
     const resolvedEntry =
       items.find((item) => String(item?.id || "").trim() === candidateId) || items[0] || null;
+    setAimxsSpineSelection(resolvedEntry?.runId, resolvedEntry?.id, { render: false });
     incidentOpsViewState = {
       ...incidentOpsViewState,
       selectedIncidentId: String(resolvedEntry?.id || "").trim()
     };
     renderIncidentOpsPanel();
+  };
+  renderAgentOpsPanel = () => {
+    renderAgentOpsPage(ui, latestSettingsSnapshot, {
+      ...operatorChatState,
+      agentProfileId:
+        String(
+          operatorChatState.agentProfileId ||
+            initialAgentID ||
+            latestSettingsSnapshot?.integrations?.selectedAgentProfileId ||
+            ""
+        )
+          .trim()
+          .toLowerCase(),
+      aimxsDecisionBindingSpine: buildAimxsDecisionBindingSpineModel("agentops")
+    });
   };
   const renderHomePanel = (options = {}) => {
     const snapshot = options.snapshot || triageSnapshot;
@@ -4517,14 +4864,8 @@ async function main() {
     }
     renderGovernanceOpsPage(ui, {
       ...latestGovernanceOpsContext,
-      adminQueueItems: [
-        ...(Array.isArray(identityOpsViewState.queueItems) ? identityOpsViewState.queueItems : []),
-        ...(Array.isArray(platformOpsViewState.queueItems) ? platformOpsViewState.queueItems : []),
-        ...(Array.isArray(guardrailOpsViewState.queueItems) ? guardrailOpsViewState.queueItems : []),
-        ...(Array.isArray(policyOpsViewState.queueItems) ? policyOpsViewState.queueItems : []),
-        ...(Array.isArray(complianceOpsViewState.queueItems) ? complianceOpsViewState.queueItems : []),
-        ...(Array.isArray(networkOpsViewState.queueItems) ? networkOpsViewState.queueItems : [])
-      ],
+      adminQueueItems: getAdminLifecycleQueueItems(),
+      aimxsDecisionBindingSpine: buildAimxsDecisionBindingSpineModel("governanceops"),
       viewState: governanceOpsViewState
     });
   };
@@ -4551,6 +4892,8 @@ async function main() {
     }
     renderAuditOpsPage(ui, {
       ...latestAuditOpsContext,
+      adminQueueItems: getAdminLifecycleQueueItems(),
+      aimxsDecisionBindingSpine: buildAimxsDecisionBindingSpineModel("auditops"),
       incidentHistory: {
         items: store.getIncidentPackageHistory()
       },
@@ -4564,6 +4907,8 @@ async function main() {
     }
     renderEvidenceOpsPage(ui, {
       ...latestEvidenceOpsContext,
+      adminQueueItems: getAdminLifecycleQueueItems(),
+      aimxsDecisionBindingSpine: buildAimxsDecisionBindingSpineModel("evidenceops"),
       incidentHistory: {
         items: store.getIncidentPackageHistory()
       },
@@ -4597,12 +4942,18 @@ async function main() {
       viewState: policyOpsViewState
     });
   };
+  const syncAdminTracePanels = () => {
+    renderGovernanceOpsPanel();
+    renderAuditOpsPanel();
+    renderEvidenceOpsPanel();
+  };
   const renderIncidentOpsPanel = (context = null) => {
     if (context && typeof context === "object") {
       latestIncidentOpsContext = context;
     }
     renderIncidentOpsPage(ui, {
       ...latestIncidentOpsContext,
+      aimxsDecisionBindingSpine: buildAimxsDecisionBindingSpineModel("incidentops"),
       incidentHistory: {
         items: store.getIncidentPackageHistory()
       },
@@ -4621,15 +4972,26 @@ async function main() {
     };
     renderGovernanceOpsPanel();
   };
-  const setGovernanceOpsSelection = (runID) => {
+  const setGovernanceOpsSelection = (runID, options = {}) => {
     const normalizedRunID = String(runID || "").trim();
+    const nextSelectedRunId =
+      governanceOpsViewState.selectedRunId && governanceOpsViewState.selectedRunId === normalizedRunID && options.force !== true
+        ? ""
+        : normalizedRunID;
+    if (options.syncSpine !== false) {
+      setAimxsSpineSelection(nextSelectedRunId, aimxsSpineViewState.selectedIncidentEntryId, { render: false });
+    }
     governanceOpsViewState = {
       ...governanceOpsViewState,
-      selectedRunId:
-        governanceOpsViewState.selectedRunId && governanceOpsViewState.selectedRunId === normalizedRunID
-          ? ""
-          : normalizedRunID
+      selectedRunId: nextSelectedRunId
     };
+    if (options.render === false) {
+      return;
+    }
+    if (options.syncSpine !== false) {
+      syncAimxsSpinePanels();
+      return;
+    }
     renderGovernanceOpsPanel();
   };
   const setGovernanceOpsAdminSelection = (changeId) => {
@@ -4818,6 +5180,7 @@ async function main() {
       ...identityOpsViewState,
       queueItems: nextItems
     };
+    syncAdminTracePanels();
     return nextItems.find((entry) => String(entry?.id || "").trim() === changeId) || null;
   };
   const getIdentityOpsSelectedQueueItemForKind = (kind) => {
@@ -5737,6 +6100,7 @@ async function main() {
       ...platformOpsViewState,
       queueItems: nextItems
     };
+    syncAdminTracePanels();
     return nextItems.find((entry) => String(entry?.id || "").trim() === changeId) || null;
   };
   const buildPlatformOpsQueueItem = (draft, options = {}) => {
@@ -6306,6 +6670,7 @@ async function main() {
       ...guardrailOpsViewState,
       queueItems: nextItems
     };
+    syncAdminTracePanels();
     return nextItems.find((entry) => String(entry?.id || "").trim() === changeId) || null;
   };
   const buildGuardrailOpsQueueItem = (draft, options = {}) => {
@@ -6819,17 +7184,96 @@ async function main() {
     };
     renderIncidentOpsPanel();
   };
-  const setIncidentOpsSelection = (entryId) => {
+  const setIncidentOpsSelection = (entryId, options = {}) => {
     const normalizedEntryId = String(entryId || "").trim();
+    const nextSelectedIncidentId =
+      incidentOpsViewState.selectedIncidentId &&
+      incidentOpsViewState.selectedIncidentId === normalizedEntryId &&
+      options.force !== true
+        ? ""
+        : normalizedEntryId;
+    const selectedIncident =
+      getAimxsIncidentItems().find((item) => normalizeAimxsValue(item?.id) === normalizeAimxsValue(nextSelectedIncidentId)) ||
+      null;
+    if (options.syncSpine !== false) {
+      setAimxsSpineSelection(selectedIncident?.runId, nextSelectedIncidentId, { render: false });
+    }
     incidentOpsViewState = {
       ...incidentOpsViewState,
-      selectedIncidentId:
-        incidentOpsViewState.selectedIncidentId &&
-        incidentOpsViewState.selectedIncidentId === normalizedEntryId
-          ? ""
-          : normalizedEntryId
+      selectedIncidentId: nextSelectedIncidentId
     };
+    if (options.render === false) {
+      return;
+    }
+    if (options.syncSpine !== false) {
+      syncAimxsSpinePanels();
+      return;
+    }
     renderIncidentOpsPanel();
+  };
+  const openAimxsSpineWorkspace = async (view = "", runId = "", incidentEntryId = "") => {
+    const workspaceView = String(view || "").trim().toLowerCase();
+    const normalizedRunId = normalizeAimxsValue(runId);
+    const resolvedIncidentEntryId = normalizeAimxsValue(
+      incidentEntryId,
+      findIncidentEntryByRunId(normalizedRunId)?.id
+    );
+    if (!workspaceView) {
+      return false;
+    }
+    setAimxsSpineSelection(normalizedRunId, resolvedIncidentEntryId, { render: false });
+    if (workspaceView === "governanceops" && normalizedRunId) {
+      setGovernanceOpsSelection(normalizedRunId, {
+        force: true,
+        syncSpine: false,
+        render: false
+      });
+    }
+    if (workspaceView === "incidentops" && resolvedIncidentEntryId) {
+      setIncidentOpsSelection(resolvedIncidentEntryId, {
+        force: true,
+        syncSpine: false,
+        render: false
+      });
+    }
+    syncAimxsSpinePanels();
+    setWorkspaceView(workspaceView, true);
+    if (workspaceView === "agentops") {
+      focusRenderedRegion(ui.chatContent, { scroll: false });
+      return true;
+    }
+    if (workspaceView === "governanceops") {
+      focusRenderedRegion(ui.governanceOpsContent, { scroll: false });
+      return true;
+    }
+    if (workspaceView === "auditops") {
+      focusRenderedRegion(ui.auditOpsContent || ui.auditContent, { scroll: false });
+      return true;
+    }
+    if (workspaceView === "evidenceops") {
+      focusRenderedRegion(ui.evidenceOpsContent, { scroll: false });
+      return true;
+    }
+    if (workspaceView === "incidentops") {
+      focusRenderedRegion(ui.incidentOpsContent, { scroll: false });
+      return true;
+    }
+    return false;
+  };
+  const handleAimxsSpineWorkspaceClick = async (target) => {
+    if (!(target instanceof HTMLElement)) {
+      return false;
+    }
+    const actionNode = target.closest('[data-aimxs-spine-action="open-workspace"]');
+    if (!(actionNode instanceof HTMLElement)) {
+      return false;
+    }
+    await openAimxsSpineWorkspace(
+      String(actionNode.dataset.aimxsSpineView || "").trim(),
+      String(actionNode.dataset.aimxsSpineRunId || "").trim(),
+      String(actionNode.dataset.aimxsSpineIncidentEntryId || "").trim()
+    );
+    return true;
   };
   syncAuditOpsFeedbackState = (tone, message) => {
     const normalizedMessage = String(message || "").trim();
@@ -7097,18 +7541,7 @@ async function main() {
         });
         renderContextPanel();
         renderDeveloperOpsPanel();
-        renderAgentOpsPage(ui, settingsWithConfigChanges, {
-          ...operatorChatState,
-          agentProfileId:
-            String(
-              operatorChatState.agentProfileId ||
-                selectedAgentProfileId ||
-                settingsWithConfigChanges?.integrations?.selectedAgentProfileId ||
-                ""
-            )
-              .trim()
-              .toLowerCase()
-        });
+        renderAgentOpsPanel();
         renderIdentityOpsPanel({
           settings: settingsWithConfigChanges,
           session
@@ -7415,6 +7848,7 @@ async function main() {
   function getCurrentEvidenceOpsSnapshot() {
     return createEvidenceWorkspaceSnapshot({
       ...latestEvidenceOpsContext,
+      adminQueueItems: getAdminLifecycleQueueItems(),
       incidentHistory: {
         items: store.getIncidentPackageHistory()
       },
@@ -7627,6 +8061,7 @@ async function main() {
       ...policyOpsViewState,
       queueItems: nextItems
     };
+    syncAdminTracePanels();
     return nextItems.find((entry) => String(entry?.id || "").trim() === changeId) || null;
   };
 
@@ -8162,6 +8597,7 @@ async function main() {
       ...complianceOpsViewState,
       queueItems: mergedItems
     };
+    syncAdminTracePanels();
     return nextItem;
   }
 
@@ -8769,6 +9205,7 @@ async function main() {
       ...networkOpsViewState,
       queueItems: mergedItems
     };
+    syncAdminTracePanels();
     return nextItem;
   }
 
@@ -9267,7 +9704,8 @@ function getCurrentIncidentOpsEntry(entryId = "") {
       exportedAt: new Date().toISOString(),
       source: "evidenceops",
       board: "provenance_review",
-      provenance: snapshot?.provenanceBoard || {}
+      provenance: snapshot?.provenanceBoard || {},
+      adminChangeProvenance: snapshot?.adminChangeProvenanceBoard || {}
     };
   }
 
@@ -9666,6 +10104,7 @@ function getCurrentIncidentOpsEntry(entryId = "") {
     if (!nextRunID) {
       return;
     }
+    setAimxsSpineSelection(nextRunID, findIncidentEntryByRunId(nextRunID)?.id, { render: true });
     runtimeOpsViewState = {
       ...runtimeOpsViewState,
       selectedRunId: nextRunID
@@ -11136,6 +11575,9 @@ function getCurrentIncidentOpsEntry(entryId = "") {
   ui.chatContent?.addEventListener("click", async (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    if (await handleAimxsSpineWorkspaceClick(target)) {
       return;
     }
     const actionNode = target.closest("[data-chat-action]");
@@ -13756,6 +14198,9 @@ function getCurrentIncidentOpsEntry(entryId = "") {
     if (!(target instanceof HTMLElement)) {
       return;
     }
+    if (await handleAimxsSpineWorkspaceClick(target)) {
+      return;
+    }
     const selectNode = target.closest("[data-governanceops-select-run-id]");
     const selectedRunID =
       selectNode instanceof HTMLElement
@@ -13887,6 +14332,9 @@ function getCurrentIncidentOpsEntry(entryId = "") {
     if (!(target instanceof HTMLElement)) {
       return;
     }
+    if (await handleAimxsSpineWorkspaceClick(target)) {
+      return;
+    }
     const actionNode = target.closest("[data-auditops-action]");
     if (!(actionNode instanceof HTMLElement)) {
       return;
@@ -13923,6 +14371,9 @@ function getCurrentIncidentOpsEntry(entryId = "") {
   ui.evidenceOpsContent?.addEventListener("click", async (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    if (await handleAimxsSpineWorkspaceClick(target)) {
       return;
     }
     const copyPathNode = target.closest("[data-evidenceops-copy-path]");
@@ -14086,6 +14537,9 @@ function getCurrentIncidentOpsEntry(entryId = "") {
   ui.incidentOpsContent?.addEventListener("click", async (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    if (await handleAimxsSpineWorkspaceClick(target)) {
       return;
     }
     const actionNode = target.closest("[data-incidentops-action]");

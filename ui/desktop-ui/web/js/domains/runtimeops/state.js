@@ -3,6 +3,15 @@ import {
   latestManagedWorkerTranscript,
   listNativeToolProposals
 } from "../../runtime/session-client.js";
+import {
+  createAimxsField,
+  createAimxsIdentityPostureModel,
+  inferAimxsAuthorityTierFromRoles
+} from "../../shared/aimxs/identity-posture.js";
+import {
+  createAimxsRouteBoundaryField,
+  createAimxsRouteBoundaryModel
+} from "../../shared/aimxs/route-boundary.js";
 
 function normalizeStatus(value) {
   return String(value || "").trim().toLowerCase();
@@ -218,7 +227,11 @@ function summarizeIdentityApplication(runtimeIdentity = {}, session = {}) {
     roleCount: roles.length,
     tenantCount: tenantIds.length,
     projectCount: projectIds.length,
-    permissionCount: permissions.length
+    permissionCount: permissions.length,
+    roles,
+    tenantIds,
+    projectIds,
+    permissions
   };
 }
 
@@ -597,7 +610,7 @@ export function createRuntimeWorkspaceSnapshot(context = {}, session = {}, optio
   const scopeTenant = normalizeString(session?.claims?.tenant_id, tenantIds[0] || "-");
   const scopeProject = normalizeString(session?.claims?.project_id, projectIds[0] || "-");
 
-  return {
+  const snapshot = {
     runtimeHealth: healthSnapshot,
     queueAndThroughput: {
       source: normalizeString(context?.runs?.source, "unknown"),
@@ -642,4 +655,184 @@ export function createRuntimeWorkspaceSnapshot(context = {}, session = {}, optio
       evidenceLinkedCount: runs.filter((item) => normalizeString(item?.selectedEvidenceProvider)).length
     }
   };
+  snapshot.aimxsIdentityPosture = buildRuntimeAimxsIdentityPosture(snapshot);
+  snapshot.aimxsRouteBoundary = buildRuntimeAimxsRouteBoundary(snapshot);
+  return snapshot;
+}
+
+function runtimeAimxsTone(value = "") {
+  const normalized = normalizeString(value).toLowerCase();
+  if (["active", "allow", "allowed", "authenticated", "current", "ready", "running"].includes(normalized)) {
+    return "ok";
+  }
+  if (["blocked", "deny", "denied", "failed", "unresolved"].includes(normalized)) {
+    return "danger";
+  }
+  if (["approval_gated", "awaiting_approval", "pending", "review", "watch"].includes(normalized)) {
+    return "warn";
+  }
+  return "neutral";
+}
+
+function buildRuntimeAimxsIdentityPosture(snapshot = {}) {
+  const identity = snapshot?.identityApplication || {};
+  const review = snapshot?.selectedSessionReview || {};
+  const worker = snapshot?.workerPosture || {};
+  const action = snapshot?.actionReview || {};
+  const authorityTier = inferAimxsAuthorityTierFromRoles(identity?.roles, identity?.authenticated ? "workspace_operator" : "unresolved");
+  const currentBadge =
+    normalizeStatus(review?.sessionStatus) === "failed"
+      ? "blocked"
+      : Number(review?.openApprovalCount || 0) > 0
+        ? "approval_gated"
+        : normalizeString(review?.sessionStatus, "current").toLowerCase();
+  const targetBadge =
+    Number(review?.openApprovalCount || 0) > 0
+      ? "pending"
+      : normalizeString(review?.resolutionStatus, worker?.workerStatus || "ready").toLowerCase();
+  const currentScope =
+    [action?.session?.tenantId, action?.session?.projectId]
+      .filter((value) => normalizeString(value) && normalizeString(value) !== "-")
+      .join(" / ") ||
+    [identity?.tenantIds?.[0], identity?.projectIds?.[0]].filter(Boolean).join(" / ") ||
+    "workspace";
+
+  return createAimxsIdentityPostureModel({
+    summary:
+      "This read-only echo shows the current runtime identity posture and the next bounded session posture without opening any new runtime mutation controls.",
+    surfaceLabel: "read-only echo",
+    identityFields: [
+      createAimxsField("identity class", "runtime session identity"),
+      createAimxsField("subject", identity?.subject, true),
+      createAimxsField("client", identity?.clientId, true),
+      createAimxsField("authority tier", authorityTier),
+      createAimxsField("authority basis", identity?.authorityBasis || "unknown"),
+      createAimxsField(
+        "delegation basis",
+        Number(review?.openApprovalCount || 0) > 0 ? "approval-bound runtime continuation" : identity?.policyMatrixRequired ? "policy-matrix governed" : "direct runtime grant"
+      ),
+      createAimxsField(
+        "grant basis",
+        normalizeString(action?.run?.decision, "").toUpperCase() ? `policy ${normalizeString(action?.run?.decision).toUpperCase()}` : "pending runtime decision"
+      ),
+      createAimxsField("assurance posture", identity?.authenticated ? "session authenticated" : "identity unresolved"),
+      createAimxsField("freshness anchor", review?.latestEventTimestamp || action?.session?.status || "-", Boolean(review?.latestEventTimestamp))
+    ].filter(Boolean),
+    currentPosture: {
+      badge: currentBadge,
+      tone: runtimeAimxsTone(currentBadge),
+      note: "Current posture is derived from the selected session review, current worker posture, and the bounded runtime action focus.",
+      fields: [
+        createAimxsField("current posture", normalizeString(review?.sessionStatus, "idle").toLowerCase()),
+        createAimxsField("scope", currentScope, true),
+        createAimxsField("worker posture", worker?.workerStatus || "-", true),
+        createAimxsField("selected session", review?.selectedSessionId, true),
+        createAimxsField("latest event", review?.latestEventLabel || "-", true)
+      ].filter(Boolean)
+    },
+    targetPosture: {
+      badge: targetBadge,
+      tone: runtimeAimxsTone(targetBadge),
+      note:
+        Number(review?.openApprovalCount || 0) > 0
+          ? "Runtime continuation remains approval-gated until the open review is resolved."
+          : normalizeString(review?.resolutionMessage, "The selected runtime session is ready for bounded continuation."),
+      fields: [
+        createAimxsField("target posture", Number(review?.openApprovalCount || 0) > 0 ? "approved continuation required" : "stable governed session"),
+        createAimxsField("target worker", worker?.adapterId || worker?.workerId || "-", true),
+        createAimxsField("target environment", worker?.targetEnvironment || "-", true),
+        createAimxsField("pending proposals", String(review?.pendingToolProposalCount || 0)),
+        createAimxsField("open approvals", String(review?.openApprovalCount || 0))
+      ].filter(Boolean)
+    },
+    rationale: {
+      badge: Number(review?.openApprovalCount || 0) > 0 ? "pending" : currentBadge,
+      tone: runtimeAimxsTone(Number(review?.openApprovalCount || 0) > 0 ? "pending" : currentBadge),
+      note:
+        normalizeString(review?.resolutionMessage) ||
+        normalizeString(review?.message) ||
+        "Use the bounded runtime review to understand whether session continuation is allowed or still blocked by approval or worker state.",
+      fields: [
+        createAimxsField("resolution", review?.resolutionStatus || "-", true),
+        createAimxsField("latest detail", review?.latestEventDetail || ""),
+        createAimxsField("worker summary", worker?.latestWorkerSummary || ""),
+        createAimxsField("evidence posture", `${Number(review?.evidenceCount || 0)} evidence refs`)
+      ].filter(Boolean)
+    }
+  });
+}
+
+function buildRuntimeAimxsRouteBoundary(snapshot = {}) {
+  const review = snapshot?.selectedSessionReview || {};
+  const worker = snapshot?.workerPosture || {};
+  const action = snapshot?.actionReview || {};
+  const routing = snapshot?.providerRouting || {};
+  const queue = snapshot?.queueAndThroughput || {};
+  const currentScope =
+    [action?.session?.tenantId, action?.session?.projectId]
+      .filter((value) => normalizeString(value) && normalizeString(value) !== "-")
+      .join(" / ") || "workspace";
+  const approvalGated = Number(review?.openApprovalCount || 0) > 0;
+  const routeHealthy = !approvalGated && normalizeString(worker?.workerStatus).toLowerCase() !== "failed";
+
+  return createAimxsRouteBoundaryModel({
+    summary:
+      "This read-only echo correlates the active runtime worker route, the loaded provider route set, and the bounded session boundary without opening new runtime mutation controls.",
+    surfaceLabel: "read-only echo",
+    routeFields: [
+      createAimxsRouteBoundaryField("session", review?.selectedSessionId, true),
+      createAimxsRouteBoundaryField("worker", worker?.workerId, true),
+      createAimxsRouteBoundaryField("adapter", worker?.adapterId, true),
+      createAimxsRouteBoundaryField("provider", worker?.provider, true),
+      createAimxsRouteBoundaryField("transport", worker?.transport, true),
+      createAimxsRouteBoundaryField("model", worker?.model),
+      createAimxsRouteBoundaryField("target", worker?.targetEnvironment, true)
+    ].filter(Boolean),
+    currentBoundary: {
+      title: "Current Boundary",
+      badge: approvalGated ? "approval_gated" : routeHealthy ? "current" : "watch",
+      tone: approvalGated ? "warn" : routeHealthy ? "ok" : "warn",
+      note: "Current runtime boundary comes from the selected session, worker capability, and current scope.",
+      fields: [
+        createAimxsRouteBoundaryField("scope", currentScope, true),
+        createAimxsRouteBoundaryField("session status", review?.sessionStatus),
+        createAimxsRouteBoundaryField("worker status", worker?.workerStatus),
+        createAimxsRouteBoundaryField("boundaries", String(worker?.boundaryCount || 0)),
+        createAimxsRouteBoundaryField("first boundary", worker?.boundaryRequirements?.[0], true),
+        createAimxsRouteBoundaryField("latest event", review?.latestEventLabel, true)
+      ].filter(Boolean)
+    },
+    routePosture: {
+      title: "Route Posture",
+      badge: approvalGated || Number(queue?.attentionCount || 0) > 0 ? "watch" : routing?.totalRuns > 0 ? "current" : "limited",
+      tone: approvalGated || Number(queue?.attentionCount || 0) > 0 ? "warn" : routing?.totalRuns > 0 ? "ok" : "neutral",
+      note:
+        "This route set is bounded to loaded runtime runs and the selected managed worker capability. No new runtime write controls are opened here.",
+      fields: [
+        createAimxsRouteBoundaryField("profile routes", String(routing?.profileRouteCount || 0)),
+        createAimxsRouteBoundaryField("policy routes", String(routing?.policyRouteCount || 0)),
+        createAimxsRouteBoundaryField("evidence routes", String(routing?.evidenceRouteCount || 0)),
+        createAimxsRouteBoundaryField("desktop routes", String(routing?.desktopRouteCount || 0)),
+        createAimxsRouteBoundaryField("latest policy", routing?.latestPolicyProvider, true),
+        createAimxsRouteBoundaryField("latest evidence", routing?.latestEvidenceProvider, true),
+        createAimxsRouteBoundaryField("latest desktop", routing?.latestDesktopProvider, true)
+      ].filter(Boolean)
+    },
+    rationale: {
+      title: "Allowed Or Constrained",
+      badge: approvalGated ? "constrained" : review?.loaded ? "allowed" : "review",
+      tone: approvalGated ? "warn" : review?.loaded ? "ok" : "neutral",
+      note:
+        normalizeString(review?.resolutionMessage, "") ||
+        normalizeString(worker?.latestWorkerSummary, "") ||
+        normalizeString(review?.message, ""),
+      fields: [
+        createAimxsRouteBoundaryField("resolution", review?.resolutionStatus, true),
+        createAimxsRouteBoundaryField("open approvals", String(review?.openApprovalCount || 0)),
+        createAimxsRouteBoundaryField("pending proposals", String(review?.pendingToolProposalCount || 0)),
+        createAimxsRouteBoundaryField("evidence refs", String(review?.evidenceCount || 0)),
+        createAimxsRouteBoundaryField("transcript events", String(worker?.transcriptEventCount || 0))
+      ].filter(Boolean)
+    }
+  });
 }

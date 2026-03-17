@@ -268,6 +268,14 @@ test("guardrailops page renders the first inspect-only guardrail boards", () => 
   assert.match(ui.guardrailOpsContent.innerHTML, /Governance Route And Receipt/);
   assert.match(ui.guardrailOpsContent.innerHTML, /Rollback And History/);
   assert.match(ui.guardrailOpsContent.innerHTML, /Guardrail Posture/);
+  assert.match(ui.guardrailOpsContent.innerHTML, /AIMXS Identity And Posture/);
+  assert.match(ui.guardrailOpsContent.innerHTML, /desktop execution posture/);
+  assert.match(ui.guardrailOpsContent.innerHTML, /approval gate \+ runtime policy/);
+  assert.match(ui.guardrailOpsContent.innerHTML, /Current Posture/);
+  assert.match(ui.guardrailOpsContent.innerHTML, /approval required|interactive_sandbox_only/);
+  assert.match(ui.guardrailOpsContent.innerHTML, /Target Posture/);
+  assert.match(ui.guardrailOpsContent.innerHTML, /tenant-demo \/ project-core/);
+  assert.match(ui.guardrailOpsContent.innerHTML, /Allowed Or Blocked/);
   assert.match(ui.guardrailOpsContent.innerHTML, /Sandbox And Capability/);
   assert.match(ui.guardrailOpsContent.innerHTML, /Quota And Timeout/);
   assert.match(ui.guardrailOpsContent.innerHTML, /Kill Switch/);

@@ -1,6 +1,9 @@
 import { displayPolicyProviderLabel, escapeHTML, formatTime } from "./common.js";
 import { buildNativeSessionActivitySummary, deriveOperatorChatThreadState, listNativeToolProposals, latestManagedWorkerTranscript } from "../runtime/session-client.js";
 import { buildEnterpriseReportEnvelope, buildGovernedExportSelectionState, renderEnterpriseReportEnvelope } from "../runtime/governance-report.js";
+import { createAimxsLegibilityModel } from "../shared/aimxs/legibility.js";
+import { renderAimxsLegibilityBlock } from "../shared/components/aimxs-legibility.js";
+import { renderAimxsDecisionBindingSpine } from "../shared/components/aimxs-decision-binding-spine.js";
 
 function normalizedString(value, fallback = "") {
   const text = String(value || "").trim();
@@ -1290,6 +1293,7 @@ function buildAgentRunArtifactContext(latestTurn = null, latestPolicyOutcome = n
     runStatus: normalizedString(runSnapshot?.status).toUpperCase(),
     policyDecision: normalizedString(runSnapshot?.policyDecision, normalizedString(latestPolicyOutcome?.decision)).toUpperCase(),
     policyProvider: normalizedString(runSnapshot?.selectedPolicyProvider, normalizedString(latestPolicyOutcome?.provider)),
+    policyGrantTokenPresent: runSnapshot?.policyGrantTokenPresent === true,
     approvalCount: approvals.length,
     proposalCount: proposals.length,
     toolActionCount: toolActions.length,
@@ -1302,6 +1306,46 @@ function buildAgentRunArtifactContext(latestTurn = null, latestPolicyOutcome = n
     workerAdapter: normalizedString(selectedWorker?.adapterId, normalizedString(selectedWorker?.workerId)),
     workerType: normalizedString(selectedWorker?.workerType)
   };
+}
+
+function buildAgentAimxsLegibilityContext({
+  thread = {},
+  runArtifactContext = {},
+  decisionPivotContext = {},
+  governancePivotContext = {},
+  executionMode = "",
+  agentProfileId = ""
+} = {}) {
+  const scopeParts = [
+    normalizedString(thread?.tenantId),
+    normalizedString(thread?.projectId)
+  ].filter(Boolean);
+  const approvalRef = normalizedString(decisionPivotContext?.latestApprovalId);
+  const proposalRef = normalizedString(decisionPivotContext?.latestProposalId, normalizedString(decisionPivotContext?.requestId));
+  return createAimxsLegibilityModel({
+    requestRef: proposalRef || normalizedString(runArtifactContext?.runId),
+    actorRef: normalizedString(runArtifactContext?.workerAdapter, normalizedString(runArtifactContext?.workerType)),
+    subjectRef: normalizedString(runArtifactContext?.sessionId, normalizedString(thread?.taskId)),
+    authorityRef: normalizedString(agentProfileId, executionModeLabel(executionMode)),
+    grantRef: runArtifactContext?.policyGrantTokenPresent ? "policy_grant_token" : approvalRef,
+    posture: normalizedString(
+      runArtifactContext?.policyDecision,
+      normalizedString(runArtifactContext?.runStatus, normalizedString(governancePivotContext?.latestDecision))
+    ),
+    scopeRef: scopeParts.join(" / "),
+    providerRef: normalizedString(runArtifactContext?.policyProvider),
+    routeRef: normalizedString(runArtifactContext?.route),
+    boundaryRef: normalizedString(runArtifactContext?.boundary),
+    previewRef: normalizedString(proposalRef, normalizedString(governancePivotContext?.latestEventTimestamp)),
+    previewSummary: normalizedString(governancePivotContext?.summary),
+    decisionRef: normalizedString(approvalRef, proposalRef),
+    decisionStatus: normalizedString(governancePivotContext?.latestDecision, normalizedString(runArtifactContext?.policyDecision)),
+    executionRef: normalizedString(runArtifactContext?.runId, normalizedString(runArtifactContext?.latestToolActionId)),
+    executionStatus: normalizedString(runArtifactContext?.runStatus),
+    replayRef: normalizedString(runArtifactContext?.runId),
+    evidenceRefs: [normalizedString(runArtifactContext?.latestEvidenceId)].filter(Boolean),
+    summary: normalizedString(governancePivotContext?.summary, normalizedString(thread?.intent))
+  });
 }
 
 function renderAgentProofChip(label, value, tone = "chip chip-neutral chip-compact") {
@@ -1651,6 +1695,253 @@ function renderAgentExecutionProofContext(context = {}) {
   `;
 }
 
+function renderAgentAimxsLegibilityContext(model = {}) {
+  return `
+    <div class="metric agentops-context-panel">
+      <div class="metric-title-row">
+        <div class="title">AIMXS Decision Binding</div>
+        <span class="chip chip-neutral chip-compact">shared</span>
+      </div>
+      ${
+        model?.available
+          ? renderAimxsLegibilityBlock(model)
+          : '<div class="meta">No AIMXS lifecycle or binding anchors are available for the active thread yet.</div>'
+      }
+    </div>
+  `;
+}
+
+function renderAgentAimxsDecisionBindingSpine(model = {}) {
+  if (!model?.available) {
+    return "";
+  }
+  return `
+    <div class="metric agentops-context-panel">
+      <div class="metric-title-row">
+        <div class="title">Correlated AIMXS Drill-In</div>
+        <span class="chip chip-neutral chip-compact">spine</span>
+      </div>
+      ${renderAimxsDecisionBindingSpine(model)}
+    </div>
+  `;
+}
+
+function resolveAgentWorkflowStage(model = {}) {
+  const stages = Array.isArray(model?.lifecycle) ? model.lifecycle : [];
+  if (!stages.length) {
+    return {
+      label: "Governed Ingress",
+      stateLabel: "Pending",
+      tone: "neutral"
+    };
+  }
+  for (const state of ["blocked", "active", "pending", "recovered"]) {
+    const match = stages.find((stage) => String(stage?.state || "").trim().toLowerCase() === state);
+    if (match) {
+      return match;
+    }
+  }
+  return stages[stages.length - 1] || {
+    label: "Governed Ingress",
+    stateLabel: "Pending",
+    tone: "neutral"
+  };
+}
+
+function buildAgentWorkflowClarityContext({
+  taskId = "",
+  threadState = {},
+  focusSummary = {},
+  latestPolicyOutcome = null,
+  runArtifactContext = {},
+  decisionPivotContext = {},
+  aimxsLegibilityContext = {}
+} = {}) {
+  const approvalCount = Math.max(0, Number(focusSummary.pendingApprovalCount ?? threadState?.openApprovalCount ?? 0) || 0);
+  const proposalCount = Math.max(0, Number(focusSummary.pendingProposalCount ?? 0) || 0);
+  const currentStage = resolveAgentWorkflowStage(aimxsLegibilityContext);
+  const chips = [
+    { label: "currentStage", value: String(currentStage?.label || "").trim() },
+    { label: "posture", value: normalizedString(runArtifactContext?.policyDecision, normalizedString(threadState?.sessionStatus)) },
+    { label: "provider", value: normalizedString(runArtifactContext?.policyProvider) },
+    { label: "route", value: normalizedString(runArtifactContext?.route) },
+    { label: "boundary", value: normalizedString(runArtifactContext?.boundary) }
+  ].filter((item) => item.value);
+
+  const buttons = [];
+  let nextActionTitle = "Continue the current thread";
+  let nextActionDetail = "Review the latest reply, then use Anchored Composer for the next governed turn.";
+  let nextActionMeta = "No additional review gate is active on the current thread.";
+  let tone = "ok";
+
+  if (!taskId) {
+    tone = "neutral";
+    nextActionTitle = "Start the first governed thread";
+    nextActionDetail = "Use Anchored Composer to create the native task, then send the first prompt.";
+    nextActionMeta = "No governed thread anchors exist yet.";
+  } else if (threadState?.isResolvedThread) {
+    tone = "ok";
+    nextActionTitle = "Start a follow-up thread";
+    nextActionDetail = "The current task is resolved; only reopen if the same governed work must continue.";
+    nextActionMeta = normalizedString(threadState?.resolutionMessage, "Recovery is complete for the current thread.");
+  } else if (approvalCount > 0) {
+    tone = "danger";
+    nextActionTitle = `Review ${approvalCount} approval checkpoint${approvalCount === 1 ? "" : "s"}`;
+    nextActionDetail = "Governance is the active gate for the next thread transition.";
+    nextActionMeta = normalizedString(threadState?.message, "Resolve approval checkpoints before continuing the current governed run.");
+    if (decisionPivotContext?.approvalsDetailKey) {
+      buttons.push({
+        action: "focus-agent-detail",
+        detailKey: decisionPivotContext.approvalsDetailKey,
+        label: "Pin Approval Checkpoints"
+      });
+    }
+  } else if (proposalCount > 0) {
+    tone = "warn";
+    nextActionTitle = `Review ${proposalCount} tool proposal${proposalCount === 1 ? "" : "s"}`;
+    nextActionDetail = "Proposal review is the active gate for the next governed step.";
+    nextActionMeta = "The active thread has pending tool proposals that should be reviewed before more execution.";
+    if (decisionPivotContext?.proposalsDetailKey) {
+      buttons.push({
+        action: "focus-agent-detail",
+        detailKey: decisionPivotContext.proposalsDetailKey,
+        label: "Pin Tool Proposals"
+      });
+    }
+  } else if (latestPolicyOutcome?.decision === "DENY") {
+    tone = "danger";
+    nextActionTitle = "Review the blocked run before retrying";
+    nextActionDetail = normalizedString(
+      latestPolicyOutcome?.outcome?.detail,
+      "The latest request is blocked at the policy surface."
+    );
+    nextActionMeta = `Latest policy outcome is ${latestPolicyOutcome.decision} via ${latestPolicyOutcome.provider || "-"}.`;
+    if (latestPolicyOutcome?.runId) {
+      buttons.push({
+        action: "open-governed-run",
+        runId: latestPolicyOutcome.runId,
+        label: "Open Run Detail"
+      });
+    }
+  } else if (latestPolicyOutcome?.decision === "DEFER") {
+    tone = "warn";
+    nextActionTitle = "Review the deferred run and evidence basis";
+    nextActionDetail = normalizedString(
+      latestPolicyOutcome?.outcome?.detail,
+      "The latest request is deferred pending grants, evidence, or other readiness."
+    );
+    nextActionMeta = `Latest policy outcome is ${latestPolicyOutcome.decision} via ${latestPolicyOutcome.provider || "-"}.`;
+    if (latestPolicyOutcome?.runId) {
+      buttons.push({
+        action: "open-governed-run",
+        runId: latestPolicyOutcome.runId,
+        label: "Open Run Detail"
+      });
+    }
+  } else if (String(threadState?.sessionStatus || "").trim().toUpperCase() === "AWAITING_WORKER") {
+    tone = "warn";
+    nextActionTitle = "Wait for worker attachment or inspect run detail";
+    nextActionDetail = normalizedString(threadState?.message, "The current turn is approved but still waiting on worker attachment.");
+    nextActionMeta = "No additional write surface is needed until the worker posture changes.";
+    if (runArtifactContext?.runId) {
+      buttons.push({
+        action: "open-governed-run",
+        runId: runArtifactContext.runId,
+        label: "Open Run Detail"
+      });
+    }
+  } else if (String(threadState?.sessionStatus || "").trim().toUpperCase() === "RUNNING") {
+    tone = "warn";
+    nextActionTitle = "Monitor the active run and latest reply";
+    nextActionDetail = normalizedString(
+      threadState?.latestWorkerSummary,
+      "The managed worker is still active on the current thread."
+    );
+    nextActionMeta = "Continue only when the latest reply or a review gate requires operator input.";
+    if (runArtifactContext?.runId) {
+      buttons.push({
+        action: "open-governed-run",
+        runId: runArtifactContext.runId,
+        label: "Open Run Detail"
+      });
+    }
+  }
+
+  return {
+    tone,
+    currentStage,
+    nextActionTitle,
+    nextActionDetail,
+    nextActionMeta,
+    chips,
+    buttons,
+    stages: Array.isArray(aimxsLegibilityContext?.lifecycle) ? aimxsLegibilityContext.lifecycle : []
+  };
+}
+
+function renderAgentWorkflowClarityContext(context = {}) {
+  const toneClass = chipClassForActivityTone(context?.tone || "neutral");
+  const currentStage = context?.currentStage || {};
+  const stages = Array.isArray(context?.stages) ? context.stages : [];
+  return `
+    <div class="agentops-thread-flow">
+      <div class="metric-title-row">
+        <div class="title">AIMXS Thread Flow</div>
+        <span class="${toneClass}">${escapeHTML(String(currentStage?.stateLabel || "Pending"))}</span>
+      </div>
+      <div class="meta">Current stage: ${escapeHTML(String(currentStage?.label || "Governed Ingress"))}</div>
+      ${context?.chips?.length ? `<div class="run-detail-chips">${context.chips.map((item) => `<span class="chip chip-neutral chip-compact">${escapeHTML(`${item.label}=${item.value}`)}</span>`).join("")}</div>` : ""}
+      ${
+        stages.length
+          ? `
+            <div class="agentops-flow-ribbon">
+              ${stages
+                .map(
+                  (stage) => `
+                    <div class="agentops-flow-stage agentops-flow-stage-${escapeHTML(String(stage?.tone || "neutral"))}">
+                      <div class="agentops-flow-stage-label">${escapeHTML(String(stage?.label || "-"))}</div>
+                      <div class="agentops-flow-stage-state">${escapeHTML(String(stage?.stateLabel || "Pending"))}</div>
+                    </div>
+                  `
+                )
+                .join("")}
+            </div>
+          `
+          : `<div class="meta">No AIMXS lifecycle anchors are available for the active thread yet.</div>`
+      }
+      <div class="agentops-workflow-next">
+        <div class="agentops-proof-label">Next Truthful Action</div>
+        <div class="title">${escapeHTML(String(context?.nextActionTitle || "Review the active thread"))}</div>
+        <div class="meta">${escapeHTML(String(context?.nextActionDetail || "Use the active thread surface for the next governed step."))}</div>
+        <div class="meta">${escapeHTML(String(context?.nextActionMeta || ""))}</div>
+        ${
+          Array.isArray(context?.buttons) && context.buttons.length
+            ? `
+              <div class="filter-row settings-editor-actions">
+                <div class="action-hierarchy">
+                  <div class="action-group action-group-secondary">
+                    ${context.buttons
+                      .map((button) => {
+                        if (button.action === "focus-agent-detail" && button.detailKey) {
+                          return `<button class="btn btn-secondary btn-small" type="button" data-chat-action="focus-agent-detail" data-chat-detail-key="${escapeHTML(button.detailKey)}">${escapeHTML(button.label)}</button>`;
+                        }
+                        if (button.action === "open-governed-run" && button.runId) {
+                          return `<button class="btn btn-secondary btn-small" type="button" data-chat-action="open-governed-run" data-chat-run-id="${escapeHTML(button.runId)}">${escapeHTML(button.label)}</button>`;
+                        }
+                        return "";
+                      })
+                      .join("")}
+                  </div>
+                </div>
+              </div>
+            `
+            : ""
+        }
+      </div>
+    </div>
+  `;
+}
+
 function buildAgentArtifactEvidenceDrillInContext(latestTurn = null, runArtifactContext = {}) {
   const sessionView = latestTurn?.sessionView || {};
   const timeline = objectValue(sessionView?.timeline);
@@ -1900,7 +2191,27 @@ export function buildAgentWorkspaceMarkup(settingsPayload = {}, chatState = {}) 
   const decisionPivotContext = buildAgentDecisionPivotContext(latestTurn);
   const governancePivotContext = buildAgentGovernancePivotContext(latestTurn, catalogState, governedExportSelection);
   const executionProofContext = buildAgentExecutionProofContext(latestTurn, runArtifactContext);
+  const aimxsLegibilityContext = buildAgentAimxsLegibilityContext({
+    thread,
+    runArtifactContext,
+    decisionPivotContext,
+    governancePivotContext,
+    executionMode,
+    agentProfileId: selectedProfileId
+  });
+  const aimxsDecisionBindingSpine = chatState?.aimxsDecisionBindingSpine && typeof chatState.aimxsDecisionBindingSpine === "object"
+    ? chatState.aimxsDecisionBindingSpine
+    : { available: false };
   const artifactEvidenceDrillInContext = buildAgentArtifactEvidenceDrillInContext(latestTurn, runArtifactContext);
+  const workflowClarityContext = buildAgentWorkflowClarityContext({
+    taskId,
+    threadState,
+    focusSummary,
+    latestPolicyOutcome,
+    runArtifactContext,
+    decisionPivotContext,
+    aimxsLegibilityContext
+  });
 
   return `
     <div class="stack chat-surface agentops-workspace">
@@ -1927,6 +2238,7 @@ export function buildAgentWorkspaceMarkup(settingsPayload = {}, chatState = {}) 
             <span class="chip chip-neutral chip-compact">execution=${escapeHTML(executionModeLabel(executionMode))}</span>
           </div>
         </div>
+        ${renderAgentWorkflowClarityContext(workflowClarityContext)}
         <div class="agentops-thread-fields">
           <label class="field">
             <span class="label">Thread Title</span>
@@ -2014,6 +2326,8 @@ export function buildAgentWorkspaceMarkup(settingsPayload = {}, chatState = {}) 
           </div>
           <div class="agentops-context-drawer">
             ${renderAgentApprovalContextDrawer(focusSummary, threadState, decisionPivotContext, governancePivotContext)}
+            ${renderAgentAimxsLegibilityContext(aimxsLegibilityContext)}
+            ${renderAgentAimxsDecisionBindingSpine(aimxsDecisionBindingSpine)}
             ${renderAgentRunArtifactContext(runArtifactContext)}
             ${renderAgentExecutionProofContext(executionProofContext)}
             ${renderAgentArtifactEvidenceDrillInContext(artifactEvidenceDrillInContext)}

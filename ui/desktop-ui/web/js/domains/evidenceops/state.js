@@ -1,3 +1,5 @@
+import { createAimxsLegibilityModel } from "../../shared/aimxs/legibility.js";
+
 const WORKSPACE_ARTIFACT_ROOTS = {
   repoProvenance: "EPYDIOS_AGENTOPS_DESKTOP_REPO/provenance/",
   nonRepoProvenance: "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/",
@@ -148,6 +150,66 @@ function controlTone(entries = []) {
     return "warn";
   }
   return "ok";
+}
+
+function normalizeAdminTraceItem(item = {}) {
+  const current = item && typeof item === "object" ? item : {};
+  const decision = readObject(current?.decision);
+  const execution = readObject(current?.execution);
+  const receipt = readObject(current?.receipt);
+  const rollback = readObject(current?.rollback);
+  return {
+    id: normalizeString(current?.id),
+    ownerDomain: normalizeString(current?.ownerDomain, "unknown").toLowerCase(),
+    kind: normalizeString(current?.kind),
+    status: normalizeString(current?.status).toLowerCase(),
+    requestedAction: normalizeString(current?.requestedAction),
+    subjectId: normalizeString(current?.subjectId),
+    targetScope: normalizeString(current?.targetScope),
+    reason: normalizeString(current?.reason),
+    summary: normalizeString(current?.summary),
+    simulationSummary: normalizeString(current?.simulationSummary),
+    simulatedAt: normalizeString(current?.simulatedAt),
+    decision: {
+      decisionId: normalizeString(decision?.decisionId),
+      status: normalizeString(decision?.status).toLowerCase(),
+      approvalReceiptId: normalizeString(decision?.approvalReceiptId),
+      decidedAt: normalizeString(decision?.decidedAt)
+    },
+    execution: {
+      executionId: normalizeString(execution?.executionId),
+      executedAt: normalizeString(execution?.executedAt),
+      status: normalizeString(execution?.status).toLowerCase()
+    },
+    receipt: {
+      receiptId: normalizeString(receipt?.receiptId),
+      issuedAt: normalizeString(receipt?.issuedAt),
+      stableRef: normalizeString(receipt?.stableRef),
+      executionId: normalizeString(receipt?.executionId)
+    },
+    recovery: {
+      recoveryId: normalizeString(rollback?.rollbackId),
+      action: normalizeString(rollback?.action),
+      status: normalizeString(rollback?.status).toLowerCase(),
+      recordedAt: normalizeString(rollback?.rolledBackAt),
+      stableRef: normalizeString(rollback?.stableRef)
+    },
+    updatedAt: normalizeString(current?.updatedAt),
+    createdAt: normalizeString(current?.createdAt)
+  };
+}
+
+function adminTraceTone(items = [], latest = {}) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return "neutral";
+  }
+  if (normalizeString(latest?.recovery?.recoveryId)) {
+    return "ok";
+  }
+  if (normalizeString(latest?.receipt?.receiptId)) {
+    return "ok";
+  }
+  return "warn";
 }
 
 function desktopEvidenceStage(run, key, kind, label) {
@@ -348,6 +410,9 @@ export function createEvidenceWorkspaceSnapshot(context = {}) {
   const incidentPackages = (Array.isArray(context?.incidentHistory?.items) ? context.incidentHistory.items : [])
     .map((item) => normalizeIncidentPackage(item))
     .filter((item) => item.id || item.packageId);
+  const adminTraceItems = (Array.isArray(context?.adminQueueItems) ? context.adminQueueItems : [])
+    .map((item) => normalizeAdminTraceItem(item))
+    .filter((item) => item.id);
 
   const approvalsByRunId = new Map(
     approvals
@@ -413,6 +478,15 @@ export function createEvidenceWorkspaceSnapshot(context = {}) {
   const allArtifacts = [...runArtifacts, ...threadArtifacts];
   const latestBundle = pickLatest(bundleEntries, ["updatedAt", "createdAt"]);
   const latestArtifact = pickLatest(allArtifacts, ["createdAt", "updatedAt"]);
+  const latestAdminTrace = pickLatest(adminTraceItems, [
+    "updatedAt",
+    "recovery.recordedAt",
+    "receipt.issuedAt",
+    "execution.executedAt",
+    "decision.decidedAt",
+    "simulatedAt",
+    "createdAt"
+  ]);
   const latestIncidentPackage = normalizeIncidentPackage(
     pickLatest(incidentPackages, ["generatedAt", "filingUpdatedAt"])
   );
@@ -517,6 +591,7 @@ export function createEvidenceWorkspaceSnapshot(context = {}) {
   const feedbackMessage = normalizeString(viewState?.feedback?.message);
   const suggestedRunFolderPath =
     accessEntries.find((entry) => normalizeString(entry?.label).toLowerCase() === "suggested run folder")?.path || "";
+  const adminOwnerMix = summarizeTopValues(adminTraceItems, "ownerDomain");
 
   return {
     feedback: feedbackMessage
@@ -525,6 +600,10 @@ export function createEvidenceWorkspaceSnapshot(context = {}) {
           message: feedbackMessage
         }
       : null,
+    aimxsDecisionBindingSpine:
+      context?.aimxsDecisionBindingSpine && typeof context.aimxsDecisionBindingSpine === "object"
+        ? context.aimxsDecisionBindingSpine
+        : { available: false },
     evidenceBundleBoard: {
       bundleCount,
       readyCount,
@@ -592,6 +671,38 @@ export function createEvidenceWorkspaceSnapshot(context = {}) {
           : hashedCount === 0
             ? "warn"
             : "ok"
+    },
+    adminChangeProvenanceBoard: {
+      totalCount: adminTraceItems.length,
+      fullLifecycleCount: adminTraceItems.filter((item) => normalizeString(item?.recovery?.recoveryId)).length,
+      stableRefCount: adminTraceItems.filter(
+        (item) => normalizeString(item?.receipt?.stableRef) || normalizeString(item?.recovery?.stableRef)
+      ).length,
+      ownerMix: adminOwnerMix,
+      latestTrace: latestAdminTrace,
+      aimxsLegibility: createAimxsLegibilityModel({
+        requestRef: normalizeString(latestAdminTrace?.id),
+        actorRef: normalizeString(latestAdminTrace?.decision?.actorRef),
+        subjectRef: normalizeString(latestAdminTrace?.subjectId),
+        authorityRef: normalizeString(latestAdminTrace?.ownerDomain),
+        grantRef: normalizeString(latestAdminTrace?.decision?.approvalReceiptId),
+        posture: normalizeString(latestAdminTrace?.status),
+        scopeRef: normalizeString(latestAdminTrace?.targetScope),
+        previewRef: normalizeString(latestAdminTrace?.simulatedAt),
+        previewSummary: normalizeString(latestAdminTrace?.simulationSummary),
+        decisionRef: normalizeString(latestAdminTrace?.decision?.decisionId),
+        decisionStatus: normalizeString(latestAdminTrace?.decision?.status || latestAdminTrace?.status),
+        approvalReceiptRef: normalizeString(latestAdminTrace?.decision?.approvalReceiptId),
+        executionRef: normalizeString(latestAdminTrace?.execution?.executionId),
+        executionStatus: normalizeString(latestAdminTrace?.execution?.status),
+        receiptRef: normalizeString(latestAdminTrace?.receipt?.receiptId),
+        stableRef: normalizeString(latestAdminTrace?.receipt?.stableRef),
+        recoveryRef: normalizeString(latestAdminTrace?.recovery?.recoveryId),
+        recoveryAction: normalizeString(latestAdminTrace?.recovery?.action),
+        recoveryStableRef: normalizeString(latestAdminTrace?.recovery?.stableRef),
+        summary: normalizeString(latestAdminTrace?.summary)
+      }),
+      tone: adminTraceTone(adminTraceItems, latestAdminTrace)
     },
     artifactAccessBoard: {
       artifactCount: allArtifacts.length,

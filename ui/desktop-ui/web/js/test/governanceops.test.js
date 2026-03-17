@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { renderGovernanceOpsEmptyState, renderGovernanceOpsPage } from "../domains/governanceops/routes.js";
+import { createAimxsDecisionBindingSpine } from "../shared/aimxs/decision-binding.js";
 
 test("governanceops page renders runtime approvals plus identity admin proposal review", () => {
   const ui = { governanceOpsContent: { innerHTML: "" } };
@@ -150,11 +151,50 @@ test("governanceops page renders runtime approvals plus identity admin proposal 
     viewState: {
       selectedAdminChangeId: "authority-change-001"
     },
+    aimxsDecisionBindingSpine: createAimxsDecisionBindingSpine({
+      activeDomain: "governanceops",
+      sourceLabel: "correlated run",
+      correlationRef: "run-20260314-queue-001",
+      runId: "run-20260314-queue-001",
+      approvalId: "approval-run-20260314-queue-001",
+      actorRef: "demo.operator",
+      subjectRef: "task-20260314-queue-001",
+      authorityRef: "codex",
+      authorityBasis: "bearer_token_jwt",
+      scopeRef: "tenant-demo / project-core",
+      providerRef: "aimxs-policy-primary",
+      routeRef: "managed_codex_worker",
+      boundaryRef: "agentops_gateway",
+      grantRef: "policy_grant_token",
+      decisionStatus: "DEFER",
+      executionProfile: "sandbox_vm_autonomous",
+      grantReason: "Tier-3 desktop actuation requires explicit approval and policy grant token.",
+      receiptRef: "approval-receipt-queue-001",
+      stableRef: "stable://run-20260314-queue-001",
+      bundleId: "bundle-governed-001",
+      recordId: "evidence-run-001",
+      replayRef: "run-20260314-queue-001",
+      sessionRef: "session-20260314-queue-001",
+      taskRef: "task-20260314-queue-001",
+      evidenceRefs: ["evidence://finance/transfer/001"],
+      auditRefs: ["approval.reviewed@2026-03-14T21:05:00Z"],
+      summary: "Correlated AIMXS drill-in for governance review."
+    }),
     now: "2026-03-14T21:05:00Z"
   });
 
   assert.match(ui.governanceOpsContent.innerHTML, /data-domain-root="governanceops"/);
   assert.match(ui.governanceOpsContent.innerHTML, /Admin Proposal Review/);
+  assert.match(ui.governanceOpsContent.innerHTML, /AIMXS Lifecycle Ribbon/);
+  assert.match(ui.governanceOpsContent.innerHTML, /AIMXS Decision-Binding Spine/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Authority Chain/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Grant Chain/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Receipt Chain/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Replay Chain/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Evidence Chain/);
+  assert.match(ui.governanceOpsContent.innerHTML, /data-aimxs-spine-action="open-workspace"/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Decision Binding Contract/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Stable Or Replay Refs/);
   assert.match(ui.governanceOpsContent.innerHTML, /Approval Queue/);
   assert.match(ui.governanceOpsContent.innerHTML, /Authority Ladder/);
   assert.match(ui.governanceOpsContent.innerHTML, /Decision Receipt/);

@@ -64,6 +64,36 @@ function renderSnapshotCard(item = {}) {
   `;
 }
 
+function renderAimxsCard(item = {}) {
+  return `
+    <article class="metric homeops-aimxs-card" data-homeops-card="${escapeHTML(item.id || "aimxs-summary")}">
+      <div class="title">${escapeHTML(item.title || "AIMXS")}</div>
+      <div class="meta">
+        <span class="${chipClassForStatus(item.tone || "unknown")} chip-compact">${escapeHTML(
+          String(item.tone || "unknown")
+        )}</span>
+      </div>
+      <div class="homeops-aimxs-value">${escapeHTML(item.value || "-")}</div>
+      <div class="meta">${escapeHTML(item.summary || "-")}</div>
+      <div class="meta">${escapeHTML(item.meta || "-")}</div>
+      ${
+        item.actionLabel
+          ? `
+            <div class="homeops-actions">
+              <button
+                class="btn btn-secondary btn-small"
+                type="button"
+                data-homeops-action="${escapeHTML(item.action || "open-domain")}"
+                ${item.view ? `data-homeops-view="${escapeHTML(item.view)}"` : ""}
+              >${escapeHTML(item.actionLabel)}</button>
+            </div>
+          `
+          : ""
+      }
+    </article>
+  `;
+}
+
 function renderDomainPivot(pivot = {}) {
   return `
     <button
@@ -82,6 +112,7 @@ export function renderHomeWorkspace(snapshot = {}) {
   const commandCards = Array.isArray(snapshot?.commandDashboard?.cards)
     ? snapshot.commandDashboard.cards
     : [];
+  const aimxsCards = Array.isArray(snapshot?.aimxsWorkflow?.cards) ? snapshot.aimxsWorkflow.cards : [];
   const identityCards = Array.isArray(snapshot?.identityAndScope?.cards)
     ? snapshot.identityAndScope.cards
     : [];
@@ -99,6 +130,15 @@ export function renderHomeWorkspace(snapshot = {}) {
         </div>
         <div class="homeops-command-grid">
           ${commandCards.map((card) => renderCommandCard(card)).join("")}
+        </div>
+      </section>
+      <section class="homeops-board">
+        <div class="homeops-board-header">
+          <h3>AIMXS Posture And Readiness</h3>
+          <p class="homeops-board-lead">${escapeHTML(snapshot?.aimxsWorkflow?.summary || "Current AIMXS path, governed state, and next truthful action.")}</p>
+        </div>
+        <div class="homeops-aimxs-grid">
+          ${aimxsCards.map((item) => renderAimxsCard(item)).join("")}
         </div>
       </section>
       <section class="homeops-board">
