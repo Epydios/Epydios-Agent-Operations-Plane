@@ -1,4 +1,4 @@
-package aimxs
+package providerboundary
 
 import "context"
 

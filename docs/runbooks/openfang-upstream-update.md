@@ -4,7 +4,7 @@ This runbook defines a controlled update path for Openfang upstream releases whi
 
 ## Inputs
 
-- Pin file: `providers/desktop/openfang/upstream-pin.json`
+- Pin file: `provider-reference/desktop/openfang/upstream-pin.json`
 - Upstream repo: `https://github.com/RightNow-AI/openfang.git`
 
 ## Drift Check
@@ -37,7 +37,7 @@ COMMIT="$(git -C "SUBSTRATE_UPSTREAMS/DESKTOP_EXECUTION_PLANE/openfang" rev-pars
 echo "TAG=${TAG} COMMIT=${COMMIT}"
 ```
 
-3. Update `providers/desktop/openfang/upstream-pin.json`:
+3. Update `provider-reference/desktop/openfang/upstream-pin.json`:
 - `trackedTag`
 - `trackedCommit`
 - `lastVerifiedAtUtc`

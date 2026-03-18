@@ -56,7 +56,7 @@ restore_policy_config() {
   if [ "${NO_GRANT_POLICY_APPLIED}" != "1" ]; then
     return 0
   fi
-  kubectl -n "${NAMESPACE}" apply -f "${REPO_ROOT}/platform/providers/oss-policy-opa/configmap-opa-policy.yaml" >/dev/null 2>&1 || true
+  kubectl -n "${NAMESPACE}" apply -f "${REPO_ROOT}/platform/provider-manifests/oss-policy-opa/configmap-opa-policy.yaml" >/dev/null 2>&1 || true
   kubectl -n "${NAMESPACE}" rollout restart deployment/epydios-oss-policy-provider >/dev/null 2>&1 || true
   kubectl -n "${NAMESPACE}" rollout status deployment/epydios-oss-policy-provider --timeout=6m >/dev/null 2>&1 || true
   NO_GRANT_POLICY_APPLIED="0"
@@ -66,7 +66,7 @@ restore_policy_selection() {
   if [ "${POLICY_SELECTION_PATCHED}" != "1" ]; then
     return 0
   fi
-  kubectl -n "${NAMESPACE}" apply -f "${REPO_ROOT}/platform/providers/oss-policy-opa/extensionprovider.yaml" >/dev/null 2>&1 || true
+  kubectl -n "${NAMESPACE}" apply -f "${REPO_ROOT}/platform/provider-manifests/oss-policy-opa/extensionprovider.yaml" >/dev/null 2>&1 || true
   wait_for_provider_ready_probed oss-policy-opa >/dev/null 2>&1 || true
   POLICY_SELECTION_PATCHED="0"
 }
@@ -219,7 +219,7 @@ YAML
 }
 
 apply_policy_with_grant() {
-  kubectl -n "${NAMESPACE}" apply -f "${REPO_ROOT}/platform/providers/oss-policy-opa/configmap-opa-policy.yaml"
+  kubectl -n "${NAMESPACE}" apply -f "${REPO_ROOT}/platform/provider-manifests/oss-policy-opa/configmap-opa-policy.yaml"
   kubectl -n "${NAMESPACE}" rollout restart deployment/epydios-oss-policy-provider >/dev/null
   wait_for_rollout epydios-oss-policy-provider
   wait_for_provider_ready_probed oss-policy-opa

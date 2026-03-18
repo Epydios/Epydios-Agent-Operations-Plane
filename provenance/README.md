@@ -8,7 +8,7 @@ What belongs here:
 
 - lockfiles such as image, chart, CRD, and license pins
 - machine-readable OSS intake and first-party IP accountability data
-- placeholder directories for generated release/promotion outputs that are intentionally ignored in git
+- generated machine-readable provenance artifacts when a workflow explicitly writes them here
 
 What does not belong here:
 
@@ -100,7 +100,8 @@ ALLOW_DOCKER_PULL=1 ./platform/local/bin/sync-provenance-image-digests.sh
 - `crds.lock.yaml` CRD source/version references
 - `licenses.lock.yaml` license expectations and verification status
 - `ip/intake-register.json` machine-readable OSS-intake and first-party IP governance register
-- `promotion/`, `release-image-digests/`, `release-images-lockfile-sync/`, and `releases/` placeholder directories for generated artifacts that stay ignored by default
+
+Generated release or promotion artifacts are created on demand and should not require committed placeholder directories.
 
 ## Relationship to Workspace-Level Provenance
 

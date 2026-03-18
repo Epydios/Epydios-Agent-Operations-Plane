@@ -73,9 +73,9 @@
       "artifacts": [
         "platform/local/bin/verify-aimxs-boundary.sh",
         "platform/local/bin/verify-m10-aimxs-private-release.sh",
-        "internal/aimxs/slot.go",
+        "internal/providerboundary/slot.go",
         "docs/aimxs-plugin-slot.md",
-        "examples/aimxs/extensionprovider-policy-https.yaml",
+        "examples/providers/aimxs-boundary/extensionprovider-policy-https.yaml",
         "~/.epydios/premium/release/aimxs/private-release-inputs.vars",
         "~/.epydios/premium/release/aimxs/m10-2-private-release-evidence-latest.json",
         "../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/promotion/staging-full-gate-20260301T183622Z.log",

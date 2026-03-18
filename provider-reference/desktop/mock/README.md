@@ -11,4 +11,4 @@ Binary:
 - `cmd/desktop-provider-mock`
 
 Default config:
-- `providers/desktop/mock/config.example.json`
+- `provider-reference/desktop/mock/config.example.json`

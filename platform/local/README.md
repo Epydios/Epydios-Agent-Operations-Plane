@@ -490,7 +490,7 @@ Default output location:
 
 ### Openfang upstream drift check
 
-Compares `providers/desktop/openfang/upstream-pin.json` with latest upstream semver tag:
+Compares `provider-reference/desktop/openfang/upstream-pin.json` with latest upstream semver tag:
 
 ```bash
 ./platform/local/bin/check-openfang-upstream-drift.sh
@@ -867,7 +867,7 @@ AUTO_INSTALL_MONITORING_STACK=1 ./platform/local/bin/verify-monitoring-alerts.sh
 ### AIMXS external-boundary verification
 
 Validates AIMXS plug-in boundary constraints:
-- `internal/aimxs/slot.go` contract exists and contains required adapter interfaces
+- `internal/providerboundary/slot.go` contract exists and contains required adapter interfaces
 - no direct AIMXS module dependency/import leakage into OSS module graph
 - AIMXS example provider endpoint uses HTTPS and secure auth mode
 - boundary documentation includes conformance + failure-handling expectations
@@ -888,7 +888,7 @@ cd ui/desktop-ui
 Switch to the secure HTTPS registration when you want the external provider path:
 
 ```bash
-kubectl apply -f examples/aimxs/extensionprovider-policy-https.yaml
+kubectl apply -f examples/providers/aimxs-boundary/extensionprovider-policy-https.yaml
 kubectl -n epydios-system patch extensionprovider aimxs-policy-primary --type=merge -p '{"spec":{"selection":{"enabled":true,"priority":900}}}'
 ```
 
@@ -1037,8 +1037,8 @@ WITH_SYSTEM_SMOKETEST=1 ./platform/local/bin/bootstrap-k3d.sh
 - `platform/local/bin/smoke-provider-discovery.sh` applies `platform/system` and verifies `ExtensionProvider` discovery status (`Ready=True`, `Probed=True`)
 - `platform/local/bin/smoke-provider-discovery-negative.sh` applies negative `ExtensionProvider` cases and verifies `Ready=False` / `Probed=False` with expected errors
 - `platform/local/bin/smoke-provider-discovery-mtls.sh` deploys mTLS fixture providers and verifies `MTLS` and `MTLSAndBearerTokenSecret` success paths
-- `platform/local/bin/smoke-policy-provider-opa.sh` applies `platform/providers/oss-policy-opa` and runs policy evaluate/validate smoke checks
-- `platform/local/bin/smoke-evidence-provider-memory.sh` applies `platform/providers/oss-evidence-memory` and runs evidence record/finalize smoke checks
+- `platform/local/bin/smoke-policy-provider-opa.sh` applies `platform/provider-manifests/oss-policy-opa` and runs policy evaluate/validate smoke checks
+- `platform/local/bin/smoke-evidence-provider-memory.sh` applies `platform/provider-manifests/oss-evidence-memory` and runs evidence record/finalize smoke checks
 - `platform/local/bin/smoke-kserve-inferenceservice.sh` applies `platform/tests/kserve-smoke` and validates a live `InferenceService` predict request
 - `platform/local/bin/verify-m1-policy-provider.sh` runs the M1 policy-provider verification gate
 - `platform/local/bin/verify-m1-evidence-provider.sh` runs the evidence-provider verification gate

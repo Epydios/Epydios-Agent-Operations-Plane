@@ -3,8 +3,8 @@ kind: Kustomization
 resources:
   - ../../base
   - ../../system
-  - ../../providers/oss-policy-opa
-  - ../../providers/oss-evidence-memory
+  - ../../provider-manifests/oss-policy-opa
+  - ../../provider-manifests/oss-evidence-memory
   - ../../data/cnpg-prod-cluster
   - ../../hardening/networkpolicy
   - ../../hardening/monitoring
