@@ -26,13 +26,46 @@ Usage:
 
 Required input:
   - ARTIFACT_DIR containing ${DIGEST_MANIFEST_BASENAME}
+    or downloaded per-component release-digest-* artifacts from a failed aggregate run
 
 What this does:
   1) Archives release artifacts to EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/releases/<timestamp>/ by default
-  2) Syncs provenance/images.lock.yaml from release digest manifest
-  3) Syncs platform/overlays/production/patch-image-digests.yaml from release digest manifest
-  4) Runs strict provenance lock verification
+  2) Rebuilds ${DIGEST_MANIFEST_BASENAME} from component digest JSON files when needed
+  3) Syncs provenance/images.lock.yaml from release digest manifest
+  4) Syncs platform/overlays/production/patch-image-digests.yaml from release digest manifest
+  5) Runs strict provenance lock verification
 EOF
+}
+
+rebuild_digest_manifest_if_needed() {
+  local digest_manifest="$1"
+  local -a digest_jsons
+  local path
+
+  if [ -f "${digest_manifest}" ]; then
+    return 0
+  fi
+
+  digest_jsons=()
+  while IFS= read -r path; do
+    digest_jsons+=("${path}")
+  done < <(find "${ARTIFACT_DIR}" -type f -name '*.json' -print | sort)
+
+  if [ "${#digest_jsons[@]}" -eq 0 ]; then
+    echo "Required digest manifest missing: ${digest_manifest}" >&2
+    exit 1
+  fi
+
+  echo "Rebuilding ${DIGEST_MANIFEST_BASENAME} from component digest artifacts..."
+  jq -s '
+    map(select(type == "object" and has("component") and has("digest_ref"))) |
+    sort_by(.component)
+  ' "${digest_jsons[@]}" > "${digest_manifest}"
+
+  jq -e 'type == "array" and length > 0' "${digest_manifest}" >/dev/null || {
+    echo "Unable to rebuild ${DIGEST_MANIFEST_BASENAME} from ${ARTIFACT_DIR}" >&2
+    exit 1
+  }
 }
 
 main() {
@@ -55,10 +88,7 @@ main() {
 
   local digest_manifest
   digest_manifest="${ARTIFACT_DIR}/${DIGEST_MANIFEST_BASENAME}"
-  if [ ! -f "${digest_manifest}" ]; then
-    echo "Required digest manifest missing: ${digest_manifest}" >&2
-    exit 1
-  fi
+  rebuild_digest_manifest_if_needed "${digest_manifest}"
 
   jq -e 'type == "array" and length > 0' "${digest_manifest}" >/dev/null || {
     echo "Invalid digest manifest format: ${digest_manifest}" >&2
