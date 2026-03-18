@@ -5,7 +5,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 WORKSPACE_ROOT="$(cd "${REPO_ROOT}/.." && pwd)"
 NON_GITHUB_ROOT="${NON_GITHUB_ROOT:-${WORKSPACE_ROOT}/EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB}"
-DEFAULT_PROVENANCE_ROOT="${REPO_ROOT}/provenance/aimxs"
+PREMIUM_ROOT="${EPYDIOS_PREMIUM_ROOT:-${HOME}/.epydios/premium}"
+DEFAULT_RELEASE_METADATA_ROOT="${PREMIUM_ROOT}/release/aimxs"
 
 EVIDENCE_INPUT_FILE="${EVIDENCE_INPUT_FILE:-}"
 OUTPUT_DIR="${OUTPUT_DIR:-}"
@@ -112,7 +113,9 @@ validate_sha256() {
 
 load_inputs() {
   if [ -z "${EVIDENCE_INPUT_FILE}" ]; then
-    if [ -f "${REPO_ROOT}/provenance/aimxs/private-release-inputs.vars" ]; then
+    if [ -f "${DEFAULT_RELEASE_METADATA_ROOT}/private-release-inputs.vars" ]; then
+      EVIDENCE_INPUT_FILE="${DEFAULT_RELEASE_METADATA_ROOT}/private-release-inputs.vars"
+    elif [ -f "${REPO_ROOT}/provenance/aimxs/private-release-inputs.vars" ]; then
       EVIDENCE_INPUT_FILE="${REPO_ROOT}/provenance/aimxs/private-release-inputs.vars"
     else
       EVIDENCE_INPUT_FILE="${NON_GITHUB_ROOT}/provenance/aimxs/private-release-inputs.vars"
@@ -226,7 +229,7 @@ main() {
   require_cmd awk
 
   if [ -z "${OUTPUT_DIR}" ]; then
-    OUTPUT_DIR="${DEFAULT_PROVENANCE_ROOT}"
+    OUTPUT_DIR="${DEFAULT_RELEASE_METADATA_ROOT}"
   fi
 
   load_inputs

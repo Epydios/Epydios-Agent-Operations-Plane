@@ -76,8 +76,8 @@
         "internal/aimxs/slot.go",
         "docs/aimxs-plugin-slot.md",
         "examples/aimxs/extensionprovider-policy-https.yaml",
-        "provenance/aimxs/private-release-inputs.vars",
-        "provenance/aimxs/m10-2-private-release-evidence-latest.json",
+        "~/.epydios/premium/release/aimxs/private-release-inputs.vars",
+        "~/.epydios/premium/release/aimxs/m10-2-private-release-evidence-latest.json",
         "../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/promotion/staging-full-gate-20260301T183622Z.log",
         "../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/promotion/staging-full-gate-20260301T183622Z.log.sha256",
         "../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/promotion/staging-full-gate-20260301T183622Z.log.proof.json"

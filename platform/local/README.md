@@ -678,15 +678,15 @@ RUN_M5_BASELINE=0 ./platform/local/bin/verify-m10-entitlement-deny.sh
 ### M10.7 AIMXS aimxs-full packaging evidence verification
 
 Validates release-grade packaging evidence for aimxs-full AIMXS mode:
-- consumes private metadata inputs from `provenance/aimxs/aimxs-full-release-inputs.vars` by default
-- accepts `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/aimxs-full-release-inputs.vars` as an optional legacy override
+- consumes private metadata inputs from `~/.epydios/premium/release/aimxs/aimxs-full-release-inputs.vars` by default
+- accepts `provenance/aimxs/aimxs-full-release-inputs.vars` or `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/aimxs-full-release-inputs.vars` as legacy compatibility overrides
 - requires strict staging log markers for M10.4/M10.5/M10.6 and full-gate pass
 - asserts signed packaging references, SBOM/signature references, air-gapped install/update bundle refs, and support/SLA references
 - verifies required runbooks:
   - `docs/runbooks/aimxs-full-airgap.md`
   - `docs/runbooks/aimxs-full-support-boundary.md`
 - writes evidence to:
-  - `provenance/aimxs/m10-7-aimxs-full-packaging-evidence-<timestamp>.json`
+  - `~/.epydios/premium/release/aimxs/m10-7-aimxs-full-packaging-evidence-<timestamp>.json`
 
 ```bash
 ./platform/local/bin/verify-m10-aimxs-full-packaging.sh
@@ -695,8 +695,8 @@ Validates release-grade packaging evidence for aimxs-full AIMXS mode:
 Override input/evidence paths explicitly:
 
 ```bash
-INPUT_FILE=provenance/aimxs/aimxs-full-release-inputs.vars \
-OUTPUT_DIR=provenance/aimxs \
+INPUT_FILE=~/.epydios/premium/release/aimxs/aimxs-full-release-inputs.vars \
+OUTPUT_DIR=~/.epydios/premium/release/aimxs \
 ./platform/local/bin/verify-m10-aimxs-full-packaging.sh
 ```
 

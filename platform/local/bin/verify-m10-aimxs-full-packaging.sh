@@ -5,7 +5,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 WORKSPACE_ROOT="$(cd "${REPO_ROOT}/.." && pwd)"
 NON_GITHUB_ROOT="${NON_GITHUB_ROOT:-${WORKSPACE_ROOT}/EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB}"
-DEFAULT_PROVENANCE_ROOT="${REPO_ROOT}/provenance/aimxs"
+PREMIUM_ROOT="${EPYDIOS_PREMIUM_ROOT:-${HOME}/.epydios/premium}"
+DEFAULT_RELEASE_METADATA_ROOT="${PREMIUM_ROOT}/release/aimxs"
 
 INPUT_FILE="${INPUT_FILE:-}"
 OUTPUT_DIR="${OUTPUT_DIR:-}"
@@ -108,7 +109,9 @@ validate_sha256() {
 
 load_inputs() {
   if [ -z "${INPUT_FILE}" ]; then
-    if [ -f "${REPO_ROOT}/provenance/aimxs/aimxs-full-release-inputs.vars" ]; then
+    if [ -f "${DEFAULT_RELEASE_METADATA_ROOT}/aimxs-full-release-inputs.vars" ]; then
+      INPUT_FILE="${DEFAULT_RELEASE_METADATA_ROOT}/aimxs-full-release-inputs.vars"
+    elif [ -f "${REPO_ROOT}/provenance/aimxs/aimxs-full-release-inputs.vars" ]; then
       INPUT_FILE="${REPO_ROOT}/provenance/aimxs/aimxs-full-release-inputs.vars"
     else
       INPUT_FILE="${NON_GITHUB_ROOT}/provenance/aimxs/aimxs-full-release-inputs.vars"
@@ -117,7 +120,7 @@ load_inputs() {
 
   if [ ! -f "${INPUT_FILE}" ]; then
     echo "Missing aimxs-full packaging inputs file: ${INPUT_FILE}" >&2
-    echo "Create ${REPO_ROOT}/provenance/aimxs/aimxs-full-release-inputs.vars or point INPUT_FILE at your premium packaging metadata." >&2
+    echo "Create ${DEFAULT_RELEASE_METADATA_ROOT}/aimxs-full-release-inputs.vars or point INPUT_FILE at your premium packaging metadata." >&2
     exit 1
   fi
 
@@ -187,7 +190,7 @@ main() {
   find_staging_log
 
   if [ -z "${OUTPUT_DIR}" ]; then
-    OUTPUT_DIR="${DEFAULT_PROVENANCE_ROOT}"
+    OUTPUT_DIR="${DEFAULT_RELEASE_METADATA_ROOT}"
   fi
   mkdir -p "${OUTPUT_DIR}"
 

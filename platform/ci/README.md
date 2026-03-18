@@ -97,13 +97,13 @@ This directory contains CI entrypoint scripts invoked by GitHub Actions.
     - `RUN_M10_AIMXS_PRIVATE_RELEASE=0` default in fast mode
     - runs `platform/local/bin/verify-m10-aimxs-private-release.sh`
     - validates first private AIMXS SDK/provider release evidence and staging strict-proof assertions
-    - reads `provenance/aimxs/private-release-inputs.vars` by default for private release metadata (allows a legacy external override when explicitly present)
+    - reads `~/.epydios/premium/release/aimxs/private-release-inputs.vars` by default for private release metadata (allows legacy repo-local or external overrides when explicitly present)
   - M10.7 AIMXS aimxs-full packaging evidence verification:
     - `RUN_M10_CUSTOMER_HOSTED_PACKAGING=1` in full mode (required)
     - `RUN_M10_CUSTOMER_HOSTED_PACKAGING=0` default in fast mode
     - runs `platform/local/bin/verify-m10-aimxs-full-packaging.sh`
     - validates aimxs-full packaging references (signed image/artifact + SBOM + air-gapped install/update bundles + support/SLA docs)
-    - reads `provenance/aimxs/aimxs-full-release-inputs.vars` by default for private aimxs-full release metadata (allows a legacy external override when explicitly present)
+    - reads `~/.epydios/premium/release/aimxs/aimxs-full-release-inputs.vars` by default for private aimxs-full release metadata (allows legacy repo-local or external overrides when explicitly present)
   - M13 desktop execution-plane contract + deny-path verifier:
     - `RUN_M13_DESKTOP_PROVIDER=1` in full mode (required)
     - `RUN_M13_DESKTOP_PROVIDER=0` default in fast mode
