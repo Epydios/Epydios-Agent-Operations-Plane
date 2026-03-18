@@ -30,4 +30,4 @@ Forks are allowed under the software license, but you must:
 If you claim compatibility, be specific and accurate (for example, document which versions you tested). Do not imply that Epydios has verified or certified your implementation unless you have written permission.
 
 ## Questions and permission requests
-If you want to request permission to use Epydios or AIMXS marks beyond the allowances above, open a GitHub issue in this repository describing the intended use.
+If you want to request permission to use Epydios or AIMXS marks beyond the allowances above, contact Epydios at brothers@epydios.com

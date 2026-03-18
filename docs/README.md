@@ -41,6 +41,7 @@ If you are evaluating the repo for the first time, stay on those four pages firs
 These docs are still useful, but they are not the first-click path:
 
 - `runbooks/` for operational and packaging detail
+- `premium/` for premium AIMXS release-process documentation kept outside OSS provenance lockfiles
 - `specs/` for deeper contract and hardening material
 - `plans/` for historical planning artifacts
 - pilot sign-off drafts and provenance-heavy material for internal release tracking

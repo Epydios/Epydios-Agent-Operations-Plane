@@ -61,8 +61,9 @@ The aimxs-full packaging verifier requires explicit references for:
 
 These values are supplied in:
 
-- `provenance/aimxs/aimxs-full-release-inputs.vars` by default
-- `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/aimxs-full-release-inputs.vars` as an optional legacy override
+- `~/.epydios/premium/release/aimxs/aimxs-full-release-inputs.vars` by default
+- `provenance/aimxs/aimxs-full-release-inputs.vars` as a legacy repo-local compatibility override
+- `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/aimxs-full-release-inputs.vars` as an optional legacy external override
 
 ## Local Full Packaging Rule
 

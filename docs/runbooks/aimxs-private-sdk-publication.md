@@ -54,22 +54,24 @@ Define the release process for the private AIMXS SDK/reference adapter while kee
 ## OSS Evidence Artifacts (M10.2)
 
 1. Input metadata:
-   - `provenance/aimxs/private-release-inputs.vars` (default)
-   - `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/private-release-inputs.vars` (optional legacy override)
+   - `~/.epydios/premium/release/aimxs/private-release-inputs.vars` (default)
+   - `provenance/aimxs/private-release-inputs.vars` (legacy repo-local compatibility override)
+   - `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/private-release-inputs.vars` (optional legacy external override)
 2. Generated evidence:
-   - `provenance/aimxs/m10-2-private-release-evidence-<timestamp>.json`
-   - `provenance/aimxs/m10-2-private-release-evidence-<timestamp>.json.sha256`
-   - `provenance/aimxs/m10-2-private-release-evidence-latest.json`
+   - `~/.epydios/premium/release/aimxs/m10-2-private-release-evidence-<timestamp>.json`
+   - `~/.epydios/premium/release/aimxs/m10-2-private-release-evidence-<timestamp>.json.sha256`
+   - `~/.epydios/premium/release/aimxs/m10-2-private-release-evidence-latest.json`
 
 ## OSS Evidence Artifacts (M10.7)
 
 1. Input metadata:
-   - `provenance/aimxs/aimxs-full-release-inputs.vars` (default)
-   - `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/aimxs-full-release-inputs.vars` (optional legacy override)
+   - `~/.epydios/premium/release/aimxs/aimxs-full-release-inputs.vars` (default)
+   - `provenance/aimxs/aimxs-full-release-inputs.vars` (legacy repo-local compatibility override)
+   - `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/aimxs-full-release-inputs.vars` (optional legacy external override)
 2. Generated evidence:
-   - `provenance/aimxs/m10-7-aimxs-full-packaging-evidence-<timestamp>.json`
-   - `provenance/aimxs/m10-7-aimxs-full-packaging-evidence-<timestamp>.json.sha256`
-   - `provenance/aimxs/m10-7-aimxs-full-packaging-evidence-latest.json`
+   - `~/.epydios/premium/release/aimxs/m10-7-aimxs-full-packaging-evidence-<timestamp>.json`
+   - `~/.epydios/premium/release/aimxs/m10-7-aimxs-full-packaging-evidence-<timestamp>.json.sha256`
+   - `~/.epydios/premium/release/aimxs/m10-7-aimxs-full-packaging-evidence-latest.json`
 
 ## Local Full Packaging Rule
 

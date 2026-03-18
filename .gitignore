@@ -30,6 +30,3 @@ provenance/releases/*
 !provenance/releases/.gitkeep
 provenance/drift/*
 !provenance/drift/.gitkeep
-provenance/aimxs/*.json
-provenance/aimxs/*.sha256
-provenance/aimxs/*.vars

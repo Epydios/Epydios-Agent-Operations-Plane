@@ -1,27 +1,33 @@
 # Provenance and Lockfiles
 
-This directory holds lightweight lockfiles that should be updated as components are pinned for deployment.
+This directory holds the repo-tracked machine-readable deployment and accountability lockfiles for the OSS control plane.
 
-The goal is to start provenance tracking now and tighten enforcement later.
+The goal is to keep the committed provenance surface narrow, reviewable, and automatable.
 
-## Non-GitHub Artifact Boundary
+What belongs here:
 
-Raw release/promotion evidence artifacts are intentionally kept outside this repo tree to avoid
-publishing operational logs or private AIMXS evidence by accident.
+- lockfiles such as image, chart, CRD, and license pins
+- machine-readable OSS intake and first-party IP accountability data
+- placeholder directories for generated release/promotion outputs that are intentionally ignored in git
 
-Default external location:
+What does not belong here:
+
+- premium AIMXS release-process documentation
+- private AIMXS packaging metadata
+- private release evidence payloads
+- raw operational logs that make the OSS repo look incomplete or workspace-dependent
+
+Premium AIMXS release-process docs now live under:
+
+- `docs/premium/`
+
+Default premium AIMXS release metadata and evidence now live outside the repo at:
 
 ```bash
-../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/
+~/.epydios/premium/release/aimxs
 ```
 
-Keep these in-repo files as authoritative sources:
-- `images.lock.yaml`
-- `charts.lock.yaml`
-- `crds.lock.yaml`
-- `licenses.lock.yaml`
-- `ip/intake-register.json`
-- `aimxs/README.md` (boundary/process documentation only)
+Legacy repo-local or workspace-local premium AIMXS metadata paths may still be accepted by some scripts for compatibility, but they are not the primary taxonomy and should not be treated as part of committed OSS provenance.
 
 ## Validation Gate
 
@@ -94,7 +100,7 @@ ALLOW_DOCKER_PULL=1 ./platform/local/bin/sync-provenance-image-digests.sh
 - `crds.lock.yaml` CRD source/version references
 - `licenses.lock.yaml` license expectations and verification status
 - `ip/intake-register.json` machine-readable OSS-intake and first-party IP governance register
-- `aimxs/` private AIMXS publication evidence for M10.2 (tag + digest evidence + staging strict proof)
+- `promotion/`, `release-image-digests/`, `release-images-lockfile-sync/`, and `releases/` placeholder directories for generated artifacts that stay ignored by default
 
 ## Relationship to Workspace-Level Provenance
 
