@@ -23,6 +23,8 @@ For each governed request, the system does this:
 Key contract and runtime references:
 
 - Docs entry path: [docs/README.md](docs/README.md)
+- Release policy: [docs/release-policy.md](docs/release-policy.md)
+- OSS vs premium: [docs/oss-premium-policy.md](docs/oss-premium-policy.md)
 - Provider boundary: [contracts/extensions/v1alpha1/README.md](contracts/extensions/v1alpha1/README.md)
 - Runtime API: [docs/runtime-orchestration-service.md](docs/runtime-orchestration-service.md)
 - Governed request contract: [docs/specs/governed-action-request-contract.md](docs/specs/governed-action-request-contract.md)
@@ -99,7 +101,17 @@ Premium AIMXS stays behind the public provider boundary:
 
 ## Trust And Contribution
 
+- Quality story: [docs/quality-story.md](docs/quality-story.md)
+- Release policy: [docs/release-policy.md](docs/release-policy.md)
+- OSS vs premium policy: [docs/oss-premium-policy.md](docs/oss-premium-policy.md)
 - License: [LICENSE](LICENSE)
 - Security: [SECURITY.md](SECURITY.md)
 - Contributing: [CONTRIBUTING.md](CONTRIBUTING.md)
+- Trademark: [TRADEMARK.md](TRADEMARK.md)
 - Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
+
+Telemetry/defaults:
+
+- the documented OSS quality story does not enable product analytics or usage tracking by default
+- local managed Codex worker invocation explicitly disables CLI analytics in its default path
+- platform observability components are operator-managed infrastructure, not default third-party product analytics

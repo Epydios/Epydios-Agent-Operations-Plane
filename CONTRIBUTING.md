@@ -26,3 +26,9 @@ If you believe you have found a security vulnerability, please do not file a pub
 - Do not link copyleft/source-available dependencies into planned/shipped product paths unless explicit approval evidence exists.
 - New first-party IP entries must include review metadata (`review.required=true`, review status, and review ticket).
 - Run `./platform/ci/bin/check-ip-intake-register.sh` locally before opening a PR.
+
+## Premium boundary rules
+- Do not commit premium AIMXS source, extracted artifacts, or private package payloads into this OSS repo.
+- Do not make the OSS baseline require premium material in order to run the documented OSS path.
+- Do not add hidden fallback from `aimxs-full` to OSS behavior.
+- Changes that touch the provider seam should preserve the public contract boundary and the clear OSS-versus-premium split documented in `docs/oss-premium-policy.md`.
