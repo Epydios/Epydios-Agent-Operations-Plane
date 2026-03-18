@@ -463,6 +463,7 @@ jobs:
           fi
 
           trivy_image="$(select_image aquasec/trivy:0.67.2 ghcr.io/aquasecurity/trivy:0.67.2)"
+          trivy_report="dist/security/${{ matrix.component }}.trivy.json"
 
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
@@ -475,9 +476,47 @@ jobs:
             --scanners vuln \
             --pkg-types os,library \
             --severity "${{ steps.meta.outputs.vuln_fail_severities }}" \
-            --exit-code 1 \
+            --exit-code 0 \
             ${ignore_unfixed_flag} \
             "${image_ref}"
+
+          fail_count="$(
+            jq \
+              --arg severities "${{ steps.meta.outputs.vuln_fail_severities }}" \
+              '
+                ($severities | split(",") | map(gsub("^\\s+|\\s+$"; ""))) as $fail |
+                [
+                  .Results[]?.Vulnerabilities[]?
+                  | select(.Severity as $s | $fail | index($s))
+                ] | length
+              ' \
+              "${trivy_report}"
+          )"
+
+          if [ "${fail_count}" -gt 0 ]; then
+            echo "Blocking vulnerabilities found for ${{ matrix.component }}: ${fail_count}" >&2
+            jq \
+              --arg severities "${{ steps.meta.outputs.vuln_fail_severities }}" \
+              '
+                ($severities | split(",") | map(gsub("^\\s+|\\s+$"; ""))) as $fail |
+                [
+                  .Results[]?.Vulnerabilities[]?
+                  | select(.Severity as $s | $fail | index($s))
+                  | {
+                      Severity,
+                      VulnerabilityID,
+                      PkgName,
+                      InstalledVersion,
+                      FixedVersion,
+                      Title: (.Title // "")
+                    }
+                ]
+                | sort_by(.Severity, .PkgName, .VulnerabilityID)
+                | .[:25]
+              ' \
+              "${trivy_report}" >&2
+            exit 1
+          fi
 
       - name: Publish component digest artifact
         shell: bash
