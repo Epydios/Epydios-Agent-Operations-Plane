@@ -140,8 +140,8 @@ images:
   - component: epydios-extension-provider-registry-controller
     phase: phase-01-control-plane-extensibility
     image: ghcr.io/epydios/epydios-agent-operations-plane-extension-provider-registry-controller
-    tag: "0.2.0"
-    digest: sha256:af15ae4cdddcdfdb2a3e9070abe86a221553bd5e896f6d9574abdab8485d227d
+    tag: "0.3.0"
+    digest: sha256:a952d53141c932d6b8b18c5f17165126cf95b513a14e3648b48110c3478cd2f9
     source: epydios-agent-operations-plane
     source_path: cmd/extension-provider-registry-controller
     manifest_paths:
@@ -155,8 +155,8 @@ images:
   - component: epydios-oss-profile-static-resolver
     phase: phase-01-control-plane-extensibility
     image: ghcr.io/epydios/epydios-agent-operations-plane-oss-profile-static-resolver
-    tag: "0.2.0"
-    digest: sha256:0681313aea4fbade49d92d6900de4e8bf16dfb28802feef9e0c4023f8c47ab25
+    tag: "0.3.0"
+    digest: sha256:a11325971b027a90d2e72e4ad7c1aa99f6869734baf1ce37bcffa8486cfed61a
     source: epydios-agent-operations-plane
     source_path: cmd/profile-resolver-provider
     manifest_paths:
@@ -171,8 +171,8 @@ images:
   - component: epydios-control-plane-runtime
     phase: phase-01-control-plane-extensibility
     image: ghcr.io/epydios/epydios-agent-operations-plane-runtime
-    tag: "0.2.0"
-    digest: sha256:ca19da830596659931ae1c4444dcf399c124f93e3f33c384c7c705dce91e7f81
+    tag: "0.3.0"
+    digest: sha256:57a02ca7a2dfdbe09b2574e87864764fec91c9e27745840ad387f07ca433e4f9
     source: epydios-agent-operations-plane
     source_path: cmd/control-plane-runtime
     manifest_paths:
@@ -186,8 +186,8 @@ images:
   - component: epydios-oss-policy-opa-provider
     phase: phase-02-oss-policy-provider
     image: ghcr.io/epydios/epydios-agent-operations-plane-oss-policy-opa-provider
-    tag: "0.2.0"
-    digest: sha256:0da915c2a4e571404dffbe63168b017f1176f8d5f4387a4e4d91317d9787c3cc
+    tag: "0.3.0"
+    digest: sha256:21418c580e115ffed134060946cfccf2f430d5aad970416e036a0396ec088d84
     source: epydios-agent-operations-plane
     source_path: cmd/policy-provider-opa-adapter
     manifest_paths:
@@ -201,8 +201,8 @@ images:
   - component: epydios-oss-evidence-memory-provider
     phase: phase-02-oss-evidence-provider
     image: ghcr.io/epydios/epydios-agent-operations-plane-oss-evidence-memory-provider
-    tag: "0.2.0"
-    digest: sha256:d3839d68b405fc841fdfa40bf5eae3843eaa874d3affd80154182c83d761a84f
+    tag: "0.3.0"
+    digest: sha256:1e3047021d317e2f5606413e2a0b956a80f36fa09dafcd82a2fe0ec1e8d6551d
     source: epydios-agent-operations-plane
     source_path: cmd/evidence-provider-memory
     manifest_paths:
@@ -216,8 +216,8 @@ images:
   - component: epydios-mtls-capabilities-provider
     phase: phase-02-mtls-provider-discovery
     image: ghcr.io/epydios/epydios-agent-operations-plane-mtls-capabilities-provider
-    tag: "0.2.0"
-    digest: sha256:a6131127505dce19905a7c63369222258248e18846140dd98f001813163b9b62
+    tag: "0.3.0"
+    digest: sha256:a5b04a133613deeefcdb22a1cb2696f26c2a24bdd92216365e96a856a91ef034
     source: epydios-agent-operations-plane
     source_path: cmd/mtls-capabilities-provider
     manifest_paths:
@@ -233,7 +233,7 @@ images:
     phase: phase-02-desktop-provider
     image: ghcr.io/epydios/epydios-agent-operations-plane-oss-desktop-provider
     tag: "0.3.0"
-    digest: sha256:TBD
+    digest: sha256:dd37e979870714d6a34aa9184057cc004c9e056b04293f5ef2e2cd20f5a5932b
     source: epydios-agent-operations-plane
     source_path: cmd/desktop-provider-mock
     manifest_paths:
@@ -243,12 +243,12 @@ images:
       - Build/push in CI from this repository.
       - Fill digest after push using `crane digest` or `docker buildx imagetools inspect`.
     required: false
-    status: planned
+    status: release-synced
   - component: epydios-oss-desktop-openfang-provider
     phase: phase-02-desktop-provider
     image: ghcr.io/epydios/epydios-agent-operations-plane-oss-desktop-openfang-provider
     tag: "0.3.0"
-    digest: sha256:TBD
+    digest: sha256:6a8a7a5305282c0a5e8c934420633f1acc2bcebf5ae0c9ae373572f79f2c3c0d
     source: epydios-agent-operations-plane
     source_path: cmd/desktop-provider-openfang
     manifest_paths:
@@ -260,12 +260,12 @@ images:
       - Build/push in CI from this repository.
       - Fill digest after push using `crane digest` or `docker buildx imagetools inspect`.
     required: false
-    status: planned
+    status: release-synced
   - component: epydios-agent-operations-plane-desktop
     phase: phase-03-operator-workbench
     image: ghcr.io/epydios/epydios-agent-operations-plane-desktop
     tag: "0.3.0"
-    digest: sha256:TBD
+    digest: sha256:db152865b0733d1f2a7abade10a69c580fb4e1f19c164fc479aed8b94d51ccd0
     source: epydios-agent-operations-plane
     source_path: ui/desktop-ui
     manifest_paths:
@@ -275,7 +275,7 @@ images:
       - Build/push in CI from this repository.
       - Fill digest after push using `crane digest` or `docker buildx imagetools inspect`.
     required: false
-    status: planned
+    status: release-synced
   - component: opa-sidecar
     phase: phase-02-oss-policy-provider
     image: openpolicyagent/opa
