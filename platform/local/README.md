@@ -678,14 +678,15 @@ RUN_M5_BASELINE=0 ./platform/local/bin/verify-m10-entitlement-deny.sh
 ### M10.7 AIMXS aimxs-full packaging evidence verification
 
 Validates release-grade packaging evidence for aimxs-full AIMXS mode:
-- consumes private metadata inputs from `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/aimxs-full-release-inputs.vars` by default
+- consumes private metadata inputs from `provenance/aimxs/aimxs-full-release-inputs.vars` by default
+- accepts `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/aimxs-full-release-inputs.vars` as an optional legacy override
 - requires strict staging log markers for M10.4/M10.5/M10.6 and full-gate pass
 - asserts signed packaging references, SBOM/signature references, air-gapped install/update bundle refs, and support/SLA references
 - verifies required runbooks:
   - `docs/runbooks/aimxs-full-airgap.md`
   - `docs/runbooks/aimxs-full-support-boundary.md`
 - writes evidence to:
-  - `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/m10-7-aimxs-full-packaging-evidence-<timestamp>.json`
+  - `provenance/aimxs/m10-7-aimxs-full-packaging-evidence-<timestamp>.json`
 
 ```bash
 ./platform/local/bin/verify-m10-aimxs-full-packaging.sh
@@ -694,8 +695,8 @@ Validates release-grade packaging evidence for aimxs-full AIMXS mode:
 Override input/evidence paths explicitly:
 
 ```bash
-INPUT_FILE=../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/aimxs-full-release-inputs.vars \
-OUTPUT_DIR=../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs \
+INPUT_FILE=provenance/aimxs/aimxs-full-release-inputs.vars \
+OUTPUT_DIR=provenance/aimxs \
 ./platform/local/bin/verify-m10-aimxs-full-packaging.sh
 ```
 
@@ -1077,7 +1078,7 @@ WITH_SYSTEM_SMOKETEST=1 ./platform/local/bin/bootstrap-k3d.sh
 - `platform/local/bin/verify-admission-enforcement.sh` validates admission-deny behavior for mutable tags and optional signed-image enforcement via Kyverno
 - `platform/local/bin/bootstrap-monitoring-stack.sh` installs a local kube-prometheus-stack profile for pilot/staging monitoring validation
 - `platform/local/bin/verify-monitoring-alerts.sh` validates Prometheus/Alertmanager rule load + synthetic firing alert path
-- `platform/local/bin/verify-aimxs-boundary.sh` verifies AIMXS stays an external HTTPS plug-in boundary (slot contract + import boundary + manifest auth constraints)
+- `platform/local/bin/verify-aimxs-boundary.sh` verifies the premium AIMXS path is self-contained for local full mode, fails clearly when the premium artifact is missing, preserves the slot/import boundary, and does not silently fall back to OSS
 - `platform/local/bin/verify-provenance-lockfiles.sh` validates chart/image/CRD/license lockfiles (development and strict modes)
 - `platform/local/bin/sync-provenance-image-digests.sh` fills `provenance/images.lock.yaml` digests from running cluster image IDs and optional registry pulls
 

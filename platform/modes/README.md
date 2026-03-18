@@ -15,6 +15,7 @@ These profiles codify three deployment modes under the same `ExtensionProvider` 
 3. `aimxs-full`
 - Names the full AIMXS contract surface.
 - Desktop/runtime local troubleshooting uses the live launcher AIMXS shim instead of a hidden OSS fallback.
+- Local full mode expects the premium AIMXS artifact at `~/.epydios/premium/aimxs/extracted` unless `EPYDIOS_AIMXS_EXTRACTED_ROOT` overrides it.
 - Cluster-side secure wiring can still reuse the same mode name when a full AIMXS endpoint is available.
 
 ## Apply

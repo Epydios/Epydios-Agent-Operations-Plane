@@ -50,17 +50,17 @@ type DesktopVerifierPolicy struct {
 }
 
 type DesktopGrantEnvelope struct {
-	CapabilityGrantToken string    `json:"capabilityGrantToken"`
+	CapabilityGrantToken string     `json:"capabilityGrantToken"`
 	CapabilityScope      JSONObject `json:"capabilityScope,omitempty"`
-	GrantExpiresAt       string    `json:"grantExpiresAt,omitempty"`
+	GrantExpiresAt       string     `json:"grantExpiresAt,omitempty"`
 }
 
 type DesktopStepEnvelope struct {
-	RunID                  string               `json:"runId"`
-	StepID                 string               `json:"stepId"`
-	TargetOS               string               `json:"targetOS"`
-	TargetExecutionProfile string               `json:"targetExecutionProfile"`
-	RequestedCapabilities  []string             `json:"requestedCapabilities"`
+	RunID                  string                `json:"runId"`
+	StepID                 string                `json:"stepId"`
+	TargetOS               string                `json:"targetOS"`
+	TargetExecutionProfile string                `json:"targetExecutionProfile"`
+	RequestedCapabilities  []string              `json:"requestedCapabilities"`
 	VerifierPolicy         DesktopVerifierPolicy `json:"verifierPolicy"`
 	Grant                  *DesktopGrantEnvelope `json:"grant,omitempty"`
 }

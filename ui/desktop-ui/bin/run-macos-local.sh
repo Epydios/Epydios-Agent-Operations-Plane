@@ -6,6 +6,7 @@ MODULE_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 REPO_ROOT="$(cd "${MODULE_ROOT}/../.." && pwd)"
 # shellcheck source=./lib-m21-paths.sh
 source "${SCRIPT_DIR}/lib-m21-paths.sh"
+m21_prepare_local_state_layout
 
 MODE="mock"
 UI_HOST="${UI_HOST:-127.0.0.1}"
@@ -198,9 +199,6 @@ LOCAL_REF_VAULT_SERVICE="$(m21_local_ref_vault_service_name)"
 LOCAL_AIMXS_OVERRIDE_PATH="$(m21_local_aimxs_provider_override_path)"
 LOCAL_AIMXS_STATE_PATH="$(m21_local_aimxs_provider_state_path)"
 LOCAL_AIMXS_ENDPOINT_URL="http://${AIMXS_LOCAL_FULL_HOST}:${AIMXS_LOCAL_FULL_PORT}"
-
-mkdir -p "${LOCAL_REF_VAULT_ROOT}"
-mkdir -p "$(m21_local_aimxs_root)"
 
 check_port_available() {
   local port="$1"

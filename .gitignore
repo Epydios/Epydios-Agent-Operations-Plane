@@ -5,6 +5,7 @@
 *.log
 .env
 .env.*
+.epydios/
 .tmp/
 tmp/
 dist/

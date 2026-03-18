@@ -28,9 +28,9 @@ It is the human-facing companion to `docs/pilot-readiness-signoff-draft.json`.
      - `./platform/local/bin/verify-m7-integration.sh`
      - `./platform/local/bin/verify-m7-cnpg-backup-restore.sh`
      - `./platform/local/bin/verify-m7-upgrade-safety.sh`
-5. AIMXS external boundary pass (M8.6 partial)
+5. AIMXS premium-path boundary pass (M8.6 partial)
    - Command: `./platform/local/bin/verify-aimxs-boundary.sh`
-   - Must include: HTTPS/auth constraints, slot-only contract use, no direct module leakage.
+   - Must include: self-contained premium local-full startup, clear missing-artifact failure, slot-only contract use, no direct module leakage, and no silent OSS fallback.
 6. AIMXS private release evidence pass (M10.2)
    - Commands:
      - `./platform/local/bin/verify-m10-aimxs-private-release.sh`

@@ -2302,8 +2302,8 @@ func (c *fakeGovernedActionProviderClient) PostJSON(_ context.Context, target *P
 			"aimxs": map[string]interface{}{
 				"providerId": "aimxs-full",
 				"providerMeta": map[string]interface{}{
-					"baak_engaged":  true,
-					"decision_path": map[string]string{"ALLOW": "finance_governed_allow", "DEFER": "finance_governed_defer", "DENY": "finance_governed_deny"}[decision],
+					"baak_engaged":          true,
+					"decision_path":         map[string]string{"ALLOW": "finance_governed_allow", "DEFER": "finance_governed_defer", "DENY": "finance_governed_deny"}[decision],
 					"policy_stratification": providerPolicy,
 				},
 				"evidence": map[string]interface{}{
@@ -2327,7 +2327,7 @@ func (c *fakeGovernedActionProviderClient) PostJSON(_ context.Context, target *P
 					"message": message,
 				},
 			},
-			"evidenceRefs": []string{"evidence://mock-governed-1"},
+			"evidenceRefs":      []string{"evidence://mock-governed-1"},
 			"grantTokenPresent": decision == "ALLOW",
 			"output":            output,
 		})

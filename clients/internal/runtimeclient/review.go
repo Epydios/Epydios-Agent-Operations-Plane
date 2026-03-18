@@ -71,10 +71,10 @@ type OrgAdminReviewProjection struct {
 }
 
 type OrgAdminArtifactProjection struct {
-	EventLabels       []string `json:"eventLabels,omitempty"`
-	EvidenceKinds     []string `json:"evidenceKinds,omitempty"`
-	RetentionClasses  []string `json:"retentionClasses,omitempty"`
-	Details           []string `json:"details,omitempty"`
+	EventLabels      []string `json:"eventLabels,omitempty"`
+	EvidenceKinds    []string `json:"evidenceKinds,omitempty"`
+	RetentionClasses []string `json:"retentionClasses,omitempty"`
+	Details          []string `json:"details,omitempty"`
 }
 
 type orgAdminDecisionBindingProjection struct {

@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MODULE_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 # shellcheck source=./lib-m21-paths.sh
 source "${SCRIPT_DIR}/lib-m21-paths.sh"
+m21_prepare_local_state_layout
 
 LISTEN_HOST="${LISTEN_HOST:-127.0.0.1}"
 LISTEN_PORT="${LISTEN_PORT:-18080}"
@@ -435,8 +436,6 @@ SESSION_ROOT="$(m21_local_runtime_session_root)"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 SESSION_DIR="${SESSION_ROOT}/${STAMP}"
 mkdir -p "${SESSION_DIR}" "$(m21_go_cache_root)" "$(m21_go_mod_cache_root)" "$(m21_local_runtime_bin_root)"
-mkdir -p "$(m21_local_ref_vault_root)"
-mkdir -p "$(m21_local_aimxs_root)"
 
 POSTGRES_PORT_FORWARD_LOG="${SESSION_DIR}/postgres-port-forward.log"
 PROFILE_PORT_FORWARD_LOG="${SESSION_DIR}/profile-port-forward.log"
