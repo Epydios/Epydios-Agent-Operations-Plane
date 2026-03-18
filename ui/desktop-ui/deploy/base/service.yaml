@@ -5,7 +5,7 @@ metadata:
   labels:
     app.kubernetes.io/name: agentops-desktop
     app.kubernetes.io/component: ui
-    app.kubernetes.io/part-of: epydios-agentops-control-plane
+    app.kubernetes.io/part-of: epydios-agent-operations-plane
 spec:
   selector:
     app.kubernetes.io/name: agentops-desktop

@@ -21,7 +21,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: evidence-provider
-          image: ghcr.io/epydios/epydios-oss-evidence-memory-provider:0.2.0
+          image: ghcr.io/epydios/epydios-agent-operations-plane-oss-evidence-memory-provider:0.3.0
           imagePullPolicy: IfNotPresent
           args:
             - -listen=:8080
@@ -62,4 +62,3 @@ spec:
         - name: provider-config
           configMap:
             name: epydios-oss-evidence-provider-config
-

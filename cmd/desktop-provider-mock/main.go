@@ -167,7 +167,7 @@ func applyDefaults(cfg *Config) {
 		cfg.ProviderID = "oss-desktop-linux"
 	}
 	if strings.TrimSpace(cfg.ProviderVersion) == "" {
-		cfg.ProviderVersion = "0.2.0"
+		cfg.ProviderVersion = "0.3.0"
 	}
 	cfg.TargetOS = strings.ToLower(strings.TrimSpace(cfg.TargetOS))
 	if cfg.TargetOS == "" {

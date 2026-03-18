@@ -8,8 +8,8 @@ RUNTIME="${RUNTIME:-kind}" # kind | k3d
 CLUSTER_NAME="${CLUSTER_NAME:-epydios-dev}"
 NAMESPACE="${NAMESPACE:-epydios-system}"
 
-PREVIOUS_TAG="${PREVIOUS_TAG:-0.1.0}"
-CURRENT_TAG="${CURRENT_TAG:-0.2.0}"
+PREVIOUS_TAG="${PREVIOUS_TAG:-0.2.0}"
+CURRENT_TAG="${CURRENT_TAG:-0.3.0}"
 UPGRADE_POLICY_FILE="${UPGRADE_POLICY_FILE:-${REPO_ROOT}/platform/upgrade/compatibility-policy.yaml}"
 
 RUN_PRECHECK_PHASE04="${RUN_PRECHECK_PHASE04:-1}"
@@ -17,11 +17,11 @@ RUN_POSTCHECK_PHASE04="${RUN_POSTCHECK_PHASE04:-1}"
 RUN_POSTCHECK_M5="${RUN_POSTCHECK_M5:-1}"
 TIMEOUT_SECONDS="${TIMEOUT_SECONDS:-360}"
 
-CONTROLLER_REPO="ghcr.io/epydios/epydios-extension-provider-registry-controller"
-RUNTIME_REPO="ghcr.io/epydios/epydios-control-plane-runtime"
-PROFILE_REPO="ghcr.io/epydios/epydios-oss-profile-static-resolver"
-POLICY_REPO="ghcr.io/epydios/epydios-oss-policy-opa-provider"
-EVIDENCE_REPO="ghcr.io/epydios/epydios-oss-evidence-memory-provider"
+CONTROLLER_REPO="ghcr.io/epydios/epydios-agent-operations-plane-extension-provider-registry-controller"
+RUNTIME_REPO="ghcr.io/epydios/epydios-agent-operations-plane-runtime"
+PROFILE_REPO="ghcr.io/epydios/epydios-agent-operations-plane-oss-profile-static-resolver"
+POLICY_REPO="ghcr.io/epydios/epydios-agent-operations-plane-oss-policy-opa-provider"
+EVIDENCE_REPO="ghcr.io/epydios/epydios-agent-operations-plane-oss-evidence-memory-provider"
 
 require_cmd() {
   command -v "$1" >/dev/null 2>&1 || {

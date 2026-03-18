@@ -321,7 +321,7 @@ Monitoring ownership and rollout policy is documented in:
 
 - `.github/workflows/release-images-ghcr.yml`
   - Triggers on tag push (`v*`) and manual dispatch
-  - Builds all Epydios binaries into OCI images via `build/docker/Dockerfile.go-binary`
+  - Builds all release-coupled first-party OCI images, including the desktop UI image
   - Pushes to GHCR by default (manual dispatch can disable push for dry-run validation)
   - Signs pushed image digests with keyless cosign (GitHub OIDC)
   - Attests pushed image digests with a release predicate and verifies both signature/attestation
@@ -334,6 +334,7 @@ Monitoring ownership and rollout policy is documented in:
     - `release-image-digests.md`
   - Auto-syncs `provenance/images.lock.yaml` from aggregated release digests (artifact output):
     - `release-images-lockfile-sync` (contains synced lockfile + diff)
+    - `platform/overlays/production/patch-image-digests.yaml`
   - Runs strict provenance validation on the synced lockfile artifact before publish:
     - `go run ./cmd/provenance-lock-check -strict -repo-root dist/repo-root`
     - blocks artifact publication if the sync result violates strict policy
