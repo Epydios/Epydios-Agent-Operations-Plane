@@ -4,7 +4,7 @@ Use this path if you want to see the OSS baseline without digging through the fu
 
 ## What You Are Running
 
-Epydios AgentOps is a control plane and operator workbench for governed agent tool execution with approvals and evidence.
+Epydios Agent Operations Plane is a control plane and operator workbench for governed agent tool execution with approvals and evidence.
 
 The narrow first story is:
 

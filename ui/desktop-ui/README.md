@@ -1,6 +1,6 @@
-# Epydios AgentOps Desktop
+# Desktop UI for Epydios Agent Operations Plane
 
-`Epydios AgentOps Desktop` is the separate operator UI module for the Epydios control plane.
+`Epydios AgentOps Desktop` is the separate operator UI module for Epydios Agent Operations Plane.
 
 This module is intentionally outside `EPYDIOS_AI_CONTROL_PLANE` to keep backend/runtime release velocity independent from UI release cadence.
 
@@ -15,10 +15,10 @@ This module is intentionally outside `EPYDIOS_AI_CONTROL_PLANE` to keep backend/
 
 ## Initial Product Positioning
 
-- Backend product: `Epydios AgentOps Control Plane` (technical descriptor).
-- UI product: `Epydios AgentOps Desktop` (operator-facing desktop/web app).
+- Backend product: `Epydios Agent Operations Plane`.
+- UI module and current launcher artifact name: `Epydios AgentOps Desktop`.
 
-This naming keeps the backend accurate while giving the user-facing layer a stronger product identity.
+This naming keeps the product name accurate while preserving the current desktop module, launcher, and install-artifact labels.
 
 ## M0 Goals
 

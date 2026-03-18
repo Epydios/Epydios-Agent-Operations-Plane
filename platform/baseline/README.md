@@ -1,6 +1,6 @@
 # Platform Baseline (Initial Catalog)
 
-This directory captures the initial bootstrap sequence and the component catalog for the `Epydios AgentOps Control Plane` Kubernetes baseline.
+This directory captures the initial bootstrap sequence and the component catalog for the `Epydios Agent Operations Plane` Kubernetes baseline.
 
 The baseline is intentionally split into ordered phases so the control plane can be stood up incrementally and debugged in layers.
 
@@ -18,4 +18,3 @@ The baseline is intentionally split into ordered phases so the control plane can
 3. Bring up a dev cluster and install `platform/base`
 4. Install phase 00 foundation, then phase 01 observability/runtime
 5. Add control plane core services and provider registry controller
-

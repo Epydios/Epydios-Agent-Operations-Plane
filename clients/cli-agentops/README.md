@@ -1,6 +1,6 @@
-# Epydios AgentOps CLI
+# CLI Ingress for Epydios Agent Operations Plane
 
-`Epydios AgentOps CLI` is the first `M19` CLI ingress slice.
+`cli-agentops` is the first `M19` CLI ingress slice for Epydios Agent Operations Plane.
 
 Scope of this slice:
 - list native M16 tasks as governed threads

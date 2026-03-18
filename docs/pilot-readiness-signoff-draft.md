@@ -5,7 +5,7 @@ Status: Approved (all evidence complete and approvals recorded)
 
 ## Scope
 
-This draft defines the pilot sign-off package for the Epydios AgentOps Control Plane.
+This draft defines the pilot sign-off package for the Epydios Agent Operations Plane.
 It is the human-facing companion to `docs/pilot-readiness-signoff-draft.json`.
 
 ## Required Evidence Checklist
