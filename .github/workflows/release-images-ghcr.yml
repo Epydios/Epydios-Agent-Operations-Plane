@@ -473,7 +473,7 @@ jobs:
             --format json \
             --output "/out/${{ matrix.component }}.trivy.json" \
             --scanners vuln \
-            --vuln-type os,library \
+            --pkg-types os,library \
             --severity "${{ steps.meta.outputs.vuln_fail_severities }}" \
             --exit-code 1 \
             ${ignore_unfixed_flag} \
