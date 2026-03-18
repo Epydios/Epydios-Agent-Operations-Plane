@@ -6,6 +6,8 @@ Start here:
 
 - [Getting started](getting-started.md)
 - [OSS quality story](quality-story.md)
+- [Release policy](release-policy.md)
+- [OSS and premium policy](oss-premium-policy.md)
 - [Runtime orchestration service](runtime-orchestration-service.md)
 - [Governed action request contract](specs/governed-action-request-contract.md)
 - [AIMXS governed action demo](runbooks/aimxs-governed-action-demo.md)
@@ -27,6 +29,8 @@ If you are evaluating the repo for the first time, stay on those four pages firs
 - [Provider boundary](../contracts/extensions/v1alpha1/README.md)
 - [Governed action request contract](specs/governed-action-request-contract.md)
 - [Architecture](architecture.md)
+- [Release policy](release-policy.md)
+- [OSS and premium policy](oss-premium-policy.md)
 
 ### Run One Demo
 
