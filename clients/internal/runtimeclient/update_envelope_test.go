@@ -35,10 +35,10 @@ func TestRenderGovernedUpdateEnvelope(t *testing.T) {
 		OrgAdminArtifactRetention: []string{
 			"standard",
 		},
-		Summary:              "Governed thread state refreshed.",
-		Details:              []string{"Title: Chat task"},
-		Recent:               []string{"Worker Progress: Worker collected deployment context."},
-		ActionHints:          []string{"Approve the pending action."},
+		Summary:     "Governed thread state refreshed.",
+		Details:     []string{"Title: Chat task"},
+		Recent:      []string{"Worker Progress: Worker collected deployment context."},
+		ActionHints: []string{"Approve the pending action."},
 	})
 	for _, part := range []string{
 		"AgentOps thread update",

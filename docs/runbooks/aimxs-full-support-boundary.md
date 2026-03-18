@@ -61,7 +61,14 @@ The aimxs-full packaging verifier requires explicit references for:
 
 These values are supplied in:
 
-- `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/aimxs-full-release-inputs.vars`
+- `provenance/aimxs/aimxs-full-release-inputs.vars` by default
+- `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/aimxs-full-release-inputs.vars` as an optional legacy override
+
+## Local Full Packaging Rule
+
+- The official local install root for premium `aimxs-full` verification is `~/.epydios/premium/aimxs/extracted`.
+- `EPYDIOS_AIMXS_EXTRACTED_ROOT` is the supported override.
+- Missing premium AIMXS must fail clearly and must never silently fall back to OSS.
 
 ## Verification Hook
 

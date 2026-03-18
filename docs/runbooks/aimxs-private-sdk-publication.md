@@ -33,6 +33,7 @@ Define the release process for the private AIMXS SDK/reference adapter while kee
 2. Run OSS boundary checks in this repo:
    - `./platform/local/bin/verify-aimxs-boundary.sh`
    - `./platform/local/bin/verify-m10-policy-grant-enforcement.sh`
+   - `./platform/local/bin/verify-m10-entitlement-deny.sh`
    - `./platform/local/bin/verify-m10-aimxs-private-release.sh`
    - `./platform/local/bin/verify-m10-aimxs-full-packaging.sh`
 3. Build and push private AIMXS provider image(s).
@@ -53,22 +54,28 @@ Define the release process for the private AIMXS SDK/reference adapter while kee
 ## OSS Evidence Artifacts (M10.2)
 
 1. Input metadata:
-   - `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/private-release-inputs.vars` (default)
-   - `provenance/aimxs/private-release-inputs.vars` (repo-local fallback for offline/local-only usage)
+   - `provenance/aimxs/private-release-inputs.vars` (default)
+   - `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/private-release-inputs.vars` (optional legacy override)
 2. Generated evidence:
-   - `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/m10-2-private-release-evidence-<timestamp>.json`
-   - `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/m10-2-private-release-evidence-<timestamp>.json.sha256`
-   - `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/m10-2-private-release-evidence-latest.json`
+   - `provenance/aimxs/m10-2-private-release-evidence-<timestamp>.json`
+   - `provenance/aimxs/m10-2-private-release-evidence-<timestamp>.json.sha256`
+   - `provenance/aimxs/m10-2-private-release-evidence-latest.json`
 
 ## OSS Evidence Artifacts (M10.7)
 
 1. Input metadata:
-   - `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/aimxs-full-release-inputs.vars` (default)
-   - `provenance/aimxs/aimxs-full-release-inputs.vars` (repo-local fallback for offline/local-only usage)
+   - `provenance/aimxs/aimxs-full-release-inputs.vars` (default)
+   - `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/aimxs-full-release-inputs.vars` (optional legacy override)
 2. Generated evidence:
-   - `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/m10-7-aimxs-full-packaging-evidence-<timestamp>.json`
-   - `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/m10-7-aimxs-full-packaging-evidence-<timestamp>.json.sha256`
-   - `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/m10-7-aimxs-full-packaging-evidence-latest.json`
+   - `provenance/aimxs/m10-7-aimxs-full-packaging-evidence-<timestamp>.json`
+   - `provenance/aimxs/m10-7-aimxs-full-packaging-evidence-<timestamp>.json.sha256`
+   - `provenance/aimxs/m10-7-aimxs-full-packaging-evidence-latest.json`
+
+## Local Full Packaging Rule
+
+- `aimxs-full` local mode is verified against the official premium install root `~/.epydios/premium/aimxs/extracted`.
+- Override that root only with `EPYDIOS_AIMXS_EXTRACTED_ROOT`.
+- Missing premium AIMXS must fail clearly and must never silently fall back to OSS.
 
 ## Rollback
 

@@ -7,15 +7,15 @@ import (
 )
 
 const (
-	defaultModelRouting                = "gateway_first"
-	defaultGatewayProviderID           = "litellm"
-	defaultGatewayTokenRef             = "ref://projects/{projectId}/gateways/litellm/bearer-token"
-	defaultGatewayMTLSCertRef          = "ref://projects/{projectId}/gateways/litellm/mtls-cert"
-	defaultGatewayMTLSKeyRef           = "ref://projects/{projectId}/gateways/litellm/mtls-key"
-	defaultSelectedAgentProfileID      = "codex"
-	defaultAzureOpenAIAPIVersion       = "2024-10-21"
-	defaultInvokeMaxOutputTokens       = 1024
-	defaultBedrockAnthropicAPIVersion  = "bedrock-2023-05-31"
+	defaultModelRouting               = "gateway_first"
+	defaultGatewayProviderID          = "litellm"
+	defaultGatewayTokenRef            = "ref://projects/{projectId}/gateways/litellm/bearer-token"
+	defaultGatewayMTLSCertRef         = "ref://projects/{projectId}/gateways/litellm/mtls-cert"
+	defaultGatewayMTLSKeyRef          = "ref://projects/{projectId}/gateways/litellm/mtls-key"
+	defaultSelectedAgentProfileID     = "codex"
+	defaultAzureOpenAIAPIVersion      = "2024-10-21"
+	defaultInvokeMaxOutputTokens      = 1024
+	defaultBedrockAnthropicAPIVersion = "bedrock-2023-05-31"
 )
 
 type agentProfileConfig struct {
@@ -54,19 +54,19 @@ type rawAgentProfileConfig struct {
 }
 
 type rawAgentIntegrationSettings struct {
-	ModelRouting                string                 `json:"modelRouting"`
-	GatewayProviderID           string                 `json:"gatewayProviderId"`
-	GatewayTokenRef             string                 `json:"gatewayTokenRef"`
-	GatewayMTLSCertRef          string                 `json:"gatewayMtlsCertRef"`
-	GatewayMTLSKeyRef           string                 `json:"gatewayMtlsKeyRef"`
-	AllowDirectProviderFallback *bool                  `json:"allowDirectProviderFallback,omitempty"`
-	SelectedAgentProfileID      string                 `json:"selectedAgentProfileId"`
-	ProfileTransport            string                 `json:"profileTransport"`
-	ProfileModel                string                 `json:"profileModel"`
-	ProfileEndpointRef          string                 `json:"profileEndpointRef"`
-	ProfileCredentialRef        string                 `json:"profileCredentialRef"`
-	ProfileCredentialScope      string                 `json:"profileCredentialScope"`
-	ProfileEnabled              *bool                  `json:"profileEnabled,omitempty"`
+	ModelRouting                string                  `json:"modelRouting"`
+	GatewayProviderID           string                  `json:"gatewayProviderId"`
+	GatewayTokenRef             string                  `json:"gatewayTokenRef"`
+	GatewayMTLSCertRef          string                  `json:"gatewayMtlsCertRef"`
+	GatewayMTLSKeyRef           string                  `json:"gatewayMtlsKeyRef"`
+	AllowDirectProviderFallback *bool                   `json:"allowDirectProviderFallback,omitempty"`
+	SelectedAgentProfileID      string                  `json:"selectedAgentProfileId"`
+	ProfileTransport            string                  `json:"profileTransport"`
+	ProfileModel                string                  `json:"profileModel"`
+	ProfileEndpointRef          string                  `json:"profileEndpointRef"`
+	ProfileCredentialRef        string                  `json:"profileCredentialRef"`
+	ProfileCredentialScope      string                  `json:"profileCredentialScope"`
+	ProfileEnabled              *bool                   `json:"profileEnabled,omitempty"`
 	AgentProfiles               []rawAgentProfileConfig `json:"agentProfiles"`
 }
 
@@ -366,4 +366,3 @@ func (s agentIntegrationSettings) resolveProfile(profileID string) (agentProfile
 func isGatewayRef(value string) bool {
 	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(value)), "ref://gateways/")
 }
-

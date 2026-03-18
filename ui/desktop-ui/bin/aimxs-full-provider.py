@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Local AIMXS full-mode provider shim for the desktop/runtime stack.
 
-This wrapper keeps private AIMXS logic outside the OSS repo while exposing the
-public PolicyProvider contract locally for desktop/runtime testing.
+This wrapper exposes the public PolicyProvider contract locally while loading
+the premium AIMXS artifact from an official install root or explicit override.
 """
 
 from __future__ import annotations
@@ -176,6 +176,34 @@ def normalize_mapping(value: Any) -> Dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
+def module_root() -> Path:
+    return Path(__file__).resolve().parents[1]
+
+
+def default_state_root() -> Path:
+    explicit = os.environ.get("EPYDIOS_M21_STATE_ROOT", "").strip()
+    if explicit:
+        return Path(explicit).expanduser().resolve()
+    return module_root() / ".epydios"
+
+
+def default_premium_root() -> Path:
+    explicit = os.environ.get("EPYDIOS_PREMIUM_ROOT", "").strip()
+    if explicit:
+        return Path(explicit).expanduser().resolve()
+    home_root = os.environ.get("HOME", "").strip()
+    if home_root:
+        return Path(home_root).expanduser().resolve() / ".epydios" / "premium"
+    return default_state_root() / "premium"
+
+
+def default_aimxs_install_root() -> Path:
+    explicit = os.environ.get("EPYDIOS_AIMXS_INSTALL_ROOT", "").strip()
+    if explicit:
+        return Path(explicit).expanduser().resolve()
+    return default_premium_root() / "aimxs"
+
+
 def resolve_local_aimxs_root() -> Path:
     explicit = os.environ.get("EPYDIOS_AIMXS_LOCAL_ROOT", "").strip()
     if explicit:
@@ -183,16 +211,7 @@ def resolve_local_aimxs_root() -> Path:
     cache_root = os.environ.get("EPYDIOS_M21_CACHE_ROOT", "").strip()
     if cache_root:
         return Path(cache_root).expanduser().resolve() / "local-runtime" / "aimxs-full"
-    repo_root = Path(__file__).resolve().parents[3]
-    workspace_root = repo_root.parent
-    return (
-        workspace_root
-        / "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB"
-        / "internal-readiness"
-        / "m21-local-cache"
-        / "local-runtime"
-        / "aimxs-full"
-    )
+    return default_state_root() / "m21-local-cache" / "local-runtime" / "aimxs-full"
 
 
 class LocalJsonlAuditSink:
@@ -750,14 +769,16 @@ def resolve_aimxs_extracted_root() -> Path:
     explicit = os.environ.get("EPYDIOS_AIMXS_EXTRACTED_ROOT", "").strip()
     if explicit:
         candidate = Path(explicit).expanduser().resolve()
-        if candidate.exists():
-            return candidate
-        raise FileNotFoundError(f"AIMXS extracted root does not exist: {candidate}")
-    repo_root = Path(__file__).resolve().parents[3]
-    workspace_root = repo_root.parent
-    candidate = workspace_root / "AIMXS" / "AIMXS_CORE_PACK_v74" / "EXTRACTED"
+    else:
+        candidate = default_aimxs_install_root() / "extracted"
     if not candidate.exists():
-        raise FileNotFoundError(f"AIMXS extracted root does not exist: {candidate}")
+        default_root = default_aimxs_install_root() / "extracted"
+        raise FileNotFoundError(
+            "Premium AIMXS artifact not installed for aimxs-full mode. "
+            f"Expected extracted pack root at: {candidate}. "
+            f"Install the official premium AIMXS artifact under {default_root} "
+            "or set EPYDIOS_AIMXS_EXTRACTED_ROOT to the extracted pack root."
+        )
     return candidate
 
 
@@ -820,9 +841,13 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    extracted_root = resolve_aimxs_extracted_root()
-    local_root = resolve_local_aimxs_root()
-    runtime = AimxsLocalFullRuntime(extracted_root, local_root)
+    try:
+        extracted_root = resolve_aimxs_extracted_root()
+        local_root = resolve_local_aimxs_root()
+        runtime = AimxsLocalFullRuntime(extracted_root, local_root)
+    except FileNotFoundError as error:
+        print(str(error), file=sys.stderr)
+        return 2
 
     class Handler(AimxsRequestHandler):
         pass

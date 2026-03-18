@@ -1,6 +1,8 @@
-# AIMXS Plug-in Slot (External Boundary)
+# AIMXS Plug-in Slot (Provider Boundary)
 
 This document codifies the boundary: AIMXS remains private and external to the OSS build graph.
+The stale sibling-folder workspace dependency is not part of that boundary and
+is being replaced with an official premium install path for local full mode.
 
 ## Design Rule
 
@@ -33,7 +35,10 @@ This package defines:
 ## Full Local Mode
 
 - `aimxs-full` is the local Desktop/runtime AIMXS shim started by `ui/desktop-ui/bin/run-macos-local.sh`.
-- It dynamically loads the external AIMXS pack at runtime and exposes the public `PolicyProvider` contract locally.
+- It dynamically loads the premium AIMXS artifact at runtime and exposes the public `PolicyProvider` contract locally.
+- The default local install root is `~/.epydios/premium/aimxs/extracted`.
+- `EPYDIOS_AIMXS_EXTRACTED_ROOT` can override that root when the premium artifact is installed elsewhere.
+- The premium artifact should live outside the OSS repo tree by default.
 - It does not reuse the OSS placeholder policy provider and it does not require HTTPS, mTLS, or bearer-token refs.
 
 ## Deployment Mode Profiles
@@ -42,6 +47,7 @@ This package defines:
 - `oss-only` routes to OSS providers and keeps AIMXS out of the execution path.
 - `aimxs-https` routes to AIMXS HTTPS endpoint over secure auth.
 - `aimxs-full` routes local Desktop/runtime policy evaluation through the AIMXS full shim with no silent OSS fallback.
+- Missing premium AIMXS material must fail clearly; `aimxs-full` must never silently degrade to OSS.
 
 ## Operational Contract
 

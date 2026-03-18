@@ -19,7 +19,7 @@ without importing AIMXS code into the OSS control-plane module graph.
 
 The verifier checks:
 
-1. AIMXS boundary contract (`verify-aimxs-boundary.sh`) still passes.
+1. AIMXS premium-path verifier (`verify-aimxs-boundary.sh`) still passes.
 2. Private release inputs are non-placeholder and usable.
 3. SDK/provider digest evidence can be computed/validated.
 4. Latest staging strict gate log proves full gate + AIMXS boundary pass.

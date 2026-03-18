@@ -4,12 +4,14 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MODULE_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 REPO_ROOT="$(cd "${MODULE_ROOT}/../.." && pwd)"
-WORKSPACE_ROOT="$(cd "${REPO_ROOT}/.." && pwd)"
+# shellcheck source=./lib-m21-paths.sh
+source "${SCRIPT_DIR}/lib-m21-paths.sh"
 
 NAMESPACE="${NAMESPACE:-epydios-system}"
 AIMXS_URL="${AIMXS_URL:-http://127.0.0.1:4271}"
 OSS_URL="${OSS_URL:-http://127.0.0.1:18081}"
-AIMXS_EXTRACTED_ROOT="${AIMXS_EXTRACTED_ROOT:-${WORKSPACE_ROOT}/AIMXS/AIMXS_CORE_PACK_v74/EXTRACTED}"
+DEFAULT_AIMXS_EXTRACTED_ROOT="$(m21_official_aimxs_extracted_root)"
+AIMXS_EXTRACTED_ROOT="${AIMXS_EXTRACTED_ROOT:-${EPYDIOS_AIMXS_EXTRACTED_ROOT:-${DEFAULT_AIMXS_EXTRACTED_ROOT}}}"
 SKIP_HANDSHAKE_PROBE=0
 OSS_PF_PID=""
 TMP_DIR=""
@@ -33,6 +35,8 @@ Options:
 
 Preconditions:
   - Terminal 2 is running so aimxs-full is live on ${AIMXS_URL}
+  - The premium AIMXS extracted artifact is installed at ${DEFAULT_AIMXS_EXTRACTED_ROOT}
+    or provided explicitly with --aimxs-extracted-root / EPYDIOS_AIMXS_EXTRACTED_ROOT
   - The cluster is reachable so the script can port-forward the OSS provider
 EOF
 }
@@ -92,6 +96,13 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+if [[ "${SKIP_HANDSHAKE_PROBE}" -eq 0 && ! -d "${AIMXS_EXTRACTED_ROOT}" ]]; then
+  echo "Missing premium AIMXS extracted artifact for aimxs-full verification: ${AIMXS_EXTRACTED_ROOT}" >&2
+  echo "Install the official premium AIMXS artifact under ${DEFAULT_AIMXS_EXTRACTED_ROOT}," >&2
+  echo "or pass --aimxs-extracted-root / EPYDIOS_AIMXS_EXTRACTED_ROOT." >&2
+  exit 1
+fi
 
 require_cmd curl
 require_cmd jq

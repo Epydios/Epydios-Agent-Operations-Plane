@@ -37,3 +37,4 @@ breaking_change_examples:
 notes:
   - Keep AIMXS private implementation separate from OSS by enforcing only network/API compatibility at this boundary.
   - Runtime enforcement knob is AUTHZ_REQUIRE_POLICY_GRANT.
+  - Runtime entitlement gate can also be enabled with AUTHZ_REQUIRE_AIMXS_ENTITLEMENT before provider invocation.

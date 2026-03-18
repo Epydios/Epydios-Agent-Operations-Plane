@@ -67,7 +67,7 @@
     },
     {
       "id": "m8_6_aimxs_boundary_partial",
-      "description": "AIMXS remains external via HTTPS and slot contract checks",
+      "description": "AIMXS premium path is self-contained for local full mode and still respects the slot contract",
       "command": "./platform/local/bin/verify-aimxs-boundary.sh",
       "status": "pass",
       "artifacts": [
@@ -76,15 +76,15 @@
         "internal/aimxs/slot.go",
         "docs/aimxs-plugin-slot.md",
         "examples/aimxs/extensionprovider-policy-https.yaml",
-        "../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/private-release-inputs.vars",
-        "../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/m10-2-private-release-evidence-latest.json",
+        "provenance/aimxs/private-release-inputs.vars",
+        "provenance/aimxs/m10-2-private-release-evidence-latest.json",
         "../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/promotion/staging-full-gate-20260301T183622Z.log",
         "../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/promotion/staging-full-gate-20260301T183622Z.log.sha256",
         "../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/promotion/staging-full-gate-20260301T183622Z.log.proof.json"
       ],
       "notes": [
         "First private AIMXS release evidence is archived (artifact digest mode) with strict staging profile proof.",
-        "Publication process remains codified in docs/runbooks/aimxs-private-sdk-publication.md."
+        "The premium-path verifier now proves self-contained local-full startup, clear missing-artifact failure, and no silent OSS fallback."
       ]
     },
     {

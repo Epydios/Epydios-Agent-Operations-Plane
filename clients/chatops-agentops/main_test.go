@@ -76,15 +76,15 @@ func TestBuildChatopsStatusReport(t *testing.T) {
 		},
 	})
 	timeline := &runtimeapi.SessionTimelineResponse{
-		Session:             runtimeapi.SessionRecord{SessionID: "sess-1", Status: runtimeapi.SessionStatusAwaitingApproval, SelectedWorkerID: "worker-1"},
-		Task:                &runtimeapi.TaskRecord{TaskID: "task-1", Title: "Chat task", Status: runtimeapi.TaskStatusInProgress, LatestSessionID: "sess-1", Annotations: annotations},
-		SelectedWorker:      &runtimeapi.SessionWorkerRecord{WorkerID: "worker-1", WorkerType: "managed_agent", Status: runtimeapi.WorkerStatusRunning},
+		Session:        runtimeapi.SessionRecord{SessionID: "sess-1", Status: runtimeapi.SessionStatusAwaitingApproval, SelectedWorkerID: "worker-1"},
+		Task:           &runtimeapi.TaskRecord{TaskID: "task-1", Title: "Chat task", Status: runtimeapi.TaskStatusInProgress, LatestSessionID: "sess-1", Annotations: annotations},
+		SelectedWorker: &runtimeapi.SessionWorkerRecord{WorkerID: "worker-1", WorkerType: "managed_agent", Status: runtimeapi.WorkerStatusRunning},
 		ApprovalCheckpoints: []runtimeapi.ApprovalCheckpointRecord{
 			{CheckpointID: "approval-1", Status: runtimeapi.ApprovalStatusPending},
 			{CheckpointID: "approval-2", Status: runtimeapi.ApprovalStatusApproved},
 		},
-		ToolActions:         []runtimeapi.ToolActionRecord{{ToolActionID: "tool-1", ToolType: "managed_agent_turn"}},
-		EvidenceRecords:     []runtimeapi.EvidenceRecord{{EvidenceID: "evidence-1"}},
+		ToolActions:     []runtimeapi.ToolActionRecord{{ToolActionID: "tool-1", ToolType: "managed_agent_turn"}},
+		EvidenceRecords: []runtimeapi.EvidenceRecord{{EvidenceID: "evidence-1"}},
 		Events: []runtimeapi.SessionEventRecord{
 			{Sequence: 1, EventType: runtimeapi.SessionEventType("tool_proposal.generated"), Payload: proposalPayload},
 			{Sequence: 2, EventType: runtimeapi.SessionEventType("worker.progress"), Payload: mustJSON(map[string]interface{}{"summary": "Worker is waiting for approval."})},
@@ -344,11 +344,11 @@ func TestRenderChatopsReport(t *testing.T) {
 				}),
 			},
 		},
-		PendingProposals:        []runtimeclient.ToolProposalReview{{ProposalID: "proposal-1", Summary: "Run pwd"}},
-		ToolActionCount:         2,
-		EvidenceCount:           1,
-		LatestWorkerSummary:     "Managed worker is awaiting governed approval.",
-		RecentEvents:            []runtimeclient.EventSummary{{Label: "Worker Progress", Detail: "Awaiting approval."}},
+		PendingProposals:    []runtimeclient.ToolProposalReview{{ProposalID: "proposal-1", Summary: "Run pwd"}},
+		ToolActionCount:     2,
+		EvidenceCount:       1,
+		LatestWorkerSummary: "Managed worker is awaiting governed approval.",
+		RecentEvents:        []runtimeclient.EventSummary{{Label: "Worker Progress", Detail: "Awaiting approval."}},
 	}
 	rendered, err := renderChatopsReport(context.Background(), client, report, runtimeclient.EnterpriseReportSelection{})
 	if err != nil {

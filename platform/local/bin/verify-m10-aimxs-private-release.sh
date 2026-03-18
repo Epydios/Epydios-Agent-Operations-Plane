@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 WORKSPACE_ROOT="$(cd "${REPO_ROOT}/.." && pwd)"
 NON_GITHUB_ROOT="${NON_GITHUB_ROOT:-${WORKSPACE_ROOT}/EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB}"
+DEFAULT_PROVENANCE_ROOT="${REPO_ROOT}/provenance/aimxs"
 
 EVIDENCE_INPUT_FILE="${EVIDENCE_INPUT_FILE:-}"
 OUTPUT_DIR="${OUTPUT_DIR:-}"
@@ -111,10 +112,10 @@ validate_sha256() {
 
 load_inputs() {
   if [ -z "${EVIDENCE_INPUT_FILE}" ]; then
-    if [ -f "${NON_GITHUB_ROOT}/provenance/aimxs/private-release-inputs.vars" ]; then
-      EVIDENCE_INPUT_FILE="${NON_GITHUB_ROOT}/provenance/aimxs/private-release-inputs.vars"
-    else
+    if [ -f "${REPO_ROOT}/provenance/aimxs/private-release-inputs.vars" ]; then
       EVIDENCE_INPUT_FILE="${REPO_ROOT}/provenance/aimxs/private-release-inputs.vars"
+    else
+      EVIDENCE_INPUT_FILE="${NON_GITHUB_ROOT}/provenance/aimxs/private-release-inputs.vars"
     fi
   fi
 
@@ -225,7 +226,7 @@ main() {
   require_cmd awk
 
   if [ -z "${OUTPUT_DIR}" ]; then
-    OUTPUT_DIR="${NON_GITHUB_ROOT}/provenance/aimxs"
+    OUTPUT_DIR="${DEFAULT_PROVENANCE_ROOT}"
   fi
 
   load_inputs

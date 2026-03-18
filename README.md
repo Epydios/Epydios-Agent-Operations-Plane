@@ -1,118 +1,105 @@
-# Epydios AgentOps Control Plane
+# Epydios AgentOps
 
-**Policy-driven control plane for AI and agent workflows on Kubernetes.**
+Governed agent tool execution with approvals and evidence.
 
-AgentOps Control Plane is an open source control plane for governing agent actions with enforceable policy and auditable evidence. It evaluates each agent action against a policy provider, selects the right profile and extensions for the context, and records a structured evidence trail. Kubernetes-native, fast and composable, it provides a clean provider interface so you can swap policy engines, evidence stores and organization-specific decision logic without rewriting your runtime.
+Epydios AgentOps is an open source control plane and operator workbench for running agent and tool actions behind explicit policy, approval, audit, and evidence flows on Kubernetes.
 
-## Overview
-Profile Provider = “What context/profile should we apply?”
-- Looks at your request fields (tenant, project, environment, sensitivity, etc.)
+## One Concrete Use Case
 
-Policy Provider = “Given this request + profile, should we allow it?”
-- Approve/deny decision is made
-- Returns: ALLOW or DENY
-- Reasons explaining why are provided
+Submit a governed action request, evaluate it through policy, require approval when needed, execute it, and keep a readable receipt and evidence chain for later review.
 
-Evidence Provider = “Record what happened.”
-- Stores the decision and related data for audit
+That is the center of this repo. It is not trying to be a generic "autonomous systems" platform.
 
-It is designed as an **enterprise-ready baseline**: strong controls, clear extension contracts and repeatable promotion gates.
+## Runtime Path
 
-## Features
+For each governed request, the system does this:
 
-- **Governed execution**: policy decision + evidence capture are first-class runtime paths.
-- **Extensible by contract**: swap providers without changing control-plane internals.
-- **Security-first operations**: authn/authz, tenancy scoping, audit trails, signed+pinned image admission.
-- **Promotion discipline**: strict staging/prod gates with provenance artifacts.
+1. Accept the request with tenant, project, environment, and action scope.
+2. Resolve context through `ProfileResolver`.
+3. Ask `PolicyProvider` for `allow`, `deny`, or `defer`, plus rationale and grant requirements.
+4. Record the result through `EvidenceProvider`.
+5. Surface the lifecycle in the desktop workbench for approval, audit, export, and incident follow-through.
 
-### Core platform
+Key contract and runtime references:
 
-- Kubernetes-native control-plane components
-- Postgres/CNPG-backed runtime state
-- Runtime orchestration API with lifecycle/query/export controls
-- Delivery/event and model-serving baseline (Argo + KServe path)
+- Docs entry path: [docs/README.md](docs/README.md)
+- Provider boundary: [contracts/extensions/v1alpha1/README.md](contracts/extensions/v1alpha1/README.md)
+- Runtime API: [docs/runtime-orchestration-service.md](docs/runtime-orchestration-service.md)
+- Governed request contract: [docs/specs/governed-action-request-contract.md](docs/specs/governed-action-request-contract.md)
+- Deployment modes: [platform/modes/README.md](platform/modes/README.md)
+- Desktop UI: [ui/desktop-ui/README.md](ui/desktop-ui/README.md)
 
-### Security and governance
+## Modes
 
-- OIDC/JWT authn/authz for runtime API
-- Tenant/project isolation checks
-- Structured audit events and scoped audit read endpoint
-- Provider auth modes:
-  - `None`
-  - `BearerTokenSecret`
-  - `MTLS`
-  - `MTLSAndBearerTokenSecret`
-- Policy grant enforcement and entitlement-deny path assertions
+The same public provider contract supports three runtime modes:
 
-### Production hardening
+| Mode | Meaning | Notes |
+| --- | --- | --- |
+| `oss-only` | Self-contained OSS baseline providers | No AIMXS dependency |
+| `aimxs-https` | Premium AIMXS over the public HTTPS provider boundary | Secure external-provider path |
+| `aimxs-full` | Premium local/full AIMXS integration | Loads from `~/.epydios/premium/aimxs/extracted` by default and fails clearly if the premium artifact is missing |
 
-- NetworkPolicy baseline (controller/provider/runtime boundaries)
-- ServiceMonitor + PrometheusRule coverage
-- Secret/cert rotation checks
-- Admission enforcement for immutable/signed images
-- DR game day + rollback/failure-injection verification paths
+## Repo Map
 
-## Quick Start (Local)
+- [cmd/](cmd): control-plane entrypoints
+- [internal/](internal): runtime, provider routing, orchestration, and control logic
+- [contracts/extensions/v1alpha1/](contracts/extensions/v1alpha1): public provider contract surface
+- [platform/](platform): local bootstrap, CI gates, deployment modes, upgrade policy
+- [ui/desktop-ui/](ui/desktop-ui): operator workbench
+- [examples/](examples): provider registration examples
 
-Prerequisites:
+## Demo Path
 
-- Docker + kind
-- kubectl
-- Helm
-- Go toolchain
-
-Run baseline bring-up + smoke:
+Use this as the first OSS path:
 
 ```bash
 ./platform/local/bin/verify-m0.sh
+kubectl apply -k platform/modes/oss-only
 ```
 
-Run strict profile gates:
+Then move into the operator workbench:
+
+1. Follow [ui/desktop-ui/README.md](ui/desktop-ui/README.md) for the local desktop run.
+2. Use the desktop to inspect governed runs, approvals, audit, evidence, and admin workflows.
+3. If you need the AIMXS comparison path later, use [docs/runbooks/aimxs-governed-action-demo.md](docs/runbooks/aimxs-governed-action-demo.md).
+
+## Quality Story
+
+Use the canonical OSS quality story:
+
+- [docs/quality-story.md](docs/quality-story.md)
+
+It covers one launch path, one test path, one demo path, and the exact expected PASS results.
+
+The bounded commands are:
 
 ```bash
-PROFILE=staging-full ./platform/ci/bin/run-gate-profile.sh
-PROFILE=prod-full ./platform/ci/bin/run-gate-profile.sh
-```
-
-Run preflight QC only:
-
-```bash
+cd ui/desktop-ui && PORT=4176 ./bin/run-dev.sh
+curl -sSf http://127.0.0.1:4176/ >/dev/null && echo READY
 ./platform/ci/bin/qc-preflight.sh
+./ui/desktop-ui/bin/verify-m14-ui-daily-loop.sh
 ```
 
-## Architecture At A Glance
+## OSS And Premium Boundary
 
-- **Control plane**: provider registry controller + runtime orchestration API
-- **Providers**: ProfileResolver, PolicyProvider, EvidenceProvider, DesktopProvider (observe/actuate/verify)
-- **Data plane state**: Postgres (CNPG)
-- **Ops controls**: monitoring, admission policy, provenance lock checks, promotion gates
+The OSS repo includes:
 
-## Enterprise Adjacent
+- the control plane
+- the desktop workbench
+- the public provider contracts
+- baseline OSS providers
+- governed execution, approvals, receipts, audit, evidence, and incident flows
 
-Current signal categories:
+Premium AIMXS stays behind the public provider boundary:
 
-- security controls present and enforced
-- strict staging/prod profile gates passing
-- provenance lock checks strict-pass
-- DR + rollback drills captured as machine-readable evidence
-- governance boundary validation and private-release evidence path
+- `aimxs-https` uses the secure external-provider path
+- `aimxs-full` supports premium local/full integration when the premium artifact is installed
+- missing premium AIMXS fails clearly
+- there is no silent fallback from `aimxs-full` to the OSS baseline
 
-## Comparison At A Glance
+## Trust And Contribution
 
-| Capability area | Typical API wrapper stack | Model-serving-only stack | Epydios AgentOps |
-|---|---|---|---|
-| Provider contract model | limited/informal | limited | explicit versioned contracts |
-| Policy + evidence in runtime path | partial/manual | partial | built-in and test-gated |
-| Tenant/project authz | often custom add-on | often custom add-on | built-in runtime checks |
-| Admission + supply-chain controls | external bolt-on | external bolt-on | integrated verification path |
-| private boundary support (CONTACT US) | custom integration | custom integration | first-class external provider pattern |
-| Promotion evidence (staging/prod strict) | inconsistent | inconsistent | profile-driven strict gate artifacts |
-
-Related UI module: separate repository (to be announced).
-
-## Community
-
-- Contributing: `CONTRIBUTING.md`
-- Security policy: `SECURITY.md`
-- Trademark policy: `TRADEMARK.md`
-- Third-party notices: `THIRD_PARTY_NOTICES.md`
+- License: [LICENSE](LICENSE)
+- Security: [SECURITY.md](SECURITY.md)
+- Contributing: [CONTRIBUTING.md](CONTRIBUTING.md)
+- Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)

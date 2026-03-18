@@ -56,9 +56,9 @@ type EvidenceRecordRequest struct {
 }
 
 type EvidenceRecordResponse struct {
-	Accepted  bool   `json:"accepted"`
+	Accepted   bool   `json:"accepted"`
 	EvidenceID string `json:"evidenceId"`
-	Checksum  string `json:"checksum,omitempty"`
+	Checksum   string `json:"checksum,omitempty"`
 	StorageURI string `json:"storageUri,omitempty"`
 	BundleHint string `json:"bundleHint,omitempty"`
 }
@@ -80,13 +80,13 @@ type EvidenceFinalizeBundleResponse struct {
 }
 
 type storedEvidence struct {
-	EvidenceID      string
-	RunID           string
-	RetentionClass  string
-	EventType       string
-	CreatedAt       time.Time
-	Checksum        string
-	StorageURI      string
+	EvidenceID     string
+	RunID          string
+	RetentionClass string
+	EventType      string
+	CreatedAt      time.Time
+	Checksum       string
+	StorageURI     string
 }
 
 type Server struct {
@@ -200,9 +200,9 @@ func (s *Server) handleCapabilities(w http.ResponseWriter, r *http.Request) {
 		ProviderVersion: s.cfg.ProviderVersion,
 		Capabilities:    s.cfg.Capabilities,
 		Status: map[string]interface{}{
-			"backend":              "memory",
-			"storedRecordCount":    count,
-			"storageUriBase":       s.cfg.StorageURIBase,
+			"backend":               "memory",
+			"storedRecordCount":     count,
+			"storageUriBase":        s.cfg.StorageURIBase,
 			"bundleManifestUriBase": s.cfg.BundleManifestURIBase,
 		},
 	}
@@ -276,14 +276,14 @@ func (s *Server) handleFinalizeBundle(w http.ResponseWriter, r *http.Request) {
 	itemCount, resolvedIDs := s.resolveFinalizeItems(req)
 
 	manifestPayload := map[string]interface{}{
-		"providerId":      s.cfg.ProviderID,
-		"bundleId":        strings.TrimSpace(req.BundleID),
-		"runId":           strings.TrimSpace(req.RunID),
-		"retentionClass":  coalesce(strings.TrimSpace(req.RetentionClass), s.cfg.DefaultRetentionClass),
-		"evidenceIds":     resolvedIDs,
-		"annotations":     mapOrEmpty(req.Annotations),
-		"itemCount":       itemCount,
-		"finalizedAt":     time.Now().UTC().Format(time.RFC3339),
+		"providerId":     s.cfg.ProviderID,
+		"bundleId":       strings.TrimSpace(req.BundleID),
+		"runId":          strings.TrimSpace(req.RunID),
+		"retentionClass": coalesce(strings.TrimSpace(req.RetentionClass), s.cfg.DefaultRetentionClass),
+		"evidenceIds":    resolvedIDs,
+		"annotations":    mapOrEmpty(req.Annotations),
+		"itemCount":      itemCount,
+		"finalizedAt":    time.Now().UTC().Format(time.RFC3339),
 	}
 	manifestChecksum := sha256JSON(manifestPayload)
 	manifestURI := joinURIPath(s.cfg.BundleManifestURIBase, strings.TrimSpace(req.BundleID)+".json")
@@ -471,4 +471,3 @@ func loggingMiddleware(next http.Handler) http.Handler {
 		log.Printf("%s %s remote=%s dur=%s", r.Method, r.URL.Path, r.RemoteAddr, time.Since(start).Round(time.Millisecond))
 	})
 }
-
