@@ -167,8 +167,8 @@ load_upgrade_images() {
 
 apply_runtime_manifests() {
   kubectl apply -k "${REPO_ROOT}/platform/system"
-  kubectl apply -k "${REPO_ROOT}/platform/providers/oss-policy-opa"
-  kubectl apply -k "${REPO_ROOT}/platform/providers/oss-evidence-memory"
+  kubectl apply -k "${REPO_ROOT}/platform/provider-manifests/oss-policy-opa"
+  kubectl apply -k "${REPO_ROOT}/platform/provider-manifests/oss-evidence-memory"
 
   wait_for_deployment extension-provider-registry-controller
   wait_for_deployment orchestration-runtime

@@ -9,7 +9,7 @@ Define the release process for the private AIMXS SDK/reference adapter while kee
 ## Boundary Contract
 
 1. AIMXS SDK implements only the slot boundary in:
-   - `internal/aimxs/slot.go`
+   - `internal/providerboundary/slot.go`
 2. AIMXS SDK is not imported by this OSS module.
 3. AIMXS provider endpoints are exposed as `ExtensionProvider` resources over HTTPS.
 4. Secure auth modes are required:

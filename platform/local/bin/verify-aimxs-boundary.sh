@@ -4,15 +4,15 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 
-SLOT_FILE="${SLOT_FILE:-${REPO_ROOT}/internal/aimxs/slot.go}"
+SLOT_FILE="${SLOT_FILE:-${REPO_ROOT}/internal/providerboundary/slot.go}"
 DOC_FILE="${DOC_FILE:-${REPO_ROOT}/docs/aimxs-plugin-slot.md}"
 PUBLICATION_DOC="${PUBLICATION_DOC:-${REPO_ROOT}/docs/runbooks/aimxs-private-sdk-publication.md}"
-AIMXS_MANIFEST="${AIMXS_MANIFEST:-${REPO_ROOT}/examples/aimxs/extensionprovider-policy-https.yaml}"
+AIMXS_MANIFEST="${AIMXS_MANIFEST:-${REPO_ROOT}/examples/providers/aimxs-boundary/extensionprovider-policy-https.yaml}"
 AIMXS_COMPAT_POLICY="${AIMXS_COMPAT_POLICY:-${REPO_ROOT}/platform/upgrade/compatibility-policy-aimxs-decision-api.yaml}"
 PRIVATE_RELEASE_VERIFIER="${PRIVATE_RELEASE_VERIFIER:-${REPO_ROOT}/platform/local/bin/verify-m10-aimxs-private-release.sh}"
 FULL_PACKAGING_VERIFIER="${FULL_PACKAGING_VERIFIER:-${REPO_ROOT}/platform/local/bin/verify-m10-aimxs-full-packaging.sh}"
 AIMXS_PROVIDER_SCRIPT="${AIMXS_PROVIDER_SCRIPT:-${REPO_ROOT}/ui/desktop-ui/bin/aimxs-full-provider.py}"
-ALLOWED_LOCAL_IMPORT="github.com/Epydios/Epydios-AgentOps-Control-Plane/internal/aimxs"
+ALLOWED_LOCAL_IMPORT="github.com/Epydios/Epydios-AgentOps-Control-Plane/internal/providerboundary"
 
 TMPDIR_LOCAL=""
 PROVIDER_PID=""

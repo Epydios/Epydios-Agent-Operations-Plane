@@ -18,7 +18,7 @@ is being replaced with an official premium install path for local full mode.
 
 The OSS slot boundary is defined in:
 
-- `internal/aimxs/slot.go`
+- `internal/providerboundary/slot.go`
 
 This package defines:
 
@@ -70,7 +70,7 @@ This package defines:
 - Conformance checks should prove:
   - provider probe success updates `ExtensionProvider.status.conditions` to `Ready=True` and `Probed=True`
   - endpoint URL is HTTPS and auth mode is `MTLS` or `MTLSAndBearerTokenSecret`
-  - AIMXS is only referenced through `internal/aimxs/slot.go` interfaces
+  - AIMXS is only referenced through `internal/providerboundary/slot.go` interfaces
 - Failure-handling behavior must stay observable at the CR status boundary:
   - endpoint/network/auth failures must surface as `Ready=False` / `Probed=False`
   - capability or provider-type mismatch must surface as probe failure with explicit status message

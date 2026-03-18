@@ -17,7 +17,7 @@ This provider is suitable for:
 ## Run (after `go` toolchain is available)
 
 ```bash
-go run ./cmd/profile-resolver-provider -config providers/profile/static-resolver/config.example.json
+go run ./cmd/profile-resolver-provider -config provider-reference/profile/static-resolver/config.example.json
 ```
 
 ## Endpoints

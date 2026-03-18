@@ -4,6 +4,7 @@ These manifests demonstrate how AIMXS is integrated on the public provider bound
 not as linked code inside the OSS control plane.
 
 - `extensionprovider-policy-https.yaml`: `PolicyProvider` over HTTPS with `MTLSAndBearerTokenSecret`
+- `extensionprovider-aimxs-policy.yaml`: legacy-style policy registration example kept as a public boundary reference for private deployment repos
 
 Use these as templates for private AIMXS deployment repos.
 
@@ -18,6 +19,6 @@ Use these as templates for private AIMXS deployment repos.
 Apply the secure registration and restore policy selection:
 
 ```bash
-kubectl apply -f examples/aimxs/extensionprovider-policy-https.yaml
+kubectl apply -f examples/providers/aimxs-boundary/extensionprovider-policy-https.yaml
 kubectl -n epydios-system patch extensionprovider aimxs-policy-primary --type=merge -p '{"spec":{"selection":{"enabled":true,"priority":900}}}'
 ```

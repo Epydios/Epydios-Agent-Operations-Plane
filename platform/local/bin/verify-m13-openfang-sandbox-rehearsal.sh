@@ -7,8 +7,8 @@ LOCAL_GO_CACHE="${GOCACHE:-${REPO_ROOT}/.tmp/go-build}"
 mkdir -p "${LOCAL_GO_CACHE}"
 
 NAMESPACE="${NAMESPACE:-epydios-system}"
-PROVIDER_MANIFEST="${REPO_ROOT}/platform/providers/oss-desktop-openfang/extensionprovider.yaml"
-CONFIGMAP_MANIFEST="${REPO_ROOT}/platform/providers/oss-desktop-openfang/configmap.yaml"
+PROVIDER_MANIFEST="${REPO_ROOT}/platform/provider-manifests/oss-desktop-openfang/extensionprovider.yaml"
+CONFIGMAP_MANIFEST="${REPO_ROOT}/platform/provider-manifests/oss-desktop-openfang/configmap.yaml"
 
 fail() {
   echo "M13 Openfang sandbox rehearsal failed: $1" >&2

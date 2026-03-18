@@ -209,7 +209,7 @@ main() {
   require_cmd kubectl
   require_cmd curl
 
-  kubectl apply -k "${REPO_ROOT}/platform/providers/oss-policy-opa"
+  kubectl apply -k "${REPO_ROOT}/platform/provider-manifests/oss-policy-opa"
 
   wait_for_deployment epydios-oss-policy-provider
   wait_for_provider_status oss-policy-opa

@@ -120,7 +120,7 @@ type server struct {
 func main() {
 	var (
 		listenAddr = flag.String("listen", ":8080", "HTTP listen address")
-		configPath = flag.String("config", "providers/desktop/mock/config.example.json", "path to JSON config")
+		configPath = flag.String("config", "provider-reference/desktop/mock/config.example.json", "path to JSON config")
 	)
 	flag.Parse()
 

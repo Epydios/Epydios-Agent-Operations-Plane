@@ -191,7 +191,7 @@ images:
     source: epydios-ai-control-plane
     source_path: cmd/policy-provider-opa-adapter
     manifest_paths:
-      - platform/providers/oss-policy-opa/deployment.yaml
+      - platform/provider-manifests/oss-policy-opa/deployment.yaml
     build_context: .
     build_notes:
       - Build/push in CI from `EPYDIOS_AI_CONTROL_PLANE` repo.
@@ -206,7 +206,7 @@ images:
     source: epydios-ai-control-plane
     source_path: cmd/evidence-provider-memory
     manifest_paths:
-      - platform/providers/oss-evidence-memory/deployment.yaml
+      - platform/provider-manifests/oss-evidence-memory/deployment.yaml
     build_context: .
     build_notes:
       - Build/push in CI from `EPYDIOS_AI_CONTROL_PLANE` repo.
@@ -236,7 +236,7 @@ images:
     digest: sha256:15151b408ff6477e5f6b675e491cab60776be84be4fcbc19ca2d2024cec789bf
     source: open-policy-agent/opa
     manifest_paths:
-      - platform/providers/oss-policy-opa/deployment.yaml
+      - platform/provider-manifests/oss-policy-opa/deployment.yaml
     required: false
     status: planned
   - component: postgres-smoketest-client

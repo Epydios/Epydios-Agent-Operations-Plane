@@ -125,7 +125,7 @@ main() {
   require_cmd grep
   require_cmd sed
 
-  kubectl apply -k "${REPO_ROOT}/platform/providers/oss-evidence-memory"
+  kubectl apply -k "${REPO_ROOT}/platform/provider-manifests/oss-evidence-memory"
 
   wait_for_deployment epydios-oss-evidence-provider
   wait_for_provider_status oss-evidence-memory

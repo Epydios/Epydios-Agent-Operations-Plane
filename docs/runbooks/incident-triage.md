@@ -37,8 +37,8 @@ Use this runbook for control-plane incidents in pilot scope:
    - `kubectl -n epydios-system rollout restart deployment/<name>`
 2. Reconcile manifests:
    - `kubectl apply -k platform/system`
-   - `kubectl apply -k platform/providers/oss-policy-opa`
-   - `kubectl apply -k platform/providers/oss-evidence-memory`
+   - `kubectl apply -k platform/provider-manifests/oss-policy-opa`
+   - `kubectl apply -k platform/provider-manifests/oss-evidence-memory`
 3. Re-run critical checks:
    - `./platform/local/bin/verify-phase-04-policy-evidence-kserve.sh`
    - `./platform/local/bin/verify-m5-runtime-orchestration.sh`

@@ -6,8 +6,8 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 LOCAL_GO_CACHE="${GOCACHE:-${REPO_ROOT}/.tmp/go-build}"
 mkdir -p "${LOCAL_GO_CACHE}"
 
-DEFAULT_PROVIDER="${REPO_ROOT}/platform/providers/oss-desktop-openfang/extensionprovider.yaml"
-DEFAULT_CONFIGMAP="${REPO_ROOT}/platform/providers/oss-desktop-openfang/configmap.yaml"
+DEFAULT_PROVIDER="${REPO_ROOT}/platform/provider-manifests/oss-desktop-openfang/extensionprovider.yaml"
+DEFAULT_CONFIGMAP="${REPO_ROOT}/platform/provider-manifests/oss-desktop-openfang/configmap.yaml"
 SECURE_EXAMPLE="${REPO_ROOT}/examples/providers/extensionprovider-oss-desktop-openfang-mtls-bearer.yaml"
 
 assert_pattern() {

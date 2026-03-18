@@ -7,9 +7,9 @@ Enable the Openfang DesktopProvider path safely, keeping sandbox autonomy as def
 ## Scope
 
 - Applies to Openfang provider registration scaffolds:
-  - `platform/providers/oss-desktop-openfang/extensionprovider.yaml`
-  - `platform/providers/oss-desktop-openfang/extensionprovider-windows-restricted.yaml`
-  - `platform/providers/oss-desktop-openfang/extensionprovider-macos-restricted.yaml`
+  - `platform/provider-manifests/oss-desktop-openfang/extensionprovider.yaml`
+  - `platform/provider-manifests/oss-desktop-openfang/extensionprovider-windows-restricted.yaml`
+  - `platform/provider-manifests/oss-desktop-openfang/extensionprovider-macos-restricted.yaml`
   - `examples/providers/extensionprovider-oss-desktop-openfang-mtls-bearer.yaml`
 - Does not authorize broad host-autonomous execution.
 
@@ -57,7 +57,7 @@ kubectl apply -f examples/providers/extensionprovider-oss-desktop-openfang-mtls-
 3. Apply restricted xOS secure endpoint workloads (keeps provider routing disabled while probe readiness is established):
 
 ```bash
-kubectl apply -k platform/providers/oss-desktop-openfang/xos-secure
+kubectl apply -k platform/provider-manifests/oss-desktop-openfang/xos-secure
 ```
 
 4. Verify endpoint readiness and contract surface (without routing live runtime traffic):

@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
-PIN_FILE="${PIN_FILE:-${REPO_ROOT}/providers/desktop/openfang/upstream-pin.json}"
+PIN_FILE="${PIN_FILE:-${REPO_ROOT}/provider-reference/desktop/openfang/upstream-pin.json}"
 FAIL_ON_DRIFT="${FAIL_ON_DRIFT:-0}"
 
 require_cmd() {

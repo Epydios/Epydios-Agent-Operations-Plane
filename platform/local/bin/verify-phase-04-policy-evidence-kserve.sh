@@ -228,8 +228,8 @@ run_phase03_if_requested() {
 apply_phase04_components() {
   echo "Applying system + policy + evidence provider components..."
   kubectl apply -k "${REPO_ROOT}/platform/system"
-  kubectl apply -k "${REPO_ROOT}/platform/providers/oss-policy-opa"
-  kubectl apply -k "${REPO_ROOT}/platform/providers/oss-evidence-memory"
+  kubectl apply -k "${REPO_ROOT}/platform/provider-manifests/oss-policy-opa"
+  kubectl apply -k "${REPO_ROOT}/platform/provider-manifests/oss-evidence-memory"
 
   wait_for_deployment extension-provider-registry-controller
   wait_for_deployment oss-profile-static-resolver

@@ -44,11 +44,11 @@ This folder owns Desktop-specific AIMXS logic that should remain easy to find an
 ## Boundary files that should not be moved into this folder
 
 - `docs/aimxs-plugin-slot.md`
-- `internal/aimxs/slot.go`
+- `internal/providerboundary/slot.go`
 - `platform/modes/README.md`
 - `platform/modes/aimxs-https/*`
 - `platform/modes/aimxs-full/*`
-- `examples/aimxs/*`
+- `examples/providers/aimxs-boundary/*`
 
 These stay in their existing locations because they define the external slot contract and deployment-mode boundary, not Desktop-only logic.
 
