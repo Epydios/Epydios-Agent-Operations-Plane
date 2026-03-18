@@ -702,7 +702,7 @@ jobs:
           DIGEST_MANIFEST=dist/release-image-digests.json \
           LOCKFILE=dist/provenance/images.lock.yaml \
           UPDATE_STATUS=release-synced \
-            "${src_root}/platform/ci/bin/sync-release-digests-to-lockfile.sh"
+            bash "${src_root}/platform/ci/bin/sync-release-digests-to-lockfile.sh"
 
           diff -u "${src_root}/provenance/images.lock.yaml" dist/provenance/images.lock.yaml > dist/provenance/images.lock.diff || true
 
@@ -731,7 +731,7 @@ jobs:
           mkdir -p dist/production
           DIGEST_MANIFEST=dist/release-image-digests.json \
           PATCH_FILE=dist/production/patch-image-digests.yaml \
-            "${src_root}/platform/ci/bin/sync-release-digests-to-production-patch.sh"
+            bash "${src_root}/platform/ci/bin/sync-release-digests-to-production-patch.sh"
 
       - name: Upload synced lockfile artifact
         if: steps.locksync.outputs.enabled == 'true'
