@@ -5,7 +5,7 @@
 Build and tag:
 
 ```bash
-docker build -t ghcr.io/epydios/epydios-agentops-desktop:0.1.0 .
+docker build -t ghcr.io/epydios/epydios-agent-operations-plane-desktop:0.3.0 .
 ```
 
 ## Base Manifests

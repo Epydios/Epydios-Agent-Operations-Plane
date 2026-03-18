@@ -761,12 +761,12 @@ Runs upgrade-safety validation for first-party control-plane deployments:
 ./platform/local/bin/verify-m7-upgrade-safety.sh
 ```
 
-Default tested path is `0.1.0 -> 0.2.0` (aligned to `platform/upgrade/compatibility-policy.yaml`).
+Default tested path is `0.2.0 -> 0.3.0` (aligned to `platform/upgrade/compatibility-policy.yaml`).
 
 Override tested path:
 
 ```bash
-PREVIOUS_TAG=0.0.9 CURRENT_TAG=0.1.0 ./platform/local/bin/verify-m7-upgrade-safety.sh
+PREVIOUS_TAG=0.1.0 CURRENT_TAG=0.2.0 ./platform/local/bin/verify-m7-upgrade-safety.sh
 ```
 
 ### Phase 05 distributed compute verification (KubeRay)
@@ -1002,6 +1002,12 @@ Allow registry pulls for missing digests:
 
 ```bash
 ALLOW_DOCKER_PULL=1 ./platform/local/bin/sync-provenance-image-digests.sh
+```
+
+Sync release artifacts back into the repo after a GHCR release run:
+
+```bash
+ARTIFACT_DIR=/path/to/release-artifacts ./platform/local/bin/ingest-release-artifacts.sh
 ```
 
 ### kind

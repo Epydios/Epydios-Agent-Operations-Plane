@@ -6,7 +6,7 @@ data:
   config.json: |
     {
       "providerId": "oss-desktop-openfang-macos",
-      "providerVersion": "0.3.0-preview",
+      "providerVersion": "0.3.0",
       "targetOS": "macos",
       "allowRestrictedHost": false,
       "capabilities": [

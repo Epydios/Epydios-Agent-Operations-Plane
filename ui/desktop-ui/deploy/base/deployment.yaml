@@ -5,7 +5,7 @@ metadata:
   labels:
     app.kubernetes.io/name: agentops-desktop
     app.kubernetes.io/component: ui
-    app.kubernetes.io/part-of: epydios-agentops-control-plane
+    app.kubernetes.io/part-of: epydios-agent-operations-plane
 spec:
   replicas: 1
   selector:
@@ -17,7 +17,7 @@ spec:
       labels:
         app.kubernetes.io/name: agentops-desktop
         app.kubernetes.io/component: ui
-        app.kubernetes.io/part-of: epydios-agentops-control-plane
+        app.kubernetes.io/part-of: epydios-agent-operations-plane
     spec:
       securityContext:
         runAsNonRoot: true
@@ -25,7 +25,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: web
-          image: ghcr.io/epydios/epydios-agentops-desktop:0.1.0
+          image: ghcr.io/epydios/epydios-agent-operations-plane-desktop:0.3.0
           imagePullPolicy: IfNotPresent
           ports:
             - name: http

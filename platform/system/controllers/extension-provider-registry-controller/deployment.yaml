@@ -22,7 +22,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: controller
-          image: ghcr.io/epydios/epydios-extension-provider-registry-controller:0.2.0
+          image: ghcr.io/epydios/epydios-agent-operations-plane-extension-provider-registry-controller:0.3.0
           imagePullPolicy: IfNotPresent
           args:
             - --metrics-bind-address=:8080
@@ -57,4 +57,3 @@ spec:
             readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
-

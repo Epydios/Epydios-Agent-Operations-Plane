@@ -139,96 +139,143 @@ images:
     status: planned
   - component: epydios-extension-provider-registry-controller
     phase: phase-01-control-plane-extensibility
-    image: ghcr.io/epydios/epydios-extension-provider-registry-controller
+    image: ghcr.io/epydios/epydios-agent-operations-plane-extension-provider-registry-controller
     tag: "0.2.0"
     digest: sha256:af15ae4cdddcdfdb2a3e9070abe86a221553bd5e896f6d9574abdab8485d227d
-    source: epydios-ai-control-plane
+    source: epydios-agent-operations-plane
     source_path: cmd/extension-provider-registry-controller
     manifest_paths:
       - platform/system/controllers/extension-provider-registry-controller/deployment.yaml
     build_context: .
     build_notes:
-      - Build/push in CI from `EPYDIOS_AI_CONTROL_PLANE` repo.
+      - Build/push in CI from this repository.
       - Fill digest after push using `crane digest` or `docker buildx imagetools inspect`.
     required: true
     status: release-synced
   - component: epydios-oss-profile-static-resolver
     phase: phase-01-control-plane-extensibility
-    image: ghcr.io/epydios/epydios-oss-profile-static-resolver
+    image: ghcr.io/epydios/epydios-agent-operations-plane-oss-profile-static-resolver
     tag: "0.2.0"
     digest: sha256:0681313aea4fbade49d92d6900de4e8bf16dfb28802feef9e0c4023f8c47ab25
-    source: epydios-ai-control-plane
+    source: epydios-agent-operations-plane
     source_path: cmd/profile-resolver-provider
     manifest_paths:
       - platform/system/providers/oss-profile-static/deployment.yaml
       - platform/system/providers/oss-profile-static/extensionprovider.yaml
     build_context: .
     build_notes:
-      - Build/push in CI from `EPYDIOS_AI_CONTROL_PLANE` repo.
+      - Build/push in CI from this repository.
       - Fill digest after push using `crane digest` or `docker buildx imagetools inspect`.
     required: true
     status: release-synced
   - component: epydios-control-plane-runtime
     phase: phase-01-control-plane-extensibility
-    image: ghcr.io/epydios/epydios-control-plane-runtime
+    image: ghcr.io/epydios/epydios-agent-operations-plane-runtime
     tag: "0.2.0"
     digest: sha256:ca19da830596659931ae1c4444dcf399c124f93e3f33c384c7c705dce91e7f81
-    source: epydios-ai-control-plane
+    source: epydios-agent-operations-plane
     source_path: cmd/control-plane-runtime
     manifest_paths:
       - platform/system/controllers/orchestration-runtime/deployment.yaml
     build_context: .
     build_notes:
-      - Build/push in CI from `EPYDIOS_AI_CONTROL_PLANE` repo.
+      - Build/push in CI from this repository.
       - Replace digest with published immutable digest before release sign-off.
     required: true
     status: release-synced
   - component: epydios-oss-policy-opa-provider
     phase: phase-02-oss-policy-provider
-    image: ghcr.io/epydios/epydios-oss-policy-opa-provider
+    image: ghcr.io/epydios/epydios-agent-operations-plane-oss-policy-opa-provider
     tag: "0.2.0"
     digest: sha256:0da915c2a4e571404dffbe63168b017f1176f8d5f4387a4e4d91317d9787c3cc
-    source: epydios-ai-control-plane
+    source: epydios-agent-operations-plane
     source_path: cmd/policy-provider-opa-adapter
     manifest_paths:
       - platform/provider-manifests/oss-policy-opa/deployment.yaml
     build_context: .
     build_notes:
-      - Build/push in CI from `EPYDIOS_AI_CONTROL_PLANE` repo.
+      - Build/push in CI from this repository.
       - Fill digest after push using `crane digest` or `docker buildx imagetools inspect`.
     required: false
     status: release-synced
   - component: epydios-oss-evidence-memory-provider
     phase: phase-02-oss-evidence-provider
-    image: ghcr.io/epydios/epydios-oss-evidence-memory-provider
+    image: ghcr.io/epydios/epydios-agent-operations-plane-oss-evidence-memory-provider
     tag: "0.2.0"
     digest: sha256:d3839d68b405fc841fdfa40bf5eae3843eaa874d3affd80154182c83d761a84f
-    source: epydios-ai-control-plane
+    source: epydios-agent-operations-plane
     source_path: cmd/evidence-provider-memory
     manifest_paths:
       - platform/provider-manifests/oss-evidence-memory/deployment.yaml
     build_context: .
     build_notes:
-      - Build/push in CI from `EPYDIOS_AI_CONTROL_PLANE` repo.
+      - Build/push in CI from this repository.
       - Fill digest after push using `crane digest` or `docker buildx imagetools inspect`.
     required: false
     status: release-synced
   - component: epydios-mtls-capabilities-provider
     phase: phase-02-mtls-provider-discovery
-    image: ghcr.io/epydios/epydios-mtls-capabilities-provider
+    image: ghcr.io/epydios/epydios-agent-operations-plane-mtls-capabilities-provider
     tag: "0.2.0"
     digest: sha256:a6131127505dce19905a7c63369222258248e18846140dd98f001813163b9b62
-    source: epydios-ai-control-plane
+    source: epydios-agent-operations-plane
     source_path: cmd/mtls-capabilities-provider
     manifest_paths:
       - platform/tests/provider-discovery-mtls/deployment-mtls-only-provider.yaml
       - platform/tests/provider-discovery-mtls/deployment-mtls-bearer-provider.yaml
     build_context: .
     build_notes:
-      - Build/push in CI from `EPYDIOS_AI_CONTROL_PLANE` repo.
+      - Build/push in CI from this repository.
       - Fill digest after push using `crane digest` or `docker buildx imagetools inspect`.
     required: false
     status: release-synced
+  - component: epydios-oss-desktop-provider
+    phase: phase-02-desktop-provider
+    image: ghcr.io/epydios/epydios-agent-operations-plane-oss-desktop-provider
+    tag: "0.3.0"
+    digest: sha256:TBD
+    source: epydios-agent-operations-plane
+    source_path: cmd/desktop-provider-mock
+    manifest_paths:
+      - platform/provider-manifests/oss-desktop-mock/deployment.yaml
+    build_context: .
+    build_notes:
+      - Build/push in CI from this repository.
+      - Fill digest after push using `crane digest` or `docker buildx imagetools inspect`.
+    required: false
+    status: planned
+  - component: epydios-oss-desktop-openfang-provider
+    phase: phase-02-desktop-provider
+    image: ghcr.io/epydios/epydios-agent-operations-plane-oss-desktop-openfang-provider
+    tag: "0.3.0"
+    digest: sha256:TBD
+    source: epydios-agent-operations-plane
+    source_path: cmd/desktop-provider-openfang
+    manifest_paths:
+      - platform/provider-manifests/oss-desktop-openfang/deployment.yaml
+      - platform/provider-manifests/oss-desktop-openfang/xos-secure/deployment-macos.yaml
+      - platform/provider-manifests/oss-desktop-openfang/xos-secure/deployment-windows.yaml
+    build_context: .
+    build_notes:
+      - Build/push in CI from this repository.
+      - Fill digest after push using `crane digest` or `docker buildx imagetools inspect`.
+    required: false
+    status: planned
+  - component: epydios-agent-operations-plane-desktop
+    phase: phase-03-operator-workbench
+    image: ghcr.io/epydios/epydios-agent-operations-plane-desktop
+    tag: "0.3.0"
+    digest: sha256:TBD
+    source: epydios-agent-operations-plane
+    source_path: ui/desktop-ui
+    manifest_paths:
+      - ui/desktop-ui/deploy/base/deployment.yaml
+    build_context: ui/desktop-ui
+    build_notes:
+      - Build/push in CI from this repository.
+      - Fill digest after push using `crane digest` or `docker buildx imagetools inspect`.
+    required: false
+    status: planned
   - component: opa-sidecar
     phase: phase-02-oss-policy-provider
     image: openpolicyagent/opa

@@ -30,7 +30,8 @@ Required input:
 What this does:
   1) Archives release artifacts to EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/releases/<timestamp>/ by default
   2) Syncs provenance/images.lock.yaml from release digest manifest
-  3) Runs strict provenance lock verification
+  3) Syncs platform/overlays/production/patch-image-digests.yaml from release digest manifest
+  4) Runs strict provenance lock verification
 EOF
 }
 
@@ -79,6 +80,11 @@ main() {
     UPDATE_STATUS="${UPDATE_STATUS}" \
     "${REPO_ROOT}/platform/ci/bin/sync-release-digests-to-lockfile.sh"
 
+  echo "Syncing production digest patch from ${digest_manifest}..."
+  DIGEST_MANIFEST="${digest_manifest}" \
+    PATCH_FILE="${REPO_ROOT}/platform/overlays/production/patch-image-digests.yaml" \
+    "${REPO_ROOT}/platform/ci/bin/sync-release-digests-to-production-patch.sh"
+
   echo "Running strict provenance lock verification..."
   (cd "${REPO_ROOT}" && GOCACHE=/tmp/go-build go run ./cmd/provenance-lock-check -strict -repo-root .)
 
@@ -88,6 +94,7 @@ Release artifact ingest completed.
   digest_manifest=${digest_manifest}
   archive_path=${archive_path}
   lockfile=${REPO_ROOT}/provenance/images.lock.yaml
+  production_patch=${REPO_ROOT}/platform/overlays/production/patch-image-digests.yaml
 EOF
 }
 

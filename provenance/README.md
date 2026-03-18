@@ -118,8 +118,8 @@ Use `images.lock.yaml` as the source of truth for image tags first, then fill `d
 Example flow (per image):
 
 ```bash
-IMAGE=ghcr.io/epydios/epydios-extension-provider-registry-controller
-TAG=0.2.0
+IMAGE=ghcr.io/epydios/epydios-agent-operations-plane-extension-provider-registry-controller
+TAG=0.3.0
 crane digest "${IMAGE}:${TAG}"
 ```
 

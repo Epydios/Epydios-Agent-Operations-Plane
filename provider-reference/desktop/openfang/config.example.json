@@ -1,6 +1,6 @@
 {
   "providerId": "oss-desktop-openfang-linux",
-  "providerVersion": "0.3.0-preview",
+  "providerVersion": "0.3.0",
   "targetOS": "linux",
   "allowRestrictedHost": false,
   "capabilities": [

@@ -3,6 +3,16 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+UNSIGNED_IMAGE_DEFAULT="$(
+  awk '
+    /- name: runtime/ {
+      getline
+      sub(/^[[:space:]]*image:[[:space:]]*/, "", $0)
+      print $0
+      exit
+    }
+  ' "${REPO_ROOT}/platform/overlays/production/patch-image-digests.yaml" 2>/dev/null || true
+)"
 
 NAMESPACE="${NAMESPACE:-epydios-system}"
 APPLY_SIGNED_IMAGE_POLICY="${APPLY_SIGNED_IMAGE_POLICY:-auto}" # auto|1|0
@@ -14,7 +24,7 @@ MUTABLE_IMAGE="${MUTABLE_IMAGE:-openpolicyagent/opa:0.67.1}"
 # Pinned digest to assert allow-path under immutable policy.
 IMMUTABLE_IMAGE="${IMMUTABLE_IMAGE:-openpolicyagent/opa@sha256:15151b408ff6477e5f6b675e491cab60776be84be4fcbc19ca2d2024cec789bf}"
 # Deliberately digest-pinned but expected unsigned for Kyverno keyless policy.
-UNSIGNED_IMAGE="${UNSIGNED_IMAGE:-ghcr.io/epydios/epydios-control-plane-runtime@sha256:babbddab65e14b247cc14a902ecb71430bb9b4161e8d925cbe50ce3417953078}"
+UNSIGNED_IMAGE="${UNSIGNED_IMAGE:-${UNSIGNED_IMAGE_DEFAULT:-ghcr.io/epydios/epydios-agent-operations-plane-runtime@sha256:babbddab65e14b247cc14a902ecb71430bb9b4161e8d925cbe50ce3417953078}}"
 
 SIGNED_POLICY_APPLIED="0"
 

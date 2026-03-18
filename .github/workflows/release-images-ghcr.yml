@@ -46,7 +46,6 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  DOCKERFILE_RELATIVE: build/docker/Dockerfile.go-binary
 
 jobs:
   build-and-push:
@@ -57,17 +56,67 @@ jobs:
       matrix:
         include:
           - component: epydios-extension-provider-registry-controller
+            image_name: epydios-agent-operations-plane-extension-provider-registry-controller
             binary_package: ./cmd/extension-provider-registry-controller
+            docker_context: .
+            dockerfile_path: build/docker/Dockerfile.go-binary
+            build_args: |
+              BINARY_PACKAGE=./cmd/extension-provider-registry-controller
           - component: epydios-oss-profile-static-resolver
+            image_name: epydios-agent-operations-plane-oss-profile-static-resolver
             binary_package: ./cmd/profile-resolver-provider
+            docker_context: .
+            dockerfile_path: build/docker/Dockerfile.go-binary
+            build_args: |
+              BINARY_PACKAGE=./cmd/profile-resolver-provider
           - component: epydios-control-plane-runtime
+            image_name: epydios-agent-operations-plane-runtime
             binary_package: ./cmd/control-plane-runtime
+            docker_context: .
+            dockerfile_path: build/docker/Dockerfile.go-binary
+            build_args: |
+              BINARY_PACKAGE=./cmd/control-plane-runtime
           - component: epydios-oss-policy-opa-provider
+            image_name: epydios-agent-operations-plane-oss-policy-opa-provider
             binary_package: ./cmd/policy-provider-opa-adapter
+            docker_context: .
+            dockerfile_path: build/docker/Dockerfile.go-binary
+            build_args: |
+              BINARY_PACKAGE=./cmd/policy-provider-opa-adapter
           - component: epydios-oss-evidence-memory-provider
+            image_name: epydios-agent-operations-plane-oss-evidence-memory-provider
             binary_package: ./cmd/evidence-provider-memory
+            docker_context: .
+            dockerfile_path: build/docker/Dockerfile.go-binary
+            build_args: |
+              BINARY_PACKAGE=./cmd/evidence-provider-memory
           - component: epydios-mtls-capabilities-provider
+            image_name: epydios-agent-operations-plane-mtls-capabilities-provider
             binary_package: ./cmd/mtls-capabilities-provider
+            docker_context: .
+            dockerfile_path: build/docker/Dockerfile.go-binary
+            build_args: |
+              BINARY_PACKAGE=./cmd/mtls-capabilities-provider
+          - component: epydios-oss-desktop-provider
+            image_name: epydios-agent-operations-plane-oss-desktop-provider
+            binary_package: ./cmd/desktop-provider-mock
+            docker_context: .
+            dockerfile_path: build/docker/Dockerfile.go-binary
+            build_args: |
+              BINARY_PACKAGE=./cmd/desktop-provider-mock
+          - component: epydios-oss-desktop-openfang-provider
+            image_name: epydios-agent-operations-plane-oss-desktop-openfang-provider
+            binary_package: ./cmd/desktop-provider-openfang
+            docker_context: .
+            dockerfile_path: build/docker/Dockerfile.go-binary
+            build_args: |
+              BINARY_PACKAGE=./cmd/desktop-provider-openfang
+          - component: epydios-agent-operations-plane-desktop
+            image_name: epydios-agent-operations-plane-desktop
+            binary_package: ""
+            docker_context: ui/desktop-ui
+            dockerfile_path: ui/desktop-ui/Dockerfile
+            build_args: ""
 
     steps:
       - name: Checkout
@@ -90,18 +139,15 @@ jobs:
           fi
 
           selected=""
-          dockerfile=""
           source_label=""
           for root in "${roots[@]}"; do
             candidate="${root%/}"
             [ -n "${candidate}" ] || candidate="."
-            candidate_dockerfile="${candidate}/${{ env.DOCKERFILE_RELATIVE }}"
+            candidate_dockerfile="${candidate}/${{ matrix.dockerfile_path }}"
             if [ -f "${candidate_dockerfile}" ] \
-              && [ -d "${candidate}/cmd" ] \
               && [ -d "${candidate}/platform" ] \
               && [ -d "${candidate}/provenance" ]; then
               selected="${candidate}"
-              dockerfile="${candidate_dockerfile}"
               source_label="${{ github.server_url }}/${{ github.repository }}"
               if [ "${selected}" != "." ]; then
                 source_label="${source_label}/tree/${GITHUB_SHA}/${selected}"
@@ -113,13 +159,12 @@ jobs:
           if [ -z "${selected}" ]; then
             echo "Unable to resolve source root for release build." >&2
             echo "Checked roots: ${roots[*]}" >&2
-            echo "Expected: <root>/${{ env.DOCKERFILE_RELATIVE }}, <root>/cmd, <root>/platform, <root>/provenance" >&2
+            echo "Expected: <root>/${{ matrix.dockerfile_path }}, <root>/platform, <root>/provenance" >&2
             ls -la >&2
             exit 1
           fi
 
           echo "source_root=${selected}" >>"${GITHUB_OUTPUT}"
-          echo "dockerfile=${dockerfile}" >>"${GITHUB_OUTPUT}"
           echo "source_label=${source_label}" >>"${GITHUB_OUTPUT}"
 
       - name: Validate component package path
@@ -127,6 +172,9 @@ jobs:
         run: |
           set -euo pipefail
           pkg="${{ matrix.binary_package }}"
+          if [ -z "${pkg}" ]; then
+            exit 0
+          fi
           pkg_rel="${pkg#./}"
           pkg_path="${{ steps.source.outputs.source_root }}/${pkg_rel}"
           if [ ! -d "${pkg_path}" ]; then
@@ -180,7 +228,7 @@ jobs:
             vuln_ignore_unfixed="false"
           fi
 
-          image_repo="${{ env.REGISTRY }}/${owner}/${{ matrix.component }}"
+          image_repo="${{ env.REGISTRY }}/${owner}/${{ matrix.image_name }}"
           tags="${image_repo}:${release_tag}"
           if [ "${lock_tag}" != "${release_tag}" ]; then
             tags="${tags},${image_repo}:${lock_tag}"
@@ -214,10 +262,9 @@ jobs:
         id: build
         uses: docker/build-push-action@v6
         with:
-          context: ${{ steps.source.outputs.source_root }}
-          file: ${{ steps.source.outputs.dockerfile }}
-          build-args: |
-            BINARY_PACKAGE=${{ matrix.binary_package }}
+          context: ${{ steps.source.outputs.source_root }}/${{ matrix.docker_context }}
+          file: ${{ steps.source.outputs.source_root }}/${{ matrix.dockerfile_path }}
+          build-args: ${{ matrix.build_args }}
           platforms: ${{ steps.meta.outputs.platforms }}
           push: ${{ steps.meta.outputs.push_images }}
           tags: ${{ steps.meta.outputs.tags }}
@@ -636,6 +683,17 @@ jobs:
             go run ./cmd/provenance-lock-check -strict -repo-root "${GITHUB_WORKSPACE}/dist/repo-root"
           )
 
+      - name: Build production digest patch
+        if: steps.locksync.outputs.enabled == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          src_root="${{ steps.source.outputs.source_root }}"
+          mkdir -p dist/production
+          DIGEST_MANIFEST=dist/release-image-digests.json \
+          PATCH_FILE=dist/production/patch-image-digests.yaml \
+            "${src_root}/platform/ci/bin/sync-release-digests-to-production-patch.sh"
+
       - name: Upload synced lockfile artifact
         if: steps.locksync.outputs.enabled == 'true'
         uses: actions/upload-artifact@v4
@@ -644,6 +702,7 @@ jobs:
           path: |
             dist/provenance/images.lock.yaml
             dist/provenance/images.lock.diff
+            dist/production/patch-image-digests.yaml
           retention-days: 30
 
       - name: Upload release digest manifest

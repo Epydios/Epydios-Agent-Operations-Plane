@@ -164,7 +164,7 @@ func applyDefaults(cfg *Config) {
 		cfg.ProviderID = "oss-policy-opa"
 	}
 	if cfg.ProviderVersion == "" {
-		cfg.ProviderVersion = "0.2.0"
+		cfg.ProviderVersion = "0.3.0"
 	}
 	if cfg.OPABaseURL == "" {
 		cfg.OPABaseURL = "http://127.0.0.1:8181"

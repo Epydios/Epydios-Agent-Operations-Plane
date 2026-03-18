@@ -1,6 +1,6 @@
 {
   "providerId": "oss-desktop-openfang-windows",
-  "providerVersion": "0.3.0-preview",
+  "providerVersion": "0.3.0",
   "targetOS": "windows",
   "allowRestrictedHost": false,
   "capabilities": [
