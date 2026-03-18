@@ -2,7 +2,7 @@
 
 ## Product Boundary
 
-`Epydios AgentOps Control Plane` is an OSS control plane for AI/agent execution on Kubernetes. It is not a kernel, distro, or desktop operating system.
+`Epydios Agent Operations Plane` is an OSS control plane for AI/agent execution on Kubernetes. It is not a kernel, distro, or desktop operating system.
 
 ## Core Design Goals
 

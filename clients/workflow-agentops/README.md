@@ -1,6 +1,6 @@
-# Epydios AgentOps Workflow Ingress
+# Workflow Ingress for Epydios Agent Operations Plane
 
-`Epydios AgentOps Workflow Ingress` is the first `M19` ticket/workflow ingress slice.
+`workflow-agentops` is the first `M19` ticket/workflow ingress slice for Epydios Agent Operations Plane.
 
 Scope of this slice:
 - intake external ticket or workflow payloads into native M16 tasks

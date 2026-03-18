@@ -1,6 +1,6 @@
-# Epydios AgentOps VS Code
+# VS Code Ingress for Epydios Agent Operations Plane
 
-`Epydios AgentOps VS Code` is the first M19 IDE-facing client slice.
+`vscode-agentops` is the first M19 IDE-facing client slice for Epydios Agent Operations Plane.
 
 Scope of this slice:
 - list native M16 tasks as governed threads

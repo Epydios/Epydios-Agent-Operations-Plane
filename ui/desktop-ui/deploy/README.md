@@ -1,4 +1,4 @@
-# Deploying Epydios AgentOps Desktop
+# Deploying the Desktop UI for Epydios Agent Operations Plane
 
 ## Image Build
 

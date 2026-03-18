@@ -7,9 +7,9 @@ This repository is licensed under the Apache License, Version 2.0. The license g
 
 ## Allowed uses (nominative and descriptive)
 You may use the marks only as reasonably necessary to describe the software in this repository, for example:
-- “Based on Epydios AgentOps Control Plane”
-- “Compatible with Epydios AgentOps Control Plane”
-- “Fork of Epydios AgentOps Control Plane (modified)”
+- “Based on Epydios Agent Operations Plane”
+- “Compatible with Epydios Agent Operations Plane”
+- “Fork of Epydios Agent Operations Plane (modified)”
 
 These uses must not imply endorsement, sponsorship, or an official relationship with Epydios Technologies, Inc.
 

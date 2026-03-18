@@ -1,8 +1,8 @@
-# Epydios AgentOps
+# Epydios Agent Operations Plane
 
 Governed agent tool execution with approvals and evidence.
 
-Epydios AgentOps is an open source control plane and operator workbench for running agent and tool actions behind explicit policy, approval, audit, and evidence flows on Kubernetes.
+Epydios Agent Operations Plane is an open source control plane and operator workbench for running agent and tool actions behind explicit policy, approval, audit, and evidence flows on Kubernetes.
 
 ## One Concrete Use Case
 

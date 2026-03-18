@@ -1,4 +1,4 @@
-# Epydios AgentOps Desktop M0 Scope
+# Desktop UI M0 Scope for Epydios Agent Operations Plane
 
 ## Objective
 
