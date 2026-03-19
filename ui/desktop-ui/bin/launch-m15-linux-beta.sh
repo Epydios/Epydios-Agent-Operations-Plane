@@ -26,4 +26,21 @@ fi
 
 export APPIMAGE_EXTRACT_AND_RUN=1
 export EPYDIOS_NATIVEAPP_BOOTSTRAP_PATH="${BOOTSTRAP_PATH}"
+
+if command -v qemu-x86_64-static >/dev/null 2>&1 && command -v file >/dev/null 2>&1; then
+  appimage_desc="$(file -b "${INSTALL_PATH}" 2>/dev/null || true)"
+  host_arch="$(uname -m 2>/dev/null || true)"
+  case "${appimage_desc}" in
+    *x86-64*)
+      case "${host_arch}" in
+        x86_64|amd64)
+          ;;
+        *)
+          exec qemu-x86_64-static "${INSTALL_PATH}" "$@"
+          ;;
+      esac
+      ;;
+  esac
+fi
+
 exec "${INSTALL_PATH}" "$@"
