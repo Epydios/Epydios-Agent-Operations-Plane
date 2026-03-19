@@ -1,0 +1,9 @@
+README.md
+pyproject.toml
+setup.py
+src/epydios_client/__init__.py
+src/epydios_client/client.py
+src/epydios_client.egg-info/PKG-INFO
+src/epydios_client.egg-info/SOURCES.txt
+src/epydios_client.egg-info/dependency_links.txt
+src/epydios_client.egg-info/top_level.txt

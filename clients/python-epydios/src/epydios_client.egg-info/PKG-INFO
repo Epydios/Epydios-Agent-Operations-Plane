@@ -1,0 +1,12 @@
+Metadata-Version: 2.1
+Name: epydios-client
+Version: 0.3.0
+Summary: Thin Python client SDK for the Epydios localhost gateway
+Home-page: UNKNOWN
+Author: Epydios
+License: Apache-2.0
+Platform: UNKNOWN
+Requires-Python: >=3.9
+
+UNKNOWN
+
