@@ -20,7 +20,27 @@ This SDK does not:
 
 ```bash
 cd "/Users/maindrive/Dropbox (Personal)/1 chatGPT SHARED FILES/GITHUB/AGENTOPS DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/python-epydios"
-python3 -m pip install -e .
+./bin/install-local.sh
+```
+
+This creates an isolated local Python environment and wrapper without touching
+the system Python installation. On macOS the default install root is:
+
+```text
+~/Library/Application Support/EpydiosAgentOpsDesktop/python-sdk
+```
+
+Quick smoke test after install:
+
+```bash
+"$HOME/Library/Application Support/EpydiosAgentOpsDesktop/python-sdk/bin/epydios-python" \
+  -c "from epydios_client import EpydiosClient; print(EpydiosClient().health())"
+```
+
+Override the install location if needed:
+
+```bash
+EPYDIOS_PYTHON_SDK_HOME=/tmp/epydios-python-sdk ./bin/install-local.sh
 ```
 
 ## Example
