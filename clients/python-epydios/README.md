@@ -33,14 +33,14 @@ client = EpydiosClient()
 result = client.submit_governed_action(
     GovernedActionRequest(
         tenant_id="tenant-demo",
-        project_id="project-payments",
-        environment_id="staging",
+        project_id="project-core",
+        environment_id="dev",
         action_type="desktop.execute",
         target_type="terminal",
-        target_ref="kubectl rollout restart deploy/payments",
-        input={"command": "kubectl rollout restart deploy/payments"},
+        target_ref="echo EPYDIOS_GATEWAY_SMOKE_TEST",
+        input={"command": "echo EPYDIOS_GATEWAY_SMOKE_TEST"},
         client=ClientIdentity(id="python-example", name="Python Example"),
-        reason="Restart the payments deployment",
+        reason="Run a harmless local gateway smoke test",
     )
 )
 
