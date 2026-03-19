@@ -203,6 +203,8 @@ assert manifest["launcherState"] == "ready", manifest["launcherState"]
 assert manifest["runtimeProcessMode"] == "mock_only", manifest["runtimeProcessMode"]
 assert manifest["bootstrapConfigState"] == "loaded", manifest["bootstrapConfigState"]
 assert manifest["bootstrapConfigPath"] == bootstrap_path, manifest["bootstrapConfigPath"]
+assert manifest["paths"]["gatewayRoot"].endswith("localhost-gateway"), manifest["paths"]["gatewayRoot"]
+assert manifest["gatewayService"]["statusPath"] == manifest["paths"]["gatewayStatusPath"], manifest["gatewayService"]["statusPath"]
 
 checklist = {
     "startup_reliability": {

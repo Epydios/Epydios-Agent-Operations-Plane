@@ -24,29 +24,59 @@ func main() {
 		os.Exit(1)
 	}
 
+	if opts.GatewayServiceOnly {
+		if err := nativeapp.RunGatewayService(opts); err != nil {
+			fmt.Fprintf(os.Stderr, "run localhost gateway: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	session, err := nativeapp.PrepareSession(embeddedWeb, opts)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "prepare native session: %v\n", err)
 		os.Exit(1)
 	}
 
-	runtimeProcess, err := nativeapp.StartRuntimeProcess(opts, session)
+	runtimeService, err := nativeapp.EnsureRuntimeService(opts, session)
 	if err != nil {
-		_ = session.RecordEvent("runtime_start_failed", map[string]any{"error": err.Error()})
-		_ = session.RecordStartupFailure("port_forward_failed", err)
-	} else if runtimeProcess != nil {
-		_ = session.UpdateRuntimeState("port_forward_active")
-		_ = session.UpdateLauncherState("ready")
-		_ = session.RecordEvent("runtime_started", map[string]any{
-			"runtimeApiBaseUrl": session.Manifest.RuntimeAPIBaseURL,
-			"logPath":           session.Manifest.Paths.RuntimeLogPath,
+		_ = session.RecordEvent("runtime_service_start_failed", map[string]any{"error": err.Error()})
+		_ = session.RecordStartupFailure(session.Manifest.RuntimeState, err)
+	} else if opts.Mode == "live" {
+		_ = session.RecordEvent("runtime_service_ready", map[string]any{
+			"runtimeApiBaseUrl": runtimeService.RuntimeAPIBaseURL,
+			"logPath":           runtimeService.LogPath,
+			"statusPath":        runtimeService.StatusPath,
+			"state":             runtimeService.State,
+			"health":            runtimeService.Health,
 		})
 	}
-	if runtimeProcess == nil && session.Manifest.LauncherState != "degraded" {
+	gatewayService, gatewayErr := nativeapp.SyncGatewayServiceStatus(opts, session)
+	if gatewayErr != nil {
+		_ = session.RecordEvent("gateway_service_status_failed", map[string]any{"error": gatewayErr.Error()})
+		_ = session.RecordStartupFailure(session.Manifest.RuntimeState, gatewayErr)
+	} else if opts.Mode == "live" && err == nil {
+		gatewayService, gatewayErr = nativeapp.EnsureGatewayService(opts, session)
+		if gatewayErr != nil {
+			_ = session.RecordEvent("gateway_service_start_failed", map[string]any{"error": gatewayErr.Error()})
+			_ = session.RecordStartupFailure(session.Manifest.RuntimeState, gatewayErr)
+		}
+	}
+	if gatewayErr == nil {
+		_ = session.RecordEvent("gateway_service_ready", map[string]any{
+			"gatewayBaseUrl": gatewayService.BaseURL,
+			"logPath":        gatewayService.LogPath,
+			"statusPath":     gatewayService.StatusPath,
+			"tokenPath":      gatewayService.TokenPath,
+			"state":          gatewayService.State,
+			"health":         gatewayService.Health,
+		})
+	}
+	if session.Manifest.LauncherState != "degraded" {
 		_ = session.UpdateLauncherState("ready")
 	}
 
-	app := NewApp(session, runtimeProcess)
+	app := NewApp(session)
 	err = wails.Run(&options.App{
 		Title:              "EpydiosOps Desktop",
 		Width:              1440,

@@ -7,7 +7,6 @@ import (
 	"io/fs"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -30,41 +29,83 @@ const (
 type LaunchOptions struct {
 	Mode                   string
 	RuntimeLocalPort       int
+	GatewayLocalPort       int
 	RuntimeNamespace       string
 	RuntimeService         string
 	TargetExecutionProfile string
 	AllowRestrictedHost    bool
 	BootstrapConfigPath    string
+	GatewayServiceOnly     bool
 }
 
 type SessionPaths struct {
-	ConfigRoot     string `json:"configRoot"`
-	CacheRoot      string `json:"cacheRoot"`
-	RootDir        string `json:"rootDir"`
-	WebDir         string `json:"webDir"`
-	LogDir         string `json:"logDir"`
-	CrashDir       string `json:"crashDir"`
-	EventLogPath   string `json:"eventLogPath"`
-	UILogPath      string `json:"uiLogPath"`
-	RuntimeLogPath string `json:"runtimeLogPath"`
-	ManifestPath   string `json:"manifestPath"`
+	ConfigRoot          string `json:"configRoot"`
+	CacheRoot           string `json:"cacheRoot"`
+	ServiceRoot         string `json:"serviceRoot"`
+	GatewayRoot         string `json:"gatewayRoot"`
+	RootDir             string `json:"rootDir"`
+	WebDir              string `json:"webDir"`
+	LogDir              string `json:"logDir"`
+	CrashDir            string `json:"crashDir"`
+	EventLogPath        string `json:"eventLogPath"`
+	UILogPath           string `json:"uiLogPath"`
+	RuntimeLogPath      string `json:"runtimeLogPath"`
+	ManifestPath        string `json:"manifestPath"`
+	ServicePIDPath      string `json:"servicePidPath"`
+	ServiceLogPath      string `json:"serviceLogPath"`
+	ServiceStatusPath   string `json:"serviceStatusPath"`
+	GatewayPIDPath      string `json:"gatewayPidPath"`
+	GatewayLogPath      string `json:"gatewayLogPath"`
+	GatewayStatusPath   string `json:"gatewayStatusPath"`
+	GatewayTokenPath    string `json:"gatewayTokenPath"`
+	GatewayRequestsRoot string `json:"gatewayRequestsRoot"`
+}
+
+type RuntimeServiceRecord struct {
+	State             string `json:"state"`
+	Health            string `json:"health"`
+	PID               int    `json:"pid,omitempty"`
+	RuntimeAPIBaseURL string `json:"runtimeApiBaseUrl"`
+	LogPath           string `json:"logPath"`
+	PIDPath           string `json:"pidPath"`
+	StatusPath        string `json:"statusPath"`
+	StartedAtUTC      string `json:"startedAtUtc,omitempty"`
+	UpdatedAtUTC      string `json:"updatedAtUtc,omitempty"`
+	LastError         string `json:"lastError,omitempty"`
+}
+
+type GatewayServiceRecord struct {
+	State        string `json:"state"`
+	Health       string `json:"health"`
+	PID          int    `json:"pid,omitempty"`
+	BaseURL      string `json:"baseUrl"`
+	LogPath      string `json:"logPath"`
+	PIDPath      string `json:"pidPath"`
+	StatusPath   string `json:"statusPath"`
+	TokenPath    string `json:"tokenPath"`
+	RequestsRoot string `json:"requestsRoot"`
+	StartedAtUTC string `json:"startedAtUtc,omitempty"`
+	UpdatedAtUTC string `json:"updatedAtUtc,omitempty"`
+	LastError    string `json:"lastError,omitempty"`
 }
 
 type SessionManifest struct {
-	AppName                string       `json:"appName"`
-	StartedAtUTC           string       `json:"startedAtUtc"`
-	Mode                   string       `json:"mode"`
-	LauncherState          string       `json:"launcherState"`
-	RuntimeProcessMode     string       `json:"runtimeProcessMode"`
-	RuntimeState           string       `json:"runtimeState"`
-	RuntimeAPIBaseURL      string       `json:"runtimeApiBaseUrl"`
-	RegistryAPIBaseURL     string       `json:"registryApiBaseUrl"`
-	TargetExecutionProfile string       `json:"targetExecutionProfile"`
-	AllowRestrictedHost    bool         `json:"allowRestrictedHost"`
-	BootstrapConfigPath    string       `json:"bootstrapConfigPath"`
-	BootstrapConfigState   string       `json:"bootstrapConfigState"`
-	StartupError           string       `json:"startupError,omitempty"`
-	Paths                  SessionPaths `json:"paths"`
+	AppName                string               `json:"appName"`
+	StartedAtUTC           string               `json:"startedAtUtc"`
+	Mode                   string               `json:"mode"`
+	LauncherState          string               `json:"launcherState"`
+	RuntimeProcessMode     string               `json:"runtimeProcessMode"`
+	RuntimeState           string               `json:"runtimeState"`
+	RuntimeAPIBaseURL      string               `json:"runtimeApiBaseUrl"`
+	RegistryAPIBaseURL     string               `json:"registryApiBaseUrl"`
+	TargetExecutionProfile string               `json:"targetExecutionProfile"`
+	AllowRestrictedHost    bool                 `json:"allowRestrictedHost"`
+	BootstrapConfigPath    string               `json:"bootstrapConfigPath"`
+	BootstrapConfigState   string               `json:"bootstrapConfigState"`
+	StartupError           string               `json:"startupError,omitempty"`
+	RuntimeService         RuntimeServiceRecord `json:"runtimeService"`
+	GatewayService         GatewayServiceRecord `json:"gatewayService"`
+	Paths                  SessionPaths         `json:"paths"`
 }
 
 type Session struct {
@@ -72,16 +113,11 @@ type Session struct {
 	launchOptions LaunchOptions
 }
 
-type RuntimeProcess struct {
-	cmd      *exec.Cmd
-	logFile  *os.File
-	manifest *SessionManifest
-}
-
 func DefaultLaunchOptions() LaunchOptions {
 	return LaunchOptions{
 		Mode:                   modeMock,
 		RuntimeLocalPort:       8080,
+		GatewayLocalPort:       18765,
 		RuntimeNamespace:       "epydios-system",
 		RuntimeService:         "orchestration-runtime",
 		TargetExecutionProfile: "sandbox_vm_autonomous",
@@ -125,6 +161,18 @@ func ParseLaunchOptions(args []string) (LaunchOptions, error) {
 			}
 			opts.RuntimeService = strings.TrimSpace(args[i+1])
 			i++
+		case "--gateway-port":
+			if i+1 >= len(args) {
+				return LaunchOptions{}, fmt.Errorf("missing value for --gateway-port")
+			}
+			port, err := strconv.Atoi(args[i+1])
+			if err != nil || port <= 0 {
+				return LaunchOptions{}, fmt.Errorf("invalid gateway port %q", args[i+1])
+			}
+			opts.GatewayLocalPort = port
+			i++
+		case "--gateway-service":
+			opts.GatewayServiceOnly = true
 		default:
 			return LaunchOptions{}, fmt.Errorf("unknown argument %q", args[i])
 		}
@@ -149,18 +197,28 @@ func PrepareSession(assets fs.FS, opts LaunchOptions) (*Session, error) {
 	productConfigRoot := filepath.Join(configRoot, "EpydiosAgentOpsDesktop")
 	sessionRoot := filepath.Join(productCacheRoot, "native-shell", stamp)
 	paths := SessionPaths{
-		ConfigRoot:     productConfigRoot,
-		CacheRoot:      productCacheRoot,
-		RootDir:        sessionRoot,
-		WebDir:         filepath.Join(sessionRoot, "web"),
-		LogDir:         filepath.Join(sessionRoot, "logs"),
-		CrashDir:       filepath.Join(sessionRoot, "crashdumps"),
-		EventLogPath:   filepath.Join(sessionRoot, "logs", "session-events.jsonl"),
-		UILogPath:      filepath.Join(sessionRoot, "logs", "ui-shell.log"),
-		RuntimeLogPath: filepath.Join(sessionRoot, "logs", "runtime-process.log"),
-		ManifestPath:   filepath.Join(sessionRoot, "session.json"),
+		ConfigRoot:          productConfigRoot,
+		CacheRoot:           productCacheRoot,
+		ServiceRoot:         filepath.Join(productConfigRoot, "runtime-service"),
+		GatewayRoot:         filepath.Join(productConfigRoot, "localhost-gateway"),
+		RootDir:             sessionRoot,
+		WebDir:              filepath.Join(sessionRoot, "web"),
+		LogDir:              filepath.Join(sessionRoot, "logs"),
+		CrashDir:            filepath.Join(sessionRoot, "crashdumps"),
+		EventLogPath:        filepath.Join(sessionRoot, "logs", "session-events.jsonl"),
+		UILogPath:           filepath.Join(sessionRoot, "logs", "ui-shell.log"),
+		RuntimeLogPath:      filepath.Join(sessionRoot, "logs", "runtime-process.log"),
+		ManifestPath:        filepath.Join(sessionRoot, "session.json"),
+		ServicePIDPath:      filepath.Join(productConfigRoot, "runtime-service", "runtime-service.pid"),
+		ServiceLogPath:      filepath.Join(productConfigRoot, "runtime-service", "runtime-service.log"),
+		ServiceStatusPath:   filepath.Join(productConfigRoot, "runtime-service", "runtime-service.json"),
+		GatewayPIDPath:      filepath.Join(productConfigRoot, "localhost-gateway", "gateway-service.pid"),
+		GatewayLogPath:      filepath.Join(productConfigRoot, "localhost-gateway", "gateway-service.log"),
+		GatewayStatusPath:   filepath.Join(productConfigRoot, "localhost-gateway", "gateway-service.json"),
+		GatewayTokenPath:    filepath.Join(productConfigRoot, "localhost-gateway", "gateway-token"),
+		GatewayRequestsRoot: filepath.Join(productConfigRoot, "localhost-gateway", "requests"),
 	}
-	for _, dir := range []string{paths.WebDir, paths.LogDir, paths.CrashDir} {
+	for _, dir := range []string{paths.WebDir, paths.LogDir, paths.CrashDir, paths.ServiceRoot, paths.GatewayRoot, paths.GatewayRequestsRoot} {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return nil, fmt.Errorf("create session dir %s: %w", dir, err)
 		}
@@ -182,6 +240,8 @@ func PrepareSession(assets fs.FS, opts LaunchOptions) (*Session, error) {
 		AllowRestrictedHost:    opts.AllowRestrictedHost,
 		BootstrapConfigPath:    opts.BootstrapConfigPath,
 		BootstrapConfigState:   resolveBootstrapConfigState(opts.BootstrapConfigPath),
+		RuntimeService:         defaultRuntimeServiceRecord(opts, paths),
+		GatewayService:         defaultGatewayServiceRecord(opts, paths),
 		Paths:                  paths,
 	}
 	if err := patchRuntimeConfig(paths.WebDir, opts, manifest); err != nil {
@@ -249,6 +309,23 @@ func (s *Session) RecordStartupFailure(runtimeState string, err error) error {
 	})
 }
 
+func (s *Session) LaunchOptions() LaunchOptions {
+	return s.launchOptions
+}
+
+func (s *Session) UpdateRuntimeService(record RuntimeServiceRecord) error {
+	return s.update(func(manifest *SessionManifest) {
+		manifest.RuntimeService = record
+		manifest.RuntimeState = runtimeStateFromService(manifest.Mode, record)
+	})
+}
+
+func (s *Session) UpdateGatewayService(record GatewayServiceRecord) error {
+	return s.update(func(manifest *SessionManifest) {
+		manifest.GatewayService = record
+	})
+}
+
 func (s *Session) update(mutate func(*SessionManifest)) error {
 	if mutate != nil {
 		mutate(&s.Manifest)
@@ -267,52 +344,12 @@ func (s *Session) writeManifest() error {
 	return os.WriteFile(s.Manifest.Paths.ManifestPath, append(data, '\n'), 0o644)
 }
 
-func StartRuntimeProcess(opts LaunchOptions, session *Session) (*RuntimeProcess, error) {
-	if opts.Mode != modeLive {
-		return nil, nil
-	}
-	logFile, err := os.OpenFile(session.Manifest.Paths.RuntimeLogPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
-	if err != nil {
-		return nil, fmt.Errorf("open runtime log: %w", err)
-	}
-	cmd := exec.Command(
-		"kubectl",
-		"-n", opts.RuntimeNamespace,
-		"port-forward",
-		"svc/"+opts.RuntimeService,
-		fmt.Sprintf("%d:8080", opts.RuntimeLocalPort),
-	)
-	cmd.Stdout = logFile
-	cmd.Stderr = logFile
-	if err := cmd.Start(); err != nil {
-		logFile.Close()
-		return nil, fmt.Errorf("start runtime process: %w", err)
-	}
-	process := &RuntimeProcess{cmd: cmd, logFile: logFile, manifest: &session.Manifest}
-	if err := waitForRuntimeHealth(session.Manifest.RuntimeAPIBaseURL + "/healthz"); err != nil {
-		_ = process.Stop()
-		return nil, err
-	}
-	return process, nil
-}
-
-func (p *RuntimeProcess) Stop() error {
-	if p == nil {
-		return nil
-	}
-	var stopErr error
-	if p.cmd != nil && p.cmd.Process != nil {
-		stopErr = p.cmd.Process.Kill()
-		_, _ = p.cmd.Process.Wait()
-	}
-	if p.logFile != nil {
-		_ = p.logFile.Close()
-	}
-	return stopErr
-}
-
 func waitForRuntimeHealth(url string) error {
 	deadline := time.Now().Add(30 * time.Second)
+	return waitForRuntimeHealthUntil(url, deadline)
+}
+
+func waitForRuntimeHealthUntil(url string, deadline time.Time) error {
 	client := &http.Client{Timeout: 2 * time.Second}
 	for time.Now().Before(deadline) {
 		resp, err := client.Get(url)
@@ -354,6 +391,8 @@ func patchRuntimeConfig(webDir string, opts LaunchOptions, manifest SessionManif
 		"mode":                   opts.Mode,
 		"runtimeProcessMode":     manifest.RuntimeProcessMode,
 		"runtimeState":           manifest.RuntimeState,
+		"runtimeService":         manifest.RuntimeService,
+		"gatewayService":         manifest.GatewayService,
 		"targetExecutionProfile": manifest.TargetExecutionProfile,
 		"allowRestrictedHost":    manifest.AllowRestrictedHost,
 		"bootstrapConfigPath":    manifest.BootstrapConfigPath,
@@ -367,12 +406,32 @@ func patchRuntimeConfig(webDir string, opts LaunchOptions, manifest SessionManif
 		"uiLogPath":              manifest.Paths.UILogPath,
 		"runtimeLogPath":         manifest.Paths.RuntimeLogPath,
 		"sessionManifestPath":    manifest.Paths.ManifestPath,
+		"serviceRoot":            manifest.Paths.ServiceRoot,
+		"servicePidPath":         manifest.Paths.ServicePIDPath,
+		"serviceLogPath":         manifest.Paths.ServiceLogPath,
+		"serviceStatusPath":      manifest.Paths.ServiceStatusPath,
+		"gatewayRoot":            manifest.Paths.GatewayRoot,
+		"gatewayPidPath":         manifest.Paths.GatewayPIDPath,
+		"gatewayLogPath":         manifest.Paths.GatewayLogPath,
+		"gatewayStatusPath":      manifest.Paths.GatewayStatusPath,
+		"gatewayTokenPath":       manifest.Paths.GatewayTokenPath,
+		"gatewayRequestsRoot":    manifest.Paths.GatewayRequestsRoot,
 		"diagnostics": map[string]any{
 			"bootstrapConfigPath": manifest.BootstrapConfigPath,
 			"sessionManifestPath": manifest.Paths.ManifestPath,
 			"eventLogPath":        manifest.Paths.EventLogPath,
 			"uiLogPath":           manifest.Paths.UILogPath,
 			"runtimeLogPath":      manifest.Paths.RuntimeLogPath,
+			"servicePidPath":      manifest.Paths.ServicePIDPath,
+			"serviceLogPath":      manifest.Paths.ServiceLogPath,
+			"serviceStatusPath":   manifest.Paths.ServiceStatusPath,
+			"serviceRoot":         manifest.Paths.ServiceRoot,
+			"gatewayPidPath":      manifest.Paths.GatewayPIDPath,
+			"gatewayLogPath":      manifest.Paths.GatewayLogPath,
+			"gatewayStatusPath":   manifest.Paths.GatewayStatusPath,
+			"gatewayTokenPath":    manifest.Paths.GatewayTokenPath,
+			"gatewayRequestsRoot": manifest.Paths.GatewayRequestsRoot,
+			"gatewayRoot":         manifest.Paths.GatewayRoot,
 			"crashDir":            manifest.Paths.CrashDir,
 			"configRoot":          manifest.Paths.ConfigRoot,
 			"cacheRoot":           manifest.Paths.CacheRoot,
@@ -430,21 +489,71 @@ func copyFS(root fs.FS, target string) error {
 
 func runtimeProcessMode(opts LaunchOptions) string {
 	if opts.Mode == modeLive {
-		return "kubectl_port_forward"
+		return "background_supervisor"
 	}
 	return "mock_only"
 }
 
 func runtimeState(opts LaunchOptions) string {
 	if opts.Mode == modeLive {
-		return "port_forward_pending"
+		return "service_pending"
 	}
 	return "mock_active"
+}
+
+func runtimeStateFromService(mode string, record RuntimeServiceRecord) string {
+	if strings.TrimSpace(mode) != modeLive {
+		return "mock_active"
+	}
+	switch strings.TrimSpace(strings.ToLower(record.State)) {
+	case "running":
+		return "service_running"
+	case "starting":
+		return "service_starting"
+	case "degraded":
+		return "service_degraded"
+	case "failed":
+		return "service_failed"
+	case "stopped":
+		return "service_stopped"
+	default:
+		return "service_pending"
+	}
+}
+
+func defaultRuntimeServiceRecord(opts LaunchOptions, paths SessionPaths) RuntimeServiceRecord {
+	record := RuntimeServiceRecord{
+		State:             "stopped",
+		Health:            "unknown",
+		RuntimeAPIBaseURL: fmt.Sprintf("http://127.0.0.1:%d", opts.RuntimeLocalPort),
+		LogPath:           paths.ServiceLogPath,
+		PIDPath:           paths.ServicePIDPath,
+		StatusPath:        paths.ServiceStatusPath,
+	}
+	if opts.Mode != modeLive {
+		record.State = "mock_only"
+		record.Health = "not_required"
+	}
+	return record
+}
+
+func defaultGatewayServiceRecord(opts LaunchOptions, paths SessionPaths) GatewayServiceRecord {
+	return GatewayServiceRecord{
+		State:        "stopped",
+		Health:       "unknown",
+		BaseURL:      fmt.Sprintf("http://127.0.0.1:%d", opts.GatewayLocalPort),
+		LogPath:      paths.GatewayLogPath,
+		PIDPath:      paths.GatewayPIDPath,
+		StatusPath:   paths.GatewayStatusPath,
+		TokenPath:    paths.GatewayTokenPath,
+		RequestsRoot: paths.GatewayRequestsRoot,
+	}
 }
 
 type bootstrapLaunchOptions struct {
 	Mode             string `json:"mode"`
 	RuntimeLocalPort int    `json:"runtimeLocalPort"`
+	GatewayLocalPort int    `json:"gatewayLocalPort"`
 	RuntimeNamespace string `json:"runtimeNamespace"`
 	RuntimeService   string `json:"runtimeService"`
 }
@@ -480,6 +589,9 @@ func applyBootstrapLaunchOptions(opts *LaunchOptions) error {
 	}
 	if payload.RuntimeLocalPort > 0 {
 		opts.RuntimeLocalPort = payload.RuntimeLocalPort
+	}
+	if payload.GatewayLocalPort > 0 {
+		opts.GatewayLocalPort = payload.GatewayLocalPort
 	}
 	if namespace := strings.TrimSpace(payload.RuntimeNamespace); namespace != "" {
 		opts.RuntimeNamespace = namespace

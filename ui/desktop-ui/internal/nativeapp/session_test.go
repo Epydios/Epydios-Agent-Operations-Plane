@@ -52,6 +52,9 @@ func TestPrepareSessionPatchesMockConfigAndCreatesPaths(t *testing.T) {
 		session.Manifest.Paths.WebDir,
 		session.Manifest.Paths.LogDir,
 		session.Manifest.Paths.CrashDir,
+		session.Manifest.Paths.ServiceRoot,
+		session.Manifest.Paths.GatewayRoot,
+		session.Manifest.Paths.GatewayRequestsRoot,
 	} {
 		if _, err := os.Stat(dir); err != nil {
 			t.Fatalf("expected %s to exist: %v", dir, err)
@@ -103,6 +106,41 @@ func TestPrepareSessionPatchesMockConfigAndCreatesPaths(t *testing.T) {
 	if got := nativeShell["cacheRoot"]; got != session.Manifest.Paths.CacheRoot {
 		t.Fatalf("expected cacheRoot to match manifest, got %#v", got)
 	}
+	service, ok := nativeShell["runtimeService"].(map[string]any)
+	if !ok {
+		t.Fatal("expected runtimeService block in nativeShell")
+	}
+	if got := service["state"]; got != runtimeServiceStateMockOnly {
+		t.Fatalf("expected runtimeService.state=%q, got %#v", runtimeServiceStateMockOnly, got)
+	}
+	if got := service["health"]; got != runtimeServiceHealthNotRequired {
+		t.Fatalf("expected runtimeService.health=%q, got %#v", runtimeServiceHealthNotRequired, got)
+	}
+	if got := nativeShell["serviceStatusPath"]; got != session.Manifest.Paths.ServiceStatusPath {
+		t.Fatalf("expected serviceStatusPath to match manifest, got %#v", got)
+	}
+	if got := nativeShell["servicePidPath"]; got != session.Manifest.Paths.ServicePIDPath {
+		t.Fatalf("expected servicePidPath to match manifest, got %#v", got)
+	}
+	if got := nativeShell["serviceLogPath"]; got != session.Manifest.Paths.ServiceLogPath {
+		t.Fatalf("expected serviceLogPath to match manifest, got %#v", got)
+	}
+	gateway, ok := nativeShell["gatewayService"].(map[string]any)
+	if !ok {
+		t.Fatal("expected gatewayService block in nativeShell")
+	}
+	if got := gateway["state"]; got != gatewayStateStopped {
+		t.Fatalf("expected gatewayService.state=%q, got %#v", gatewayStateStopped, got)
+	}
+	if got := gateway["statusPath"]; got != session.Manifest.Paths.GatewayStatusPath {
+		t.Fatalf("expected gatewayService.statusPath to match manifest, got %#v", got)
+	}
+	if got := nativeShell["gatewayStatusPath"]; got != session.Manifest.Paths.GatewayStatusPath {
+		t.Fatalf("expected gatewayStatusPath to match manifest, got %#v", got)
+	}
+	if got := nativeShell["gatewayTokenPath"]; got != session.Manifest.Paths.GatewayTokenPath {
+		t.Fatalf("expected gatewayTokenPath to match manifest, got %#v", got)
+	}
 }
 
 func TestPrepareSessionDisablesAuthForLiveMode(t *testing.T) {
@@ -153,11 +191,17 @@ func TestPrepareSessionDisablesAuthForLiveMode(t *testing.T) {
 	if got := auth["enabled"]; got != false {
 		t.Fatalf("expected auth.enabled=false in live mode, got %#v", got)
 	}
-	if session.Manifest.RuntimeProcessMode != "kubectl_port_forward" {
-		t.Fatalf("expected live runtime process mode kubectl_port_forward, got %q", session.Manifest.RuntimeProcessMode)
+	if session.Manifest.RuntimeProcessMode != "background_supervisor" {
+		t.Fatalf("expected live runtime process mode background_supervisor, got %q", session.Manifest.RuntimeProcessMode)
 	}
 	if session.Manifest.BootstrapConfigState != bootstrapStateMissing {
 		t.Fatalf("expected missing bootstrap state by default, got %q", session.Manifest.BootstrapConfigState)
+	}
+	if session.Manifest.RuntimeState != "service_pending" {
+		t.Fatalf("expected initial live runtime state service_pending, got %q", session.Manifest.RuntimeState)
+	}
+	if session.Manifest.RuntimeService.State != runtimeServiceStateStopped {
+		t.Fatalf("expected initial runtime service state stopped, got %q", session.Manifest.RuntimeService.State)
 	}
 }
 
@@ -176,6 +220,7 @@ func TestParseLaunchOptionsUsesBootstrapDefaultsAndAllowsCliOverride(t *testing.
 	if err := os.WriteFile(defaults.BootstrapConfigPath, []byte(`{
   "mode": "live",
   "runtimeLocalPort": 18080,
+  "gatewayLocalPort": 18777,
   "runtimeNamespace": "epydios-beta",
   "runtimeService": "runtime-beta"
 }`), 0o644); err != nil {
@@ -192,6 +237,9 @@ func TestParseLaunchOptionsUsesBootstrapDefaultsAndAllowsCliOverride(t *testing.
 	if opts.RuntimeLocalPort != 18080 {
 		t.Fatalf("expected bootstrap port 18080, got %d", opts.RuntimeLocalPort)
 	}
+	if opts.GatewayLocalPort != 18777 {
+		t.Fatalf("expected bootstrap gateway port 18777, got %d", opts.GatewayLocalPort)
+	}
 	if opts.RuntimeNamespace != "epydios-beta" {
 		t.Fatalf("expected bootstrap namespace epydios-beta, got %q", opts.RuntimeNamespace)
 	}
@@ -199,7 +247,7 @@ func TestParseLaunchOptionsUsesBootstrapDefaultsAndAllowsCliOverride(t *testing.
 		t.Fatalf("expected bootstrap service runtime-beta, got %q", opts.RuntimeService)
 	}
 
-	overridden, err := ParseLaunchOptions([]string{"--mode", "mock", "--runtime-port", "19090"})
+	overridden, err := ParseLaunchOptions([]string{"--mode", "mock", "--runtime-port", "19090", "--gateway-port", "19091"})
 	if err != nil {
 		t.Fatalf("parse launch options with cli overrides: %v", err)
 	}
@@ -208,6 +256,9 @@ func TestParseLaunchOptionsUsesBootstrapDefaultsAndAllowsCliOverride(t *testing.
 	}
 	if overridden.RuntimeLocalPort != 19090 {
 		t.Fatalf("expected CLI port override 19090, got %d", overridden.RuntimeLocalPort)
+	}
+	if overridden.GatewayLocalPort != 19091 {
+		t.Fatalf("expected CLI gateway port override 19091, got %d", overridden.GatewayLocalPort)
 	}
 	if overridden.RuntimeNamespace != "epydios-beta" {
 		t.Fatalf("expected bootstrap namespace to remain when not overridden, got %q", overridden.RuntimeNamespace)
@@ -277,5 +328,135 @@ func TestSessionStateUpdatesRefreshRuntimeConfig(t *testing.T) {
 	}
 	if got := nativeShell["startupError"]; got == nil || got == "" {
 		t.Fatal("expected startupError to be populated")
+	}
+	if got := nativeShell["gatewayStatusPath"]; got != session.Manifest.Paths.GatewayStatusPath {
+		t.Fatalf("expected gatewayStatusPath to match manifest, got %#v", got)
+	}
+}
+
+func TestUpdateRuntimeServiceRefreshesRuntimeConfig(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(tempHome, ".cache"))
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tempHome, ".config"))
+
+	assets := fstest.MapFS{
+		"web/config/runtime-config.json": {
+			Data: []byte(`{
+  "environment": "local",
+  "mockMode": false,
+  "runtimeApiBaseUrl": "http://127.0.0.1:8080",
+  "registryApiBaseUrl": "http://127.0.0.1:8080",
+  "auth": {
+    "enabled": true
+  }
+}`),
+		},
+		"web/index.html": {Data: []byte("<html></html>")},
+	}
+
+	opts := DefaultLaunchOptions()
+	opts.Mode = modeLive
+	session, err := PrepareSession(assets, opts)
+	if err != nil {
+		t.Fatalf("prepare session: %v", err)
+	}
+
+	record := session.Manifest.RuntimeService
+	record.State = runtimeServiceStateRunning
+	record.Health = runtimeServiceHealthHealthy
+	record.PID = 4242
+	record.UpdatedAtUTC = "2026-03-19T00:00:00Z"
+	record.StartedAtUTC = "2026-03-19T00:00:00Z"
+	if err := session.UpdateRuntimeService(record); err != nil {
+		t.Fatalf("update runtime service: %v", err)
+	}
+
+	content, err := os.ReadFile(filepath.Join(session.Manifest.Paths.WebDir, "config", "runtime-config.json"))
+	if err != nil {
+		t.Fatalf("read patched config: %v", err)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(content, &payload); err != nil {
+		t.Fatalf("decode patched config: %v", err)
+	}
+	nativeShell, ok := payload["nativeShell"].(map[string]any)
+	if !ok {
+		t.Fatal("expected nativeShell block")
+	}
+	service, ok := nativeShell["runtimeService"].(map[string]any)
+	if !ok {
+		t.Fatal("expected runtimeService block")
+	}
+	if got := service["state"]; got != runtimeServiceStateRunning {
+		t.Fatalf("expected runtimeService.state=%q, got %#v", runtimeServiceStateRunning, got)
+	}
+	if got := service["health"]; got != runtimeServiceHealthHealthy {
+		t.Fatalf("expected runtimeService.health=%q, got %#v", runtimeServiceHealthHealthy, got)
+	}
+	if got := nativeShell["runtimeState"]; got != "service_running" {
+		t.Fatalf("expected runtimeState=service_running, got %#v", got)
+	}
+}
+
+func TestUpdateGatewayServiceRefreshesRuntimeConfig(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(tempHome, ".cache"))
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tempHome, ".config"))
+
+	assets := fstest.MapFS{
+		"web/config/runtime-config.json": {
+			Data: []byte(`{
+  "environment": "local",
+  "mockMode": false,
+  "runtimeApiBaseUrl": "http://127.0.0.1:8080",
+  "registryApiBaseUrl": "http://127.0.0.1:8080",
+  "auth": {
+    "enabled": true
+  }
+}`),
+		},
+		"web/index.html": {Data: []byte("<html></html>")},
+	}
+
+	opts := DefaultLaunchOptions()
+	opts.Mode = modeLive
+	session, err := PrepareSession(assets, opts)
+	if err != nil {
+		t.Fatalf("prepare session: %v", err)
+	}
+
+	record := session.Manifest.GatewayService
+	record.State = gatewayStateRunning
+	record.Health = gatewayHealthHealthy
+	record.PID = 5252
+	record.UpdatedAtUTC = "2026-03-19T00:00:00Z"
+	record.StartedAtUTC = "2026-03-19T00:00:00Z"
+	if err := session.UpdateGatewayService(record); err != nil {
+		t.Fatalf("update gateway service: %v", err)
+	}
+
+	content, err := os.ReadFile(filepath.Join(session.Manifest.Paths.WebDir, "config", "runtime-config.json"))
+	if err != nil {
+		t.Fatalf("read patched config: %v", err)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(content, &payload); err != nil {
+		t.Fatalf("decode patched config: %v", err)
+	}
+	nativeShell, ok := payload["nativeShell"].(map[string]any)
+	if !ok {
+		t.Fatal("expected nativeShell block")
+	}
+	gateway, ok := nativeShell["gatewayService"].(map[string]any)
+	if !ok {
+		t.Fatal("expected gatewayService block")
+	}
+	if got := gateway["state"]; got != gatewayStateRunning {
+		t.Fatalf("expected gatewayService.state=%q, got %#v", gatewayStateRunning, got)
+	}
+	if got := gateway["health"]; got != gatewayHealthHealthy {
+		t.Fatalf("expected gatewayService.health=%q, got %#v", gatewayHealthHealthy, got)
 	}
 }

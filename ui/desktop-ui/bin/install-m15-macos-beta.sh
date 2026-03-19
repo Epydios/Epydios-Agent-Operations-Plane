@@ -64,6 +64,7 @@ EOF
 {
   "mode": "${M15_MACOS_BETA_MODE:-mock}",
   "runtimeLocalPort": ${M15_MACOS_RUNTIME_PORT:-8080},
+  "gatewayLocalPort": ${M15_MACOS_GATEWAY_PORT:-18765},
   "runtimeNamespace": "${M15_MACOS_RUNTIME_NAMESPACE:-epydios-system}",
   "runtimeService": "${M15_MACOS_RUNTIME_SERVICE:-orchestration-runtime}"
 }

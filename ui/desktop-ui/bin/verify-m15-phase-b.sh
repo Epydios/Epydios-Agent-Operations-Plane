@@ -190,6 +190,8 @@ assert manifest["bootstrapConfigState"] == "loaded", manifest["bootstrapConfigSt
 assert manifest["bootstrapConfigPath"] == bootstrap_path, manifest["bootstrapConfigPath"]
 assert manifest["paths"]["configRoot"].endswith("EpydiosAgentOpsDesktop"), manifest["paths"]["configRoot"]
 assert manifest["paths"]["cacheRoot"].endswith("EpydiosAgentOpsDesktop"), manifest["paths"]["cacheRoot"]
+assert manifest["paths"]["gatewayRoot"].endswith("localhost-gateway"), manifest["paths"]["gatewayRoot"]
+assert manifest["gatewayService"]["statusPath"] == manifest["paths"]["gatewayStatusPath"], manifest["gatewayService"]["statusPath"]
 
 checklist = {
     "startup_reliability": {
