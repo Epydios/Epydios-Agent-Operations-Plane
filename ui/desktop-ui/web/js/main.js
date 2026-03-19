@@ -25,6 +25,7 @@ import {
 import { createWorkspaceNavController } from "./shell/nav/workspace-nav.js";
 import { initializeShellLiveRegions } from "./shell/alerts/live-regions.js";
 import { createTopbarController } from "./shell/topbar/topbar.js";
+import { renderNativeLauncherStatus } from "./shell/topbar/native-launcher-status.js";
 import { createRefreshStatusController } from "./shell/topbar/refresh-status.js";
 import { initializePanelRegions } from "./shared/components/panel-region.js";
 import { copyTextToClipboard, triggerTextDownload } from "./shared/exports/text.js";
@@ -202,6 +203,7 @@ import {
 } from "./views/common.js";
 
 const ui = {
+  nativeLauncherStatus: document.getElementById("native-launcher-status"),
   workspaceLayout: document.getElementById("workspace-layout"),
   chatContent: document.getElementById("chat-content"),
   identityContent: document.getElementById("identity-content"),
@@ -4023,6 +4025,20 @@ async function main() {
     title: config.appName || "EpydiosOps Desktop",
     subtitle: `${config.environment || "unknown"} environment`
   });
+  if (ui.nativeLauncherStatus instanceof HTMLElement) {
+    const launcherMarkup = renderNativeLauncherStatus(config.nativeShell);
+    ui.nativeLauncherStatus.innerHTML = launcherMarkup;
+    ui.nativeLauncherStatus.hidden = !launcherMarkup;
+    if (launcherMarkup) {
+      ui.nativeLauncherStatus.dataset.launcherState = String(
+        config?.nativeShell?.launcherState || ""
+      )
+        .trim()
+        .toLowerCase();
+    } else {
+      delete ui.nativeLauncherStatus.dataset.launcherState;
+    }
+  }
   setWorkspaceView(readSavedValue(WORKSPACE_VIEW_PREF_KEY));
   setIncidentSubview(readSavedValue(INCIDENT_SUBVIEW_PREF_KEY));
   settingsSubviewState = normalizeSettingsSubview(readSavedValue(SETTINGS_SUBVIEW_PREF_KEY));

@@ -33,15 +33,17 @@ func main() {
 	runtimeProcess, err := nativeapp.StartRuntimeProcess(opts, session)
 	if err != nil {
 		_ = session.RecordEvent("runtime_start_failed", map[string]any{"error": err.Error()})
-		fmt.Fprintf(os.Stderr, "start runtime process: %v\n", err)
-		os.Exit(1)
-	}
-	if runtimeProcess != nil {
+		_ = session.RecordStartupFailure("port_forward_failed", err)
+	} else if runtimeProcess != nil {
 		_ = session.UpdateRuntimeState("port_forward_active")
+		_ = session.UpdateLauncherState("ready")
 		_ = session.RecordEvent("runtime_started", map[string]any{
 			"runtimeApiBaseUrl": session.Manifest.RuntimeAPIBaseURL,
 			"logPath":           session.Manifest.Paths.RuntimeLogPath,
 		})
+	}
+	if runtimeProcess == nil && session.Manifest.LauncherState != "degraded" {
+		_ = session.UpdateLauncherState("ready")
 	}
 
 	app := NewApp(session, runtimeProcess)

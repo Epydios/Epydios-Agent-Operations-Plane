@@ -76,6 +76,89 @@
   text-align: center;
 }
 
+.native-launcher-status {
+  width: min(var(--max-content-width), calc(100% - (2 * var(--shell-gutter))));
+  margin: 0 auto var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid color-mix(in srgb, var(--topbar-border) 88%, var(--line));
+  border-radius: var(--radius-3);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface) 90%, transparent), color-mix(in srgb, var(--panel) 94%, transparent)),
+    color-mix(in srgb, var(--topbar-bg) 82%, var(--surface));
+  box-shadow: var(--shadow-1);
+}
+
+.native-launcher-status[data-launcher-state="degraded"] {
+  border-color: color-mix(in srgb, var(--danger) 48%, var(--line));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface) 88%, transparent), color-mix(in srgb, var(--danger-bg) 52%, transparent)),
+    color-mix(in srgb, var(--danger-bg) 22%, var(--surface));
+}
+
+.native-launcher-status[data-launcher-state="ready"] {
+  border-color: color-mix(in srgb, var(--success) 34%, var(--line));
+}
+
+.native-launcher-status-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.native-launcher-status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.85rem;
+  padding: 0 var(--space-3);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary) 16%, var(--surface));
+  color: var(--ink);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.native-launcher-status-copy {
+  margin-top: var(--space-2);
+  color: var(--ink-soft);
+  font-size: var(--font-size-sm);
+}
+
+.native-launcher-status-error {
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-2);
+  background: color-mix(in srgb, var(--danger-bg) 72%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--danger) 24%, var(--line));
+  color: var(--ink);
+  font-size: var(--font-size-sm);
+}
+
+.native-launcher-status-paths {
+  margin-top: var(--space-2);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2) var(--space-3);
+}
+
+.native-launcher-status-path {
+  min-width: 0;
+}
+
+.native-launcher-status-path .label {
+  margin-bottom: 0.18rem;
+}
+
+.native-launcher-status-path code {
+  display: block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  font-size: 0.76rem;
+}
+
 @media (max-width: 768px) {
   .topbar {
     width: min(var(--max-content-width), calc(100% - (2 * var(--shell-gutter))));
@@ -96,6 +179,14 @@
     grid-column: 1 / -1;
     min-width: 0;
     width: 100%;
+  }
+
+  .native-launcher-status {
+    padding: var(--space-3);
+  }
+
+  .native-launcher-status-paths {
+    grid-template-columns: 1fr;
   }
 
   .brand {
@@ -132,6 +223,10 @@
   .topbar {
     padding: var(--space-2);
     gap: var(--space-2);
+  }
+
+  .native-launcher-status {
+    padding: var(--space-2);
   }
 
   .brand-mark {

@@ -11,7 +11,9 @@ usage() {
   cat <<'EOF'
 Usage: install-macos-launcher.sh [options]
 
-Installs a double-clickable macOS launcher (.command) for Epydios AgentOps Desktop.
+Installs a double-clickable macOS compatibility launcher (.command) for
+Epydios AgentOps Desktop. When an installed .app bundle exists, the launcher
+prefers that app-first path and only falls back to the repo-local script.
 
 Options:
   --target-dir PATH          Install directory (default: ~/Applications)
@@ -56,6 +58,21 @@ cat > "${LAUNCHER_PATH}" <<EOF
 set -euo pipefail
 cd "${MODULE_ROOT}"
 MODE="\${EPYDIOS_DESKTOP_MODE:-${DEFAULT_MODE}}"
+APP_INSTALL_PATH="\${EPYDIOS_M15_MACOS_INSTALL_PATH:-\${HOME}/Applications/Epydios AgentOps Desktop.app}"
+SUPPORT_ROOT="\${EPYDIOS_M15_MACOS_SUPPORT_ROOT:-\${HOME}/Library/Application Support/EpydiosAgentOpsDesktop}"
+APP_EXECUTABLE_PATH="\${APP_INSTALL_PATH}/Contents/MacOS/epydios-agentops-desktop"
+BOOTSTRAP_PATH="\${SUPPORT_ROOT}/runtime-bootstrap.json"
+LAUNCH_HELPER_PATH="\${SUPPORT_ROOT}/launch-installed.sh"
+
+if [[ -x "\${LAUNCH_HELPER_PATH}" ]]; then
+  exec "\${LAUNCH_HELPER_PATH}" "\$@"
+fi
+
+if [[ -x "\${APP_EXECUTABLE_PATH}" && -f "\${BOOTSTRAP_PATH}" ]]; then
+  export EPYDIOS_NATIVEAPP_BOOTSTRAP_PATH="\${BOOTSTRAP_PATH}"
+  exec "\${APP_EXECUTABLE_PATH}" "\$@"
+fi
+
 exec "${MODULE_ROOT}/bin/run-macos-local.sh" --mode "\${MODE}"
 EOF
 

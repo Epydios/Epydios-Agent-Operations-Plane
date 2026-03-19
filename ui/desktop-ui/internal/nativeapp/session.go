@@ -17,6 +17,14 @@ import (
 const (
 	modeMock = "mock"
 	modeLive = "live"
+
+	launcherStatePrepared = "prepared"
+	launcherStateReady    = "ready"
+	launcherStateDegraded = "degraded"
+	launcherStateStopped  = "stopped"
+
+	bootstrapStateLoaded  = "loaded"
+	bootstrapStateMissing = "missing"
 )
 
 type LaunchOptions struct {
@@ -30,6 +38,8 @@ type LaunchOptions struct {
 }
 
 type SessionPaths struct {
+	ConfigRoot     string `json:"configRoot"`
+	CacheRoot      string `json:"cacheRoot"`
 	RootDir        string `json:"rootDir"`
 	WebDir         string `json:"webDir"`
 	LogDir         string `json:"logDir"`
@@ -44,6 +54,7 @@ type SessionManifest struct {
 	AppName                string       `json:"appName"`
 	StartedAtUTC           string       `json:"startedAtUtc"`
 	Mode                   string       `json:"mode"`
+	LauncherState          string       `json:"launcherState"`
 	RuntimeProcessMode     string       `json:"runtimeProcessMode"`
 	RuntimeState           string       `json:"runtimeState"`
 	RuntimeAPIBaseURL      string       `json:"runtimeApiBaseUrl"`
@@ -51,11 +62,14 @@ type SessionManifest struct {
 	TargetExecutionProfile string       `json:"targetExecutionProfile"`
 	AllowRestrictedHost    bool         `json:"allowRestrictedHost"`
 	BootstrapConfigPath    string       `json:"bootstrapConfigPath"`
+	BootstrapConfigState   string       `json:"bootstrapConfigState"`
+	StartupError           string       `json:"startupError,omitempty"`
 	Paths                  SessionPaths `json:"paths"`
 }
 
 type Session struct {
-	Manifest SessionManifest
+	Manifest      SessionManifest
+	launchOptions LaunchOptions
 }
 
 type RuntimeProcess struct {
@@ -122,13 +136,21 @@ func ParseLaunchOptions(args []string) (LaunchOptions, error) {
 }
 
 func PrepareSession(assets fs.FS, opts LaunchOptions) (*Session, error) {
-	root, err := os.UserCacheDir()
+	cacheRoot, err := os.UserCacheDir()
 	if err != nil {
 		return nil, fmt.Errorf("resolve user cache dir: %w", err)
 	}
+	configRoot, err := os.UserConfigDir()
+	if err != nil {
+		return nil, fmt.Errorf("resolve user config dir: %w", err)
+	}
 	stamp := time.Now().UTC().Format("20060102T150405Z")
-	sessionRoot := filepath.Join(root, "EpydiosAgentOpsDesktop", "native-shell", stamp)
+	productCacheRoot := filepath.Join(cacheRoot, "EpydiosAgentOpsDesktop")
+	productConfigRoot := filepath.Join(configRoot, "EpydiosAgentOpsDesktop")
+	sessionRoot := filepath.Join(productCacheRoot, "native-shell", stamp)
 	paths := SessionPaths{
+		ConfigRoot:     productConfigRoot,
+		CacheRoot:      productCacheRoot,
 		RootDir:        sessionRoot,
 		WebDir:         filepath.Join(sessionRoot, "web"),
 		LogDir:         filepath.Join(sessionRoot, "logs"),
@@ -151,6 +173,7 @@ func PrepareSession(assets fs.FS, opts LaunchOptions) (*Session, error) {
 		AppName:                "EpydiosOps Desktop",
 		StartedAtUTC:           time.Now().UTC().Format(time.RFC3339),
 		Mode:                   opts.Mode,
+		LauncherState:          launcherStatePrepared,
 		RuntimeProcessMode:     runtimeProcessMode(opts),
 		RuntimeState:           runtimeState(opts),
 		RuntimeAPIBaseURL:      runtimeBase,
@@ -158,12 +181,16 @@ func PrepareSession(assets fs.FS, opts LaunchOptions) (*Session, error) {
 		TargetExecutionProfile: opts.TargetExecutionProfile,
 		AllowRestrictedHost:    opts.AllowRestrictedHost,
 		BootstrapConfigPath:    opts.BootstrapConfigPath,
+		BootstrapConfigState:   resolveBootstrapConfigState(opts.BootstrapConfigPath),
 		Paths:                  paths,
 	}
 	if err := patchRuntimeConfig(paths.WebDir, opts, manifest); err != nil {
 		return nil, err
 	}
-	session := &Session{Manifest: manifest}
+	session := &Session{
+		Manifest:      manifest,
+		launchOptions: opts,
+	}
 	if err := session.writeManifest(); err != nil {
 		return nil, err
 	}
@@ -195,7 +222,40 @@ func (s *Session) RecordEvent(name string, payload map[string]any) error {
 }
 
 func (s *Session) UpdateRuntimeState(state string) error {
-	s.Manifest.RuntimeState = state
+	return s.update(func(manifest *SessionManifest) {
+		manifest.RuntimeState = state
+	})
+}
+
+func (s *Session) UpdateLauncherState(state string) error {
+	return s.update(func(manifest *SessionManifest) {
+		manifest.LauncherState = state
+		if state != launcherStateDegraded {
+			manifest.StartupError = ""
+		}
+	})
+}
+
+func (s *Session) RecordStartupFailure(runtimeState string, err error) error {
+	if err == nil {
+		return nil
+	}
+	return s.update(func(manifest *SessionManifest) {
+		manifest.LauncherState = launcherStateDegraded
+		if strings.TrimSpace(runtimeState) != "" {
+			manifest.RuntimeState = runtimeState
+		}
+		manifest.StartupError = err.Error()
+	})
+}
+
+func (s *Session) update(mutate func(*SessionManifest)) error {
+	if mutate != nil {
+		mutate(&s.Manifest)
+	}
+	if err := patchRuntimeConfig(s.Manifest.Paths.WebDir, s.launchOptions, s.Manifest); err != nil {
+		return err
+	}
 	return s.writeManifest()
 }
 
@@ -290,15 +350,33 @@ func patchRuntimeConfig(webDir string, opts LaunchOptions, manifest SessionManif
 		payload["auth"] = authValue
 	}
 	payload["nativeShell"] = map[string]any{
+		"launcherState":          manifest.LauncherState,
 		"mode":                   opts.Mode,
 		"runtimeProcessMode":     manifest.RuntimeProcessMode,
 		"runtimeState":           manifest.RuntimeState,
 		"targetExecutionProfile": manifest.TargetExecutionProfile,
 		"allowRestrictedHost":    manifest.AllowRestrictedHost,
 		"bootstrapConfigPath":    manifest.BootstrapConfigPath,
+		"bootstrapConfigState":   manifest.BootstrapConfigState,
+		"startupError":           manifest.StartupError,
+		"configRoot":             manifest.Paths.ConfigRoot,
+		"cacheRoot":              manifest.Paths.CacheRoot,
 		"logDir":                 manifest.Paths.LogDir,
 		"crashDir":               manifest.Paths.CrashDir,
+		"eventLogPath":           manifest.Paths.EventLogPath,
+		"uiLogPath":              manifest.Paths.UILogPath,
+		"runtimeLogPath":         manifest.Paths.RuntimeLogPath,
 		"sessionManifestPath":    manifest.Paths.ManifestPath,
+		"diagnostics": map[string]any{
+			"bootstrapConfigPath": manifest.BootstrapConfigPath,
+			"sessionManifestPath": manifest.Paths.ManifestPath,
+			"eventLogPath":        manifest.Paths.EventLogPath,
+			"uiLogPath":           manifest.Paths.UILogPath,
+			"runtimeLogPath":      manifest.Paths.RuntimeLogPath,
+			"crashDir":            manifest.Paths.CrashDir,
+			"configRoot":          manifest.Paths.ConfigRoot,
+			"cacheRoot":           manifest.Paths.CacheRoot,
+		},
 	}
 	encoded, err := json.MarshalIndent(payload, "", "  ")
 	if err != nil {
@@ -410,4 +488,14 @@ func applyBootstrapLaunchOptions(opts *LaunchOptions) error {
 		opts.RuntimeService = service
 	}
 	return nil
+}
+
+func resolveBootstrapConfigState(path string) string {
+	if strings.TrimSpace(path) == "" {
+		return bootstrapStateMissing
+	}
+	if _, err := os.Stat(path); err == nil {
+		return bootstrapStateLoaded
+	}
+	return bootstrapStateMissing
 }

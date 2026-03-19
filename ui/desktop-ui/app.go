@@ -45,6 +45,7 @@ func (a *App) shutdown(ctx context.Context) {
 		_ = a.runtimeProcess.Stop()
 		_ = a.session.UpdateRuntimeState("port_forward_stopped")
 	}
+	_ = a.session.UpdateLauncherState("stopped")
 }
 
 func (a *App) NativeSessionSummary() nativeapp.SessionManifest {

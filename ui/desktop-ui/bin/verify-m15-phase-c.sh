@@ -92,9 +92,14 @@ bootstrap_path = sys.argv[5]
 manifest = json.loads(manifest_path.read_text())
 
 assert manifest["mode"] == "mock", manifest["mode"]
+assert manifest["launcherState"] == "ready", manifest["launcherState"]
 assert manifest["runtimeProcessMode"] == "mock_only", manifest["runtimeProcessMode"]
 assert manifest["targetExecutionProfile"] == "sandbox_vm_autonomous", manifest["targetExecutionProfile"]
 assert manifest["allowRestrictedHost"] is False, manifest["allowRestrictedHost"]
+assert manifest["bootstrapConfigState"] == "loaded", manifest["bootstrapConfigState"]
+assert manifest["bootstrapConfigPath"] == bootstrap_path, manifest["bootstrapConfigPath"]
+assert manifest["paths"]["configRoot"].endswith("EpydiosAgentOpsDesktop"), manifest["paths"]["configRoot"]
+assert manifest["paths"]["cacheRoot"].endswith("EpydiosAgentOpsDesktop"), manifest["paths"]["cacheRoot"]
 
 checklist = {
     "startup_reliability": {

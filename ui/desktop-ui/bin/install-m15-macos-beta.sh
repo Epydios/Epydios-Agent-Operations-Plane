@@ -30,6 +30,7 @@ SUPPORT_ROOT="${EPYDIOS_M15_MACOS_SUPPORT_ROOT:-${HOME}/Library/Application Supp
 INSTALL_PATH="${INSTALL_ROOT}/${APP_INSTALL_NAME}"
 BOOTSTRAP_PATH="${SUPPORT_ROOT}/runtime-bootstrap.json"
 LAUNCH_HELPER_PATH="${SUPPORT_ROOT}/launch-installed.sh"
+APP_EXECUTABLE_PATH="${INSTALL_PATH}/Contents/MacOS/epydios-agentops-desktop"
 
 write_summary() {
   cat > "${SUMMARY_PATH}" <<EOF
@@ -38,6 +39,7 @@ write_summary() {
   "status": "installed_macos_beta_bundle",
   "install_root": "${INSTALL_ROOT}",
   "install_path": "${INSTALL_PATH}",
+  "app_executable_path": "${APP_EXECUTABLE_PATH}",
   "support_root": "${SUPPORT_ROOT}",
   "bootstrap_path": "${BOOTSTRAP_PATH}",
   "launch_helper_path": "${LAUNCH_HELPER_PATH}",

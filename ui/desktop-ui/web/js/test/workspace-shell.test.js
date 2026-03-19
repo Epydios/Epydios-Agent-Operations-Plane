@@ -53,3 +53,8 @@ test("workspace shell does not leak provider inventory or diagnostics toggle int
   assert.doesNotMatch(INDEX_HTML, /Provider Contract Inventory/);
   assert.doesNotMatch(INDEX_HTML, /id="settings-advanced-toggle"/);
 });
+
+test("workspace shell reserves a native launcher status surface ahead of the workbench", () => {
+  assert.match(INDEX_HTML, /id="native-launcher-status"/);
+  assert.match(INDEX_HTML, /class="native-launcher-status"/);
+});
