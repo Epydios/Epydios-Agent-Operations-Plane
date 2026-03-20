@@ -1,25 +1,17 @@
-import { chipClassForStatus, escapeHTML } from "../../../views/common.js";
+import { chipClassForStatus, escapeHTML, formatTime } from "../../../views/common.js";
 
-function renderCommandCard(card = {}) {
+function renderStatusCard(card = {}) {
   return `
-    <article class="metric homeops-command-card" data-homeops-card="${escapeHTML(card.id || "homeops")}">
-      <div class="title">${escapeHTML(card.title || "HomeOps")}</div>
+    <article class="metric homeops-status-card" data-homeops-card="${escapeHTML(card.id || "companion-status")}">
+      <div class="title">${escapeHTML(card.title || "Status")}</div>
       <div class="meta">
         <span class="${chipClassForStatus(card.tone || "unknown")} chip-compact">${escapeHTML(
           String(card.tone || "unknown")
         )}</span>
       </div>
-      <div class="homeops-command-value">${escapeHTML(card.value || "-")}</div>
+      <div class="homeops-status-value">${escapeHTML(card.value || "-")}</div>
       <div class="meta">${escapeHTML(card.summary || "-")}</div>
       <div class="meta">${escapeHTML(card.meta || "-")}</div>
-      <div class="homeops-actions">
-        <button
-          class="btn btn-secondary btn-small"
-          type="button"
-          data-homeops-action="${escapeHTML(card.action || "open-domain")}"
-          ${card.view ? `data-homeops-view="${escapeHTML(card.view)}"` : ""}
-        >${escapeHTML(card.actionLabel || "Open")}</button>
-      </div>
     </article>
   `;
 }
@@ -39,19 +31,66 @@ function renderAttentionItem(item = {}) {
         <button
           class="btn btn-secondary btn-small"
           type="button"
-          data-homeops-action="${escapeHTML(item.action || "open-domain")}"
+          data-homeops-action="${escapeHTML(item.action || "open-workbench")}"
           ${item.view ? `data-homeops-view="${escapeHTML(item.view)}"` : ""}
           ${item.runId ? `data-homeops-run-id="${escapeHTML(item.runId)}"` : ""}
+          ${item.approvalId ? `data-homeops-approval-id="${escapeHTML(item.approvalId)}"` : ""}
+          ${item.incidentId ? `data-homeops-incident-id="${escapeHTML(item.incidentId)}"` : ""}
         >${escapeHTML(item.actionLabel || "Open")}</button>
       </div>
     </article>
   `;
 }
 
-function renderSnapshotCard(item = {}) {
+function renderRecentActionRow(item = {}) {
   return `
-    <article class="metric homeops-summary-card" data-homeops-card="${escapeHTML(item.id || "identity-snapshot")}">
-      <div class="title">${escapeHTML(item.title || "Snapshot")}</div>
+    <article class="metric homeops-recent-action-card" data-homeops-run="${escapeHTML(item.runId || item.id || "")}">
+      <div class="homeops-recent-action-header">
+        <div class="title">${escapeHTML(item.actionName || "governed action")}</div>
+        <div class="meta">
+          <span class="${chipClassForStatus(String(item.state || "").trim().toLowerCase() || "unknown")} chip-compact">${escapeHTML(
+            item.state || "-"
+          )}</span>
+          <span class="chip chip-neutral chip-compact">policy=${escapeHTML(item.policyDecision || "-")}</span>
+        </div>
+      </div>
+      <div class="homeops-recent-action-grid">
+        <div class="meta">client=${escapeHTML(item.clientLabel || "-")}</div>
+        <div class="meta">target=${escapeHTML(item.targetSummary || "-")}</div>
+        <div class="meta">run=${escapeHTML(item.runId || "-")}</div>
+        <div class="meta">time=${escapeHTML(formatTime(item.occurredAt || "-"))}</div>
+      </div>
+      <div class="homeops-actions">
+        <button
+          class="btn btn-secondary btn-small"
+          type="button"
+          data-homeops-action="${escapeHTML(item.action || "open-run-item")}"
+          ${item.runId ? `data-homeops-run-id="${escapeHTML(item.runId)}"` : ""}
+          ${item.approvalId ? `data-homeops-approval-id="${escapeHTML(item.approvalId)}"` : ""}
+        >${escapeHTML(item.actionLabel || "Open")}</button>
+      </div>
+    </article>
+  `;
+}
+
+function renderQuickAction(action = {}) {
+  return `
+    <button
+      class="homeops-pivot-button"
+      type="button"
+      data-homeops-action="${escapeHTML(action.action || "open-workbench")}"
+      ${action.view ? `data-homeops-view="${escapeHTML(action.view)}"` : ""}
+    >
+      <span class="homeops-pivot-label">${escapeHTML(action.label || "Open")}</span>
+      <span class="homeops-pivot-summary">${escapeHTML(action.summary || "-")}</span>
+    </button>
+  `;
+}
+
+function renderConnectedClientCard(item = {}) {
+  return `
+    <article class="metric homeops-summary-card" data-homeops-card="${escapeHTML(item.id || "connected-client")}">
+      <div class="title">${escapeHTML(item.title || "Connected Client")}</div>
       <div class="meta">
         <span class="${chipClassForStatus(item.tone || "unknown")} chip-compact">${escapeHTML(
           String(item.tone || "unknown")
@@ -64,116 +103,78 @@ function renderSnapshotCard(item = {}) {
   `;
 }
 
-function renderAimxsCard(item = {}) {
-  return `
-    <article class="metric homeops-aimxs-card" data-homeops-card="${escapeHTML(item.id || "aimxs-summary")}">
-      <div class="title">${escapeHTML(item.title || "AIMXS")}</div>
-      <div class="meta">
-        <span class="${chipClassForStatus(item.tone || "unknown")} chip-compact">${escapeHTML(
-          String(item.tone || "unknown")
-        )}</span>
-      </div>
-      <div class="homeops-aimxs-value">${escapeHTML(item.value || "-")}</div>
-      <div class="meta">${escapeHTML(item.summary || "-")}</div>
-      <div class="meta">${escapeHTML(item.meta || "-")}</div>
-      ${
-        item.actionLabel
-          ? `
-            <div class="homeops-actions">
-              <button
-                class="btn btn-secondary btn-small"
-                type="button"
-                data-homeops-action="${escapeHTML(item.action || "open-domain")}"
-                ${item.view ? `data-homeops-view="${escapeHTML(item.view)}"` : ""}
-              >${escapeHTML(item.actionLabel)}</button>
-            </div>
-          `
-          : ""
-      }
-    </article>
-  `;
-}
-
-function renderDomainPivot(pivot = {}) {
-  return `
-    <button
-      class="homeops-pivot-button"
-      type="button"
-      data-homeops-action="open-domain"
-      data-homeops-view="${escapeHTML(pivot.view || "homeops")}"
-    >
-      <span class="homeops-pivot-label">${escapeHTML(pivot.label || "HomeOps")}</span>
-      <span class="homeops-pivot-summary">${escapeHTML(pivot.summary || "-")}</span>
-    </button>
-  `;
+function renderEmptyMessage(message) {
+  return `<div class="homeops-empty">${escapeHTML(message)}</div>`;
 }
 
 export function renderHomeWorkspace(snapshot = {}) {
-  const commandCards = Array.isArray(snapshot?.commandDashboard?.cards)
-    ? snapshot.commandDashboard.cards
+  const systemCards = Array.isArray(snapshot?.systemStatus?.cards) ? snapshot.systemStatus.cards : [];
+  const systemActions = Array.isArray(snapshot?.systemStatus?.actions) ? snapshot.systemStatus.actions : [];
+  const attentionItems = Array.isArray(snapshot?.attentionQueue?.items) ? snapshot.attentionQueue.items : [];
+  const recentActions = Array.isArray(snapshot?.recentGovernedActions?.items)
+    ? snapshot.recentGovernedActions.items
     : [];
-  const aimxsCards = Array.isArray(snapshot?.aimxsWorkflow?.cards) ? snapshot.aimxsWorkflow.cards : [];
-  const identityCards = Array.isArray(snapshot?.identityAndScope?.cards)
-    ? snapshot.identityAndScope.cards
+  const quickActions = Array.isArray(snapshot?.quickActions?.items) ? snapshot.quickActions.items : [];
+  const connectedClientCards = Array.isArray(snapshot?.connectedClientContext?.cards)
+    ? snapshot.connectedClientContext.cards
     : [];
-  const attentionItems = Array.isArray(snapshot?.attentionQueue?.items)
-    ? snapshot.attentionQueue.items
-    : [];
-  const pivots = Array.isArray(snapshot?.domainPivots?.items) ? snapshot.domainPivots.items : [];
+  const feedback = snapshot?.systemStatus?.feedback && typeof snapshot.systemStatus.feedback === "object"
+    ? snapshot.systemStatus.feedback
+    : null;
 
   return `
-    <div class="homeops-workspace" data-domain-root="homeops">
+    <div class="homeops-workspace" data-domain-root="companionops">
       <section class="homeops-board">
         <div class="homeops-board-header">
-          <h3>Command Dashboard</h3>
-          <p class="homeops-board-lead">Bounded current-state posture across the owning domains.</p>
+          <h3>Mode And System Status</h3>
+          <p class="homeops-board-lead">Companion posture, native launcher state, runtime service state, and gateway readiness.</p>
         </div>
+        ${
+          feedback?.message
+            ? `<div class="homeops-feedback ${escapeHTML(feedback.tone || "info")}">${escapeHTML(feedback.message)}</div>`
+            : ""
+        }
         <div class="homeops-command-grid">
-          ${commandCards.map((card) => renderCommandCard(card)).join("")}
+          ${systemCards.map((card) => renderStatusCard(card)).join("")}
         </div>
-      </section>
-      <section class="homeops-board">
-        <div class="homeops-board-header">
-          <h3>AIMXS Posture And Readiness</h3>
-          <p class="homeops-board-lead">${escapeHTML(snapshot?.aimxsWorkflow?.summary || "Current AIMXS path, governed state, and next truthful action.")}</p>
-        </div>
-        <div class="homeops-aimxs-grid">
-          ${aimxsCards.map((item) => renderAimxsCard(item)).join("")}
+        <div class="homeops-pivot-grid">
+          ${systemActions.map((action) => renderQuickAction(action)).join("")}
         </div>
       </section>
       <section class="homeops-board">
         <div class="homeops-board-header">
           <h3>Attention Queue</h3>
-          <p class="homeops-board-lead">Next actions that should route into the owning domain surfaces.</p>
+          <p class="homeops-board-lead">Only the items that need operator attention now.</p>
         </div>
         <div class="homeops-attention-grid">
-          ${attentionItems.map((item) => renderAttentionItem(item)).join("")}
+          ${attentionItems.length ? attentionItems.map((item) => renderAttentionItem(item)).join("") : renderEmptyMessage("No immediate approvals, degraded services, failed runs, or incident escalations are waiting for action.")}
         </div>
       </section>
       <section class="homeops-board">
         <div class="homeops-board-header">
-          <h3>Identity And Scope Snapshot</h3>
-          <p class="homeops-board-lead">Current acting identity, authority basis, and scope.</p>
+          <h3>Recent Governed Actions</h3>
+          <p class="homeops-board-lead">Latest gateway-backed submissions with exact handoff into run or approval review.</p>
         </div>
-        <div class="homeops-summary-grid">
-          ${identityCards.map((item) => renderSnapshotCard(item)).join("")}
-        </div>
-        <div class="homeops-actions">
-          <button
-            class="btn btn-secondary btn-small"
-            type="button"
-            data-homeops-action="open-domain"
-            data-homeops-view="${escapeHTML(snapshot?.identityAndScope?.view || "identityops")}"
-          >${escapeHTML(snapshot?.identityAndScope?.actionLabel || "Open IdentityOps")}</button>
+        <div class="homeops-recent-action-list">
+          ${recentActions.length ? recentActions.map((item) => renderRecentActionRow(item)).join("") : renderEmptyMessage("No recent governed actions are available yet. Submit work through the local gateway to populate this surface.")}
         </div>
       </section>
       <section class="homeops-board">
         <div class="homeops-board-header">
-          <h3>Domain Pivot Row</h3>
-          <p class="homeops-board-lead">Fast pivots into the already-built workspaces.</p>
+          <h3>Quick Actions</h3>
+          <p class="homeops-board-lead">Fast actions into Workbench depth, recent runs, diagnostics, and local service recovery.</p>
         </div>
         <div class="homeops-pivot-grid">
-          ${pivots.map((pivot) => renderDomainPivot(pivot)).join("")}
+          ${quickActions.map((action) => renderQuickAction(action)).join("")}
+        </div>
+      </section>
+      <section class="homeops-board">
+        <div class="homeops-board-header">
+          <h3>Connected Client Context</h3>
+          <p class="homeops-board-lead">Visible client, scope, and recent gateway activity without fake global interception theater.</p>
+        </div>
+        <div class="homeops-summary-grid">
+          ${connectedClientCards.map((item) => renderConnectedClientCard(item)).join("")}
         </div>
       </section>
     </div>

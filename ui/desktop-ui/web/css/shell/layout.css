@@ -63,6 +63,7 @@
 .panel-auditops,
 .panel-evidenceops,
 .panel-incidentops,
+.panel-logops,
 .panel-ops-placeholder {
   grid-column: span 12;
 }
@@ -72,6 +73,7 @@
   grid-column: span 12;
 }
 
+.layout[data-workspace-view="companionops"] [data-workspace-section]:not([data-workspace-section="companionops"]),
 .layout[data-workspace-view="homeops"] [data-workspace-section]:not([data-workspace-section="homeops"]),
 .layout[data-workspace-view="agentops"] [data-workspace-section]:not([data-workspace-section="agentops"]),
 .layout[data-workspace-view="runtimeops"] [data-workspace-section]:not([data-workspace-section="runtimeops"]),
@@ -85,6 +87,7 @@
 .layout[data-workspace-view="auditops"] [data-workspace-section]:not([data-workspace-section="auditops"]),
 .layout[data-workspace-view="evidenceops"] [data-workspace-section]:not([data-workspace-section="evidenceops"]),
 .layout[data-workspace-view="incidentops"] [data-workspace-section]:not([data-workspace-section="incidentops"]),
+.layout[data-workspace-view="logops"] [data-workspace-section]:not([data-workspace-section="logops"]),
 .layout[data-workspace-view="settingsops"] [data-workspace-section]:not([data-workspace-section="settingsops"]),
 .layout[data-workspace-view="developerops"] [data-workspace-section]:not([data-workspace-section="developerops"]) {
   display: none;
@@ -107,6 +110,7 @@
     --layout-gap: var(--space-5);
   }
 
+  .layout[data-workspace-view="companionops"] .panel-dashboard,
   .layout[data-workspace-view="homeops"] .panel-dashboard {
     grid-column: span 12;
   }
@@ -158,6 +162,7 @@
     --layout-gap: var(--space-4);
   }
 
+  .layout[data-workspace-view="companionops"] .panel-dashboard,
   .layout[data-workspace-view="homeops"] .panel-dashboard {
     grid-column: span 12;
   }

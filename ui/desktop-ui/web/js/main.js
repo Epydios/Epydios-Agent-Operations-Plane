@@ -78,6 +78,10 @@ import {
   renderIncidentOpsPage
 } from "./domains/incidentops/routes.js";
 import { createIncidentOpsWorkspaceSnapshot } from "./domains/incidentops/state.js";
+import {
+  renderLogOpsEmptyState,
+  renderLogOpsPage
+} from "./domains/logops/routes.js";
 import { buildTimestampToken } from "./domains/incidentops/tokens.js";
 import {
   renderNetworkOpsEmptyState,
@@ -204,6 +208,7 @@ import {
 
 const ui = {
   nativeLauncherStatus: document.getElementById("native-launcher-status"),
+  companionHandoffBanner: document.getElementById("companion-handoff-banner"),
   workspaceLayout: document.getElementById("workspace-layout"),
   chatContent: document.getElementById("chat-content"),
   identityContent: document.getElementById("identity-content"),
@@ -213,6 +218,7 @@ const ui = {
   evidenceOpsContent: document.getElementById("evidenceops-content"),
   complianceOpsContent: document.getElementById("complianceops-content"),
   incidentOpsContent: document.getElementById("incidentops-content"),
+  logOpsContent: document.getElementById("logops-content"),
   networkOpsContent: document.getElementById("networkops-content"),
   runtimeOpsContent: document.getElementById("runtimeops-content"),
   platformOpsContent: document.getElementById("platformops-content"),
@@ -368,6 +374,15 @@ const ui = {
 };
 
 let runtimeApiClient = null;
+let companionOpsViewState = {
+  lastWorkbenchDomain: "agentops",
+  handoffContext: null,
+  feedback: null
+};
+let logOpsViewState = {
+  feedback: null
+};
+let renderCompanionHandoffBanner = () => {};
 
 function requireRuntimeApiClient() {
   if (!runtimeApiClient) {
@@ -394,7 +409,7 @@ const DEMO_GOVERNANCE_EDITOR_KEY = DEMO_GOVERNANCE_STATE_KEY;
 const APPROVAL_SELECTION_NONE = "__approval_selection_none__";
 const PROJECT_ANY_SCOPE_KEY = "__project_any__";
 const WORKSPACE_VIEW_IDS = new Set([
-  "homeops",
+  "companionops",
   "agentops",
   "runtimeops",
   "platformops",
@@ -407,12 +422,13 @@ const WORKSPACE_VIEW_IDS = new Set([
   "auditops",
   "evidenceops",
   "incidentops",
+  "logops",
   "settingsops",
   "developerops"
 ]);
 const WORKSPACE_VIEW_ID_LIST = Array.from(WORKSPACE_VIEW_IDS);
 const INCIDENT_SUBVIEW_IDS = new Set(["queue", "audit"]);
-const SETTINGS_SUBVIEW_IDS = new Set(["configuration"]);
+const SETTINGS_SUBVIEW_IDS = new Set(["configuration", "diagnostics"]);
 const ADVANCED_SECTION_IDS = new Set(["operations", "runs", "approvals", "incidents"]);
 const INCIDENT_STATUS_TRANSITIONS = {
   drafted: [
@@ -734,7 +750,7 @@ async function runOperatorChatFollowLoop(token) {
 
 function reconcileOperatorChatFollowLoop() {
   const derived = deriveOperatorChatThreadState(operatorChatState.thread);
-  if (activeWorkspaceView() !== "agent" || document.visibilityState === "hidden" || !derived.shouldFollow) {
+  if (activeWorkspaceView() !== "agentops" || document.visibilityState === "hidden" || !derived.shouldFollow) {
     if (operatorChatFollowState.timerId || operatorChatFollowState.sessionId) {
       clearOperatorChatFollowLoop();
     }
@@ -1461,15 +1477,22 @@ function buildOperatorChatGovernanceReportExport(thread = {}, sessionId, catalog
   return buildChatTurnGovernanceReport(turn, catalogs, exportSelection);
 }
 
-function normalizeWorkspaceView(value, fallback = "homeops") {
+function normalizeWorkspaceView(value, fallback = "companionops") {
   return normalizeShellWorkspaceView(value, fallback, WORKSPACE_VIEW_ID_LIST);
 }
 
 function setWorkspaceView(view, persist = false) {
   const selectedView = workspaceShell.applyView(view, { tabs: workspaceTabNodes });
+  if (selectedView !== "companionops") {
+    companionOpsViewState = {
+      ...companionOpsViewState,
+      lastWorkbenchDomain: selectedView
+    };
+  }
   if (persist) {
     saveValue(WORKSPACE_VIEW_PREF_KEY, selectedView);
   }
+  renderCompanionHandoffBanner();
   reconcileOperatorChatFollowLoop();
   return selectedView;
 }
@@ -3048,8 +3071,8 @@ function renderPanelLoadingStates() {
   if (ui.homeOpsContent) {
     ui.homeOpsContent.innerHTML = renderPanelStateMetric(
       "loading",
-      "HomeOps",
-      "Loading command dashboard, attention queue, and domain pivots..."
+      "CompanionOps",
+      "Loading companion status, attention queue, recent governed actions, and workbench handoffs..."
     );
   }
   if (ui.runsContent) {
@@ -3117,6 +3140,13 @@ function renderPanelLoadingStates() {
       "IncidentOps",
       "Loading incident queue, active package posture, and severity anchors..."
     );
+  }
+  if (ui.logOpsContent) {
+    renderLogOpsEmptyState(ui, {
+      tone: "loading",
+      title: "LogOps",
+      message: "Loading native shell logs, service logs, and session artifacts..."
+    });
   }
   if (ui.approvalsContent) {
     ui.approvalsContent.innerHTML = renderPanelStateMetric("loading", "Pending Approvals", "Loading approvals...");
@@ -4021,11 +4051,11 @@ async function main() {
     populateAgentProfileSelect(ui, profiles, selected);
     return next;
   };
-  topbarShell.setBrand({
-    title: config.appName || "EpydiosOps Desktop",
-    subtitle: `${config.environment || "unknown"} environment`
-  });
-  if (ui.nativeLauncherStatus instanceof HTMLElement) {
+  const updateNativeLauncherPresentation = (nativeShellSummary = config.nativeShell) => {
+    config.nativeShell = nativeShellSummary && typeof nativeShellSummary === "object" ? nativeShellSummary : {};
+    if (!(ui.nativeLauncherStatus instanceof HTMLElement)) {
+      return;
+    }
     const launcherMarkup = renderNativeLauncherStatus(config.nativeShell);
     ui.nativeLauncherStatus.innerHTML = launcherMarkup;
     ui.nativeLauncherStatus.hidden = !launcherMarkup;
@@ -4038,8 +4068,14 @@ async function main() {
     } else {
       delete ui.nativeLauncherStatus.dataset.launcherState;
     }
-  }
-  setWorkspaceView(readSavedValue(WORKSPACE_VIEW_PREF_KEY));
+    syncNativeInterpositionDraftPresentation();
+  };
+  topbarShell.setBrand({
+    title: config.appName || "EpydiosOps Desktop",
+    subtitle: `${config.environment || "unknown"} environment`
+  });
+  updateNativeLauncherPresentation(config.nativeShell);
+  setWorkspaceView("companionops");
   setIncidentSubview(readSavedValue(INCIDENT_SUBVIEW_PREF_KEY));
   settingsSubviewState = normalizeSettingsSubview(readSavedValue(SETTINGS_SUBVIEW_PREF_KEY));
   advancedSectionState = normalizeAdvancedSectionState(readSavedJSON(ADVANCED_SECTION_STATE_KEY));
@@ -4825,12 +4861,75 @@ async function main() {
       aimxsDecisionBindingSpine: buildAimxsDecisionBindingSpineModel("agentops")
     });
   };
+  const currentWorkspaceView = () =>
+    normalizeWorkspaceView(ui.workspaceLayout?.dataset?.workspaceView || "", "companionops");
+  renderCompanionHandoffBanner = () => {
+    if (!(ui.companionHandoffBanner instanceof HTMLElement)) {
+      return;
+    }
+    const handoff = companionOpsViewState.handoffContext;
+    const selectedView = currentWorkspaceView();
+    if (!handoff || selectedView === "companionops") {
+      ui.companionHandoffBanner.innerHTML = "";
+      ui.companionHandoffBanner.hidden = true;
+      return;
+    }
+    const chips = [
+      handoff.runId ? `<span class="chip chip-neutral chip-compact">run=${escapeHTML(handoff.runId)}</span>` : "",
+      handoff.approvalId
+        ? `<span class="chip chip-neutral chip-compact">approval=${escapeHTML(handoff.approvalId)}</span>`
+        : "",
+      handoff.incidentId
+        ? `<span class="chip chip-neutral chip-compact">incident=${escapeHTML(handoff.incidentId)}</span>`
+        : "",
+      handoff.sourceClient
+        ? `<span class="chip chip-neutral chip-compact">client=${escapeHTML(handoff.sourceClient)}</span>`
+        : ""
+    ]
+      .filter(Boolean)
+      .join("");
+    ui.companionHandoffBanner.innerHTML = `
+      <div class="companion-handoff-summary">
+        <span class="native-launcher-status-badge">Opened From CompanionOps</span>
+        <span class="chip chip-neutral chip-compact">${escapeHTML(
+          String(handoff.kind || "handoff").trim() || "handoff"
+        )}</span>
+        ${chips}
+      </div>
+      <div class="companion-handoff-copy">Workbench depth is open for the selected handoff. Use the explicit return action when you are done reviewing or approving.</div>
+      <div class="companion-handoff-actions">
+        <button class="btn btn-secondary btn-small" type="button" data-companion-return-action="return">Return To Companion</button>
+      </div>
+    `;
+    ui.companionHandoffBanner.hidden = false;
+  };
+  const setCompanionOpsFeedback = (tone, message) => {
+    companionOpsViewState = {
+      ...companionOpsViewState,
+      feedback: message
+        ? {
+            tone: String(tone || "info").trim().toLowerCase(),
+            message: String(message || "").trim()
+          }
+        : null
+    };
+    renderHomePanel();
+  };
+  const buildCompanionRenderContext = (snapshot = triageSnapshot) => ({
+    ...(snapshot && typeof snapshot === "object" ? snapshot : triageSnapshot),
+    nativeShell: config.nativeShell,
+    nativeGatewayHolds: Array.isArray(config.nativeGatewayHolds) ? config.nativeGatewayHolds : [],
+    selectedAgentProfileId: latestSettingsSnapshot?.integrations?.selectedAgentProfileId || "",
+    lastWorkbenchDomain: companionOpsViewState.lastWorkbenchDomain,
+    companionFeedback: companionOpsViewState.feedback,
+    handoffContext: companionOpsViewState.handoffContext
+  });
   const renderHomePanel = (options = {}) => {
     const snapshot = options.snapshot || triageSnapshot;
     if (options.snapshot) {
       triageSnapshot = options.snapshot;
     }
-    renderHomeOpsPage(ui, snapshot);
+    renderHomeOpsPage(ui, buildCompanionRenderContext(snapshot));
   };
   const renderHomeErrorPanel = (message, options = {}) => {
     if (options.snapshot) {
@@ -4838,7 +4937,7 @@ async function main() {
     }
     renderHomeOpsEmptyState(ui, {
       tone: "error",
-      title: "HomeOps",
+      title: "CompanionOps",
       message
     });
   };
@@ -4976,6 +5075,54 @@ async function main() {
       },
       viewState: incidentOpsViewState
     });
+  };
+  const renderLogOpsPanel = (context = null) => {
+    const nextContext = context && typeof context === "object" ? context : {};
+    renderLogOpsPage(ui, {
+      nativeShell: config.nativeShell,
+      ...nextContext,
+      viewState: logOpsViewState
+    });
+  };
+  const setLogOpsFeedback = (tone, message) => {
+    logOpsViewState = {
+      ...logOpsViewState,
+      feedback: message
+        ? {
+            tone: String(tone || "info").trim().toLowerCase(),
+            message: String(message || "").trim()
+          }
+        : null
+    };
+    renderLogOpsPanel();
+  };
+  const openLogOpsView = () => {
+    setWorkspaceView("logops", true);
+    renderLogOpsPanel();
+    focusRenderedRegion(ui.logOpsContent, { scroll: false });
+  };
+  const openNativePathFromLogOps = async (path, label = "Artifact") => {
+    const targetPath = String(path || "").trim();
+    if (!targetPath) {
+      setLogOpsFeedback("warn", `${label} path is unavailable in this shell.`);
+      return false;
+    }
+    const bindings = nativeBindings();
+    if (!bindings || typeof bindings.NativeOpenPath !== "function") {
+      setLogOpsFeedback(
+        "warn",
+        "Open path is only available from the installed desktop shell. Use LogOps from the app bundle, not the browser harness."
+      );
+      return false;
+    }
+    try {
+      await bindings.NativeOpenPath(targetPath);
+      setLogOpsFeedback("ok", `${label} opened from LogOps.`);
+      return true;
+    } catch (error) {
+      setLogOpsFeedback("error", `${label} open failed: ${error.message}`);
+      return false;
+    }
   };
   const setGovernanceOpsFeedback = (tone, message) => {
     governanceOpsViewState = {
@@ -7369,6 +7516,7 @@ async function main() {
     return sessionReview;
   };
   renderHomePanel();
+  renderLogOpsPanel();
   renderContextPanel();
   renderDeveloperOpsPanel();
   let refreshInFlight = false;
@@ -7602,6 +7750,7 @@ async function main() {
           approvals,
           audit
         });
+        renderLogOpsPanel();
         renderComplianceOpsPanel({
           settings: settingsWithConfigChanges,
           runs,
@@ -7649,7 +7798,7 @@ async function main() {
           integrationOverrides,
           runtimeIntegrationSyncStateByProject
         );
-        const nativeApprovalRailItems = buildNativeApprovalRailItems(operatorChatState.thread || {});
+        const nativeApprovalRailItems = buildCombinedNativeApprovalRailItems();
         let selectedApprovalRunId = readPinnedApprovalSelectionId();
         let selectedApproval = resolveApprovalSelection(selectedApprovalRunId);
         if (!selectedApproval && !isApprovalSelectionDismissed()) {
@@ -7749,6 +7898,7 @@ async function main() {
         tone: "error",
         message: `IncidentOps refresh failed: ${error.message}`
       });
+      renderLogOpsPanel();
       renderPlatformOpsEmptyState(ui, {
         tone: "error",
         message: `PlatformOps refresh failed: ${error.message}`
@@ -10287,12 +10437,67 @@ function getCurrentIncidentOpsEntry(entryId = "") {
       .sort((a, b) => parseTimeMs(b?.createdAt) - parseTimeMs(a?.createdAt));
   }
 
+  function buildInterpositionHoldDecisionItems(items = config.nativeGatewayHolds || []) {
+    return (Array.isArray(items) ? items : [])
+      .filter((item) => String(item?.state || "").trim().toLowerCase() === "held_pending_approval")
+      .map((item) => {
+        const interpositionRequestId = String(item?.interpositionRequestId || "").trim();
+        const runId = String(item?.runId || "").trim();
+        const approvalId = String(item?.approvalId || "").trim();
+        const tenantId = String(item?.tenantId || "").trim();
+        const projectId = String(item?.projectId || "").trim();
+        const clientName = String(item?.sourceClient?.name || "").trim();
+        const clientId = String(item?.sourceClient?.id || "").trim();
+        const summary = String(
+          item?.requestSummary?.title ||
+          item?.holdReason ||
+          item?.governanceTarget?.targetRef ||
+          item?.requestSummary?.reason ||
+          ""
+        ).trim();
+        return {
+          selectionId: `native:hold:${interpositionRequestId}`,
+          decisionType: "gateway_hold",
+          source: "gateway-hold",
+          interpositionRequestId,
+          gatewayRequestId: String(item?.gatewayRequestId || "").trim(),
+          runId,
+          approvalId,
+          tenantId,
+          projectId,
+          environmentId: String(item?.environmentId || "").trim(),
+          clientSurface: String(item?.clientSurface || "").trim(),
+          sourceClient: { id: clientId, name: clientName },
+          clientLabel: clientName || clientId || "local-gateway",
+          actorRef: String(item?.actorRef || "").trim(),
+          createdAt: String(item?.holdStartedAtUtc || item?.createdAtUtc || "").trim(),
+          expiresAt: String(item?.holdDeadlineAtUtc || "").trim(),
+          status: "PENDING",
+          state: String(item?.state || "").trim(),
+          reason: String(item?.holdReason || item?.requestSummary?.reason || "").trim(),
+          summary,
+          governanceTarget: item?.governanceTarget || {},
+          requestSummary: item?.requestSummary || {},
+          codexSessionId: String(item?.codexSessionId || "").trim(),
+          codexConversationId: String(item?.codexConversationId || "").trim()
+        };
+      })
+      .sort((a, b) => parseTimeMs(b?.createdAt || b?.expiresAt) - parseTimeMs(a?.createdAt || a?.expiresAt));
+  }
+
+  function buildCombinedNativeApprovalRailItems() {
+    return [
+      ...buildInterpositionHoldDecisionItems(config.nativeGatewayHolds || []),
+      ...buildNativeApprovalRailItems(operatorChatState.thread || {})
+    ].sort((a, b) => parseTimeMs(b?.createdAt || b?.expiresAt) - parseTimeMs(a?.createdAt || a?.expiresAt));
+  }
+
   function getNativeApprovalRailItemBySelectionId(selectionId) {
     const id = String(selectionId || "").trim();
     if (!id.startsWith("native:")) {
       return null;
     }
-    return buildNativeApprovalRailItems(operatorChatState.thread || {}).find(
+    return buildCombinedNativeApprovalRailItems().find(
       (item) => String(item?.selectionId || "").trim() === id
     ) || null;
   }
@@ -10614,13 +10819,13 @@ function getCurrentIncidentOpsEntry(entryId = "") {
     return focusRenderedRegion(detailNode, { block: "center" });
   }
 
-  function openApprovalDetail(runID) {
+  function openApprovalDetail(runID, options = {}) {
     const nextRunID = String(runID || "").trim();
     if (!nextRunID || !ui.approvalsDetailContent) {
       return "noop";
     }
     const selectedRunID = readPinnedApprovalSelectionId();
-    if (selectedRunID && selectedRunID === nextRunID) {
+    if (selectedRunID && selectedRunID === nextRunID && options.force !== true) {
       ui.approvalsDetailContent.dataset.selectedRunId = APPROVAL_SELECTION_NONE;
       renderApprovalsDetail(ui, null);
       closeApprovalReviewModal();
@@ -11325,18 +11530,21 @@ function getCurrentIncidentOpsEntry(entryId = "") {
 
   async function submitNativeApprovalRailDecision(selectionId, decision, reason) {
     const item = getNativeApprovalRailItemBySelectionId(selectionId);
-    if (!item || !operatorChatState.thread) {
+    if (!item) {
       return false;
     }
     const normalizedDecision = String(decision || "").trim().toUpperCase();
     const decisionVerb = normalizedDecision === "DENY" ? "denied" : "approved";
+    const isGatewayHold = item?.decisionType === "gateway_hold";
     const submittedReason =
       String(reason || "").trim() ||
-      (item?.decisionType === "proposal"
-        ? `Pinned Agent review ${decisionVerb} tool proposal.`
-        : `Pinned Agent review ${decisionVerb} approval checkpoint.`);
+      (isGatewayHold
+        ? `Pinned Companion review ${decisionVerb} interposed request hold.`
+        : item?.decisionType === "proposal"
+          ? `Pinned Agent review ${decisionVerb} tool proposal.`
+          : `Pinned Agent review ${decisionVerb} approval checkpoint.`);
     const sessionId = String(item?.sessionId || "").trim();
-    if (!sessionId || !normalizedDecision) {
+    if ((!isGatewayHold && !sessionId) || !normalizedDecision) {
       return false;
     }
     const currentSession = getSession();
@@ -11348,14 +11556,28 @@ function getCurrentIncidentOpsEntry(entryId = "") {
       ...operatorChatState,
       status: "running",
       message:
-        item?.decisionType === "proposal"
+        isGatewayHold
+          ? `Submitting ${normalizedDecision} for interposed request ${item.interpositionRequestId} on run ${item.runId}...`
+          : item?.decisionType === "proposal"
           ? `Submitting ${normalizedDecision} for tool proposal ${item.proposalId} on session ${sessionId}...`
           : `Submitting ${normalizedDecision} for checkpoint ${item.checkpointId} on session ${sessionId}...`
     };
     await refresh();
     try {
       let result = null;
-      if (item?.decisionType === "proposal") {
+      if (isGatewayHold) {
+        result = await api.submitApprovalDecision(item.runId, normalizedDecision, {
+          ttlSeconds: readApprovalFilters(ui).ttlSeconds,
+          reason: submittedReason
+        });
+        if (result?.applied) {
+          const bindings = nativeBindings();
+          if (bindings && typeof bindings.NativeGatewayHoldResolve === "function") {
+            await bindings.NativeGatewayHoldResolve(item.interpositionRequestId, normalizedDecision, submittedReason);
+          }
+          await syncNativeGatewayHoldsFromBindings().catch(() => {});
+        }
+      } else if (item?.decisionType === "proposal") {
         result = await api.submitRuntimeSessionToolProposalDecision(sessionId, item.proposalId, normalizedDecision, {
           meta: {
             tenantId: decisionScope.tenantId,
@@ -11374,23 +11596,31 @@ function getCurrentIncidentOpsEntry(entryId = "") {
           reason: submittedReason
         });
       }
-      const refreshed = await refreshOperatorChatThreadSession(api, operatorChatState.thread, sessionId, {
-        tailCount: 8,
-        waitSeconds: 1
-      });
-      const nextThread = refreshed?.thread || operatorChatState.thread;
-      const derived = deriveOperatorChatThreadState(nextThread);
+      let nextThread = operatorChatState.thread;
+      let derived = deriveOperatorChatThreadState(nextThread);
+      if (!isGatewayHold) {
+        const refreshed = await refreshOperatorChatThreadSession(api, operatorChatState.thread, sessionId, {
+          tailCount: 8,
+          waitSeconds: 1
+        });
+        nextThread = refreshed?.thread || operatorChatState.thread;
+        derived = deriveOperatorChatThreadState(nextThread);
+      }
       operatorChatState = {
         ...operatorChatState,
         status: derived.uiStatus || (result?.applied ? "success" : "warn"),
         message: result?.applied
-          ? item?.decisionType === "proposal"
-            ? `Tool proposal ${item.proposalId} ${normalizedDecision === "DENY" ? "denied" : "approved"}. ${derived.message}`
-            : `Checkpoint ${item.checkpointId} ${normalizedDecision === "DENY" ? "denied" : "approved"}. ${derived.message}`
+          ? isGatewayHold
+            ? `Interposed request ${item.interpositionRequestId} ${normalizedDecision === "DENY" ? "denied" : "approved"}; run ${item.runId} moved ${normalizedDecision === "DENY" ? "to deny" : "forward"}.`
+            : item?.decisionType === "proposal"
+              ? `Tool proposal ${item.proposalId} ${normalizedDecision === "DENY" ? "denied" : "approved"}. ${derived.message}`
+              : `Checkpoint ${item.checkpointId} ${normalizedDecision === "DENY" ? "denied" : "approved"}. ${derived.message}`
           : String(result?.warning || "").trim() || "Native decision was not changed.",
         thread: nextThread
       };
-      await refreshOperatorChatHistory(session);
+      if (!isGatewayHold) {
+        await refreshOperatorChatHistory(session);
+      }
       renderApprovalFeedback(
         ui,
         result?.applied ? "ok" : "warn",
@@ -11400,9 +11630,11 @@ function getCurrentIncidentOpsEntry(entryId = "") {
       operatorChatState = {
         ...operatorChatState,
         status: "error",
-        message: item?.decisionType === "proposal"
-          ? `Tool proposal decision failed: ${error.message}`
-          : `Approval decision failed: ${error.message}`,
+        message: isGatewayHold
+          ? `Interposed request decision failed: ${error.message}`
+          : item?.decisionType === "proposal"
+            ? `Tool proposal decision failed: ${error.message}`
+            : `Approval decision failed: ${error.message}`,
         thread: operatorChatState.thread
       };
       renderApprovalFeedback(ui, "error", operatorChatState.message);
@@ -14799,6 +15031,235 @@ function getCurrentIncidentOpsEntry(entryId = "") {
       focusRenderedRegion(ui.evidenceOpsContent, { scroll: false });
     }
   });
+  const nativeBindings = () => globalThis?.go?.main?.App || null;
+  const syncNativeGatewayHoldsFromBindings = async () => {
+    const bindings = nativeBindings();
+    if (!bindings || typeof bindings.NativeGatewayHoldList !== "function") {
+      config.nativeGatewayHolds = [];
+      return [];
+    }
+    const holdItems = await bindings.NativeGatewayHoldList();
+    config.nativeGatewayHolds = Array.isArray(holdItems) ? holdItems : [];
+    return config.nativeGatewayHolds;
+  };
+  const syncNativeShellStateFromBindings = async () => {
+    const bindings = nativeBindings();
+    if (!bindings || typeof bindings.NativeSessionSummary !== "function") {
+      return false;
+    }
+    const sessionSummary = await bindings.NativeSessionSummary();
+    if (sessionSummary && typeof sessionSummary === "object") {
+      updateNativeLauncherPresentation(sessionSummary);
+      await syncNativeGatewayHoldsFromBindings().catch(() => {
+        config.nativeGatewayHolds = Array.isArray(config.nativeGatewayHolds) ? config.nativeGatewayHolds : [];
+      });
+      renderHomePanel();
+      renderLogOpsPanel();
+      return true;
+    }
+    return false;
+  };
+  function syncNativeInterpositionDraftPresentation() {
+    const root = ui.nativeLauncherStatus instanceof HTMLElement ? ui.nativeLauncherStatus : null;
+    if (!(root instanceof HTMLElement)) {
+      return;
+    }
+    const shell = config?.nativeShell && typeof config.nativeShell === "object" ? config.nativeShell : {};
+    const interposition = shell?.interposition && typeof shell.interposition === "object"
+      ? shell.interposition
+      : {};
+    const authModeNodes = Array.from(
+      root.querySelectorAll("[data-native-shell-field='interposition-auth-mode']")
+    ).filter((node) => node instanceof HTMLInputElement);
+    const selectedNode = authModeNodes.find((node) => node.checked);
+    const authMode =
+      String(
+        selectedNode instanceof HTMLInputElement
+          ? selectedNode.value
+          : interposition.upstreamAuthMode || (interposition.upstreamBearerTokenConfigured ? "saved_token" : "client_passthrough")
+      )
+        .trim()
+        .toLowerCase() || "client_passthrough";
+    const usingSavedToken = authMode === "saved_token";
+    const bearerTokenInput = root.querySelector("[data-native-shell-field='interposition-upstream-bearer-token']");
+    if (bearerTokenInput instanceof HTMLInputElement) {
+      bearerTokenInput.disabled = !usingSavedToken;
+      if (usingSavedToken) {
+        bearerTokenInput.placeholder = interposition.upstreamBearerTokenConfigured
+          ? "Saved token is configured. Enter a new token to replace it."
+          : "Paste upstream bearer token";
+      } else {
+        bearerTokenInput.value = "";
+        bearerTokenInput.placeholder = "Client passthrough mode uses the Authorization already present in compatible Codex requests.";
+      }
+    }
+    const authHintNode = root.querySelector("[data-native-shell-field='interposition-auth-hint']");
+    if (authHintNode instanceof HTMLElement) {
+      authHintNode.textContent = usingSavedToken
+        ? "Save a dedicated upstream token here when you want Epydios to override Codex credentials for the OpenAI upstream."
+        : "Leave saved-token mode off to forward the Authorization already present in compatible Codex/OpenAI client requests.";
+    }
+  }
+  const readNativeInterpositionDraft = () => {
+    const shell = config?.nativeShell && typeof config.nativeShell === "object" ? config.nativeShell : {};
+    const interposition = shell?.interposition && typeof shell.interposition === "object"
+      ? shell.interposition
+      : {};
+    const root = ui.nativeLauncherStatus instanceof HTMLElement ? ui.nativeLauncherStatus : null;
+    const baseUrlInput = root?.querySelector("[data-native-shell-field='interposition-upstream-base-url']");
+    const bearerTokenInput = root?.querySelector("[data-native-shell-field='interposition-upstream-bearer-token']");
+    const authModeNodes = Array.from(
+      root?.querySelectorAll("[data-native-shell-field='interposition-auth-mode']") || []
+    );
+    const selectedAuthNode = authModeNodes.find(
+      (node) => node instanceof HTMLInputElement && node.checked
+    );
+    const authMode = String(
+      selectedAuthNode instanceof HTMLInputElement
+        ? selectedAuthNode.value
+        : interposition.upstreamAuthMode || (interposition.upstreamBearerTokenConfigured ? "saved_token" : "client_passthrough")
+    )
+      .trim()
+      .toLowerCase();
+    const upstreamBaseURL = String(
+      baseUrlInput instanceof HTMLInputElement ? baseUrlInput.value : interposition.upstreamBaseUrl || "https://api.openai.com/v1"
+    ).trim() || "https://api.openai.com/v1";
+    return {
+      enabled: Boolean(interposition.enabled),
+      upstreamBaseURL,
+      upstreamBearerToken:
+        authMode === "saved_token"
+          ? String(bearerTokenInput instanceof HTMLInputElement ? bearerTokenInput.value : "").trim()
+          : "__EPYDIOS_CLEAR_INTERPOSITION_BEARER__"
+    };
+  };
+  const configureNativeInterposition = async (enabled) => {
+    const bindings = nativeBindings();
+    if (!bindings || typeof bindings.NativeInterpositionConfigure !== "function") {
+      setCompanionOpsFeedback(
+        "warn",
+        "Interposition controls are unavailable in this shell. Use the installed native launcher build to place Epydios in the request path."
+      );
+      return false;
+    }
+    const draft = readNativeInterpositionDraft();
+    try {
+      await bindings.NativeInterpositionConfigure(Boolean(enabled), draft.upstreamBaseURL, draft.upstreamBearerToken);
+      await syncNativeShellStateFromBindings();
+      await refresh();
+      const statusMessage = enabled
+        ? "Interposition is ON. Compatible /v1/responses traffic now enters the local governed proxy path."
+        : "Interposition is OFF. Compatible /v1/responses traffic will no longer enter the local governed proxy path.";
+      setCompanionOpsFeedback("ok", statusMessage);
+      return true;
+    } catch (error) {
+      await syncNativeShellStateFromBindings().catch(() => {});
+      setCompanionOpsFeedback("error", `Interposition update failed: ${error.message}`);
+      return false;
+    }
+  };
+  const setCompanionHandoffContext = (nextContext = null) => {
+    companionOpsViewState = {
+      ...companionOpsViewState,
+      handoffContext: nextContext && typeof nextContext === "object" ? nextContext : null
+    };
+    renderCompanionHandoffBanner();
+    renderHomePanel();
+  };
+  const returnToCompanionOps = () => {
+    setWorkspaceView("companionops", true);
+    renderHomePanel();
+    focusRenderedRegion(ui.homeOpsContent, { scroll: false });
+  };
+  const restartNativeServicesFromCompanion = async () => {
+    const bindings = nativeBindings();
+    if (!bindings || typeof bindings.NativeRuntimeServiceRestart !== "function") {
+      setCompanionOpsFeedback(
+        "warn",
+        "Native service controls are unavailable in this shell. Open Diagnostics to inspect the current launcher and local runtime posture."
+      );
+      return false;
+    }
+    try {
+      await bindings.NativeRuntimeServiceRestart();
+      if (
+        String(config?.nativeShell?.mode || "").trim().toLowerCase() === "live" &&
+        typeof bindings.NativeGatewayServiceRestart === "function"
+      ) {
+        await bindings.NativeGatewayServiceRestart();
+      }
+      await syncNativeShellStateFromBindings();
+      await refresh();
+      setCompanionOpsFeedback("ok", "Local runtime and gateway services restarted from CompanionOps.");
+      return true;
+    } catch (error) {
+      await syncNativeShellStateFromBindings().catch(() => {});
+      setCompanionOpsFeedback("error", `Restart failed: ${error.message}`);
+      return false;
+    }
+  };
+  const openCompanionWorkbenchTarget = async (kind, options = {}) => {
+    const nextKind = String(kind || "").trim().toLowerCase();
+    const runId = String(options.runId || "").trim();
+    const approvalId = String(options.approvalId || "").trim();
+    const incidentId = String(options.incidentId || "").trim();
+    const sourceClient = String(options.sourceClient || "").trim();
+    const openContext = (view) => {
+      setCompanionHandoffContext({
+        kind: nextKind || "handoff",
+        approvalId,
+        runId,
+        incidentId,
+        gatewayRequestId: String(options.gatewayRequestId || "").trim(),
+        sourceClient,
+        openedFrom: "companionops",
+        view: String(view || "").trim().toLowerCase()
+      });
+    };
+    if (nextKind === "workbench") {
+      setWorkspaceView(companionOpsViewState.lastWorkbenchDomain || "agentops", true);
+      return true;
+    }
+    if (nextKind === "approval" || nextKind === "approval-queue") {
+      await refresh();
+      openContext("governanceops");
+      setGovernanceOpsSelection(runId, {
+        force: true,
+        syncSpine: false,
+        render: false
+      });
+      setWorkspaceView("governanceops", true);
+      if (runId) {
+        openApprovalDetail(runId, { force: true });
+      }
+      focusRenderedRegion(ui.governanceOpsContent, { scroll: false });
+      return true;
+    }
+    if (nextKind === "run" || nextKind === "runs") {
+      openContext("runtimeops");
+      if (runId) {
+        await openRunDetail(runId);
+      } else {
+        setWorkspaceView("runtimeops", true);
+        focusRenderedRegion(ui.runsContent, { scroll: false });
+      }
+      return true;
+    }
+    if (nextKind === "incident") {
+      await refresh();
+      openContext("incidentops");
+      await openAimxsSpineWorkspace("incidentops", runId, incidentId);
+      return true;
+    }
+    if (nextKind === "diagnostics") {
+      openContext("diagnostics");
+      setSettingsSubview("diagnostics", true);
+      setWorkspaceView("settingsops", true);
+      focusRenderedRegion(ui.settingsContent, { scroll: false });
+      return true;
+    }
+    return false;
+  };
   ui.homeOpsContent?.addEventListener("click", async (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) {
@@ -14821,57 +15282,132 @@ function getCurrentIncidentOpsEntry(entryId = "") {
       return;
     }
 
-    if (action === "open-approvals-pending") {
-      ui.approvalsStatusFilter.value = "PENDING";
+    if (action === "open-workbench") {
+      await openCompanionWorkbenchTarget("workbench");
+      return;
+    }
+
+    if (action === "restart-services") {
+      await restartNativeServicesFromCompanion();
+      return;
+    }
+
+    if (action === "show-diagnostics") {
+      await openCompanionWorkbenchTarget("diagnostics");
+      return;
+    }
+
+    if (action === "open-approval-queue") {
+      if (ui.approvalsStatusFilter) {
+        ui.approvalsStatusFilter.value = "PENDING";
+      }
       if (ui.approvalsSort) {
         ui.approvalsSort.value = "ttl_asc";
       }
       if (ui.approvalsPage) {
         ui.approvalsPage.value = "1";
       }
-      await refresh();
-      setWorkspaceView("governanceops", true);
-      ui.governanceOpsContent?.scrollIntoView({ behavior: "smooth", block: "start" });
-      focusRenderedRegion(ui.governanceOpsContent, { scroll: false });
+      await openCompanionWorkbenchTarget("approval-queue");
       return;
     }
 
-    if (action === "open-runs-attention") {
-      const runID = String(actionNode.dataset.homeopsRunId || "").trim();
+    if (action === "open-approval-item") {
+      await openCompanionWorkbenchTarget("approval", {
+        runId: String(actionNode.dataset.homeopsRunId || "").trim(),
+        approvalId: String(actionNode.dataset.homeopsApprovalId || "").trim()
+      });
+      return;
+    }
+
+    if (action === "open-run-item" || action === "open-recent-runs") {
       if (ui.runsSort) {
         ui.runsSort.value = "updated_desc";
       }
       if (ui.runsPage) {
         ui.runsPage.value = "1";
       }
-      await refresh();
-      setWorkspaceView("runtimeops", true);
-      if (runID) {
-        await openRunDetail(runID);
-      } else {
-        ui.runsContent?.scrollIntoView({ behavior: "smooth", block: "start" });
-      }
+      await openCompanionWorkbenchTarget(action === "open-run-item" ? "run" : "runs", {
+        runId: String(actionNode.dataset.homeopsRunId || "").trim()
+      });
       return;
     }
 
-    if (action === "open-incidentops-active") {
-      await refresh();
-      setWorkspaceView("incidentops", true);
-      ui.incidentOpsContent?.scrollIntoView({ behavior: "smooth", block: "start" });
-      focusRenderedRegion(ui.incidentOpsContent, { scroll: false });
+    if (action === "open-incident-item") {
+      await openCompanionWorkbenchTarget("incident", {
+        runId: String(actionNode.dataset.homeopsRunId || "").trim(),
+        incidentId: String(actionNode.dataset.homeopsIncidentId || "").trim()
+      });
       return;
     }
-
-    if (action === "open-audit-deny") {
-      ui.auditDecisionFilter.value = "DENY";
-      if (ui.auditPage) {
-        ui.auditPage.value = "1";
-      }
-      setWorkspaceView("auditops", true);
-      await refresh();
-      (ui.auditOpsContent || ui.auditContent)?.scrollIntoView({ behavior: "smooth", block: "start" });
-      focusRenderedRegion(ui.auditOpsContent || ui.auditContent, { scroll: false });
+  });
+  ui.companionHandoffBanner?.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
       return;
+    }
+    const returnNode = target.closest("[data-companion-return-action='return']");
+    if (!(returnNode instanceof HTMLElement)) {
+      return;
+    }
+    returnToCompanionOps();
+  });
+  ui.nativeLauncherStatus?.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    const actionNode = target.closest("[data-native-shell-action]");
+    if (!(actionNode instanceof HTMLElement)) {
+      return;
+    }
+    const action = String(actionNode.dataset.nativeShellAction || "").trim().toLowerCase();
+    if (action === "toggle-interposition") {
+      const nextEnabled = String(actionNode.dataset.nativeShellNextEnabled || "").trim().toLowerCase() === "true";
+      configureNativeInterposition(nextEnabled).catch(() => {});
+      return;
+    }
+    if (action === "save-interposition-config") {
+      const draft = readNativeInterpositionDraft();
+      configureNativeInterposition(draft.enabled).catch(() => {});
+    }
+  });
+  ui.nativeLauncherStatus?.addEventListener("submit", (event) => {
+    const formNode = event.target;
+    if (!(formNode instanceof HTMLFormElement)) {
+      return;
+    }
+    const formKind = String(formNode.dataset.nativeShellForm || "").trim().toLowerCase();
+    if (formKind !== "interposition-config") {
+      return;
+    }
+    event.preventDefault();
+    const draft = readNativeInterpositionDraft();
+    configureNativeInterposition(draft.enabled).catch(() => {});
+  });
+  ui.nativeLauncherStatus?.addEventListener("change", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    if (target.matches("[data-native-shell-field='interposition-auth-mode']")) {
+      syncNativeInterpositionDraftPresentation();
+    }
+  });
+  ui.logOpsContent?.addEventListener("click", async (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    const actionNode = target.closest("[data-logops-action]");
+    if (!(actionNode instanceof HTMLElement)) {
+      return;
+    }
+    const action = String(actionNode.dataset.logopsAction || "").trim().toLowerCase();
+    if (action === "open-path") {
+      await openNativePathFromLogOps(
+        String(actionNode.dataset.logopsPath || "").trim(),
+        String(actionNode.dataset.logopsLabel || "Artifact").trim()
+      );
     }
   });
 
@@ -15465,7 +16001,7 @@ function getCurrentIncidentOpsEntry(entryId = "") {
 main().catch((error) => {
   renderHomeOpsEmptyState(ui, {
     tone: "error",
-    title: "HomeOps",
+    title: "CompanionOps",
     message: `Bootstrap failed: ${error.message}`
   });
 });

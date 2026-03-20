@@ -27,15 +27,18 @@ const (
 )
 
 type LaunchOptions struct {
-	Mode                   string
-	RuntimeLocalPort       int
-	GatewayLocalPort       int
-	RuntimeNamespace       string
-	RuntimeService         string
-	TargetExecutionProfile string
-	AllowRestrictedHost    bool
-	BootstrapConfigPath    string
-	GatewayServiceOnly     bool
+	Mode                             string
+	RuntimeLocalPort                 int
+	GatewayLocalPort                 int
+	RuntimeNamespace                 string
+	RuntimeService                   string
+	InterpositionEnabled             bool
+	InterpositionUpstreamBaseURL     string
+	InterpositionUpstreamBearerToken string
+	TargetExecutionProfile           string
+	AllowRestrictedHost              bool
+	BootstrapConfigPath              string
+	GatewayServiceOnly               bool
 }
 
 type SessionPaths struct {
@@ -89,6 +92,16 @@ type GatewayServiceRecord struct {
 	LastError    string `json:"lastError,omitempty"`
 }
 
+type InterpositionRecord struct {
+	Enabled                       bool   `json:"enabled"`
+	Effective                     bool   `json:"effective"`
+	Status                        string `json:"status"`
+	Reason                        string `json:"reason,omitempty"`
+	UpstreamBaseURL               string `json:"upstreamBaseUrl,omitempty"`
+	UpstreamBearerTokenConfigured bool   `json:"upstreamBearerTokenConfigured"`
+	UpstreamAuthMode              string `json:"upstreamAuthMode,omitempty"`
+}
+
 type SessionManifest struct {
 	AppName                string               `json:"appName"`
 	StartedAtUTC           string               `json:"startedAtUtc"`
@@ -102,6 +115,7 @@ type SessionManifest struct {
 	AllowRestrictedHost    bool                 `json:"allowRestrictedHost"`
 	BootstrapConfigPath    string               `json:"bootstrapConfigPath"`
 	BootstrapConfigState   string               `json:"bootstrapConfigState"`
+	Interposition          InterpositionRecord  `json:"interposition"`
 	StartupError           string               `json:"startupError,omitempty"`
 	RuntimeService         RuntimeServiceRecord `json:"runtimeService"`
 	GatewayService         GatewayServiceRecord `json:"gatewayService"`
@@ -120,6 +134,7 @@ func DefaultLaunchOptions() LaunchOptions {
 		GatewayLocalPort:       18765,
 		RuntimeNamespace:       "epydios-system",
 		RuntimeService:         "orchestration-runtime",
+		InterpositionEnabled:   false,
 		TargetExecutionProfile: "sandbox_vm_autonomous",
 		AllowRestrictedHost:    false,
 		BootstrapConfigPath:    resolveBootstrapConfigPath(),
@@ -131,7 +146,13 @@ func ParseLaunchOptions(args []string) (LaunchOptions, error) {
 	if err := applyBootstrapLaunchOptions(&opts); err != nil {
 		return LaunchOptions{}, err
 	}
+	if err := applyEnvironmentLaunchOptions(&opts); err != nil {
+		return LaunchOptions{}, err
+	}
 	for i := 0; i < len(args); i++ {
+		if strings.HasPrefix(args[i], "-psn_") {
+			continue
+		}
 		switch args[i] {
 		case "--mode":
 			if i+1 >= len(args) {
@@ -173,6 +194,22 @@ func ParseLaunchOptions(args []string) (LaunchOptions, error) {
 			i++
 		case "--gateway-service":
 			opts.GatewayServiceOnly = true
+		case "--interposition-enabled":
+			opts.InterpositionEnabled = true
+		case "--interposition-disabled":
+			opts.InterpositionEnabled = false
+		case "--interposition-upstream-base-url":
+			if i+1 >= len(args) {
+				return LaunchOptions{}, fmt.Errorf("missing value for --interposition-upstream-base-url")
+			}
+			opts.InterpositionUpstreamBaseURL = strings.TrimSpace(args[i+1])
+			i++
+		case "--interposition-upstream-bearer-token":
+			if i+1 >= len(args) {
+				return LaunchOptions{}, fmt.Errorf("missing value for --interposition-upstream-bearer-token")
+			}
+			opts.InterpositionUpstreamBearerToken = strings.TrimSpace(args[i+1])
+			i++
 		default:
 			return LaunchOptions{}, fmt.Errorf("unknown argument %q", args[i])
 		}
@@ -244,6 +281,7 @@ func PrepareSession(assets fs.FS, opts LaunchOptions) (*Session, error) {
 		GatewayService:         defaultGatewayServiceRecord(opts, paths),
 		Paths:                  paths,
 	}
+	manifest.Interposition = buildInterpositionRecord(opts, manifest.GatewayService)
 	if err := patchRuntimeConfig(paths.WebDir, opts, manifest); err != nil {
 		return nil, err
 	}
@@ -326,10 +364,33 @@ func (s *Session) UpdateGatewayService(record GatewayServiceRecord) error {
 	})
 }
 
+func (s *Session) UpdateInterpositionConfig(enabled bool, upstreamBaseURL string, upstreamBearerToken string) error {
+	opts := s.launchOptions
+	opts.InterpositionEnabled = enabled
+	opts.InterpositionUpstreamBaseURL = strings.TrimSpace(upstreamBaseURL)
+	switch trimmedBearerToken := strings.TrimSpace(upstreamBearerToken); trimmedBearerToken {
+	case "":
+		// Preserve any existing saved token unless the UI explicitly requests a clear.
+	case "__EPYDIOS_CLEAR_INTERPOSITION_BEARER__":
+		opts.InterpositionUpstreamBearerToken = ""
+	default:
+		opts.InterpositionUpstreamBearerToken = trimmedBearerToken
+	}
+	if err := writeBootstrapLaunchOptions(opts.BootstrapConfigPath, bootstrapLaunchOptionsFromLaunchOptions(opts)); err != nil {
+		return err
+	}
+	s.launchOptions = opts
+	return s.update(func(manifest *SessionManifest) {
+		manifest.BootstrapConfigPath = opts.BootstrapConfigPath
+		manifest.BootstrapConfigState = resolveBootstrapConfigState(opts.BootstrapConfigPath)
+	})
+}
+
 func (s *Session) update(mutate func(*SessionManifest)) error {
 	if mutate != nil {
 		mutate(&s.Manifest)
 	}
+	s.Manifest.Interposition = buildInterpositionRecord(s.launchOptions, s.Manifest.GatewayService)
 	if err := patchRuntimeConfig(s.Manifest.Paths.WebDir, s.launchOptions, s.Manifest); err != nil {
 		return err
 	}
@@ -397,6 +458,7 @@ func patchRuntimeConfig(webDir string, opts LaunchOptions, manifest SessionManif
 		"allowRestrictedHost":    manifest.AllowRestrictedHost,
 		"bootstrapConfigPath":    manifest.BootstrapConfigPath,
 		"bootstrapConfigState":   manifest.BootstrapConfigState,
+		"interposition":          manifest.Interposition,
 		"startupError":           manifest.StartupError,
 		"configRoot":             manifest.Paths.ConfigRoot,
 		"cacheRoot":              manifest.Paths.CacheRoot,
@@ -501,6 +563,57 @@ func runtimeState(opts LaunchOptions) string {
 	return "mock_active"
 }
 
+func buildInterpositionRecord(opts LaunchOptions, gateway GatewayServiceRecord) InterpositionRecord {
+	upstreamBaseURL := strings.TrimSpace(opts.InterpositionUpstreamBaseURL)
+	upstreamBearerTokenConfigured := strings.TrimSpace(opts.InterpositionUpstreamBearerToken) != ""
+	upstreamAuthMode := "client_passthrough"
+	if upstreamBearerTokenConfigured {
+		upstreamAuthMode = "saved_token"
+	}
+	record := InterpositionRecord{
+		Enabled:                       opts.InterpositionEnabled,
+		Effective:                     false,
+		Status:                        "off",
+		UpstreamBaseURL:               upstreamBaseURL,
+		UpstreamBearerTokenConfigured: upstreamBearerTokenConfigured,
+		UpstreamAuthMode:              upstreamAuthMode,
+	}
+	switch {
+	case !record.Enabled:
+		record.Status = "off"
+		record.Reason = "Interposition is disabled. Codex-compatible requests will not enter the local governance path."
+	case strings.TrimSpace(opts.Mode) != modeLive:
+		record.Status = "blocked_mock_mode"
+		record.Reason = "Switch the launcher to live posture before placing Epydios in the request path."
+	case record.UpstreamBaseURL == "":
+		record.Status = "blocked_upstream_config"
+		record.Reason = "Configure the upstream base URL before turning interposition on. Leave the token blank to pass through Codex/OpenAI credentials, or save a token to override them."
+	case strings.EqualFold(strings.TrimSpace(gateway.State), "running") && strings.EqualFold(strings.TrimSpace(gateway.Health), "healthy"):
+		record.Status = "on"
+		record.Effective = true
+		if record.UpstreamAuthMode == "saved_token" {
+			record.Reason = "Codex-compatible requests can now enter the governed local proxy path using the saved upstream bearer token."
+		} else {
+			record.Reason = "Codex-compatible requests can now enter the governed local proxy path using the client request's existing upstream credentials."
+		}
+	case strings.EqualFold(strings.TrimSpace(gateway.State), "running"):
+		record.Status = "warming"
+		if record.UpstreamAuthMode == "saved_token" {
+			record.Reason = "Interposition is enabled with a saved upstream bearer token, and the local gateway is warming up."
+		} else {
+			record.Reason = "Interposition is enabled in Codex/OpenAI credential passthrough mode, and the local gateway is warming up."
+		}
+	default:
+		record.Status = "gateway_unavailable"
+		if record.UpstreamAuthMode == "saved_token" {
+			record.Reason = "Interposition is enabled with a saved upstream bearer token, but the local gateway is not ready yet."
+		} else {
+			record.Reason = "Interposition is enabled in Codex/OpenAI credential passthrough mode, but the local gateway is not ready yet."
+		}
+	}
+	return record
+}
+
 func runtimeStateFromService(mode string, record RuntimeServiceRecord) string {
 	if strings.TrimSpace(mode) != modeLive {
 		return "mock_active"
@@ -551,11 +664,14 @@ func defaultGatewayServiceRecord(opts LaunchOptions, paths SessionPaths) Gateway
 }
 
 type bootstrapLaunchOptions struct {
-	Mode             string `json:"mode"`
-	RuntimeLocalPort int    `json:"runtimeLocalPort"`
-	GatewayLocalPort int    `json:"gatewayLocalPort"`
-	RuntimeNamespace string `json:"runtimeNamespace"`
-	RuntimeService   string `json:"runtimeService"`
+	Mode                             string `json:"mode"`
+	RuntimeLocalPort                 int    `json:"runtimeLocalPort"`
+	GatewayLocalPort                 int    `json:"gatewayLocalPort"`
+	RuntimeNamespace                 string `json:"runtimeNamespace"`
+	RuntimeService                   string `json:"runtimeService"`
+	InterpositionEnabled             *bool  `json:"interpositionEnabled,omitempty"`
+	InterpositionUpstreamBaseURL     string `json:"interpositionUpstreamBaseUrl"`
+	InterpositionUpstreamBearerToken string `json:"interpositionUpstreamBearerToken"`
 }
 
 func resolveBootstrapConfigPath() string {
@@ -573,16 +689,9 @@ func applyBootstrapLaunchOptions(opts *LaunchOptions) error {
 	if strings.TrimSpace(opts.BootstrapConfigPath) == "" {
 		return nil
 	}
-	content, err := os.ReadFile(opts.BootstrapConfigPath)
+	payload, err := readBootstrapLaunchOptions(opts.BootstrapConfigPath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return fmt.Errorf("read bootstrap config: %w", err)
-	}
-	var payload bootstrapLaunchOptions
-	if err := json.Unmarshal(content, &payload); err != nil {
-		return fmt.Errorf("decode bootstrap config: %w", err)
+		return err
 	}
 	if mode := strings.ToLower(strings.TrimSpace(payload.Mode)); mode != "" {
 		opts.Mode = mode
@@ -598,6 +707,96 @@ func applyBootstrapLaunchOptions(opts *LaunchOptions) error {
 	}
 	if service := strings.TrimSpace(payload.RuntimeService); service != "" {
 		opts.RuntimeService = service
+	}
+	if payload.InterpositionEnabled != nil {
+		opts.InterpositionEnabled = *payload.InterpositionEnabled
+	}
+	if baseURL := strings.TrimSpace(payload.InterpositionUpstreamBaseURL); baseURL != "" {
+		opts.InterpositionUpstreamBaseURL = baseURL
+	}
+	if bearer := strings.TrimSpace(payload.InterpositionUpstreamBearerToken); bearer != "" {
+		opts.InterpositionUpstreamBearerToken = bearer
+	}
+	return nil
+}
+
+func applyEnvironmentLaunchOptions(opts *LaunchOptions) error {
+	if opts == nil {
+		return nil
+	}
+	if enabledRaw, ok := os.LookupEnv("EPYDIOS_NATIVEAPP_INTERPOSITION_ENABLED"); ok {
+		enabled, err := parseLaunchBool(enabledRaw)
+		if err != nil {
+			return fmt.Errorf("decode interposition enabled override: %w", err)
+		}
+		opts.InterpositionEnabled = enabled
+	}
+	if baseURL, ok := os.LookupEnv("EPYDIOS_NATIVEAPP_INTERPOSITION_UPSTREAM_BASE_URL"); ok {
+		opts.InterpositionUpstreamBaseURL = strings.TrimSpace(baseURL)
+	}
+	if token, ok := os.LookupEnv("EPYDIOS_NATIVEAPP_INTERPOSITION_UPSTREAM_BEARER_TOKEN"); ok {
+		opts.InterpositionUpstreamBearerToken = strings.TrimSpace(token)
+	}
+	return nil
+}
+
+func parseLaunchBool(raw string) (bool, error) {
+	value := strings.TrimSpace(strings.ToLower(raw))
+	switch value {
+	case "1", "true", "t", "yes", "y", "on":
+		return true, nil
+	case "0", "false", "f", "no", "n", "off", "":
+		return false, nil
+	default:
+		return false, fmt.Errorf("invalid boolean value %q", raw)
+	}
+}
+
+func readBootstrapLaunchOptions(path string) (bootstrapLaunchOptions, error) {
+	if strings.TrimSpace(path) == "" {
+		return bootstrapLaunchOptions{}, nil
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return bootstrapLaunchOptions{}, nil
+		}
+		return bootstrapLaunchOptions{}, fmt.Errorf("read bootstrap config: %w", err)
+	}
+	var payload bootstrapLaunchOptions
+	if err := json.Unmarshal(content, &payload); err != nil {
+		return bootstrapLaunchOptions{}, fmt.Errorf("decode bootstrap config: %w", err)
+	}
+	return payload, nil
+}
+
+func bootstrapLaunchOptionsFromLaunchOptions(opts LaunchOptions) bootstrapLaunchOptions {
+	enabled := opts.InterpositionEnabled
+	return bootstrapLaunchOptions{
+		Mode:                             opts.Mode,
+		RuntimeLocalPort:                 opts.RuntimeLocalPort,
+		GatewayLocalPort:                 opts.GatewayLocalPort,
+		RuntimeNamespace:                 opts.RuntimeNamespace,
+		RuntimeService:                   opts.RuntimeService,
+		InterpositionEnabled:             &enabled,
+		InterpositionUpstreamBaseURL:     strings.TrimSpace(opts.InterpositionUpstreamBaseURL),
+		InterpositionUpstreamBearerToken: strings.TrimSpace(opts.InterpositionUpstreamBearerToken),
+	}
+}
+
+func writeBootstrapLaunchOptions(path string, payload bootstrapLaunchOptions) error {
+	if strings.TrimSpace(path) == "" {
+		return fmt.Errorf("bootstrap config path is required")
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return fmt.Errorf("create bootstrap config dir: %w", err)
+	}
+	data, err := json.MarshalIndent(payload, "", "  ")
+	if err != nil {
+		return fmt.Errorf("encode bootstrap config: %w", err)
+	}
+	if err := os.WriteFile(path, append(data, '\n'), 0o644); err != nil {
+		return fmt.Errorf("write bootstrap config: %w", err)
 	}
 	return nil
 }

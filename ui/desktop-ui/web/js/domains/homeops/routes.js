@@ -15,10 +15,10 @@ export function renderHomeOpsEmptyState(ui, options = {}) {
   }
   ui.homeOpsContent.innerHTML = renderPanelStateMetric(
     options.tone || "info",
-    options.title || "HomeOps",
+    options.title || "CompanionOps",
     options.message ||
-      "HomeOps command posture becomes available after runtime, platform, policy, governance, audit, and incident anchors load.",
+      "CompanionOps becomes available after runtime, gateway, governance, and current workbench anchors load.",
     options.detail ||
-      "Refresh the workspace. If HomeOps should already be populated, verify the current domain anchors before widening Home."
+      "Refresh the workspace. If CompanionOps should already be populated, verify the current launcher, gateway, and owning-domain anchors before widening the shell."
   );
 }

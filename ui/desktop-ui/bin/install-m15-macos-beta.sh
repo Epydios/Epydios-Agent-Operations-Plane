@@ -15,8 +15,11 @@ LATEST_SUMMARY="${PHASE_ROOT}/install-m15-macos-beta-latest.summary.json"
 mkdir -p "${RUN_ROOT}"
 
 PACKAGE_SUMMARY="${PHASE_ROOT}/package-m15-macos-latest.summary.json"
-if [ ! -f "${PACKAGE_SUMMARY}" ] || ! grep -q '"status": "packaged_macos_app"' "${PACKAGE_SUMMARY}"; then
+if [ "${EPYDIOS_M15_SKIP_REPACKAGE:-0}" != "1" ]; then
   "${M15_MODULE_ROOT}/bin/package-m15-macos.sh" >/dev/null
+elif [ ! -f "${PACKAGE_SUMMARY}" ] || ! grep -q '"status": "packaged_macos_app"' "${PACKAGE_SUMMARY}"; then
+  echo "install-m15-macos-beta failed: missing packaged macOS app summary and repackage skip was requested" >&2
+  exit 1
 fi
 PACKAGE_SUMMARY="${PHASE_ROOT}/package-m15-macos-latest.summary.json"
 APP_SOURCE_PATH="$(jq -r '.app_bundle_path // ""' "${PACKAGE_SUMMARY}")"
@@ -62,11 +65,12 @@ EOF
   fi
   cat > "${BOOTSTRAP_PATH}" <<EOF
 {
-  "mode": "${M15_MACOS_BETA_MODE:-mock}",
+  "mode": "${M15_MACOS_BETA_MODE:-live}",
   "runtimeLocalPort": ${M15_MACOS_RUNTIME_PORT:-8080},
   "gatewayLocalPort": ${M15_MACOS_GATEWAY_PORT:-18765},
   "runtimeNamespace": "${M15_MACOS_RUNTIME_NAMESPACE:-epydios-system}",
-  "runtimeService": "${M15_MACOS_RUNTIME_SERVICE:-orchestration-runtime}"
+  "runtimeService": "${M15_MACOS_RUNTIME_SERVICE:-orchestration-runtime}",
+  "interpositionEnabled": false
 }
 EOF
   cat > "${LAUNCH_HELPER_PATH}" <<EOF

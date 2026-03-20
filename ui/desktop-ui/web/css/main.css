@@ -11,6 +11,7 @@
 @import "./domains/evidenceops/panels.css";
 @import "./domains/complianceops/panels.css";
 @import "./domains/incidentops/panels.css";
+@import "./domains/logops/panels.css";
 @import "./domains/identityops/panels.css";
 @import "./domains/guardrailops/panels.css";
 @import "./domains/policyops/panels.css";

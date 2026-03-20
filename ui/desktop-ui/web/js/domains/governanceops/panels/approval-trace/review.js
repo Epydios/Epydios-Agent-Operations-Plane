@@ -70,22 +70,34 @@ function buildNativeDecisionReviewModel(item) {
   const status = String(item?.status || "PENDING").trim().toUpperCase();
   const decisionType = String(item?.decisionType || "checkpoint").trim().toLowerCase();
   const isProposal = decisionType === "proposal";
-  const identifierLabel = isProposal ? "proposalId" : "checkpointId";
-  const identifierValue = isProposal
-    ? String(item?.proposalId || "").trim()
-    : String(item?.checkpointId || "").trim();
+  const isGatewayHold = decisionType === "gateway_hold";
+  const identifierLabel = isGatewayHold ? "approvalId" : isProposal ? "proposalId" : "checkpointId";
+  const identifierValue = isGatewayHold
+    ? String(item?.approvalId || "").trim()
+    : isProposal
+      ? String(item?.proposalId || "").trim()
+      : String(item?.checkpointId || "").trim();
   const summary = String(item?.summary || item?.reason || "").trim();
   const actionable = status === "PENDING";
+  const ttl = isGatewayHold
+    ? ttlInfo(item?.expiresAt)
+    : {
+        label: "-",
+        chipClass: "chip chip-neutral chip-compact",
+        expiresAtLabel: "-",
+        expired: false
+      };
+  const sourceClientLabel = String(item?.sourceClient?.name || item?.sourceClient?.id || item?.clientLabel || "-").trim() || "-";
+  const createdAt = String(item?.createdAt || "").trim();
+  const runId = String(item?.runId || "").trim();
+  const sessionId = isGatewayHold
+    ? String(item?.codexSessionId || item?.sessionId || "").trim()
+    : String(item?.sessionId || "").trim();
   return {
     approval: item,
-    runId: "",
+    runId,
     status,
-    ttl: {
-      label: "-",
-      chipClass: "chip chip-neutral chip-compact",
-      expiresAtLabel: "-",
-      expired: false
-    },
+    ttl,
     capabilities: [],
     rawApprovalRecord: JSON.stringify(item || {}, null, 2),
     capabilityRows: summary
@@ -96,35 +108,61 @@ function buildNativeDecisionReviewModel(item) {
     scopeLabel: `${String(item?.tenantId || "-")}/${String(item?.projectId || "-")}`,
     traceabilityMetric: renderTraceabilityMetric(
       "1A. Decision Traceability",
-      [
-        { label: "source", value: String(item?.source || "native-session") },
-        { label: "thread", value: String(item?.taskId || "-") },
-        { label: "session", value: String(item?.sessionId || "-") },
-        { label: "recordStatus", value: status || "UNKNOWN", tone: actionable ? "ok" : "warn" }
-      ],
-      "Use these identifiers when reviewing the current thread from the Agent workspace.",
-      [
-        `createdAt=${formatTime(item?.createdAt)}`,
-        `${identifierLabel}=${identifierValue || "-"}`,
-        `reasonOptional=true; operatorDecisionSurface=agent-approval-review`
-      ]
+      isGatewayHold
+        ? [
+            { label: "source", value: String(item?.source || "gateway-hold") },
+            { label: "client", value: sourceClientLabel },
+            { label: "runId", value: runId || "-" },
+            { label: "recordStatus", value: status || "UNKNOWN", tone: actionable ? "ok" : "warn" }
+          ]
+        : [
+            { label: "source", value: String(item?.source || "native-session") },
+            { label: "thread", value: String(item?.taskId || "-") },
+            { label: "session", value: sessionId || "-" },
+            { label: "recordStatus", value: status || "UNKNOWN", tone: actionable ? "ok" : "warn" }
+          ],
+      isGatewayHold
+        ? "Use these identifiers when reviewing the interposed request that is paused in the local gateway path."
+        : "Use these identifiers when reviewing the current thread from the Agent workspace.",
+      isGatewayHold
+        ? [
+            `createdAt=${formatTime(createdAt)}`,
+            `approvalId=${identifierValue || "-"}`,
+            `interpositionRequestId=${String(item?.interpositionRequestId || "-")}`,
+            `gatewayRequestId=${String(item?.gatewayRequestId || "-")}`,
+            `reasonOptional=true; operatorDecisionSurface=companion-governance-review`
+          ]
+        : [
+            `createdAt=${formatTime(createdAt)}`,
+            `${identifierLabel}=${identifierValue || "-"}`,
+            `reasonOptional=true; operatorDecisionSurface=agent-approval-review`
+          ]
     ),
     guardrails: [
       actionable
-        ? "Decision controls are active because the current thread still has a pending governed decision."
+        ? isGatewayHold
+          ? "Decision controls are active because the interposed request is still held pending approval."
+          : "Decision controls are active because the current thread still has a pending governed decision."
         : `Decision controls are locked because status=${status || "UNKNOWN"}.`,
-      "Decision reason is optional here; if omitted, the review surface submits a default audit note showing the action came from the pinned Agent review.",
-      isProposal
-        ? "Confirm the proposal summary and command are appropriate before approval."
-        : "Confirm the checkpoint reason and scope match the current thread state before approval."
+      isGatewayHold
+        ? "Decision reason is optional here; if omitted, the review surface submits a default audit note showing the action came from the pinned Companion review."
+        : "Decision reason is optional here; if omitted, the review surface submits a default audit note showing the action came from the pinned Agent review.",
+      isGatewayHold
+        ? "Approving resumes the interposed upstream request path; denying closes the held request and preserves the audit chain."
+        : isProposal
+          ? "Confirm the proposal summary and command are appropriate before approval."
+          : "Confirm the checkpoint reason and scope match the current thread state before approval.",
+      isGatewayHold
+        ? "Review the source client, runId, approvalId, and held target before deciding so the release path matches the intended request."
+        : "Keep the pinned review aligned with the active native decision rather than switching to an unrelated queue item."
     ],
-    detailTitle: isProposal ? "Tool Proposal" : "Approval Checkpoint",
+    detailTitle: isGatewayHold ? "Interposed Request Hold" : isProposal ? "Tool Proposal" : "Approval Checkpoint",
     identifierLabel,
     identifierValue: identifierValue || "-",
     detailSummary: summary || "No decision summary captured.",
     selectionId: String(item?.selectionId || "").trim(),
     decisionType,
-    sessionId: String(item?.sessionId || "").trim(),
+    sessionId,
     proposalId: String(item?.proposalId || "").trim(),
     checkpointId: String(item?.checkpointId || "").trim(),
     hasInlineDecision: true
@@ -222,8 +260,15 @@ export function renderGovernanceApprovalReview(target, approval) {
         <div class="title focus-anchor" tabindex="-1" data-focus-anchor="approval-detail">Pinned Approval Review</div>
         <span class="${model.statusChip} chip-compact">status=${escapeHTML(model.status || "UNKNOWN")}</span>
         <span class="${escapeHTML(model.ttl.chipClass)}">${escapeHTML(`ttl=${model.ttl.label}`)}</span>
+        <span class="chip chip-neutral chip-compact">${escapeHTML(model.detailTitle || "Approval")}</span>
       </div>
-      <div class="meta metric-note">${escapeHTML(model.hasInlineDecision ? "Keep the selected current-thread decision pinned here and approve or deny directly from this review surface." : "Keep the selected approval pinned here and use run detail for the underlying record.")}</div>
+      <div class="meta metric-note">${escapeHTML(
+        model.hasInlineDecision
+          ? model.decisionType === "gateway_hold"
+            ? "Keep the selected interposed request hold pinned here and approve or deny directly from this review surface."
+            : "Keep the selected current-thread decision pinned here and approve or deny directly from this review surface."
+          : "Keep the selected approval pinned here and use run detail for the underlying record."
+      )}</div>
       <div class="run-detail-chips">
         <span class="chip chip-neutral chip-compact">${escapeHTML(model.runId ? "runId" : "thread")}=${escapeHTML(model.runId || model.approval?.taskId || "-")}</span>
         <span class="chip chip-neutral chip-compact">tenant=${escapeHTML(model.approval?.tenantId || "-")}</span>

@@ -5,7 +5,9 @@ import {
 } from "../../shared/utils/dom.js";
 
 const WORKSPACE_VIEW_ALIASES = {
-  home: "homeops",
+  home: "companionops",
+  homeops: "companionops",
+  companion: "companionops",
   agent: "agentops",
   chat: "agentops",
   approvals: "agentops",
@@ -13,6 +15,8 @@ const WORKSPACE_VIEW_ALIASES = {
   history: "runtimeops",
   runs: "runtimeops",
   incidents: "incidentops",
+  log: "logops",
+  logs: "logops",
   settings: "settingsops",
   developer: "developerops",
   operations: "developerops"
@@ -28,7 +32,7 @@ function normalizeAllowedViewSet(viewIds) {
   const normalized = source
     .map((value) => String(value || "").trim().toLowerCase())
     .filter(Boolean);
-  return new Set(normalized.length > 0 ? normalized : ["homeops"]);
+  return new Set(normalized.length > 0 ? normalized : ["companionops"]);
 }
 
 function normalizeViewToken(value) {
@@ -36,7 +40,7 @@ function normalizeViewToken(value) {
   return WORKSPACE_VIEW_ALIASES[requested] || requested;
 }
 
-export function normalizeWorkspaceView(value, fallback = "homeops", viewIds = []) {
+export function normalizeWorkspaceView(value, fallback = "companionops", viewIds = []) {
   const allowedViews = normalizeAllowedViewSet(viewIds);
   const requested = normalizeViewToken(value);
   if (allowedViews.has(requested)) {
@@ -46,14 +50,14 @@ export function normalizeWorkspaceView(value, fallback = "homeops", viewIds = []
   if (allowedViews.has(fallbackView)) {
     return fallbackView;
   }
-  return allowedViews.values().next().value || "homeops";
+  return allowedViews.values().next().value || "companionops";
 }
 
 export function createWorkspaceLayoutController({ layout, viewIds }) {
   const allowedViews = normalizeAllowedViewSet(viewIds);
   let panels = [];
 
-  function normalizeView(value, fallback = "homeops") {
+  function normalizeView(value, fallback = "companionops") {
     return normalizeWorkspaceView(value, fallback, allowedViews);
   }
 
@@ -105,7 +109,7 @@ export function createWorkspaceLayoutController({ layout, viewIds }) {
   }
 
   function applyView(view, { tabs = [] } = {}) {
-    const selectedView = normalizeView(view, "homeops");
+    const selectedView = normalizeView(view, "companionops");
     if (layout instanceof HTMLElement) {
       layout.setAttribute("data-workspace-view", selectedView);
     }

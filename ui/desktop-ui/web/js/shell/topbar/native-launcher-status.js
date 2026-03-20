@@ -95,16 +95,45 @@ function describeGatewayServiceHealth(state) {
   }
 }
 
-function renderPathItem(label, value) {
-  if (!String(value || "").trim()) {
-    return "";
+function describeInterpositionStatus(state) {
+  switch (String(state || "").trim().toLowerCase()) {
+    case "on":
+      return "Interposition active";
+    case "warming":
+      return "Interposition warming";
+    case "blocked_mock_mode":
+      return "Live posture required";
+    case "blocked_upstream_config":
+      return "Upstream config required";
+    case "gateway_unavailable":
+      return "Gateway not ready";
+    case "off":
+    default:
+      return "Interposition off";
   }
-  return `
-    <div class="native-launcher-status-path">
-      <div class="label">${escapeHTML(label)}</div>
-      <code>${escapeHTML(String(value).trim())}</code>
-    </div>
-  `;
+}
+
+function describeInterpositionAuthMode(mode) {
+  switch (String(mode || "").trim().toLowerCase()) {
+    case "saved_token":
+      return "Saved token override";
+    case "client_passthrough":
+    default:
+      return "Codex/OpenAI credential passthrough";
+  }
+}
+
+function interpositionChipClass(state) {
+  switch (String(state || "").trim().toLowerCase()) {
+    case "on":
+      return "chip-success";
+    case "blocked_mock_mode":
+    case "blocked_upstream_config":
+    case "gateway_unavailable":
+      return "chip-danger";
+    default:
+      return "chip-neutral";
+  }
 }
 
 export function renderNativeLauncherStatus(shell = null) {
@@ -127,6 +156,21 @@ export function renderNativeLauncherStatus(shell = null) {
   const gatewayHealth = normalizeValue(gatewayService.health, "unknown").toLowerCase();
   const mode = normalizeValue(shell.mode, "unknown");
   const bootstrapState = normalizeValue(shell.bootstrapConfigState, "unknown");
+  const interposition = shell.interposition && typeof shell.interposition === "object"
+    ? shell.interposition
+    : {};
+  const interpositionEnabled = Boolean(interposition.enabled);
+  const interpositionStatus = normalizeValue(
+    interposition.status,
+    interpositionEnabled ? "warming" : "off"
+  ).toLowerCase();
+  const interpositionReason = String(interposition.reason || "").trim();
+  const interpositionBaseURL = String(interposition.upstreamBaseUrl || "https://api.openai.com/v1").trim();
+  const interpositionTokenConfigured = Boolean(interposition.upstreamBearerTokenConfigured);
+  const interpositionAuthMode = normalizeValue(
+    interposition.upstreamAuthMode,
+    interpositionTokenConfigured ? "saved_token" : "client_passthrough"
+  ).toLowerCase();
   const startupError = String(shell.startupError || "").trim();
   const copy = startupError
     ? "The native launcher opened in a degraded state. Review the diagnostics below before retrying the live path."
@@ -145,6 +189,7 @@ export function renderNativeLauncherStatus(shell = null) {
       <span class="chip chip-neutral chip-compact">${escapeHTML(describeRuntimeServiceHealth(serviceHealth))}</span>
       <span class="chip chip-compact ${gatewayState === "running" ? "chip-success" : gatewayState === "failed" || gatewayState === "degraded" ? "chip-danger" : "chip-neutral"}">${escapeHTML(describeGatewayServiceState(gatewayState))}</span>
       <span class="chip chip-neutral chip-compact">${escapeHTML(describeGatewayServiceHealth(gatewayHealth))}</span>
+      <span class="chip chip-neutral chip-compact">${escapeHTML(describeInterpositionAuthMode(interpositionAuthMode))}</span>
     </div>
     <div class="native-launcher-status-copy">${escapeHTML(copy)}</div>
     ${
@@ -152,21 +197,99 @@ export function renderNativeLauncherStatus(shell = null) {
         ? `<div class="native-launcher-status-error"><strong>Startup error:</strong> ${escapeHTML(startupError)}</div>`
         : ""
     }
-    <div class="native-launcher-status-paths">
-      ${renderPathItem("Bootstrap Config", shell.bootstrapConfigPath)}
-      ${renderPathItem("Session Manifest", shell.sessionManifestPath)}
-      ${renderPathItem("Event Log", shell.eventLogPath)}
-      ${renderPathItem("UI Log", shell.uiLogPath)}
-      ${renderPathItem("Runtime Log", shell.runtimeLogPath)}
-      ${renderPathItem("Service Status", runtimeService.statusPath || shell.serviceStatusPath)}
-      ${renderPathItem("Service PID", runtimeService.pidPath || shell.servicePidPath)}
-      ${renderPathItem("Service Log", runtimeService.logPath || shell.serviceLogPath)}
-      ${renderPathItem("Gateway Status", gatewayService.statusPath || shell.gatewayStatusPath)}
-      ${renderPathItem("Gateway PID", gatewayService.pidPath || shell.gatewayPidPath)}
-      ${renderPathItem("Gateway Log", gatewayService.logPath || shell.gatewayLogPath)}
-      ${renderPathItem("Gateway Token", gatewayService.tokenPath || shell.gatewayTokenPath)}
-      ${renderPathItem("Gateway Requests", gatewayService.requestsRoot || shell.gatewayRequestsRoot)}
-      ${renderPathItem("Crash Root", shell.crashDir)}
+    <div class="native-launcher-status-controls">
+      <div class="native-launcher-status-switch">
+        <div class="title">Interposition ON/OFF</div>
+        <div class="meta">Put Epydios directly between Codex and OpenAI only when you intentionally turn it on.</div>
+        <div class="native-launcher-status-switch-callout">
+          <div class="native-launcher-status-switch-row">
+            <span class="chip chip-compact ${interpositionEnabled ? "chip-success" : "chip-neutral"}">${escapeHTML(
+              interpositionEnabled ? "ON" : "OFF"
+            )}</span>
+            <span class="chip chip-compact ${interpositionChipClass(interpositionStatus)}">${escapeHTML(
+              describeInterpositionStatus(interpositionStatus)
+            )}</span>
+            <span class="chip chip-neutral chip-compact">${escapeHTML(describeInterpositionAuthMode(interpositionAuthMode))}</span>
+          </div>
+          <button
+            class="btn ${interpositionEnabled ? "btn-secondary" : "btn-primary"} btn-small"
+            type="button"
+            data-native-shell-action="toggle-interposition"
+            data-native-shell-next-enabled="${interpositionEnabled ? "false" : "true"}"
+          >${escapeHTML(interpositionEnabled ? "Turn Interposition OFF" : "Turn Interposition ON")}</button>
+        </div>
+        ${
+          interpositionReason
+            ? `<div class="meta native-launcher-status-hint">${escapeHTML(interpositionReason)}</div>`
+            : ""
+        }
+      </div>
+      <form class="native-launcher-status-config" data-native-shell-form="interposition-config">
+        <label class="field">
+          <span class="label">Upstream Base URL</span>
+          <input
+            class="filter-input"
+            type="url"
+            value="${escapeHTML(interpositionBaseURL)}"
+            placeholder="https://api.openai.com/v1"
+            data-native-shell-field="interposition-upstream-base-url"
+            spellcheck="false"
+            autocomplete="off"
+          />
+        </label>
+        <fieldset class="native-launcher-status-auth-options">
+          <legend class="label">Upstream Auth</legend>
+          <label class="native-launcher-status-auth-option">
+            <input
+              type="radio"
+              name="native-interposition-auth-mode"
+              value="client_passthrough"
+              data-native-shell-field="interposition-auth-mode"
+              ${interpositionAuthMode === "client_passthrough" ? "checked" : ""}
+            />
+            <span>Use Codex/OpenAI credentials already present in the client request</span>
+          </label>
+          <label class="native-launcher-status-auth-option">
+            <input
+              type="radio"
+              name="native-interposition-auth-mode"
+              value="saved_token"
+              data-native-shell-field="interposition-auth-mode"
+              ${interpositionAuthMode === "saved_token" ? "checked" : ""}
+            />
+            <span>Use a saved upstream bearer token override</span>
+          </label>
+        </fieldset>
+        <label class="field">
+          <span class="label">Upstream Bearer Token</span>
+          <input
+            class="filter-input"
+            type="password"
+            value=""
+            placeholder="${escapeHTML(
+              interpositionAuthMode === "saved_token"
+                ? interpositionTokenConfigured
+                  ? "Saved token is configured. Enter a new token to replace it."
+                  : "Paste upstream bearer token"
+                : "Client passthrough mode uses the Authorization already present in compatible Codex requests."
+            )}"
+            data-native-shell-field="interposition-upstream-bearer-token"
+            ${interpositionAuthMode === "saved_token" ? "" : "disabled"}
+            spellcheck="false"
+            autocomplete="off"
+          />
+        </label>
+        <div class="native-launcher-status-actions">
+          <div class="meta native-launcher-status-hint" data-native-shell-field="interposition-auth-hint">${
+            escapeHTML(
+              interpositionAuthMode === "saved_token"
+                ? "Save a dedicated upstream token here when you want Epydios to override Codex credentials for the OpenAI upstream."
+                : "Leave saved-token mode off to forward the Authorization already present in compatible Codex/OpenAI client requests."
+            )
+          }</div>
+          <button class="btn btn-secondary btn-small" type="submit" data-native-shell-action="save-interposition-config">Save Upstream Config</button>
+        </div>
+      </form>
     </div>
   `;
 }

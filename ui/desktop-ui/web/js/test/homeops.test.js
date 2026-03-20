@@ -2,9 +2,25 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { renderHomeOpsEmptyState, renderHomeOpsPage } from "../domains/homeops/routes.js";
 
-test("homeops page renders command dashboard, attention queue, and domain pivot row", () => {
+test("companionops page renders companion status, attention, recent governed actions, and exact workbench handoffs", () => {
   const ui = { homeOpsContent: { innerHTML: "" } };
   renderHomeOpsPage(ui, {
+    nativeShell: {
+      launcherState: "ready",
+      mode: "live",
+      runtimeState: "service_running",
+      runtimeProcessMode: "background_supervisor",
+      bootstrapConfigState: "loaded",
+      runtimeService: {
+        state: "running",
+        health: "healthy"
+      },
+      gatewayService: {
+        state: "running",
+        health: "healthy"
+      }
+    },
+    selectedAgentProfileId: "codex",
     session: {
       authenticated: true,
       claims: {
@@ -80,6 +96,7 @@ test("homeops page renders command dashboard, attention queue, and domain pivot 
         {
           approvalId: "approval-20260315-003",
           status: "PENDING",
+          runId: "run-20260315-003",
           expiresAt: "2026-03-15T16:24:00Z"
         },
         {
@@ -88,6 +105,31 @@ test("homeops page renders command dashboard, attention queue, and domain pivot 
         }
       ]
     },
+    nativeGatewayHolds: [
+      {
+        interpositionRequestId: "ixr-20260315-003",
+        gatewayRequestId: "gateway-20260315-003",
+        runId: "run-20260315-003",
+        approvalId: "approval-20260315-003",
+        state: "held_pending_approval",
+        holdStartedAtUtc: "2026-03-15T16:19:00Z",
+        holdDeadlineAtUtc: "2026-03-15T16:24:00Z",
+        clientSurface: "codex",
+        sourceClient: {
+          id: "client-codex",
+          name: "Codex"
+        },
+        tenantId: "tenant-demo",
+        projectId: "project-core",
+        requestSummary: {
+          title: "Restart payments deployment",
+          reason: "Policy deferred the request."
+        },
+        governanceTarget: {
+          targetRef: "deploy/payments"
+        }
+      }
+    ],
     audit: {
       source: "audit-endpoint",
       items: [
@@ -111,51 +153,42 @@ test("homeops page renders command dashboard, attention queue, and domain pivot 
     }
   });
 
-  assert.match(ui.homeOpsContent.innerHTML, /data-domain-root="homeops"/);
-  assert.match(ui.homeOpsContent.innerHTML, /Command Dashboard/);
-  assert.match(ui.homeOpsContent.innerHTML, /AIMXS Posture And Readiness/);
+  assert.match(ui.homeOpsContent.innerHTML, /data-domain-root="companionops"/);
+  assert.match(ui.homeOpsContent.innerHTML, /Mode And System Status/);
   assert.match(ui.homeOpsContent.innerHTML, /Attention Queue/);
-  assert.match(ui.homeOpsContent.innerHTML, /Identity And Scope Snapshot/);
-  assert.match(ui.homeOpsContent.innerHTML, /Domain Pivot Row/);
-  assert.match(ui.homeOpsContent.innerHTML, /RuntimeOps/);
-  assert.match(ui.homeOpsContent.innerHTML, /PlatformOps/);
-  assert.match(ui.homeOpsContent.innerHTML, /PolicyOps/);
-  assert.match(ui.homeOpsContent.innerHTML, /GovernanceOps/);
-  assert.match(ui.homeOpsContent.innerHTML, /IncidentOps/);
-  assert.match(ui.homeOpsContent.innerHTML, /2 runs/);
-  assert.match(ui.homeOpsContent.innerHTML, /2\/3 ready/);
-  assert.match(ui.homeOpsContent.innerHTML, /aimxs-policy-primary/);
-  assert.match(ui.homeOpsContent.innerHTML, /mode=aimxs-full/);
-  assert.match(ui.homeOpsContent.innerHTML, /incident-bound/);
-  assert.match(ui.homeOpsContent.innerHTML, /Next Truthful Action/);
-  assert.match(ui.homeOpsContent.innerHTML, /Open IncidentOps/);
-  assert.match(ui.homeOpsContent.innerHTML, /blocked=1/);
-  assert.match(ui.homeOpsContent.innerHTML, /1 pending/);
-  assert.match(ui.homeOpsContent.innerHTML, /1 active/);
-  assert.match(ui.homeOpsContent.innerHTML, /Pending approvals/);
+  assert.match(ui.homeOpsContent.innerHTML, /Recent Governed Actions/);
+  assert.match(ui.homeOpsContent.innerHTML, /Quick Actions/);
+  assert.match(ui.homeOpsContent.innerHTML, /Connected Client Context/);
+  assert.match(ui.homeOpsContent.innerHTML, /Companion/);
+  assert.match(ui.homeOpsContent.innerHTML, /Launcher/);
+  assert.match(ui.homeOpsContent.innerHTML, /Runtime Service/);
+  assert.match(ui.homeOpsContent.innerHTML, /Gateway/);
+  assert.match(ui.homeOpsContent.innerHTML, /Open Workbench/);
+  assert.match(ui.homeOpsContent.innerHTML, /Restart Services/);
+  assert.match(ui.homeOpsContent.innerHTML, /Show Diagnostics/);
+  assert.match(ui.homeOpsContent.innerHTML, /Interposed approval required/);
   assert.match(ui.homeOpsContent.innerHTML, /Runs requiring attention/);
-  assert.match(ui.homeOpsContent.innerHTML, /Audit denies/);
+  assert.match(ui.homeOpsContent.innerHTML, /Incident escalation pending/);
+  assert.match(ui.homeOpsContent.innerHTML, /Open Approval/);
+  assert.match(ui.homeOpsContent.innerHTML, /Open Run/);
   assert.match(ui.homeOpsContent.innerHTML, /operator@example\.com/);
+  assert.match(ui.homeOpsContent.innerHTML, /epydios-runtime-prod-client/);
+  assert.match(ui.homeOpsContent.innerHTML, /codex/);
   assert.match(ui.homeOpsContent.innerHTML, /tenant-demo\/project-core/);
-  assert.match(ui.homeOpsContent.innerHTML, /Runtime Context Identity/);
-  assert.match(ui.homeOpsContent.innerHTML, /2 roles/);
   assert.match(ui.homeOpsContent.innerHTML, /Open Approval Queue/);
-  assert.match(ui.homeOpsContent.innerHTML, /Open IdentityOps/);
-  assert.match(ui.homeOpsContent.innerHTML, /data-homeops-view="agentops"/);
-  assert.match(ui.homeOpsContent.innerHTML, /data-homeops-view="identityops"/);
-  assert.match(ui.homeOpsContent.innerHTML, /data-homeops-view="runtimeops"/);
-  assert.match(ui.homeOpsContent.innerHTML, /data-homeops-view="auditops"/);
-  assert.doesNotMatch(ui.homeOpsContent.innerHTML, /Terminal Issues/);
-  assert.doesNotMatch(ui.homeOpsContent.innerHTML, /Auth summary/);
+  assert.match(ui.homeOpsContent.innerHTML, /Open Recent Runs/);
+  assert.match(ui.homeOpsContent.innerHTML, /data-homeops-action="open-workbench"/);
+  assert.match(ui.homeOpsContent.innerHTML, /data-homeops-action="open-approval-item"/);
+  assert.match(ui.homeOpsContent.innerHTML, /data-homeops-action="open-run-item"/);
 });
 
 test("homeops empty state renders without loaded domain anchors", () => {
   const ui = { homeOpsContent: { innerHTML: "" } };
   renderHomeOpsEmptyState(ui, {
-    title: "HomeOps",
-    message: "HomeOps command posture becomes available after domain anchors load."
+    title: "CompanionOps",
+    message: "CompanionOps becomes available after domain anchors load."
   });
 
-  assert.match(ui.homeOpsContent.innerHTML, /HomeOps/);
+  assert.match(ui.homeOpsContent.innerHTML, /CompanionOps/);
   assert.match(ui.homeOpsContent.innerHTML, /domain anchors load/i);
 });

@@ -33,10 +33,17 @@
   gap: var(--space-3);
 }
 
+.homeops-recent-action-list {
+  display: grid;
+  gap: var(--space-3);
+}
+
 .homeops-command-card,
 .homeops-aimxs-card,
 .homeops-attention-card,
-.homeops-summary-card {
+.homeops-summary-card,
+.homeops-status-card,
+.homeops-recent-action-card {
   display: grid;
   gap: var(--space-2);
 }
@@ -44,7 +51,8 @@
 .homeops-command-value,
 .homeops-aimxs-value,
 .homeops-attention-value,
-.homeops-summary-value {
+.homeops-summary-value,
+.homeops-status-value {
   font-family: var(--font-family-display);
   font-size: 1.8rem;
   font-weight: 700;
@@ -68,6 +76,51 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
+}
+
+.homeops-feedback {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-2);
+  border: 1px solid var(--line);
+  font-size: var(--font-size-sm);
+}
+
+.homeops-feedback.ok {
+  background: color-mix(in srgb, var(--chip-ok-bg) 80%, var(--surface));
+  border-color: var(--chip-ok-line);
+}
+
+.homeops-feedback.warn {
+  background: color-mix(in srgb, var(--chip-warn-bg) 80%, var(--surface));
+  border-color: var(--chip-warn-line);
+}
+
+.homeops-feedback.error,
+.homeops-feedback.danger {
+  background: color-mix(in srgb, var(--chip-danger-bg) 80%, var(--surface));
+  border-color: var(--chip-danger-line);
+}
+
+.homeops-recent-action-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-2);
+  align-items: flex-start;
+}
+
+.homeops-recent-action-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-2);
+}
+
+.homeops-empty {
+  padding: var(--space-3);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-2);
+  color: var(--ink-soft);
+  background: color-mix(in srgb, var(--surface) 84%, transparent);
 }
 
 .homeops-pivot-grid {

@@ -4,6 +4,8 @@ package main
 
 import (
 	"context"
+	"path/filepath"
+	"strings"
 
 	"github.com/Epydios/Epydios-AgentOps-Control-Plane/ui/desktop-ui/internal/nativeapp"
 )
@@ -46,6 +48,10 @@ func (a *App) shutdown(ctx context.Context) {
 
 func (a *App) NativeSessionSummary() nativeapp.SessionManifest {
 	return a.session.Manifest
+}
+
+func (a *App) NativeOpenPath(path string) error {
+	return nativeapp.OpenPath(a.session.Manifest, path)
 }
 
 func (a *App) NativeRuntimeServiceSummary() nativeapp.RuntimeServiceRecord {
@@ -194,4 +200,80 @@ func (a *App) NativeGatewayServiceRestart() nativeapp.GatewayServiceRecord {
 		"health": record.Health,
 	})
 	return record
+}
+
+func (a *App) NativeInterpositionConfigure(enabled bool, upstreamBaseURL string, upstreamBearerToken string) error {
+	if err := a.session.UpdateInterpositionConfig(enabled, upstreamBaseURL, upstreamBearerToken); err != nil {
+		_ = a.session.RecordEvent("interposition_config_update_failed", map[string]any{
+			"error":   err.Error(),
+			"enabled": enabled,
+		})
+		return err
+	}
+	opts := a.session.LaunchOptions()
+	if opts.Mode == "live" {
+		if _, err := nativeapp.EnsureRuntimeService(opts, a.session); err != nil {
+			_ = a.session.RecordEvent("interposition_runtime_dependency_failed", map[string]any{
+				"error":   err.Error(),
+				"enabled": enabled,
+			})
+			_ = a.session.RecordStartupFailure(a.session.Manifest.RuntimeState, err)
+			return err
+		}
+		if _, err := nativeapp.RestartGatewayService(opts, a.session); err != nil {
+			_ = a.session.RecordEvent("interposition_gateway_restart_failed", map[string]any{
+				"error":   err.Error(),
+				"enabled": enabled,
+			})
+			_ = a.session.RecordStartupFailure(a.session.Manifest.RuntimeState, err)
+			return err
+		}
+	}
+	_ = a.session.UpdateLauncherState("ready")
+	_ = a.session.RecordEvent("interposition_config_updated", map[string]any{
+		"enabled":                       enabled,
+		"upstreamBaseUrl":               a.session.LaunchOptions().InterpositionUpstreamBaseURL,
+		"upstreamBearerTokenConfigured": strings.TrimSpace(a.session.LaunchOptions().InterpositionUpstreamBearerToken) != "",
+	})
+	return nil
+}
+
+func (a *App) NativeGatewayHoldList() []nativeapp.GatewayHoldRecord {
+	items, err := nativeapp.ListGatewayHoldRecords(nativeappGatewayHoldsRoot(a.session))
+	if err != nil {
+		_ = a.session.RecordEvent("gateway_hold_list_failed", map[string]any{"error": err.Error()})
+		return []nativeapp.GatewayHoldRecord{}
+	}
+	return items
+}
+
+func (a *App) NativeGatewayHoldResolve(interpositionRequestID string, decision string, reason string) nativeapp.GatewayHoldRecord {
+	record, err := nativeapp.ResolveGatewayHoldRecord(
+		nativeappGatewayHoldsRoot(a.session),
+		a.session.Manifest.Paths.GatewayRequestsRoot,
+		interpositionRequestID,
+		decision,
+		reason,
+	)
+	if err != nil {
+		_ = a.session.RecordEvent("gateway_hold_resolve_failed", map[string]any{
+			"error":                  err.Error(),
+			"interpositionRequestId": interpositionRequestID,
+			"decision":               decision,
+		})
+		return nativeapp.GatewayHoldRecord{}
+	}
+	_ = a.session.RecordEvent("gateway_hold_resolved", map[string]any{
+		"interpositionRequestId": interpositionRequestID,
+		"gatewayRequestId":       record.GatewayRequestID,
+		"runId":                  record.RunID,
+		"approvalId":             record.ApprovalID,
+		"decision":               record.Decision,
+		"state":                  record.State,
+	})
+	return record
+}
+
+func nativeappGatewayHoldsRoot(session *nativeapp.Session) string {
+	return filepath.Join(session.Manifest.Paths.GatewayRoot, "holds")
 }

@@ -1,0 +1,81 @@
+.logops-workspace {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.logops-board {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.logops-board-header {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.logops-board-lead {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: var(--font-size-sm);
+}
+
+.logops-feedback,
+.logops-startup-error,
+.logops-empty {
+  padding: var(--space-3);
+  border-radius: var(--radius-2);
+  border: 1px solid color-mix(in srgb, var(--line) 88%, var(--surface));
+  background: color-mix(in srgb, var(--surface) 88%, var(--panel));
+}
+
+.logops-feedback.ok {
+  border-color: color-mix(in srgb, var(--ok) 32%, var(--line));
+  background: color-mix(in srgb, var(--chip-ok-bg) 75%, var(--surface));
+}
+
+.logops-feedback.warn,
+.logops-startup-error {
+  border-color: color-mix(in srgb, var(--warn) 32%, var(--line));
+  background: color-mix(in srgb, var(--chip-warn-bg) 75%, var(--surface));
+}
+
+.logops-feedback.error {
+  border-color: color-mix(in srgb, var(--danger) 32%, var(--line));
+  background: color-mix(in srgb, var(--chip-danger-bg) 75%, var(--surface));
+}
+
+.logops-summary-grid {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+}
+
+.logops-summary-card {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.logops-summary-value {
+  font-family: var(--font-family-display);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.logops-table-shell {
+  overflow-x: auto;
+}
+
+.logops-table {
+  width: 100%;
+}
+
+.logops-table code {
+  display: block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  font-size: 0.76rem;
+}
+
+.logops-action-cell {
+  white-space: nowrap;
+}

@@ -71,11 +71,12 @@ EOF
   cp "${M15_MODULE_ROOT}/web/assets/epydios-logo.png" "${ICON_PATH}"
   cat > "${BOOTSTRAP_PATH}" <<EOF
 {
-  "mode": "${M15_LINUX_BETA_MODE:-mock}",
+  "mode": "${M15_LINUX_BETA_MODE:-live}",
   "runtimeLocalPort": ${M15_LINUX_RUNTIME_PORT:-8080},
   "gatewayLocalPort": ${M15_LINUX_GATEWAY_PORT:-18765},
   "runtimeNamespace": "${M15_LINUX_RUNTIME_NAMESPACE:-epydios-system}",
-  "runtimeService": "${M15_LINUX_RUNTIME_SERVICE:-orchestration-runtime}"
+  "runtimeService": "${M15_LINUX_RUNTIME_SERVICE:-orchestration-runtime}",
+  "interpositionEnabled": false
 }
 EOF
   cat > "${LAUNCH_HELPER_PATH}" <<EOF

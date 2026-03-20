@@ -92,7 +92,7 @@ export function renderGovernanceApprovalSummary(
     return Number.isFinite(deltaMs) && deltaMs > 0 && deltaMs <= 15 * 60 * 1000;
   }).length;
   const approvalStateSummary = nativeItems.length > 0
-    ? "Resolve current-thread decisions first so active Agent work does not drift away from the governing prompt."
+    ? "Resolve pinned native decisions first so active thread work and interposed gateway holds do not drift away from the governing path."
     : pendingCount > 0
       ? "Current thread is clear, but approval-queue items still need review in the active scope."
       : "No pending approvals remain in the current scope.";
@@ -122,13 +122,27 @@ export function renderGovernanceApprovalSummary(
       const status = String(item?.status || "PENDING").trim().toUpperCase();
       const selectionId = String(item?.selectionId || "").trim();
       const isSelected = selectedRunId && selectionId === selectedRunId;
-      const title = item?.decisionType === "proposal" ? "Current Thread Proposal" : "Current Thread Approval";
-      const identifier = item?.decisionType === "proposal"
-        ? String(item?.proposalId || "-")
-        : String(item?.checkpointId || "-");
-      const secondary = item?.decisionType === "proposal"
-        ? String(item?.summary || "No proposal summary captured.")
-        : String(item?.reason || item?.summary || "No checkpoint reason captured.");
+      const isGatewayHold = String(item?.decisionType || "").trim().toLowerCase() === "gateway_hold";
+      const title = isGatewayHold
+        ? "Interposed Request Hold"
+        : item?.decisionType === "proposal"
+          ? "Current Thread Proposal"
+          : "Current Thread Approval";
+      const identifier = isGatewayHold
+        ? String(item?.approvalId || "-")
+        : item?.decisionType === "proposal"
+          ? String(item?.proposalId || "-")
+          : String(item?.checkpointId || "-");
+      const secondary = isGatewayHold
+        ? String(
+            item?.summary ||
+            item?.reason ||
+            item?.governanceTarget?.targetRef ||
+            "No interposed request summary captured."
+          )
+        : item?.decisionType === "proposal"
+          ? String(item?.summary || "No proposal summary captured.")
+          : String(item?.reason || item?.summary || "No checkpoint reason captured.");
       return `
         <article class="agent-approval-card ${isSelected ? "is-selected" : ""}">
           <div class="metric-title-row">
@@ -137,9 +151,17 @@ export function renderGovernanceApprovalSummary(
           </div>
           <div class="meta">${escapeHTML(String(item?.tenantId || "-"))} / ${escapeHTML(String(item?.projectId || "-"))}</div>
           <div class="run-detail-chips">
-            <span class="chip chip-neutral chip-compact">thread=${escapeHTML(String(item?.taskId || "-"))}</span>
-            <span class="chip chip-neutral chip-compact">session=${escapeHTML(String(item?.sessionId || "-"))}</span>
-            <span class="chip chip-neutral chip-compact">${escapeHTML(item?.decisionType === "proposal" ? "proposal" : "checkpoint")}=${escapeHTML(identifier)}</span>
+            <span class="chip chip-neutral chip-compact">${escapeHTML(isGatewayHold ? "client" : "thread")}=${escapeHTML(
+              isGatewayHold
+                ? String(item?.sourceClient?.name || item?.sourceClient?.id || item?.clientLabel || "-")
+                : String(item?.taskId || "-")
+            )}</span>
+            <span class="chip chip-neutral chip-compact">${escapeHTML(isGatewayHold ? "runId" : "session")}=${escapeHTML(
+              isGatewayHold ? String(item?.runId || "-") : String(item?.sessionId || "-")
+            )}</span>
+            <span class="chip chip-neutral chip-compact">${escapeHTML(
+              isGatewayHold ? "approvalId" : item?.decisionType === "proposal" ? "proposal" : "checkpoint"
+            )}=${escapeHTML(identifier)}</span>
           </div>
           <div class="meta">${escapeHTML(secondary)}</div>
           <div class="approval-actions action-hierarchy">
@@ -161,10 +183,10 @@ export function renderGovernanceApprovalSummary(
     ? `
       <div class="metric">
         <div class="metric-title-row">
-          <div class="title">Current Thread Decisions</div>
+          <div class="title">Pinned Native Decisions</div>
           <span class="chip chip-danger chip-compact">pending=${escapeHTML(String(nativeItems.length))}</span>
         </div>
-        <div class="meta">These governed decisions come from the active native chat thread and stay surfaced in the Agent workspace.</div>
+        <div class="meta">These governed decisions include active thread checkpoints and interposed gateway holds, all pinned into the same review surface.</div>
         <div class="agent-approval-list">${nativeCards}</div>
       </div>
     `

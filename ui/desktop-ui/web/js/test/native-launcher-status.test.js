@@ -25,6 +25,15 @@ test("native launcher status renders ready mock launcher details", () => {
       tokenPath: "/Users/demo/Library/Application Support/EpydiosAgentOpsDesktop/localhost-gateway/gateway-token",
       requestsRoot: "/Users/demo/Library/Application Support/EpydiosAgentOpsDesktop/localhost-gateway/requests"
     },
+    interposition: {
+      enabled: false,
+      effective: false,
+      status: "off",
+      reason: "Interposition is disabled. Codex-compatible requests will not enter the local governance path.",
+      upstreamBaseUrl: "",
+      upstreamBearerTokenConfigured: false,
+      upstreamAuthMode: "client_passthrough"
+    },
     bootstrapConfigState: "loaded",
     bootstrapConfigPath: "/Users/demo/Library/Application Support/EpydiosAgentOpsDesktop/runtime-bootstrap.json",
     sessionManifestPath: "/Users/demo/Library/Caches/EpydiosAgentOpsDesktop/native-shell/session.json",
@@ -40,13 +49,17 @@ test("native launcher status renders ready mock launcher details", () => {
   assert.match(html, /runtime=mock_active/);
   assert.match(html, /process=mock_only/);
   assert.match(html, /Bootstrap config loaded/);
-  assert.match(html, /Session Manifest/);
-  assert.match(html, /Runtime Log/);
   assert.match(html, /Background service not required/);
-  assert.match(html, /Service Status/);
   assert.match(html, /Gateway stopped/);
-  assert.match(html, /Gateway Status/);
-  assert.match(html, /Gateway Token/);
+  assert.match(html, /Interposition off/);
+  assert.match(html, /Codex\/OpenAI credential passthrough/);
+  assert.match(html, /Turn Interposition ON/);
+  assert.match(html, /Upstream Base URL/);
+  assert.match(html, /Upstream Auth/);
+  assert.match(html, /Use Codex\/OpenAI credentials already present in the client request/);
+  assert.match(html, /https:\/\/api\.openai\.com\/v1/);
+  assert.doesNotMatch(html, /Session Manifest/);
+  assert.doesNotMatch(html, /Gateway Token/);
 });
 
 test("native launcher status renders degraded launcher failure details", () => {
@@ -71,6 +84,15 @@ test("native launcher status renders degraded launcher failure details", () => {
       tokenPath: "/Users/demo/Library/Application Support/EpydiosAgentOpsDesktop/localhost-gateway/gateway-token",
       requestsRoot: "/Users/demo/Library/Application Support/EpydiosAgentOpsDesktop/localhost-gateway/requests"
     },
+    interposition: {
+      enabled: true,
+      effective: false,
+      status: "gateway_unavailable",
+      reason: "Interposition is enabled with a saved upstream bearer token, but the local gateway is not ready yet.",
+      upstreamBaseUrl: "https://api.openai.com",
+      upstreamBearerTokenConfigured: true,
+      upstreamAuthMode: "saved_token"
+    },
     bootstrapConfigState: "loaded",
     bootstrapConfigPath: "/Users/demo/Library/Application Support/EpydiosAgentOpsDesktop/runtime-bootstrap.json",
     startupError: "runtime health endpoint did not become ready: http://127.0.0.1:8080/healthz",
@@ -90,4 +112,8 @@ test("native launcher status renders degraded launcher failure details", () => {
   assert.match(html, /health=unreachable/);
   assert.match(html, /Gateway degraded/);
   assert.match(html, /gateway=unreachable/);
+  assert.match(html, /Gateway not ready/);
+  assert.match(html, /Saved token override/);
+  assert.match(html, /Turn Interposition OFF/);
+  assert.match(html, /https:\/\/api\.openai\.com/);
 });

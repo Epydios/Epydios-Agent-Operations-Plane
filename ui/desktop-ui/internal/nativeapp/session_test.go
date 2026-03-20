@@ -141,6 +141,16 @@ func TestPrepareSessionPatchesMockConfigAndCreatesPaths(t *testing.T) {
 	if got := nativeShell["gatewayTokenPath"]; got != session.Manifest.Paths.GatewayTokenPath {
 		t.Fatalf("expected gatewayTokenPath to match manifest, got %#v", got)
 	}
+	interposition, ok := nativeShell["interposition"].(map[string]any)
+	if !ok {
+		t.Fatal("expected interposition block in nativeShell")
+	}
+	if got := interposition["enabled"]; got != false {
+		t.Fatalf("expected interposition.enabled=false, got %#v", got)
+	}
+	if got := interposition["status"]; got != "off" {
+		t.Fatalf("expected interposition.status=off, got %#v", got)
+	}
 }
 
 func TestPrepareSessionDisablesAuthForLiveMode(t *testing.T) {
@@ -246,8 +256,11 @@ func TestParseLaunchOptionsUsesBootstrapDefaultsAndAllowsCliOverride(t *testing.
 	if opts.RuntimeService != "runtime-beta" {
 		t.Fatalf("expected bootstrap service runtime-beta, got %q", opts.RuntimeService)
 	}
+	if opts.InterpositionEnabled {
+		t.Fatal("expected interposition disabled when not present in bootstrap config")
+	}
 
-	overridden, err := ParseLaunchOptions([]string{"--mode", "mock", "--runtime-port", "19090", "--gateway-port", "19091"})
+	overridden, err := ParseLaunchOptions([]string{"--mode", "mock", "--runtime-port", "19090", "--gateway-port", "19091", "--interposition-enabled"})
 	if err != nil {
 		t.Fatalf("parse launch options with cli overrides: %v", err)
 	}
@@ -262,6 +275,211 @@ func TestParseLaunchOptionsUsesBootstrapDefaultsAndAllowsCliOverride(t *testing.
 	}
 	if overridden.RuntimeNamespace != "epydios-beta" {
 		t.Fatalf("expected bootstrap namespace to remain when not overridden, got %q", overridden.RuntimeNamespace)
+	}
+	if !overridden.InterpositionEnabled {
+		t.Fatal("expected CLI flag to enable interposition")
+	}
+
+	finderLaunched, err := ParseLaunchOptions([]string{"-psn_0_12345", "--mode", "mock"})
+	if err != nil {
+		t.Fatalf("parse launch options with Finder psn token: %v", err)
+	}
+	if finderLaunched.Mode != modeMock {
+		t.Fatalf("expected Finder-launched parse to preserve CLI mode mock, got %q", finderLaunched.Mode)
+	}
+}
+
+func TestParseLaunchOptionsAppliesEnvironmentInterpositionOverrides(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tempHome, ".config"))
+
+	defaults := DefaultLaunchOptions()
+	if defaults.BootstrapConfigPath == "" {
+		t.Fatal("expected bootstrap config path to resolve")
+	}
+	if err := os.MkdirAll(filepath.Dir(defaults.BootstrapConfigPath), 0o755); err != nil {
+		t.Fatalf("create bootstrap dir: %v", err)
+	}
+	if err := os.WriteFile(defaults.BootstrapConfigPath, []byte(`{
+  "mode": "live",
+  "interpositionEnabled": false,
+  "interpositionUpstreamBaseUrl": "https://bootstrap.example.com",
+  "interpositionUpstreamBearerToken": "bootstrap-token"
+}`), 0o644); err != nil {
+		t.Fatalf("write bootstrap config: %v", err)
+	}
+
+	t.Setenv("EPYDIOS_NATIVEAPP_INTERPOSITION_ENABLED", "true")
+	t.Setenv("EPYDIOS_NATIVEAPP_INTERPOSITION_UPSTREAM_BASE_URL", "https://env.example.com")
+	t.Setenv("EPYDIOS_NATIVEAPP_INTERPOSITION_UPSTREAM_BEARER_TOKEN", "env-token")
+
+	opts, err := ParseLaunchOptions(nil)
+	if err != nil {
+		t.Fatalf("parse launch options with env overrides: %v", err)
+	}
+	if !opts.InterpositionEnabled {
+		t.Fatal("expected environment override to enable interposition")
+	}
+	if opts.InterpositionUpstreamBaseURL != "https://env.example.com" {
+		t.Fatalf("expected environment upstream base URL, got %q", opts.InterpositionUpstreamBaseURL)
+	}
+	if opts.InterpositionUpstreamBearerToken != "env-token" {
+		t.Fatalf("expected environment upstream bearer token, got %q", opts.InterpositionUpstreamBearerToken)
+	}
+}
+
+func TestUpdateInterpositionConfigPersistsBootstrapAndManifest(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(tempHome, ".cache"))
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tempHome, ".config"))
+
+	assets := fstest.MapFS{
+		"web/config/runtime-config.json": {
+			Data: []byte(`{
+  "environment": "local",
+  "mockMode": false,
+  "runtimeApiBaseUrl": "http://127.0.0.1:8080",
+  "registryApiBaseUrl": "http://127.0.0.1:8080",
+  "auth": {
+    "enabled": true
+  }
+}`),
+		},
+		"web/index.html": {Data: []byte("<html></html>")},
+	}
+
+	opts := DefaultLaunchOptions()
+	opts.Mode = modeLive
+	session, err := PrepareSession(assets, opts)
+	if err != nil {
+		t.Fatalf("prepare session: %v", err)
+	}
+	if err := session.UpdateInterpositionConfig(true, "https://api.openai.com", "token-123"); err != nil {
+		t.Fatalf("update interposition config: %v", err)
+	}
+
+	if !session.LaunchOptions().InterpositionEnabled {
+		t.Fatal("expected interposition enabled in launch options")
+	}
+	if session.Manifest.Interposition.Status != "gateway_unavailable" {
+		t.Fatalf("expected gateway_unavailable status before gateway start, got %q", session.Manifest.Interposition.Status)
+	}
+	if session.Manifest.BootstrapConfigState != bootstrapStateLoaded {
+		t.Fatalf("expected bootstrap config state loaded, got %q", session.Manifest.BootstrapConfigState)
+	}
+
+	payload, err := readBootstrapLaunchOptions(session.LaunchOptions().BootstrapConfigPath)
+	if err != nil {
+		t.Fatalf("read bootstrap payload: %v", err)
+	}
+	if payload.InterpositionEnabled == nil || !*payload.InterpositionEnabled {
+		t.Fatalf("expected persisted interpositionEnabled=true, got %#v", payload.InterpositionEnabled)
+	}
+	if payload.InterpositionUpstreamBaseURL != "https://api.openai.com" {
+		t.Fatalf("expected persisted upstream base URL, got %q", payload.InterpositionUpstreamBaseURL)
+	}
+	if payload.InterpositionUpstreamBearerToken != "token-123" {
+		t.Fatalf("expected persisted bearer token, got %q", payload.InterpositionUpstreamBearerToken)
+	}
+}
+
+func TestUpdateInterpositionConfigAllowsPassthroughModeWithoutSavedToken(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(tempHome, ".cache"))
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tempHome, ".config"))
+
+	assets := fstest.MapFS{
+		"web/config/runtime-config.json": {
+			Data: []byte(`{
+  "environment": "local",
+  "mockMode": false,
+  "runtimeApiBaseUrl": "http://127.0.0.1:8080",
+  "registryApiBaseUrl": "http://127.0.0.1:8080",
+  "auth": {
+    "enabled": true
+  }
+}`),
+		},
+		"web/index.html": {Data: []byte("<html></html>")},
+	}
+
+	opts := DefaultLaunchOptions()
+	opts.Mode = modeLive
+	session, err := PrepareSession(assets, opts)
+	if err != nil {
+		t.Fatalf("prepare session: %v", err)
+	}
+	if err := session.UpdateInterpositionConfig(true, "https://api.openai.com", ""); err != nil {
+		t.Fatalf("update interposition config: %v", err)
+	}
+
+	if session.Manifest.Interposition.Status != "gateway_unavailable" {
+		t.Fatalf("expected gateway_unavailable status before gateway start, got %q", session.Manifest.Interposition.Status)
+	}
+	if session.Manifest.Interposition.UpstreamAuthMode != "client_passthrough" {
+		t.Fatalf("upstream auth mode=%q want client_passthrough", session.Manifest.Interposition.UpstreamAuthMode)
+	}
+	if session.Manifest.Interposition.UpstreamBearerTokenConfigured {
+		t.Fatal("expected interposition manifest to report no saved upstream token")
+	}
+
+	payload, err := readBootstrapLaunchOptions(session.LaunchOptions().BootstrapConfigPath)
+	if err != nil {
+		t.Fatalf("read bootstrap payload: %v", err)
+	}
+	if payload.InterpositionUpstreamBearerToken != "" {
+		t.Fatalf("expected persisted upstream bearer token to remain empty, got %q", payload.InterpositionUpstreamBearerToken)
+	}
+}
+
+func TestUpdateInterpositionConfigCanClearSavedBearerToken(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(tempHome, ".cache"))
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tempHome, ".config"))
+
+	assets := fstest.MapFS{
+		"web/config/runtime-config.json": {
+			Data: []byte(`{
+  "environment": "local",
+  "mockMode": false,
+  "runtimeApiBaseUrl": "http://127.0.0.1:8080",
+  "registryApiBaseUrl": "http://127.0.0.1:8080",
+  "auth": {
+    "enabled": true
+  }
+}`),
+		},
+		"web/index.html": {Data: []byte("<html></html>")},
+	}
+
+	opts := DefaultLaunchOptions()
+	opts.Mode = modeLive
+	opts.InterpositionUpstreamBearerToken = "existing-token"
+	session, err := PrepareSession(assets, opts)
+	if err != nil {
+		t.Fatalf("prepare session: %v", err)
+	}
+	if err := session.UpdateInterpositionConfig(true, "https://api.openai.com", "__EPYDIOS_CLEAR_INTERPOSITION_BEARER__"); err != nil {
+		t.Fatalf("clear interposition config token: %v", err)
+	}
+
+	if session.Manifest.Interposition.UpstreamAuthMode != "client_passthrough" {
+		t.Fatalf("upstream auth mode=%q want client_passthrough", session.Manifest.Interposition.UpstreamAuthMode)
+	}
+	if session.Manifest.Interposition.UpstreamBearerTokenConfigured {
+		t.Fatal("expected saved upstream token to be cleared")
+	}
+
+	payload, err := readBootstrapLaunchOptions(session.LaunchOptions().BootstrapConfigPath)
+	if err != nil {
+		t.Fatalf("read bootstrap payload: %v", err)
+	}
+	if payload.InterpositionUpstreamBearerToken != "" {
+		t.Fatalf("expected persisted upstream bearer token to be cleared, got %q", payload.InterpositionUpstreamBearerToken)
 	}
 }
 
@@ -331,6 +549,13 @@ func TestSessionStateUpdatesRefreshRuntimeConfig(t *testing.T) {
 	}
 	if got := nativeShell["gatewayStatusPath"]; got != session.Manifest.Paths.GatewayStatusPath {
 		t.Fatalf("expected gatewayStatusPath to match manifest, got %#v", got)
+	}
+	interposition, ok := nativeShell["interposition"].(map[string]any)
+	if !ok {
+		t.Fatal("expected interposition block in runtime config")
+	}
+	if got := interposition["status"]; got != "off" {
+		t.Fatalf("expected interposition.status=off, got %#v", got)
 	}
 }
 

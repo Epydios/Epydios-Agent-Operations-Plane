@@ -29,8 +29,38 @@ test("governance summary module renders embedded approval state and current thre
   );
 
   assert.match(target.innerHTML, /Approval State/);
-  assert.match(target.innerHTML, /Current Thread Decisions/);
+  assert.match(target.innerHTML, /Pinned Native Decisions/);
   assert.match(target.innerHTML, /approval-org-admin-1/);
+});
+
+test("governance summary module renders interposed request holds alongside native approvals", () => {
+  const target = { innerHTML: "" };
+  renderGovernanceApprovalSummary(
+    target,
+    { items: [] },
+    [],
+    { items: [], page: 1, totalPages: 1, totalItems: 0 },
+    "native:hold:ixr-20260319-001",
+    [
+      {
+        selectionId: "native:hold:ixr-20260319-001",
+        decisionType: "gateway_hold",
+        tenantId: "tenant-demo",
+        projectId: "project-core",
+        runId: "run-20260319-001",
+        approvalId: "approval-20260319-001",
+        status: "PENDING",
+        sourceClient: { id: "client-codex", name: "Codex" },
+        summary: "Restart payments deployment",
+        governanceTarget: { targetRef: "deploy/payments" }
+      }
+    ]
+  );
+
+  assert.match(target.innerHTML, /Pinned Native Decisions/);
+  assert.match(target.innerHTML, /Interposed Request Hold/);
+  assert.match(target.innerHTML, /approval-20260319-001/);
+  assert.match(target.innerHTML, /Codex/);
 });
 
 test("approvals rail includes current thread decisions in the pending approvals section", () => {
@@ -75,7 +105,7 @@ test("approvals rail includes current thread decisions in the pending approvals 
   );
 
   assert.match(ui.approvalsContent.innerHTML, /Approval State/);
-  assert.match(ui.approvalsContent.innerHTML, /Current Thread Decisions/);
+  assert.match(ui.approvalsContent.innerHTML, /Pinned Native Decisions/);
   assert.match(ui.approvalsContent.innerHTML, /approval-org-admin-1/);
   assert.match(ui.approvalsContent.innerHTML, /Hide Review/);
 });
@@ -123,6 +153,33 @@ test("approval side panel renders native current-thread decisions inline", () =>
   assert.match(ui.approvalsDetailContent.innerHTML, /Pinned Approval Review/);
   assert.match(ui.approvalsDetailContent.innerHTML, /data-native-decision-action="APPROVE"/);
   assert.match(ui.approvalsDetailContent.innerHTML, /approval-org-admin-1/);
+});
+
+test("approval side panel renders interposed request holds inline", () => {
+  const ui = { approvalsDetailContent: { innerHTML: "", dataset: {} } };
+  renderApprovalsDetail(ui, {
+    selectionId: "native:hold:ixr-20260319-001",
+    decisionType: "gateway_hold",
+    interpositionRequestId: "ixr-20260319-001",
+    gatewayRequestId: "gateway-20260319-001",
+    runId: "run-20260319-001",
+    approvalId: "approval-20260319-001",
+    tenantId: "tenant-demo",
+    projectId: "project-core",
+    source: "gateway-hold",
+    sourceClient: { id: "client-codex", name: "Codex" },
+    clientSurface: "codex",
+    createdAt: "2026-03-19T05:00:00Z",
+    expiresAt: "2099-03-19T05:15:00Z",
+    status: "PENDING",
+    summary: "Restart payments deployment"
+  });
+
+  assert.equal(ui.approvalsDetailContent.dataset.selectedRunId, "run-20260319-001");
+  assert.match(ui.approvalsDetailContent.innerHTML, /Pinned Approval Review/);
+  assert.match(ui.approvalsDetailContent.innerHTML, /Interposed Request Hold/);
+  assert.match(ui.approvalsDetailContent.innerHTML, /approvalId=approval-20260319-001/);
+  assert.match(ui.approvalsDetailContent.innerHTML, /data-native-decision-action="APPROVE"/);
 });
 
 test("approval review modal renders explicit decision controls", () => {

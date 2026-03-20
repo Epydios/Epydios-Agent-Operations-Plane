@@ -25,11 +25,12 @@
     </header>
 
     <section id="native-launcher-status" class="native-launcher-status" hidden></section>
+    <section id="companion-handoff-banner" class="companion-handoff-banner" hidden></section>
 
     <div class="workspace-shell">
       <nav class="workspace-nav" data-shell-nav aria-label="Workspace sections" role="tablist" aria-orientation="vertical">
-        <button class="workspace-tab is-active" type="button" role="tab" aria-selected="true" data-workspace-tab="homeops">
-          HomeOps
+        <button class="workspace-tab is-active" type="button" role="tab" aria-selected="true" data-workspace-tab="companionops">
+          CompanionOps
         </button>
         <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="agentops">
           AgentOps
@@ -67,6 +68,9 @@
         <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="incidentops">
           IncidentOps
         </button>
+        <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="logops">
+          LogOps
+        </button>
         <div class="workspace-nav-spacer" aria-hidden="true"></div>
         <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="settingsops">
           SettingsOps
@@ -76,12 +80,12 @@
         </button>
       </nav>
 
-      <main id="workspace-layout" class="layout" data-shell-layout data-workspace-view="homeops">
-      <section class="panel panel-dashboard" data-workspace-section="homeops">
+      <main id="workspace-layout" class="layout" data-shell-layout data-workspace-view="companionops">
+      <section class="panel panel-dashboard" data-workspace-section="companionops">
         <div class="panel-header">
           <div class="panel-heading">
-            <h2>HomeOps</h2>
-            <p class="panel-lead">Summary-first command center for the current operating posture and next actions.</p>
+            <h2>CompanionOps</h2>
+            <p class="panel-lead">Default daily-use posture for system status, attention, recent governed actions, and exact handoff into Workbench depth.</p>
           </div>
           <button id="refresh-button" class="btn btn-secondary">Refresh</button>
         </div>
@@ -217,6 +221,16 @@
           </div>
         </div>
         <div id="evidenceops-content" class="stack"></div>
+      </section>
+
+      <section class="panel panel-logops" data-workspace-section="logops">
+        <div class="panel-header">
+          <div class="panel-heading">
+            <h2>LogOps</h2>
+            <p class="panel-lead">Relevant native logs and session artifacts for the installed launcher, without occupying every other tab.</p>
+          </div>
+        </div>
+        <div id="logops-content" class="stack"></div>
       </section>
 
       <section class="panel panel-settings" data-workspace-section="settingsops">

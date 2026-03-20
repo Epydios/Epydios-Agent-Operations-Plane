@@ -155,10 +155,12 @@ plutil -lint "${APP_CONTENTS_ROOT}/Info.plist" >>"${LOG_PATH}" 2>&1 || {
 
 cat > "${BOOTSTRAP_TEMPLATE_PATH}" <<EOF
 {
-  "mode": "mock",
+  "mode": "live",
   "runtimeLocalPort": 8080,
+  "gatewayLocalPort": 18765,
   "runtimeNamespace": "epydios-system",
-  "runtimeService": "orchestration-runtime"
+  "runtimeService": "orchestration-runtime",
+  "interpositionEnabled": false
 }
 EOF
 

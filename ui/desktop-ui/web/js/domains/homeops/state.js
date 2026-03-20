@@ -335,11 +335,166 @@ function createDashboardCards(context = {}) {
   ];
 }
 
+function formatOpsLabel(value, fallback = "AgentOps") {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (!normalized) {
+    return fallback;
+  }
+  if (normalized.endsWith("ops")) {
+    return `${normalized.charAt(0).toUpperCase()}${normalized.slice(1, -3)}Ops`;
+  }
+  return `${normalized.charAt(0).toUpperCase()}${normalized.slice(1)}`;
+}
+
+function titleCaseToken(value, fallback = "-") {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (!normalized) {
+    return fallback;
+  }
+  return normalized
+    .split(/[_\s-]+/)
+    .filter(Boolean)
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+    .join(" ");
+}
+
+function toneFromRuntimeStatus(value, fallback = "unknown") {
+  const normalized = normalizeStatus(value, fallback);
+  if (["ok", "healthy", "ready", "running", "loaded"].includes(normalized)) {
+    return "ok";
+  }
+  if (["starting", "prepared", "pending", "mock_only", "not_required"].includes(normalized)) {
+    return "warn";
+  }
+  if (["failed", "degraded", "deny", "blocked", "unreachable", "stopped"].includes(normalized)) {
+    return "danger";
+  }
+  return fallback;
+}
+
+function deriveGatewayClientLabel(run = {}, context = {}) {
+  const claims = readObject(context?.session?.claims);
+  return formatIdentityLabel(
+    run?.sourceClient?.name ||
+      run?.sourceClient?.id ||
+      run?.clientLabel ||
+      run?.clientSurface ||
+      run?.clientId ||
+      run?.requestClientId ||
+      run?.actorRef ||
+      claims?.client_id ||
+      context?.selectedAgentProfileId ||
+      "local-gateway"
+  );
+}
+
+function readGatewayHoldItems(context = {}) {
+  return Array.isArray(context?.nativeGatewayHolds) ? context.nativeGatewayHolds : [];
+}
+
+function pendingGatewayHolds(context = {}) {
+  return readGatewayHoldItems(context).filter(
+    (item) => String(item?.state || "").trim().toLowerCase() === "held_pending_approval"
+  );
+}
+
+function latestGatewayHold(context = {}) {
+  return pickLatest(pendingGatewayHolds(context), ["updatedAtUtc", "createdAtUtc", "holdStartedAtUtc", "holdDeadlineAtUtc"]);
+}
+
+function gatewayHoldSummaryTarget(item = {}) {
+  return formatIdentityLabel(
+    item?.requestSummary?.title ||
+      item?.governanceTarget?.targetRef ||
+      item?.requestSummary?.reason
+  );
+}
+
+function createSystemStatusRegion(context = {}) {
+  const shell = readObject(context.nativeShell);
+  const runtimeService = readObject(shell.runtimeService);
+  const gatewayService = readObject(shell.gatewayService);
+  const runtime = summarizeRuntime(context.health, context.runs, context.approvals);
+  const platform = summarizePlatform(context.health, context.pipeline, context.providers);
+  const policy = summarizePolicy(context.runs, context.settings);
+  const aimxsPath = summarizeAimxsPath(context.settings, policy);
+  const lastWorkbenchDomain = formatOpsLabel(context.lastWorkbenchDomain, "AgentOps");
+  const startupError = formatIdentityLabel(shell.startupError, "");
+  return {
+    feedback: context.companionFeedback || null,
+    cards: [
+      {
+        id: "companion-posture",
+        title: "Product Posture",
+        tone: "ok",
+        value: "Companion",
+        summary: `workbench=${lastWorkbenchDomain}`,
+        meta: `mode=${formatIdentityLabel(shell.mode, "unknown")}; aimxs=${aimxsPath.modeLabel}`
+      },
+      {
+        id: "launcher",
+        title: "Launcher",
+        tone: toneFromRuntimeStatus(shell.launcherState, "warn"),
+        value: titleCaseToken(shell.launcherState, "Unknown"),
+        summary: `bootstrap=${titleCaseToken(shell.bootstrapConfigState, "unknown")}; runtime=${formatIdentityLabel(shell.runtimeState, runtime.status)}`,
+        meta: startupError || `process=${formatIdentityLabel(shell.runtimeProcessMode, "unknown")}`
+      },
+      {
+        id: "runtime-service",
+        title: "Runtime Service",
+        tone: toneFromRuntimeStatus(runtimeService.state || runtime.status, "warn"),
+        value: titleCaseToken(runtimeService.state || runtime.status, "Unknown"),
+        summary: `health=${formatIdentityLabel(runtimeService.health, runtime.status)}`,
+        meta: runtime.detail
+      },
+      {
+        id: "gateway-service",
+        title: "Gateway",
+        tone: toneFromRuntimeStatus(gatewayService.state, "warn"),
+        value: titleCaseToken(gatewayService.state, "Unknown"),
+        summary: `health=${formatIdentityLabel(gatewayService.health, "unknown")}`,
+        meta: `route=${platform.status}; policy=${policy.latestDecision}; provider=${aimxsPath.provider}`
+      }
+    ],
+    actions: [
+      {
+        id: "open-workbench",
+        label: "Open Workbench",
+        summary: `resume ${lastWorkbenchDomain}`,
+        action: "open-workbench"
+      },
+      {
+        id: "restart-services",
+        label: "Restart Services",
+        summary: `mode=${formatIdentityLabel(shell.mode, "unknown")}`,
+        action: "restart-services"
+      },
+      {
+        id: "show-diagnostics",
+        label: "Show Diagnostics",
+        summary: "inspect launcher, gateway, and local settings state",
+        action: "show-diagnostics"
+      }
+    ]
+  };
+}
+
 function createAttentionItems(context = {}) {
   const approvals = readItems(context.approvals);
   const runs = readItems(context.runs);
-  const audit = readItems(context.audit);
+  const shell = readObject(context.nativeShell);
+  const runtimeService = readObject(shell.runtimeService);
+  const gatewayService = readObject(shell.gatewayService);
   const incidents = summarizeIncidents(context.incidentHistory, context.runs, context.approvals);
+  const pendingHolds = pendingGatewayHolds(context);
+  const latestHold = latestGatewayHold(context);
+  const pendingApprovals = approvals.filter(
+    (item) => String(item?.status || "").trim().toUpperCase() === "PENDING"
+  );
+  const latestPendingApproval = pickLatest(
+    pendingApprovals,
+    ["updatedAt", "expiresAt", "createdAt", "requestedAt"]
+  );
   const latestAttentionRun = pickLatest(
     runs.filter((item) => {
       const status = String(item?.status || "").trim().toUpperCase();
@@ -348,60 +503,236 @@ function createAttentionItems(context = {}) {
     }),
     ["updatedAt", "createdAt"]
   );
-  return [
-    {
-      title: "Pending approvals",
-      tone: countPendingApprovals(approvals) > 0 ? "danger" : "ok",
-      value: String(countPendingApprovals(approvals)),
-      detail: `expiring soon=${countExpiringApprovals(approvals)}`,
-      action: "open-approvals-pending",
-      actionLabel: "Open Approval Queue"
-    },
-    {
-      title: "Incident response",
-      tone: incidents.high > 0 ? "danger" : incidents.medium > 0 ? "warn" : "ok",
-      value: String(incidents.total),
-      detail: `latest=${String(incidents.latest?.packageId || "-").trim() || "-"}`,
-      action: "open-incidentops-active",
-      actionLabel: "Open IncidentOps"
-    },
-    {
+  const items = [];
+  if (pendingHolds.length > 0) {
+    const holdDeadlineMs = parseTimeMs(latestHold?.holdDeadlineAtUtc);
+    items.push({
+      title: "Interposed approval required",
+      tone: holdDeadlineMs > 0 && holdDeadlineMs - Date.now() <= 300000 ? "danger" : "warn",
+      value: String(pendingHolds.length),
+      detail: `latest=${formatIdentityLabel(latestHold?.approvalId, "-")}; client=${deriveGatewayClientLabel(latestHold, context)}; deadline=${formatIdentityLabel(latestHold?.holdDeadlineAtUtc, "-")}`,
+      action: "open-approval-item",
+      actionLabel: "Open Approval",
+      runId: String(latestHold?.runId || "").trim(),
+      approvalId: String(latestHold?.approvalId || "").trim()
+    });
+  } else if (pendingApprovals.length > 0) {
+    items.push({
+      title: "Approval required",
+      tone: countExpiringApprovals(approvals) > 0 ? "danger" : "warn",
+      value: String(pendingApprovals.length),
+      detail: `latest=${formatIdentityLabel(latestPendingApproval?.approvalId, "-")}; expiring soon=${countExpiringApprovals(approvals)}`,
+      action: "open-approval-item",
+      actionLabel: "Open Approval",
+      runId: String(latestPendingApproval?.runId || "").trim(),
+      approvalId: String(latestPendingApproval?.approvalId || "").trim()
+    });
+  }
+  const runtimeServiceNeedsAttention =
+    ["failed", "degraded", "stopped"].includes(normalizeStatus(runtimeService.state, "")) ||
+    ["unreachable"].includes(normalizeStatus(runtimeService.health, ""));
+  const gatewayNeedsAttention =
+    ["failed", "degraded", "stopped"].includes(normalizeStatus(gatewayService.state, "")) ||
+    ["unreachable"].includes(normalizeStatus(gatewayService.health, ""));
+  if (runtimeServiceNeedsAttention || gatewayNeedsAttention) {
+    const affected = gatewayNeedsAttention ? "Gateway" : "Runtime service";
+    const state = gatewayNeedsAttention
+      ? formatIdentityLabel(gatewayService.state, gatewayService.health)
+      : formatIdentityLabel(runtimeService.state, runtimeService.health);
+    items.push({
+      title: `${affected} degraded`,
+      tone: "danger",
+      value: state,
+      detail: "Inspect diagnostics before trusting the current local governed path.",
+      action: "show-diagnostics",
+      actionLabel: "Open Diagnostics"
+    });
+  }
+  if (countAttentionRuns(runs) > 0) {
+    items.push({
       title: "Runs requiring attention",
-      tone: countAttentionRuns(runs) > 0 ? "danger" : "ok",
+      tone: "danger",
       value: String(countAttentionRuns(runs)),
       detail: `latest=${String(latestAttentionRun?.runId || "-").trim() || "-"}`,
-      action: "open-runs-attention",
+      action: "open-run-item",
       runId: String(latestAttentionRun?.runId || "").trim(),
-      actionLabel: "Open RuntimeOps"
+      actionLabel: "Open Run"
+    });
+  }
+  if (incidents.total > 0) {
+    items.push({
+      title: "Incident escalation pending",
+      tone: incidents.high > 0 ? "danger" : "warn",
+      value: String(incidents.total),
+      detail: `latest=${String(incidents.latest?.packageId || "-").trim() || "-"}`,
+      action: "open-incident-item",
+      actionLabel: "Open Incident",
+      incidentId: String(incidents.latest?.id || "").trim(),
+      runId: String(incidents.latest?.runId || "").trim()
+    });
+  }
+  return items.slice(0, 5);
+}
+
+function createRecentGovernedActions(context = {}) {
+  const approvals = readItems(context.approvals);
+  const pendingHolds = pendingGatewayHolds(context);
+  const approvalsByRun = new Map(
+    approvals
+      .filter((item) => String(item?.runId || "").trim())
+      .map((item) => [String(item.runId).trim(), item])
+  );
+  const recentItemsByRun = new Map();
+  pendingHolds.forEach((hold) => {
+    const runId = String(hold?.runId || "").trim();
+    if (!runId) {
+      return;
+    }
+    recentItemsByRun.set(runId, {
+      id: runId,
+      clientLabel: deriveGatewayClientLabel(hold, context),
+      actionName: gatewayHoldSummaryTarget(hold),
+      targetSummary:
+        formatScopeLabel([hold?.tenantId], [hold?.projectId]) ||
+        formatIdentityLabel(hold?.governanceTarget?.targetRef, "-"),
+      state: formatIdentityLabel(hold?.state, "-"),
+      policyDecision: "DEFER",
+      occurredAt: formatIdentityLabel(hold?.holdStartedAtUtc || hold?.createdAtUtc, "-"),
+      runId,
+      approvalId: String(hold?.approvalId || "").trim(),
+      gatewayRequestId: formatIdentityLabel(hold?.gatewayRequestId, ""),
+      action: "open-approval-item",
+      actionLabel: "Open Approval"
+    });
+  });
+  readItems(context.runs)
+    .slice()
+    .sort((left, right) => {
+      const leftTs = parseTimeMs(left?.updatedAt || left?.createdAt);
+      const rightTs = parseTimeMs(right?.updatedAt || right?.createdAt);
+      return rightTs - leftTs;
+    })
+    .map((run) => {
+      const runId = String(run?.runId || "").trim();
+      if (!runId || recentItemsByRun.has(runId)) {
+        return null;
+      }
+      const linkedApproval = approvalsByRun.get(runId) || null;
+      const policyDecision = String(run?.policyDecision || "").trim().toUpperCase() || "-";
+      const approvalRequired =
+        String(linkedApproval?.status || "").trim().toUpperCase() === "PENDING" || policyDecision === "DEFER";
+      return [
+        runId,
+        {
+        id: runId || String(run?.requestId || "").trim() || `run-${Math.random().toString(36).slice(2, 7)}`,
+        clientLabel: deriveGatewayClientLabel(run, context),
+        actionName: formatIdentityLabel(
+          run?.requestedAction || run?.action || run?.requestId || "governed action"
+        ),
+        targetSummary:
+          formatScopeLabel([run?.tenantId], [run?.projectId]) ||
+          formatIdentityLabel(run?.requestId, runId || "-"),
+        state: formatIdentityLabel(run?.status, "-"),
+        policyDecision,
+        occurredAt: formatIdentityLabel(run?.updatedAt || run?.createdAt, "-"),
+        runId,
+        approvalId: String(linkedApproval?.approvalId || "").trim(),
+        gatewayRequestId: formatIdentityLabel(run?.requestId, ""),
+        action: approvalRequired ? "open-approval-item" : "open-run-item",
+        actionLabel: approvalRequired ? "Open Approval" : "Open Run"
+        }
+      ];
+    })
+    .filter(Boolean)
+    .forEach(([runId, item]) => {
+      recentItemsByRun.set(runId, item);
+    });
+  return Array.from(recentItemsByRun.values())
+    .sort((left, right) => parseTimeMs(right?.occurredAt) - parseTimeMs(left?.occurredAt))
+    .slice(0, 5);
+}
+
+function createQuickActions(context = {}) {
+  const lastWorkbenchDomain = String(context.lastWorkbenchDomain || "agentops").trim().toLowerCase() || "agentops";
+  const approvals = readItems(context.approvals);
+  const runs = readItems(context.runs);
+  const shell = readObject(context.nativeShell);
+  return [
+    {
+      id: "open-workbench",
+      label: "Open Workbench",
+      summary: `resume ${formatOpsLabel(lastWorkbenchDomain)}`,
+      action: "open-workbench"
     },
     {
-      title: "Audit denies",
-      tone: countAuditDenies(audit) > 0 ? "warn" : "ok",
-      value: String(countAuditDenies(audit)),
-      detail: `source=${String(context.audit?.source || "unknown").trim() || "unknown"}`,
-      action: "open-audit-deny",
-      actionLabel: "Open AuditOps"
+      id: "open-approval-queue",
+      label: "Open Approval Queue",
+      summary: `pending=${countPendingApprovals(approvals)}`,
+      action: "open-approval-queue"
+    },
+    {
+      id: "open-recent-runs",
+      label: "Open Recent Runs",
+      summary: `runs=${runs.length}`,
+      action: "open-recent-runs"
+    },
+    {
+      id: "restart-services",
+      label: "Restart Services",
+      summary: `mode=${formatIdentityLabel(shell.mode, "unknown")}`,
+      action: "restart-services"
+    },
+    {
+      id: "show-diagnostics",
+      label: "Show Diagnostics",
+      summary: "settings, endpoint health, and native logs",
+      action: "show-diagnostics"
     }
   ];
 }
 
-function createDomainPivots(context = {}) {
-  const providers = readItems(context.providers);
-  const approvals = readItems(context.approvals);
-  const audit = readItems(context.audit);
-  const incidents = readItems(context.incidentHistory);
-  const runs = readItems(context.runs);
-  const policy = summarizePolicy(context.runs, context.settings);
-  return [
-    { view: "agentops", label: "AgentOps", summary: "governed work" },
-    { view: "runtimeops", label: "RuntimeOps", summary: `runs=${runs.length}` },
-    { view: "platformops", label: "PlatformOps", summary: `providers=${providers.length}` },
-    { view: "policyops", label: "PolicyOps", summary: `latest=${policy.latestDecision}` },
-    { view: "governanceops", label: "GovernanceOps", summary: `pending=${countPendingApprovals(approvals)}` },
-    { view: "auditops", label: "AuditOps", summary: `events=${audit.length}` },
-    { view: "evidenceops", label: "EvidenceOps", summary: `runs=${runs.length}` },
-    { view: "incidentops", label: "IncidentOps", summary: `active=${incidents.length}` }
-  ];
+function createConnectedClientContext(context = {}) {
+  const identity = createIdentityWorkspaceSnapshot(context.settings, context.session);
+  const latestHold = latestGatewayHold(context);
+  const latestRun = pickLatest(readItems(context.runs), ["updatedAt", "createdAt"]);
+  const shell = readObject(context.nativeShell);
+  const gatewayService = readObject(shell.gatewayService);
+  const gatewayTrafficCount = readItems(context.runs).length + pendingGatewayHolds(context).length;
+  const trafficClient = latestHold ? deriveGatewayClientLabel(latestHold, context) : formatIdentityLabel(identity.clientId || context?.session?.claims?.client_id);
+  return {
+    cards: [
+      {
+        id: "connected-client",
+        title: "Connected Client",
+        tone: identity.authenticated ? "ok" : "warn",
+        value: trafficClient,
+        summary: `subject=${formatIdentityLabel(identity.subject)}`,
+        meta: latestHold
+          ? `surface=${formatIdentityLabel(latestHold?.clientSurface, "gateway")}; authority=${formatAuthorityBasis(identity.authorityBasis)}`
+          : `authority=${formatAuthorityBasis(identity.authorityBasis)}`
+      },
+      {
+        id: "agent-profile",
+        title: "Agent Profile",
+        tone: context.selectedAgentProfileId ? "ok" : "warn",
+        value: formatIdentityLabel(context.selectedAgentProfileId),
+        summary: `scope=${formatScopeLabel(identity.tenantIds, identity.projectIds)}`,
+        meta: `roles=${identity.roles.length}`
+      },
+      {
+        id: "gateway-traffic",
+        title: "Gateway Traffic",
+        tone: toneFromRuntimeStatus(gatewayService.state, "warn"),
+        value: `${gatewayTrafficCount} observed`,
+        summary: latestHold
+          ? `latest=${formatIdentityLabel(latestHold?.runId)}`
+          : `latest=${formatIdentityLabel(latestRun?.runId)}`,
+        meta: latestHold
+          ? `approval=${formatIdentityLabel(latestHold?.approvalId)}`
+          : `request=${formatIdentityLabel(latestRun?.requestId)}`
+      }
+    ]
+  };
 }
 
 function createAimxsWorkflowSnapshot(context = {}) {
@@ -548,7 +879,8 @@ export function createEmptyHomeSnapshot() {
     runs: { items: [] },
     approvals: { items: [] },
     audit: { items: [] },
-    incidentHistory: { items: [] }
+    incidentHistory: { items: [] },
+    nativeGatewayHolds: []
   };
 }
 
@@ -559,6 +891,7 @@ export function createHomeWorkspaceSnapshot(context = {}) {
   };
   return {
     ...snapshot,
+    systemStatus: createSystemStatusRegion(snapshot),
     commandDashboard: {
       cards: createDashboardCards(snapshot)
     },
@@ -567,8 +900,12 @@ export function createHomeWorkspaceSnapshot(context = {}) {
     attentionQueue: {
       items: createAttentionItems(snapshot)
     },
-    domainPivots: {
-      items: createDomainPivots(snapshot)
-    }
+    recentGovernedActions: {
+      items: createRecentGovernedActions(snapshot)
+    },
+    quickActions: {
+      items: createQuickActions(snapshot)
+    },
+    connectedClientContext: createConnectedClientContext(snapshot)
   };
 }

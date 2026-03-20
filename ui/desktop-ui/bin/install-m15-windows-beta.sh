@@ -87,11 +87,12 @@ EOF
   cp "${WINDOWS_BINARY_PATH}" "${INSTALL_PATH}"
   cat > "${BOOTSTRAP_PATH}" <<EOF
 {
-  "mode": "${M15_WINDOWS_BETA_MODE:-mock}",
+  "mode": "${M15_WINDOWS_BETA_MODE:-live}",
   "runtimeLocalPort": ${M15_WINDOWS_RUNTIME_PORT:-8080},
   "gatewayLocalPort": ${M15_WINDOWS_GATEWAY_PORT:-18765},
   "runtimeNamespace": "${M15_WINDOWS_RUNTIME_NAMESPACE:-epydios-system}",
-  "runtimeService": "${M15_WINDOWS_RUNTIME_SERVICE:-orchestration-runtime}"
+  "runtimeService": "${M15_WINDOWS_RUNTIME_SERVICE:-orchestration-runtime}",
+  "interpositionEnabled": false
 }
 EOF
   cat > "${LAUNCHER_CMD_PATH}" <<EOF
