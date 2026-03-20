@@ -330,6 +330,12 @@ apply_mtls_fixtures() {
   apply_mtls_secrets
   kubectl apply -k "${MTLS_FIXTURES_DIR}"
 
+  # These fixtures reuse stable secret names across runs. Force the mTLS pods
+  # to restart so they pick up the freshly generated server cert and CA bundle.
+  kubectl -n "${NAMESPACE}" rollout restart deployment/m10-mtls-profile-provider
+  kubectl -n "${NAMESPACE}" rollout restart deployment/m10-mtls-policy-provider
+  kubectl -n "${NAMESPACE}" rollout restart deployment/m10-mtls-bearer-evidence-provider
+
   wait_for_deployment m10-mtls-profile-provider
   wait_for_deployment m10-mtls-policy-provider
   wait_for_deployment m10-mtls-bearer-evidence-provider
