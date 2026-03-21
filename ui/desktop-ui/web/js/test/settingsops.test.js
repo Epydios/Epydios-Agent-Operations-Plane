@@ -132,6 +132,8 @@ test("settingsops renders bounded preferences, secure refs, environment, integra
   });
 
   const html = ui.settingsContent.innerHTML;
+  assert.match(html, /App And Local Environment/);
+  assert.match(html, /Integrations And Recovery/);
   assert.match(html, /App Preferences Board/);
   assert.match(html, /Secure Ref Board/);
   assert.match(html, /Local Environment Board/);

@@ -766,21 +766,45 @@ function renderAimxsRouteBoundaryEchoBoard(snapshot) {
 export function renderRuntimeWorkspace(context = {}, session = {}, options = {}) {
   const snapshot = createRuntimeWorkspaceSnapshot(context, session, options);
   return `
-    <div class="runtimeops-workspace" data-domain-root="runtimeops">
-      <div class="runtimeops-primary-grid">
-        ${renderRuntimeActionsBoard(snapshot)}
-        ${renderSelectedSessionReviewBoard(snapshot)}
-        ${renderWorkerPostureBoard(snapshot)}
-        ${renderRuntimeHealthBoard(snapshot)}
-        ${renderQueueBoard(snapshot)}
-        ${renderCapacityBoard(snapshot)}
-        ${renderLiveSessionsBoard(snapshot)}
-        ${renderWorkerFleetBoard(snapshot)}
-        ${renderProviderRoutingBoard(snapshot)}
-        ${renderAimxsRouteBoundaryEchoBoard(snapshot)}
-        ${renderIdentityApplicationBoard(snapshot)}
-        ${renderAimxsIdentityPostureEchoBoard(snapshot)}
-        ${renderRunInventoryBoard(snapshot)}
+    <div class="workbench-domain-shell runtimeops-workspace" data-domain-root="runtimeops">
+      <div class="workbench-domain-cluster-grid" data-workbench-cluster-layout="split">
+        <section class="workbench-domain-cluster" data-workbench-cluster-span="full">
+          <div class="workbench-domain-cluster-header">
+            <h3 class="workbench-domain-cluster-title">Operate</h3>
+            <p class="workbench-domain-cluster-lead">Act on the current governed run, review the selected session, and confirm runtime health before changing fleet posture.</p>
+          </div>
+          <div class="workbench-domain-cluster-body runtimeops-primary-grid runtimeops-cluster-grid">
+            ${renderRuntimeActionsBoard(snapshot)}
+            ${renderSelectedSessionReviewBoard(snapshot)}
+            ${renderWorkerPostureBoard(snapshot)}
+            ${renderRuntimeHealthBoard(snapshot)}
+          </div>
+        </section>
+        <section class="workbench-domain-cluster">
+          <div class="workbench-domain-cluster-header">
+            <h3 class="workbench-domain-cluster-title">Fleet</h3>
+            <p class="workbench-domain-cluster-lead">Track queue pressure, capacity, live sessions, and worker availability without leaving the runtime surface.</p>
+          </div>
+          <div class="workbench-domain-cluster-body runtimeops-primary-grid runtimeops-cluster-grid">
+            ${renderQueueBoard(snapshot)}
+            ${renderCapacityBoard(snapshot)}
+            ${renderLiveSessionsBoard(snapshot)}
+            ${renderWorkerFleetBoard(snapshot)}
+          </div>
+        </section>
+        <section class="workbench-domain-cluster">
+          <div class="workbench-domain-cluster-header">
+            <h3 class="workbench-domain-cluster-title">Routing And Inventory</h3>
+            <p class="workbench-domain-cluster-lead">Keep provider routing, identity posture, route boundary echoes, and governed run inventory visible as one coherent runtime ownership area.</p>
+          </div>
+          <div class="workbench-domain-cluster-body runtimeops-primary-grid runtimeops-cluster-grid">
+            ${renderProviderRoutingBoard(snapshot)}
+            ${renderAimxsRouteBoundaryEchoBoard(snapshot)}
+            ${renderIdentityApplicationBoard(snapshot)}
+            ${renderAimxsIdentityPostureEchoBoard(snapshot)}
+            ${renderRunInventoryBoard(snapshot)}
+          </div>
+        </section>
       </div>
     </div>
   `;

@@ -37,6 +37,83 @@
   justify-self: stretch;
 }
 
+.workbench-domain-shell {
+  display: grid;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+.workbench-domain-shell-header {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.workbench-domain-shell-header h2,
+.workbench-domain-shell-header h3 {
+  margin: 0;
+  font-family: var(--font-family-display);
+  font-size: 1.08rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+}
+
+.workbench-domain-shell-lead {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+}
+
+.workbench-domain-cluster-grid {
+  display: grid;
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.workbench-domain-cluster {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-4);
+  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+  border-radius: var(--radius-2);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface) 96%, transparent), color-mix(in srgb, var(--panel) 94%, transparent)),
+    color-mix(in srgb, var(--surface) 82%, var(--panel));
+  box-shadow: var(--shadow-1), var(--shadow-inset);
+}
+
+.workbench-domain-cluster-header {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.workbench-domain-cluster-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.workbench-domain-cluster-lead {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+}
+
+.workbench-domain-cluster-body {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.workbench-domain-empty-state {
+  display: grid;
+  gap: var(--space-3);
+}
+
 .workspace-panel[hidden] {
   display: none !important;
 }
@@ -149,6 +226,14 @@
 
   .layout[data-workspace-view="settingsops"] .panel-providers {
     grid-column: span 12;
+  }
+
+  .workbench-domain-cluster-grid[data-workbench-cluster-layout="split"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .workbench-domain-cluster[data-workbench-cluster-span="full"] {
+    grid-column: 1 / -1;
   }
 
   .panel-health,

@@ -3056,6 +3056,9 @@ export class AgentOpsApi {
     if (!trimmed) {
       return `${window.location.origin}/`;
     }
+    if (this.shouldUseNativeDesktopProxy(trimmed)) {
+      return `${window.location.origin}/`;
+    }
     if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
       return trimmed;
     }
@@ -3063,6 +3066,26 @@ export class AgentOpsApi {
       return `${window.location.origin}${trimmed}`;
     }
     return `${window.location.origin}/${trimmed}`;
+  }
+
+  shouldUseNativeDesktopProxy(baseUrl) {
+    if (String(this.config?.nativeShell?.mode || "").trim().toLowerCase() !== "live") {
+      return false;
+    }
+    const trimmed = String(baseUrl || "").trim();
+    if (!trimmed || !/^https?:\/\//i.test(trimmed)) {
+      return false;
+    }
+    try {
+      const parsed = new URL(trimmed);
+      const hostname = String(parsed.hostname || "").trim().toLowerCase();
+      return (
+        parsed.protocol === "http:" &&
+        (hostname === "127.0.0.1" || hostname === "localhost" || hostname === "::1" || hostname === "[::1]")
+      );
+    } catch (_) {
+      return false;
+    }
   }
 
   async request(baseUrl, path, query, options = {}) {
@@ -3132,7 +3155,11 @@ export class AgentOpsApi {
     if (this.config.mockMode) {
       return mockHealth();
     }
-    const runtime = await fetch(`${this.config.runtimeApiBaseUrl}${this.config.endpoints.health}`, {
+    const runtimeURL = new URL(
+      this.config.endpoints.health,
+      this.resolveBaseUrl(this.config.runtimeApiBaseUrl)
+    );
+    const runtime = await fetch(runtimeURL.toString(), {
       headers: this.getToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}
     });
     return {

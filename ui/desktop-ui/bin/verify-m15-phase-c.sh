@@ -91,9 +91,10 @@ installed_app_path = sys.argv[4]
 bootstrap_path = sys.argv[5]
 manifest = json.loads(manifest_path.read_text())
 
-assert manifest["mode"] == "mock", manifest["mode"]
+assert manifest["mode"] == "live", manifest["mode"]
 assert manifest["launcherState"] == "ready", manifest["launcherState"]
-assert manifest["runtimeProcessMode"] == "mock_only", manifest["runtimeProcessMode"]
+assert manifest["runtimeProcessMode"] == "background_supervisor", manifest["runtimeProcessMode"]
+assert manifest["runtimeState"] == "service_running", manifest["runtimeState"]
 assert manifest["targetExecutionProfile"] == "sandbox_vm_autonomous", manifest["targetExecutionProfile"]
 assert manifest["allowRestrictedHost"] is False, manifest["allowRestrictedHost"]
 assert manifest["bootstrapConfigState"] == "loaded", manifest["bootstrapConfigState"]
@@ -101,7 +102,13 @@ assert manifest["bootstrapConfigPath"] == bootstrap_path, manifest["bootstrapCon
 assert manifest["paths"]["configRoot"].endswith("EpydiosAgentOpsDesktop"), manifest["paths"]["configRoot"]
 assert manifest["paths"]["cacheRoot"].endswith("EpydiosAgentOpsDesktop"), manifest["paths"]["cacheRoot"]
 assert manifest["paths"]["gatewayRoot"].endswith("localhost-gateway"), manifest["paths"]["gatewayRoot"]
+assert manifest["runtimeService"]["state"] == "running", manifest["runtimeService"]["state"]
+assert manifest["runtimeService"]["health"] == "healthy", manifest["runtimeService"]["health"]
+assert manifest["gatewayService"]["state"] == "running", manifest["gatewayService"]["state"]
+assert manifest["gatewayService"]["health"] == "healthy", manifest["gatewayService"]["health"]
 assert manifest["gatewayService"]["statusPath"] == manifest["paths"]["gatewayStatusPath"], manifest["gatewayService"]["statusPath"]
+assert manifest["interposition"]["enabled"] is False, manifest["interposition"]
+assert manifest["interposition"]["status"] == "off", manifest["interposition"]
 
 checklist = {
     "startup_reliability": {

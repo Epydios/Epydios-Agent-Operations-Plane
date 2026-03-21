@@ -275,6 +275,9 @@ test("runtimeops page renders the first inspect-only runtime boards", () => {
   );
 
   assert.match(ui.runtimeOpsContent.innerHTML, /data-domain-root="runtimeops"/);
+  assert.match(ui.runtimeOpsContent.innerHTML, /Operate/);
+  assert.match(ui.runtimeOpsContent.innerHTML, /Fleet/);
+  assert.match(ui.runtimeOpsContent.innerHTML, /Routing And Inventory/);
   assert.match(ui.runtimeOpsContent.innerHTML, /Runtime Actions/);
   assert.match(ui.runtimeOpsContent.innerHTML, /Selected Session Review/);
   assert.match(ui.runtimeOpsContent.innerHTML, /Worker Posture/);

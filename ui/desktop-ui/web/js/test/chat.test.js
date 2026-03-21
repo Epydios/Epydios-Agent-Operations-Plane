@@ -99,6 +99,8 @@ test("chat view renders parity fixture state from the native contract", async ()
   const html = ui.chatContent.innerHTML;
 
   assert.match(html, /AgentOps/);
+  assert.match(html, /Active Governed Work/);
+  assert.match(html, /Thread Review And Proof/);
   assert.match(html, /Managed Codex Worker/);
   assert.match(html, /Investigate checkout timeouts/);
   assert.match(html, /Tool proposal generated for shell execution\./);

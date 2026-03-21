@@ -2,10 +2,6 @@
   gap: var(--space-4);
 }
 
-.agentops-panel-heading {
-  margin-bottom: 0;
-}
-
 .agentops-thread-header,
 .agentops-transcript-workspace,
 .agentops-anchored-composer,
@@ -84,6 +80,10 @@
 
 .agentops-context-drawer {
   align-content: start;
+}
+
+.agentops-cluster-body {
+  gap: var(--space-4);
 }
 
 .agentops-thread-flow {

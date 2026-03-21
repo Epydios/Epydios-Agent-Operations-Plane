@@ -9,6 +9,10 @@
   gap: var(--space-3);
 }
 
+.runtimeops-cluster-grid {
+  align-items: start;
+}
+
 .runtimeops-action-board {
   grid-column: 1 / -1;
 }

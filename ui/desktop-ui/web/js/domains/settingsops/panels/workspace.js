@@ -375,12 +375,30 @@ function renderSettingsWorkflowRecoveryBoard(snapshot) {
 export function renderSettingsWorkspace(context = {}) {
   const snapshot = createSettingsWorkspaceSnapshot(context);
   return `
-    <div class="settingsops-board-grid">
-      ${renderAppPreferencesBoard(snapshot)}
-      ${renderSecureRefBoard(snapshot)}
-      ${renderLocalEnvironmentBoard(snapshot)}
-      ${renderIntegrationSettingsBoard(snapshot)}
-      ${renderSettingsWorkflowRecoveryBoard(snapshot)}
+    <div class="workbench-domain-shell settingsops-workspace" data-domain-root="settingsops">
+      <div class="workbench-domain-cluster-grid" data-workbench-cluster-layout="split">
+        <section class="workbench-domain-cluster">
+          <div class="workbench-domain-cluster-header">
+            <h3 class="workbench-domain-cluster-title">App And Local Environment</h3>
+            <p class="workbench-domain-cluster-lead">Keep local preferences, secure refs, and the active environment together so SettingsOps still reads as a real local control surface.</p>
+          </div>
+          <div class="workbench-domain-cluster-body settingsops-board-grid settingsops-cluster-grid">
+            ${renderAppPreferencesBoard(snapshot)}
+            ${renderSecureRefBoard(snapshot)}
+            ${renderLocalEnvironmentBoard(snapshot)}
+          </div>
+        </section>
+        <section class="workbench-domain-cluster">
+          <div class="workbench-domain-cluster-header">
+            <h3 class="workbench-domain-cluster-title">Integrations And Recovery</h3>
+            <p class="workbench-domain-cluster-lead">Review sync posture, edit integration defaults, and keep workflow recovery visible without sending these surfaces back into a generic settings bucket.</p>
+          </div>
+          <div class="workbench-domain-cluster-body settingsops-board-grid settingsops-cluster-grid">
+            ${renderIntegrationSettingsBoard(snapshot)}
+            ${renderSettingsWorkflowRecoveryBoard(snapshot)}
+          </div>
+        </section>
+      </div>
     </div>
   `;
 }

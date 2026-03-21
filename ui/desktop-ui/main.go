@@ -78,12 +78,15 @@ func main() {
 
 	app := NewApp(session)
 	err = wails.Run(&options.App{
-		Title:              "EpydiosOps Desktop",
-		Width:              1440,
-		Height:             960,
-		MinWidth:           1180,
-		MinHeight:          760,
-		AssetServer:        &assetserver.Options{Assets: os.DirFS(session.Manifest.Paths.WebDir)},
+		Title:     "EpydiosOps Desktop",
+		Width:     1440,
+		Height:    960,
+		MinWidth:  1180,
+		MinHeight: 760,
+		AssetServer: &assetserver.Options{
+			Assets:  os.DirFS(session.Manifest.Paths.WebDir),
+			Handler: nativeapp.NewNativeAssetHandler(session),
+		},
 		BackgroundColour:   options.NewRGB(248, 246, 240),
 		Logger:             logger.NewFileLogger(session.Manifest.Paths.UILogPath),
 		LogLevel:           logger.INFO,

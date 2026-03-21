@@ -35,10 +35,17 @@ export function renderRuntimeOpsEmptyState(ui, options = {}) {
   if (!ui?.runtimeOpsContent) {
     return;
   }
-  ui.runtimeOpsContent.innerHTML = renderPanelStateMetric(
-    options.tone || "info",
-    options.title || "RuntimeOps",
-    options.message || "Runtime state becomes available after health, provider, and run data load.",
-    options.detail || "Refresh the workspace. If runtime data should be present, verify runtime health, provider discovery, and run inventory availability."
-  );
+  ui.runtimeOpsContent.innerHTML = `
+    <div class="workbench-domain-shell runtimeops-workspace">
+      <div class="workbench-domain-empty-state">
+        ${renderPanelStateMetric(
+          options.tone || "info",
+          options.title || "RuntimeOps",
+          options.message || "Runtime state becomes available after health, provider, and run data load.",
+          options.detail ||
+            "Refresh the workspace. If runtime data should be present, verify runtime health, provider discovery, and run inventory availability."
+        )}
+      </div>
+    </div>
+  `;
 }

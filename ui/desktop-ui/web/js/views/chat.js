@@ -2214,125 +2214,144 @@ export function buildAgentWorkspaceMarkup(settingsPayload = {}, chatState = {}) 
   });
 
   return `
-    <div class="stack chat-surface agentops-workspace">
-      <div class="panel-heading agentops-panel-heading">
+    <div class="stack chat-surface agentops-workspace workbench-domain-shell">
+      <div class="workbench-domain-shell-header">
         <h2>AgentOps</h2>
+        <p class="workbench-domain-shell-lead">Drive the active governed thread here, then review the same thread through approvals, proof, run context, and history without leaving the domain.</p>
       </div>
-      <div class="metric agentops-thread-header">
-        <div class="metric-title-row">
-          <div class="title">Thread Header</div>
-          <span class="${focusSummary.tone}">${escapeHTML(focusSummary.label)}</span>
-        </div>
-        <div class="agentops-thread-summary">
-          <div class="agentops-thread-heading">
-            <div class="title">${escapeHTML(String(chatState.title || thread?.title || "New governed thread"))}</div>
-            <div class="meta">${escapeHTML(focusSummary.title)}</div>
-            <div class="meta">${escapeHTML(message || focusSummary.detail)}</div>
+      <div class="workbench-domain-cluster-grid">
+        <section class="workbench-domain-cluster" data-workbench-cluster-span="full">
+          <div class="workbench-domain-cluster-header">
+            <h3 class="workbench-domain-cluster-title">Active Governed Work</h3>
+            <p class="workbench-domain-cluster-lead">Define the thread, set execution path, and drive the next governed turn without losing the current runtime and approval posture.</p>
           </div>
-          <div class="run-detail-chips">
-            <span class="chip chip-neutral chip-compact">task=${escapeHTML(taskId || "-")}</span>
-            <span class="chip chip-neutral chip-compact">turns=${escapeHTML(String(focusSummary.turnCount))}</span>
-            <span class="chip chip-neutral chip-compact">approvals=${escapeHTML(String(focusSummary.pendingApprovalCount))}</span>
-            <span class="chip chip-neutral chip-compact">proposals=${escapeHTML(String(focusSummary.pendingProposalCount))}</span>
-            <span class="chip chip-neutral chip-compact">history=${escapeHTML(String(focusSummary.historyCount))}</span>
-            <span class="chip chip-neutral chip-compact">execution=${escapeHTML(executionModeLabel(executionMode))}</span>
-          </div>
-        </div>
-        ${renderAgentWorkflowClarityContext(workflowClarityContext)}
-        <div class="agentops-thread-fields">
-          <label class="field">
-            <span class="label">Thread Title</span>
-            <input id="chat-thread-title" class="filter-input" type="text" value="${escapeHTML(String(chatState.title || ""))}" data-chat-field="title" />
-          </label>
-          <label class="field">
-            <span class="label">Agent Profile</span>
-            <select id="chat-agent-profile" class="filter-input" data-chat-field="agentProfileId">${profileOptions}</select>
-          </label>
-          <label class="field">
-            <span class="label">Execution Path</span>
-            <select id="chat-execution-mode" class="filter-input" data-chat-field="executionMode">
-              <option value="raw_model_invoke" ${selectedAttr(executionMode, "raw_model_invoke")}>Raw Model Invoke</option>
-              <option value="managed_codex_worker" ${selectedAttr(executionMode, "managed_codex_worker")}>Managed Codex Worker</option>
-            </select>
-          </label>
-          <label class="field">
-            <span class="label">Thread Intent</span>
-            <input id="chat-thread-intent" class="filter-input" type="text" value="${escapeHTML(String(chatState.intent || ""))}" data-chat-field="intent" />
-          </label>
-        </div>
-      </div>
-      <div class="metric agentops-anchored-composer">
-        <div class="metric-title-row">
-          <div class="title">Anchored Composer</div>
-          <span class="${chipClassForSessionStatus(status)}">${escapeHTML(status.toUpperCase())}</span>
-        </div>
-        ${message ? `<div class="meta">${escapeHTML(message)}</div>` : ""}
-        <div class="agentops-composer-grid">
-          <label class="field field-wide">
-            <span class="label">System Instructions</span>
-            <textarea id="chat-system-prompt" class="filter-input settings-agent-test-textarea" rows="6" data-chat-field="systemPrompt">${escapeHTML(String(chatState.systemPrompt || ""))}</textarea>
-          </label>
-          <label class="field field-wide agentops-prompt-field">
-            <span class="label">Prompt</span>
-            <textarea id="chat-prompt" class="filter-input settings-agent-test-textarea" rows="8" data-chat-field="prompt">${escapeHTML(String(chatState.prompt || ""))}</textarea>
-          </label>
-        </div>
-        <div class="filter-row settings-editor-actions agentops-composer-actions">
-          <div class="action-hierarchy">
-            <div class="action-group action-group-primary">
-              <button class="btn btn-primary" type="button" data-chat-action="${startAction}">${startLabel}</button>
-              <button class="btn btn-primary" type="button" data-chat-action="send-turn" ${taskId ? "" : "disabled"}>${sendLabel}</button>
+          <div class="workbench-domain-cluster-body agentops-cluster-body">
+            <div class="metric agentops-thread-header">
+              <div class="metric-title-row">
+                <div class="title">Thread Header</div>
+                <span class="${focusSummary.tone}">${escapeHTML(focusSummary.label)}</span>
+              </div>
+              <div class="agentops-thread-summary">
+                <div class="agentops-thread-heading">
+                  <div class="title">${escapeHTML(String(chatState.title || thread?.title || "New governed thread"))}</div>
+                  <div class="meta">${escapeHTML(focusSummary.title)}</div>
+                  <div class="meta">${escapeHTML(message || focusSummary.detail)}</div>
+                </div>
+                <div class="run-detail-chips">
+                  <span class="chip chip-neutral chip-compact">task=${escapeHTML(taskId || "-")}</span>
+                  <span class="chip chip-neutral chip-compact">turns=${escapeHTML(String(focusSummary.turnCount))}</span>
+                  <span class="chip chip-neutral chip-compact">approvals=${escapeHTML(String(focusSummary.pendingApprovalCount))}</span>
+                  <span class="chip chip-neutral chip-compact">proposals=${escapeHTML(String(focusSummary.pendingProposalCount))}</span>
+                  <span class="chip chip-neutral chip-compact">history=${escapeHTML(String(focusSummary.historyCount))}</span>
+                  <span class="chip chip-neutral chip-compact">execution=${escapeHTML(executionModeLabel(executionMode))}</span>
+                </div>
+              </div>
+              ${renderAgentWorkflowClarityContext(workflowClarityContext)}
+              <div class="agentops-thread-fields">
+                <label class="field">
+                  <span class="label">Thread Title</span>
+                  <input id="chat-thread-title" class="filter-input" type="text" value="${escapeHTML(String(chatState.title || ""))}" data-chat-field="title" />
+                </label>
+                <label class="field">
+                  <span class="label">Agent Profile</span>
+                  <select id="chat-agent-profile" class="filter-input" data-chat-field="agentProfileId">${profileOptions}</select>
+                </label>
+                <label class="field">
+                  <span class="label">Execution Path</span>
+                  <select id="chat-execution-mode" class="filter-input" data-chat-field="executionMode">
+                    <option value="raw_model_invoke" ${selectedAttr(executionMode, "raw_model_invoke")}>Raw Model Invoke</option>
+                    <option value="managed_codex_worker" ${selectedAttr(executionMode, "managed_codex_worker")}>Managed Codex Worker</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span class="label">Thread Intent</span>
+                  <input id="chat-thread-intent" class="filter-input" type="text" value="${escapeHTML(String(chatState.intent || ""))}" data-chat-field="intent" />
+                </label>
+              </div>
             </div>
-            <div class="action-group action-group-destructive agentops-clear-action">
-              <button class="btn btn-danger" type="button" data-chat-action="reset-thread" ${taskId ? "" : "disabled"}>Clear Current Thread</button>
+            <div class="metric agentops-anchored-composer">
+              <div class="metric-title-row">
+                <div class="title">Anchored Composer</div>
+                <span class="${chipClassForSessionStatus(status)}">${escapeHTML(status.toUpperCase())}</span>
+              </div>
+              ${message ? `<div class="meta">${escapeHTML(message)}</div>` : ""}
+              <div class="agentops-composer-grid">
+                <label class="field field-wide">
+                  <span class="label">System Instructions</span>
+                  <textarea id="chat-system-prompt" class="filter-input settings-agent-test-textarea" rows="6" data-chat-field="systemPrompt">${escapeHTML(String(chatState.systemPrompt || ""))}</textarea>
+                </label>
+                <label class="field field-wide agentops-prompt-field">
+                  <span class="label">Prompt</span>
+                  <textarea id="chat-prompt" class="filter-input settings-agent-test-textarea" rows="8" data-chat-field="prompt">${escapeHTML(String(chatState.prompt || ""))}</textarea>
+                </label>
+              </div>
+              <div class="filter-row settings-editor-actions agentops-composer-actions">
+                <div class="action-hierarchy">
+                  <div class="action-group action-group-primary">
+                    <button class="btn btn-primary" type="button" data-chat-action="${startAction}">${startLabel}</button>
+                    <button class="btn btn-primary" type="button" data-chat-action="send-turn" ${taskId ? "" : "disabled"}>${sendLabel}</button>
+                  </div>
+                  <div class="action-group action-group-destructive agentops-clear-action">
+                    <button class="btn btn-danger" type="button" data-chat-action="reset-thread" ${taskId ? "" : "disabled"}>Clear Current Thread</button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
-      <div class="metric agentops-transcript-workspace">
-        <div class="metric-title-row">
-          <div class="title">Transcript Workspace</div>
-          <span class="${chipClassForSessionStatus(latestReplyStatus)}">${escapeHTML(latestReplyStatus)}</span>
-        </div>
-        <div class="agentops-transcript-layout">
-          <div class="agentops-transcript-main">
-            ${renderAgentTranscriptSummary({
-              latestReplyText,
-              latestReplyStatus,
-              latestReplySessionId,
-              latestReplyRoute,
-              latestReplyBoundary,
-              latestReplyCompletedAt,
-              latestReplyFinishReason,
-              latestPolicyOutcome,
-              latestActivity,
-              selectedWorker,
-              taskId,
-              threadState,
-              focusSummary,
-              executionMode,
-              historyCount,
-              catalogState
-            })}
-            <div class="chat-turns-stack agentops-transcript-feed">
-              ${renderTurnCards(turns, catalogState, governedExportSelection)}
+        </section>
+        <section class="workbench-domain-cluster" data-workbench-cluster-span="full">
+          <div class="workbench-domain-cluster-header">
+            <h3 class="workbench-domain-cluster-title">Thread Review And Proof</h3>
+            <p class="workbench-domain-cluster-lead">Review transcript evidence, approvals, run context, and thread history from the same governed conversation instead of switching to a different surface.</p>
+          </div>
+          <div class="workbench-domain-cluster-body agentops-cluster-body">
+            <div class="metric agentops-transcript-workspace">
+              <div class="metric-title-row">
+                <div class="title">Transcript Workspace</div>
+                <span class="${chipClassForSessionStatus(latestReplyStatus)}">${escapeHTML(latestReplyStatus)}</span>
+              </div>
+              <div class="agentops-transcript-layout">
+                <div class="agentops-transcript-main">
+                  ${renderAgentTranscriptSummary({
+                    latestReplyText,
+                    latestReplyStatus,
+                    latestReplySessionId,
+                    latestReplyRoute,
+                    latestReplyBoundary,
+                    latestReplyCompletedAt,
+                    latestReplyFinishReason,
+                    latestPolicyOutcome,
+                    latestActivity,
+                    selectedWorker,
+                    taskId,
+                    threadState,
+                    focusSummary,
+                    executionMode,
+                    historyCount,
+                    catalogState
+                  })}
+                  <div class="chat-turns-stack agentops-transcript-feed">
+                    ${renderTurnCards(turns, catalogState, governedExportSelection)}
+                  </div>
+                  ${renderAgentThreadHistory(history, taskId, historyCount, archivedCount, historySummary, {
+                    tenantId,
+                    projectId,
+                    catalogsMessage: catalogState?.message || "",
+                    mode: settingsPayload?.mockMode ? "mock" : "live"
+                  })}
+                </div>
+                <div class="agentops-context-drawer">
+                  ${renderAgentApprovalContextDrawer(focusSummary, threadState, decisionPivotContext, governancePivotContext)}
+                  ${renderAgentAimxsLegibilityContext(aimxsLegibilityContext)}
+                  ${renderAgentAimxsDecisionBindingSpine(aimxsDecisionBindingSpine)}
+                  ${renderAgentRunArtifactContext(runArtifactContext)}
+                  ${renderAgentExecutionProofContext(executionProofContext)}
+                  ${renderAgentArtifactEvidenceDrillInContext(artifactEvidenceDrillInContext)}
+                </div>
+              </div>
             </div>
-            ${renderAgentThreadHistory(history, taskId, historyCount, archivedCount, historySummary, {
-              tenantId,
-              projectId,
-              catalogsMessage: catalogState?.message || "",
-              mode: settingsPayload?.mockMode ? "mock" : "live"
-            })}
           </div>
-          <div class="agentops-context-drawer">
-            ${renderAgentApprovalContextDrawer(focusSummary, threadState, decisionPivotContext, governancePivotContext)}
-            ${renderAgentAimxsLegibilityContext(aimxsLegibilityContext)}
-            ${renderAgentAimxsDecisionBindingSpine(aimxsDecisionBindingSpine)}
-            ${renderAgentRunArtifactContext(runArtifactContext)}
-            ${renderAgentExecutionProofContext(executionProofContext)}
-            ${renderAgentArtifactEvidenceDrillInContext(artifactEvidenceDrillInContext)}
-          </div>
-        </div>
+        </section>
       </div>
     </div>
   `;

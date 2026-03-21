@@ -3,6 +3,10 @@
   gap: var(--space-5);
 }
 
+.settingsops-cluster-grid {
+  gap: var(--space-4);
+}
+
 .settingsops-card {
   display: grid;
   gap: var(--space-4);

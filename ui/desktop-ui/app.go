@@ -202,15 +202,24 @@ func (a *App) NativeGatewayServiceRestart() nativeapp.GatewayServiceRecord {
 	return record
 }
 
-func (a *App) NativeInterpositionConfigure(enabled bool, upstreamBaseURL string, upstreamBearerToken string) error {
+func (a *App) NativeInterpositionConfigure(enabled bool, upstreamBaseURL string, upstreamBearerToken string) (nativeapp.SessionManifest, error) {
+	previousOpts := a.session.LaunchOptions()
+	_ = a.session.RecordEvent("interposition_config_apply_started", map[string]any{
+		"enabled":                       enabled,
+		"upstreamBaseUrl":               strings.TrimSpace(upstreamBaseURL),
+		"upstreamBearerTokenConfigured": strings.TrimSpace(upstreamBearerToken) != "" && strings.TrimSpace(upstreamBearerToken) != "__EPYDIOS_CLEAR_INTERPOSITION_BEARER__",
+	})
 	if err := a.session.UpdateInterpositionConfig(enabled, upstreamBaseURL, upstreamBearerToken); err != nil {
 		_ = a.session.RecordEvent("interposition_config_update_failed", map[string]any{
 			"error":   err.Error(),
 			"enabled": enabled,
 		})
-		return err
+		return a.session.Manifest, err
 	}
 	opts := a.session.LaunchOptions()
+	configChanged := previousOpts.InterpositionEnabled != opts.InterpositionEnabled ||
+		previousOpts.InterpositionUpstreamBaseURL != opts.InterpositionUpstreamBaseURL ||
+		previousOpts.InterpositionUpstreamBearerToken != opts.InterpositionUpstreamBearerToken
 	if opts.Mode == "live" {
 		if _, err := nativeapp.EnsureRuntimeService(opts, a.session); err != nil {
 			_ = a.session.RecordEvent("interposition_runtime_dependency_failed", map[string]any{
@@ -218,24 +227,41 @@ func (a *App) NativeInterpositionConfigure(enabled bool, upstreamBaseURL string,
 				"enabled": enabled,
 			})
 			_ = a.session.RecordStartupFailure(a.session.Manifest.RuntimeState, err)
-			return err
+			return a.session.Manifest, err
 		}
-		if _, err := nativeapp.RestartGatewayService(opts, a.session); err != nil {
-			_ = a.session.RecordEvent("interposition_gateway_restart_failed", map[string]any{
+		if configChanged {
+			if _, err := nativeapp.RestartGatewayService(opts, a.session); err != nil {
+				_ = a.session.RecordEvent("interposition_gateway_restart_failed", map[string]any{
+					"error":   err.Error(),
+					"enabled": enabled,
+				})
+				_ = a.session.RecordStartupFailure(a.session.Manifest.RuntimeState, err)
+				return a.session.Manifest, err
+			}
+		} else if _, err := nativeapp.SyncGatewayServiceStatus(opts, a.session); err != nil {
+			_ = a.session.RecordEvent("interposition_gateway_status_failed", map[string]any{
 				"error":   err.Error(),
 				"enabled": enabled,
 			})
-			_ = a.session.RecordStartupFailure(a.session.Manifest.RuntimeState, err)
-			return err
+			return a.session.Manifest, err
 		}
+	}
+	if _, err := nativeapp.SyncGatewayServiceStatus(opts, a.session); err != nil {
+		_ = a.session.RecordEvent("interposition_gateway_status_failed", map[string]any{
+			"error":   err.Error(),
+			"enabled": enabled,
+		})
+		return a.session.Manifest, err
 	}
 	_ = a.session.UpdateLauncherState("ready")
 	_ = a.session.RecordEvent("interposition_config_updated", map[string]any{
 		"enabled":                       enabled,
 		"upstreamBaseUrl":               a.session.LaunchOptions().InterpositionUpstreamBaseURL,
 		"upstreamBearerTokenConfigured": strings.TrimSpace(a.session.LaunchOptions().InterpositionUpstreamBearerToken) != "",
+		"gatewayState":                  a.session.Manifest.GatewayService.State,
+		"gatewayHealth":                 a.session.Manifest.GatewayService.Health,
 	})
-	return nil
+	return a.session.Manifest, nil
 }
 
 func (a *App) NativeGatewayHoldList() []nativeapp.GatewayHoldRecord {

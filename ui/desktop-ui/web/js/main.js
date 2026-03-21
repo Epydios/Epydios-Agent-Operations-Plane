@@ -15031,7 +15031,70 @@ function getCurrentIncidentOpsEntry(entryId = "") {
       focusRenderedRegion(ui.evidenceOpsContent, { scroll: false });
     }
   });
+  const REQUIRED_NATIVE_BRIDGE_METHODS = Object.freeze([
+    "NativeSessionSummary",
+    "NativeGatewayHoldList",
+    "NativeInterpositionConfigure",
+    "NativeRuntimeServiceRestart",
+    "NativeOpenPath"
+  ]);
   const nativeBindings = () => globalThis?.go?.main?.App || null;
+  let nativeBridgeFailureKey = "";
+  const readNativeBridgeContract = () => {
+    const bindings = nativeBindings();
+    if (!bindings || typeof bindings !== "object") {
+      return {
+        available: false,
+        healthy: false,
+        missing: [...REQUIRED_NATIVE_BRIDGE_METHODS],
+        bindings: null
+      };
+    }
+    const missing = REQUIRED_NATIVE_BRIDGE_METHODS.filter(
+      (name) => typeof bindings?.[name] !== "function"
+    );
+    return {
+      available: true,
+      healthy: missing.length === 0,
+      missing,
+      bindings
+    };
+  };
+  const setNativeLauncherControlsDisabled = (disabled) => {
+    if (!(ui.nativeLauncherStatus instanceof HTMLElement)) {
+      return;
+    }
+    ui.nativeLauncherStatus.dataset.pending = disabled ? "true" : "false";
+    ui.nativeLauncherStatus.setAttribute("aria-busy", disabled ? "true" : "false");
+    Array.from(
+      ui.nativeLauncherStatus.querySelectorAll("button, input, select, textarea")
+    ).forEach((node) => {
+      if (node instanceof HTMLButtonElement || node instanceof HTMLInputElement || node instanceof HTMLSelectElement || node instanceof HTMLTextAreaElement) {
+        node.disabled = disabled;
+      }
+    });
+  };
+  const reportNativeBridgeContractFailure = (bridgeContract) => {
+    if (!bridgeContract?.available || bridgeContract.healthy) {
+      return false;
+    }
+    const failureKey = bridgeContract.missing.join(",");
+    if (failureKey === nativeBridgeFailureKey) {
+      return true;
+    }
+    nativeBridgeFailureKey = failureKey;
+    const shell = config?.nativeShell && typeof config.nativeShell === "object"
+      ? config.nativeShell
+      : {};
+    const startupError = `Native bridge missing required bindings: ${bridgeContract.missing.join(", ")}`;
+    updateNativeLauncherPresentation({
+      ...shell,
+      launcherState: "degraded",
+      startupError
+    });
+    setCompanionOpsFeedback("error", startupError);
+    return true;
+  };
   const syncNativeGatewayHoldsFromBindings = async () => {
     const bindings = nativeBindings();
     if (!bindings || typeof bindings.NativeGatewayHoldList !== "function") {
@@ -15042,23 +15105,41 @@ function getCurrentIncidentOpsEntry(entryId = "") {
     config.nativeGatewayHolds = Array.isArray(holdItems) ? holdItems : [];
     return config.nativeGatewayHolds;
   };
-  const syncNativeShellStateFromBindings = async () => {
-    const bindings = nativeBindings();
-    if (!bindings || typeof bindings.NativeSessionSummary !== "function") {
+  const applyNativeSessionSummary = async (sessionSummary, options = {}) => {
+    if (!sessionSummary || typeof sessionSummary !== "object") {
       return false;
     }
-    const sessionSummary = await bindings.NativeSessionSummary();
-    if (sessionSummary && typeof sessionSummary === "object") {
-      updateNativeLauncherPresentation(sessionSummary);
+    nativeBridgeFailureKey = "";
+    updateNativeLauncherPresentation(sessionSummary);
+    if (options.syncHolds !== false) {
       await syncNativeGatewayHoldsFromBindings().catch(() => {
         config.nativeGatewayHolds = Array.isArray(config.nativeGatewayHolds) ? config.nativeGatewayHolds : [];
       });
-      renderHomePanel();
-      renderLogOpsPanel();
-      return true;
     }
-    return false;
+    if (options.renderHome !== false) {
+      renderHomePanel();
+    }
+    if (options.renderLog !== false) {
+      renderLogOpsPanel();
+    }
+    return true;
   };
+  const syncNativeShellStateFromBindings = async () => {
+    const bridgeContract = readNativeBridgeContract();
+    if (!bridgeContract.available) {
+      return false;
+    }
+    if (!bridgeContract.healthy) {
+      reportNativeBridgeContractFailure(bridgeContract);
+      return false;
+    }
+    const sessionSummary = await bridgeContract.bindings.NativeSessionSummary();
+    return applyNativeSessionSummary(sessionSummary);
+  };
+  const initialNativeBridgeContract = readNativeBridgeContract();
+  if (initialNativeBridgeContract.available && !initialNativeBridgeContract.healthy) {
+    reportNativeBridgeContractFailure(initialNativeBridgeContract);
+  }
   function syncNativeInterpositionDraftPresentation() {
     const root = ui.nativeLauncherStatus instanceof HTMLElement ? ui.nativeLauncherStatus : null;
     if (!(root instanceof HTMLElement)) {
@@ -15134,28 +15215,60 @@ function getCurrentIncidentOpsEntry(entryId = "") {
     };
   };
   const configureNativeInterposition = async (enabled) => {
-    const bindings = nativeBindings();
-    if (!bindings || typeof bindings.NativeInterpositionConfigure !== "function") {
+    const bridgeContract = readNativeBridgeContract();
+    if (!bridgeContract.available) {
       setCompanionOpsFeedback(
         "warn",
         "Interposition controls are unavailable in this shell. Use the installed native launcher build to place Epydios in the request path."
       );
       return false;
     }
+    if (!bridgeContract.healthy) {
+      reportNativeBridgeContractFailure(bridgeContract);
+      return false;
+    }
     const draft = readNativeInterpositionDraft();
+    setNativeLauncherControlsDisabled(true);
+    setCompanionOpsFeedback(
+      "info",
+      enabled
+        ? "Turning interposition on. Epydios is applying the local request-path change."
+        : "Turning interposition off. Epydios is removing the local request-path change."
+    );
     try {
-      await bindings.NativeInterpositionConfigure(Boolean(enabled), draft.upstreamBaseURL, draft.upstreamBearerToken);
-      await syncNativeShellStateFromBindings();
-      await refresh();
-      const statusMessage = enabled
-        ? "Interposition is ON. Compatible /v1/responses traffic now enters the local governed proxy path."
-        : "Interposition is OFF. Compatible /v1/responses traffic will no longer enter the local governed proxy path.";
-      setCompanionOpsFeedback("ok", statusMessage);
+      const sessionSummary = await bridgeContract.bindings.NativeInterpositionConfigure(
+        Boolean(enabled),
+        draft.upstreamBaseURL,
+        draft.upstreamBearerToken
+      );
+      if (!(await applyNativeSessionSummary(sessionSummary))) {
+        await syncNativeShellStateFromBindings();
+      }
+      await refreshStatusOnly().catch(() => {});
+      const shell = config?.nativeShell && typeof config.nativeShell === "object" ? config.nativeShell : {};
+      const interposition = shell?.interposition && typeof shell.interposition === "object"
+        ? shell.interposition
+        : {};
+      const interpositionStatus = String(interposition.status || "").trim().toLowerCase();
+      const statusMessage = String(interposition.reason || "").trim() || (
+        enabled
+          ? "Interposition is ON. Compatible /v1/responses traffic now enters the local governed proxy path."
+          : "Interposition is OFF. Compatible /v1/responses traffic will no longer enter the local governed proxy path."
+      );
+      const feedbackTone =
+        !Boolean(interposition.enabled) || interpositionStatus === "off"
+          ? "danger"
+          : interpositionStatus === "on"
+            ? "ok"
+            : "warn";
+      setCompanionOpsFeedback(feedbackTone, statusMessage);
       return true;
     } catch (error) {
       await syncNativeShellStateFromBindings().catch(() => {});
       setCompanionOpsFeedback("error", `Interposition update failed: ${error.message}`);
       return false;
+    } finally {
+      setNativeLauncherControlsDisabled(false);
     }
   };
   const setCompanionHandoffContext = (nextContext = null) => {
