@@ -1,60 +1,50 @@
 # Getting Started
 
-Use this path if you want to see the OSS baseline without digging through the full docs tree.
+Use this path if you want to evaluate the public OSS baseline without digging through the full docs tree.
 
 ## What You Are Running
 
-Epydios Agent Operations Plane is a control plane and operator workbench for governed agent tool execution with approvals and evidence.
+The OSS repo gives you:
 
-The narrow first story is:
+- the control plane
+- the desktop UI and launcher source
+- the localhost gateway path
+- governed execution with audit, evidence, and receipts
+- an OSS baseline with `ALLOW` and `DENY`
 
-1. submit a governed request
-2. evaluate it through policy
-3. capture approval or denial
-4. record evidence and audit
-5. inspect the result in the desktop workbench
+Premium AIMXS remains separate and is not required for the OSS baseline.
 
-## Start With The OSS Baseline
+## Fast Repo Check
 
 From the repo root:
 
 ```bash
-./platform/local/bin/verify-m0.sh
-kubectl apply -k platform/modes/oss-only
+./platform/ci/bin/qc-preflight.sh
+./ui/desktop-ui/bin/check-m1.sh
 ```
 
-That gives you the OSS baseline mode with no AIMXS dependency.
+That gives you the quickest confidence pass that the repo and desktop module are in a sane state.
 
-## Open The Operator Workbench
+## Installed Desktop Check On macOS
 
-Follow the desktop module guide:
-
-- [ui/desktop-ui/README.md](../ui/desktop-ui/README.md)
-
-The main local quality path there is:
+If you are on macOS, use the installed desktop path next:
 
 ```bash
-./ui/desktop-ui/bin/check-m1.sh
-./ui/desktop-ui/bin/verify-m14-ui-daily-loop.sh
+./ui/desktop-ui/bin/install-m15-macos-beta.sh
+./ui/desktop-ui/bin/verify-m15-phase-c.sh
+open "$HOME/Applications/Epydios AgentOps Desktop.app"
 ```
 
-For the single canonical OSS evaluation path, use:
+This is the current verified operator path for the installable desktop app.
+
+## What To Read Next
 
 - [OSS quality story](quality-story.md)
-
-## Know The Core Contract
-
-Use these two docs next:
-
+- [Desktop module guide](../ui/desktop-ui/README.md)
 - [Runtime orchestration service](runtime-orchestration-service.md)
 - [Governed action request contract](specs/governed-action-request-contract.md)
-
-Those are the shortest path to understanding the runtime API and the governed request shape.
+- [OSS versus premium policy](oss-premium-policy.md)
 
 ## Optional Premium Comparison
 
-If you later want to compare OSS baseline behavior against premium AIMXS behavior, use:
-
-- [AIMXS governed action demo](runbooks/aimxs-governed-action-demo.md)
-
-That is intentionally not the first step for OSS evaluation.
+If premium AIMXS is installed later and you want to compare the richer premium path against the OSS baseline, use the dedicated runbooks instead of treating that as the default OSS story.

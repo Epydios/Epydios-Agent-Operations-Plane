@@ -253,6 +253,31 @@ test("aimxs https rendering still surfaces secure refs", () => {
   });
 });
 
+test("aimxs settings disables activation controls when helper is unavailable", () => {
+  const settings = {
+    aimxs: {
+      paymentEntitled: true,
+      mode: "aimxs-full",
+      state: "ready",
+      providerIds: ["aimxs-policy-primary"],
+      activation: {
+        available: false,
+        state: "unavailable",
+        message: "AIMXS activation helper is unavailable on this launcher."
+      }
+    }
+  };
+
+  const metric = renderAimxsSettingsMetric(settings, {}, {
+    chipClassForEditorStatus: () => "chip chip-neutral",
+    selectedAttr: (value, expected) => (value === expected ? "selected" : "")
+  });
+
+  assert.match(metric, /data-settings-aimxs-action="activate"[^>]*disabled/);
+  assert.match(metric, /data-settings-aimxs-action="refresh-activation"[^>]*disabled/);
+  assert.match(metric, /AIMXS activation helper is unavailable on this launcher\./);
+});
+
 test("aimxs overrides apply without mutating the base choice object", () => {
   const baseChoices = {
     integrations: {

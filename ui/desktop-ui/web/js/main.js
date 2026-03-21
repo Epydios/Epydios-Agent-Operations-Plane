@@ -13405,6 +13405,19 @@ function getCurrentIncidentOpsEntry(entryId = "") {
         return;
       }
 
+      if (action === "activate" && !aimxsActivationSnapshot.available) {
+        aimxsEditorState = {
+          status: "warn",
+          message:
+            aimxsActivationSnapshot.message ||
+            "AIMXS activation is unavailable on this launcher. Save the contract only, or use the supported launcher helper path.",
+          errors: [],
+          warnings: Array.isArray(aimxsActivationSnapshot.warnings) ? aimxsActivationSnapshot.warnings : []
+        };
+        renderAimxsEditorFeedbackInline(aimxsEditorState);
+        return;
+      }
+
       if (action === "apply" || action === "activate") {
         const validation = validateAimxsOverride(
           draft,

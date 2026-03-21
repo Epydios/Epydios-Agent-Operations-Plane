@@ -1,31 +1,10 @@
 # OSS Quality Story
 
-This is the single canonical OSS evaluation path for the repo.
+This is the public OSS evaluation path for the repo.
 
-It uses one launch path, one test path, one demo path, and one expected result set.
+It is intentionally narrower than the full product story. It proves the OSS baseline without requiring premium AIMXS material.
 
-## 1. Launch Path
-
-Start the local desktop shell:
-
-```bash
-cd ui/desktop-ui
-PORT=4176 ./bin/run-dev.sh
-```
-
-In a second terminal, confirm the UI is serving:
-
-```bash
-curl -sSf http://127.0.0.1:4176/ >/dev/null && echo READY
-```
-
-Expected result:
-
-```text
-READY
-```
-
-## 2. Test Path
+## 1. Repo QC
 
 From the repo root:
 
@@ -39,30 +18,43 @@ Expected result:
 QC preflight passed.
 ```
 
-## 3. Demo Path
+## 2. Desktop Module Baseline
 
 From the repo root:
 
 ```bash
-./ui/desktop-ui/bin/verify-m14-ui-daily-loop.sh
+./ui/desktop-ui/bin/check-m1.sh
 ```
 
 Expected result:
 
 ```text
-M14 UI daily loop PASS.
+M1-M4 and M14 baseline UI checks passed.
+```
+
+## 3. Installed Desktop Verification On macOS
+
+If you are on macOS:
+
+```bash
+./ui/desktop-ui/bin/install-m15-macos-beta.sh
+./ui/desktop-ui/bin/verify-m15-phase-c.sh
+```
+
+Expected result:
+
+```text
+M15 Phase C verifier passed.
 ```
 
 ## 4. What This Proves
 
-This story proves the OSS repo can:
+This path proves that the public OSS repo can:
 
-- launch the operator workbench locally
 - pass the repo QC baseline
-- pass the bounded desktop daily loop
+- pass the desktop module baseline checks
+- build and verify the current installable macOS desktop path
 
-It is intentionally OSS-first. It does not require premium AIMXS material.
+It does not prove premium AIMXS behavior, and it does not claim a fully verified Windows host path.
 
-If premium AIMXS is installed later, use the separate comparison path:
-
-- [AIMXS governed action demo](runbooks/aimxs-governed-action-demo.md)
+For premium comparison later, use the separate AIMXS-specific runbooks and local verifier paths.

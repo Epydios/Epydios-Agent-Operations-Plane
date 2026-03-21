@@ -2466,14 +2466,20 @@ func findGatewayRequestRecordByInterpositionRetryKey(root string, interposition 
 	if retryKey == "" {
 		return gatewayRequestRecord{}, false
 	}
+	incomingBodySHA := strings.TrimSpace(interposition.Upstream.BodySHA256)
 	items, err := listGatewayRequestRecords(root)
 	if err != nil {
 		return gatewayRequestRecord{}, false
 	}
 	for _, item := range items {
-		if strings.TrimSpace(gatewayInterpositionRetryKey(item.Interposition)) == retryKey {
-			return item, true
+		if strings.TrimSpace(gatewayInterpositionRetryKey(item.Interposition)) != retryKey {
+			continue
 		}
+		existingBodySHA := strings.TrimSpace(item.Interposition.Upstream.BodySHA256)
+		if incomingBodySHA != "" && existingBodySHA != "" && incomingBodySHA != existingBodySHA {
+			continue
+		}
+			return item, true
 	}
 	return gatewayRequestRecord{}, false
 }

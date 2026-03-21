@@ -1,131 +1,86 @@
 # Epydios Agent Operations Plane
 
-Kubernetes-first control plane and operator workbench for governed agent and tool execution.
+Installable operator desktop and local governance plane for agent and tool execution.
 
-Apply policy, require approval when needed, execute with receipts, and keep audit and evidence readable from one interface.
+Epydios is for teams that want a governed execution path with policy decisions, receipts, audit, evidence, and operator review without hiding the control surface behind a generic agent shell.
 
-> _Screenshot placeholder: hero overview of the desktop workbench_
+## Current Public Baseline
 
-## Why It Exists
+- `Companion` is the default live surface.
+- `Workbench` is the deeper operator console.
+- `Interposition OFF / ON` is explicit, not silent.
+- The verified installed desktop path today is macOS.
+- Linux packaging is verified in Docker.
+- Windows packaging exists, but a real Windows host acceptance pass is still pending.
+- The OSS baseline covers governed execution, audit, evidence, receipts, and `ALLOW` or `DENY` behavior.
+- Premium AIMXS adds the richer `DEFER` and approval-resume path.
 
-Most agent tooling makes actions easy to trigger and hard to govern. Once actions matter, teams need policy decisions, approval paths, receipts, and evidence that operators can actually follow.
+## What The OSS Repo Includes
 
-Epydios Agent Operations Plane is built for that operational reality. It gives you a governed runtime path and a full desktop workbench for taking requests from submission through policy, approval, execution, review, and follow-through.
+- control-plane source
+- desktop UI and native launcher source
+- public provider contracts
+- baseline OSS providers
+- local launcher, background supervisor, and localhost gateway
+- governed execution, audit, evidence, incident, and review surfaces
 
-## What You Get
+Premium AIMXS stays outside this OSS repo and is governed by the public provider boundary described in [docs/oss-premium-policy.md](docs/oss-premium-policy.md).
 
-- Governed requests with explicit tenant, project, environment, and action scope
-- Policy `allow`, `deny`, or `defer` decisions with rationale and grant requirements
-- Approval, receipt, and recovery flows for higher-consequence actions
-- Audit, evidence, and incident follow-through in the same workbench
-- Admin surfaces for controlled change review and lifecycle history
-- Full desktop operator workbench for Linux, macOS, and Windows
-- Kubernetes-first deployment, verification, and upgrade path
-- OSS baseline providers with a clearly bounded premium AIMXS path
+## Start Here
 
-## Product Tour
+- [Getting started](docs/getting-started.md)
+- [OSS quality story](docs/quality-story.md)
+- [Desktop module guide](ui/desktop-ui/README.md)
+- [OSS versus premium policy](docs/oss-premium-policy.md)
+- [Release policy](docs/release-policy.md)
 
-### Governed Request Flow
+## What You Can Evaluate Today
 
-> _Screenshot placeholder: governed request flow board_
-
-Track a request from submission through policy, approval, execution, and receipt without losing the thread.
-
-### Audit And Evidence
-
-> _Screenshot placeholder: audit and evidence views_
-
-Move from the decision to the receipt to the supporting evidence without exporting logs into a second tool.
-
-### Admin And Review Workflows
-
-> _Screenshot placeholder: admin, review, and history workflows_
-
-Handle higher-risk changes and operator actions through explicit review, apply, rollback, and history stages instead of hidden control paths.
-
-## One Concrete Use Case
-
-A team wants an agent to perform tool actions in a shared environment, but only with explicit policy evaluation, approval where required, and a durable audit and evidence trail.
-
-That is the center of this repo. It is not trying to be a generic “autonomous systems” platform.
-
-## How It Works
-
-For each governed request, the system does this:
-
-1. Accept the request with tenant, project, environment, and action scope.
-2. Resolve runtime context through `ProfileResolver`.
-3. Evaluate policy through `PolicyProvider`.
-4. Require approval when policy defers or grant requirements demand it.
-5. Execute the action through the runtime path.
-6. Record receipts and evidence for later review in the workbench.
-
-## Quick Start
-
-Use the OSS baseline path first.
+If you want a quick repo-level confidence pass:
 
 ```bash
-./platform/local/bin/verify-m0.sh
-kubectl apply -k platform/modes/oss-only
-cd ui/desktop-ui && PORT=4176 ./bin/run-dev.sh
-curl -sSf http://127.0.0.1:4176/ >/dev/null && echo READY
+./platform/ci/bin/qc-preflight.sh
+./ui/desktop-ui/bin/check-m1.sh
 ```
 
-Then use the operator workbench to inspect governed runs, approvals, audit, evidence, and admin workflows.
+If you are on macOS and want the installed desktop path:
 
-For the full expected verification path and PASS criteria, see [docs/quality-story.md](docs/quality-story.md).
+```bash
+./ui/desktop-ui/bin/install-m15-macos-beta.sh
+./ui/desktop-ui/bin/verify-m15-phase-c.sh
+open "$HOME/Applications/Epydios AgentOps Desktop.app"
+```
 
-## Runtime Modes
+## Product Shape
 
-| Mode | Meaning | Notes |
-| --- | --- | --- |
-| `oss-only` | Self-contained OSS baseline providers | No AIMXS dependency |
-| `aimxs-https` | Premium AIMXS over the public provider boundary | Secure external-provider path |
-| `aimxs-full` | Premium local/full AIMXS integration | Uses the premium artifact when installed and fails clearly if missing |
+Epydios currently consists of:
 
-## Architecture And Contracts
+- an installable desktop UI
+- a local launcher and background runtime supervisor
+- a loopback localhost gateway
+- a governed runtime path for requests, runs, receipts, and review
+- operator surfaces for runtime, governance, audit, evidence, incident, and settings work
 
-Start here if you want the technical surfaces behind the product flow:
-
-- Docs entry path: [docs/README.md](docs/README.md)
-- Release policy: [docs/release-policy.md](docs/release-policy.md)
-- OSS vs premium: [docs/oss-premium-policy.md](docs/oss-premium-policy.md)
-- Provider boundary: [contracts/extensions/v1alpha1/README.md](contracts/extensions/v1alpha1/README.md)
-- Runtime API: [docs/runtime-orchestration-service.md](docs/runtime-orchestration-service.md)
-- Governed request contract: [docs/specs/governed-action-request-contract.md](docs/specs/governed-action-request-contract.md)
-- Deployment modes: [platform/modes/README.md](platform/modes/README.md)
-- Desktop UI: [ui/desktop-ui/README.md](ui/desktop-ui/README.md)
-
-## OSS And Premium
-
-The OSS repo ships the control plane, desktop workbench, public provider contracts, baseline providers, and the governed execution, approval, audit, evidence, incident, and admin workflow surfaces.
-
-Premium AIMXS stays behind the public provider boundary. It is supported by the product model, but it is not bundled into this OSS repo.
+Codex-in-path interposition exists behind an explicit local switchable gateway path. The proven public baseline today is the local `ALLOW` path. Premium AIMXS remains the richer `DEFER` path.
 
 ## Repo Map
 
-- [cmd/](cmd) — control-plane and provider entrypoints
-- [internal/](internal) — runtime, orchestration, and provider routing logic
-- [contracts/extensions/v1alpha1/](contracts/extensions/v1alpha1) — public provider contract surface
-- [platform/](platform) — deployment modes, local bootstrap, CI gates, upgrade policy
-- [ui/desktop-ui/](ui/desktop-ui) — desktop operator workbench
-- [examples/](examples) — example provider registration and deployment material
+- [cmd/](cmd) - control-plane and provider entrypoints
+- [internal/](internal) - runtime, orchestration, provider routing, and gateway logic
+- [contracts/extensions/v1alpha1/](contracts/extensions/v1alpha1) - public provider contract surface
+- [platform/](platform) - deployment modes, local bootstrap, CI gates, and verification
+- [ui/desktop-ui/](ui/desktop-ui) - desktop UI, launcher, native packaging, and localhost gateway
+- [examples/](examples) - example provider registration and deployment material
 
 ## Quality And Trust
 
-- Quality story: [docs/quality-story.md](docs/quality-story.md)
-- Release policy: [docs/release-policy.md](docs/release-policy.md)
-- OSS vs premium policy: [docs/oss-premium-policy.md](docs/oss-premium-policy.md)
-- License: [LICENSE](LICENSE)
-- Security: [SECURITY.md](SECURITY.md)
-- Contributing: [CONTRIBUTING.md](CONTRIBUTING.md)
-- Trademark: [TRADEMARK.md](TRADEMARK.md)
-- Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
+- [OSS quality story](docs/quality-story.md)
+- [OSS versus premium policy](docs/oss-premium-policy.md)
+- [Release policy](docs/release-policy.md)
+- [LICENSE](LICENSE)
+- [SECURITY.md](SECURITY.md)
+- [CONTRIBUTING.md](CONTRIBUTING.md)
+- [TRADEMARK.md](TRADEMARK.md)
+- [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 
-Telemetry/defaults:
-
-- the documented OSS quality story does not enable product analytics or usage tracking by default
-- local managed Codex worker invocation explicitly disables CLI analytics in its default path
-- platform observability components are operator-managed infrastructure, not default third-party product analytics
-
-This is an early `v0.x` public baseline. The goal is governed execution that is concrete, inspectable, and operationally useful.
+This is still a `v0.x` release line. The goal is not feature sprawl. The goal is governed execution that is concrete, inspectable, and operationally useful.
