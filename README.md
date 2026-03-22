@@ -4,7 +4,7 @@ Installable operator desktop and local governance plane for agent and tool execu
 
 Epydios is for teams that want a governed execution path with policy decisions, receipts, audit, evidence, and operator review without hiding the control surface behind a generic agent shell.
 
-![Epydios Companion overview](docs/images/hero-overview.png)
+![Epydios security seal](docs/images/security-seal.png)
 
 ## Current Public Baseline
 
