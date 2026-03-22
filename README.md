@@ -6,6 +6,10 @@ Epydios gives teams a visible control plane for AI and tool execution. It combin
 
 ![Epydios security seal](docs/images/security-seal.png)
 
+Security seal says: security is sealed. 
+
+I don't want a coffee, but your stars help keep this project alive (thank you). 
+
 ## Why Epydios
 
 - Governed execution with a real operator surface instead of a hidden background policy layer.
