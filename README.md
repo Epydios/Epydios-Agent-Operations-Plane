@@ -58,7 +58,7 @@ If you want a quick repository-level confidence pass:
 ./ui/desktop-ui/bin/check-m1.sh
 ```
 
-If you are on macOS and want the installed desktop path:
+If you are on macOS and want the verified installed desktop path:
 
 ```bash
 ./ui/desktop-ui/bin/install-m15-macos-beta.sh
@@ -66,7 +66,21 @@ If you are on macOS and want the installed desktop path:
 open "$HOME/Applications/Epydios AgentOps Desktop.app"
 ```
 
-The verified installed path today is macOS. Linux packaging is exercised in Docker. Windows packaging exists, but Windows host acceptance pass is pending.
+If you are on Linux and want to evaluate the beta installed desktop path:
+
+```bash
+./ui/desktop-ui/bin/install-m15-linux-beta.sh
+./ui/desktop-ui/bin/launch-m15-linux-beta.sh
+```
+
+If you are on Windows and want to evaluate the beta installed desktop path:
+
+```bash
+bash ./ui/desktop-ui/bin/install-m15-windows-beta.sh
+bash ./ui/desktop-ui/bin/launch-m15-windows-beta.sh
+```
+
+Note: We are working on bringing host acceptance in Linux and Windows to the same level as macOS.  
 
 ## Screenshots
 
