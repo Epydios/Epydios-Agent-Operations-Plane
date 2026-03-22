@@ -1,8 +1,8 @@
-# Epydios Agent Operations Plane
+# EpydiosOps Agent Operations Plane
 
 Installable operator desktop and local governance plane for agent and tool execution.
 
-Epydios gives teams a visible control plane for AI and tool execution. It combines an installable desktop operator console, a local launcher and supervisor, a loopback gateway, and a governed runtime path for policy enforcement, receipts, audit, evidence, incident review, and operator action.
+EpydiosOps gives teams a visible control plane for AI and tool execution. It combines an installable desktop operator console, a local launcher and supervisor, a loopback gateway, and a governed runtime path for policy enforcement, receipts, audit, evidence, incident review, and operator action.
 
 ![Epydios security seal](docs/images/security-seal.png)
 
@@ -10,7 +10,7 @@ Sentry seal says: security is seal-d.
 
 If this looks useful, please give the repo a star. It helps more people discover the project, use it and contribute to making it better.
 
-## Why Epydios
+## Why EpydiosOps
 
 - Governed execution with a real operator surface instead of a hidden background policy layer.
 - Local request-path control through an explicit desktop launcher and loopback gateway.
@@ -22,11 +22,11 @@ If this looks useful, please give the repo a star. It helps more people discover
 
 This repository contains the public control plane, desktop app, native launcher, localhost gateway, public provider contracts, baseline OSS providers and the operator surfaces required to inspect and govern execution locally.
 
-The desktop product currently opens in a live `Companion` posture for day-to-day operation and includes the deeper `Workbench` surface for review, runtime, audit, evidence, incident and settings work.
+The desktop product currently opens in a live `Companion` posture for day-to-day operation and includes the deeper `Workbench` surface for review, runtime, audit, evidence and incidents.
 
-## How Epydios Is Used
+## How EpydiosOps Is Used
 
-Epydios is not just an interposition layer.
+EpydiosOps is not just an interposition layer.
 
 Teams can use it in three primary ways:
 
@@ -34,9 +34,13 @@ Teams can use it in three primary ways:
 - as a local gateway and SDK surface for governed execution from tools, scripts, and clients
 - as an explicit in-path control layer for supported clients when local interposition is intentionally enabled
 
-## Upcoming Extensions
+## Upcoming
 
-Upcoming Epydios editions are aimed at teams that need a more mature decision layer, stronger governance depth, richer evidence and approval packs, private connector paths for higher-consequence systems and enterprise distribution and support.
+We are building EpydiosOps toward a more complete agent operations plane for both individual operators and serious organizational use.
+
+Upcoming EpydiosOps editions are aimed at teams that need a more mature decision layer, stronger governance depth, richer evidence and approval packs, private connector paths for higher-consequence systems and enterprise distribution and support.
+
+We are continuously squashing bugs and adding features. 
 
 ## Getting Started
 
@@ -80,13 +84,13 @@ The verified installed path today is macOS. Linux packaging is exercised in Dock
 
 ## Product Shape
 
-Epydios currently consists of:
+EpydiosOps currently consists of:
 
 - an installable desktop UI
 - a local launcher and background runtime supervisor
 - a loopback localhost gateway
-- a governed runtime path for requests, runs, receipts, and review
-- operator surfaces for runtime, governance, audit, evidence, incident, and settings work
+- a governed runtime path for requests, runs, receipts and review
+- operator surfaces for runtime, governance, audit, evidence, incidents
 
 ## Current Client Scope
 
@@ -94,14 +98,19 @@ The first proven interposition path in the public repository is the Codex and Op
 
 That is the current leading path, not the only intended one. The operator desktop and local gateway are designed to support additional client surfaces over time. If you have a certain agent that we should look at, please let us know. Anthropic, Google, AWS and other are all planned. 
 
-## What Is Next
+## Future Directions
 
-Current follow-on work is focused on:
+We are building EpydiosOps toward a more complete agent operations plane for both individual operators and serious organizational use. Near-term work includes:
 
+- stronger enterprise readiness, including deployment maturity, operational controls and integration depth
 - expanding supported client paths beyond the first Codex-compatible interposition flow
 - continuing Companion and Workbench polish for daily operator use
 - strengthening installed desktop workflows across platforms
 - improving native-first control flows so less operator work depends on fallback or development paths
+- deeper governance and decision quality
+- richer audit, evidence and incident workflows
+- more polished desktop installs and platform support
+- a larger SDK and integration surface for tools, gateways, and providers
 
 ## Repository Guide
 
