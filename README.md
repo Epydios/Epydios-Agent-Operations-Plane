@@ -69,7 +69,9 @@ open "$HOME/Applications/Epydios AgentOps Desktop.app"
 If you are on Linux and want to evaluate the beta installed desktop path:
 
 ```bash
+./ui/desktop-ui/bin/bootstrap-m15-linux-ubuntu.sh
 ./ui/desktop-ui/bin/install-m15-linux-beta.sh
+./ui/desktop-ui/bin/verify-m15-linux-beta.sh
 ./ui/desktop-ui/bin/launch-m15-linux-beta.sh
 ```
 
@@ -80,7 +82,11 @@ bash ./ui/desktop-ui/bin/install-m15-windows-beta.sh
 bash ./ui/desktop-ui/bin/launch-m15-windows-beta.sh
 ```
 
-Note: We are working on bringing host acceptance in Linux and Windows to the same level as macOS.  
+The primary verified installed operator path today remains macOS.
+
+Linux has a proven Ubuntu 24.04 x86_64 host-acceptance path.
+
+Windows packaging exists, but a Windows host acceptance pass remains pending.
 
 ## Screenshots
 
@@ -145,4 +151,3 @@ We are building EpydiosOps toward a more complete agent operations plane for bot
 - [CONTRIBUTING.md](CONTRIBUTING.md)
 - [TRADEMARK.md](TRADEMARK.md)
 - [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
-

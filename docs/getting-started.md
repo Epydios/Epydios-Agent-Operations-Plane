@@ -37,6 +37,20 @@ open "$HOME/Applications/Epydios AgentOps Desktop.app"
 
 This is the current verified operator path for the installable desktop app.
 
+## Installed Desktop Check On Linux
+
+If you are on Ubuntu and want to evaluate the beta installed desktop path:
+
+```bash
+./ui/desktop-ui/bin/bootstrap-m15-linux-ubuntu.sh
+./ui/desktop-ui/bin/check-m15-native-toolchain.sh
+./ui/desktop-ui/bin/install-m15-linux-beta.sh
+./ui/desktop-ui/bin/verify-m15-linux-beta.sh
+./ui/desktop-ui/bin/launch-m15-linux-beta.sh
+```
+
+Ubuntu 24.04 x86_64 now has a proven host-acceptance path for native preflight, packaging and install, and launcher startup. Linux should still be treated as beta until broader host coverage is in place.
+
 ## What To Read Next
 
 - [OSS quality story](quality-story.md)
