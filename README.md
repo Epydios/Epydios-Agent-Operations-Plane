@@ -20,20 +20,15 @@ This repository contains the public control plane, desktop app, native launcher,
 
 The desktop product currently opens in a live `Companion` posture for day-to-day operation and includes the deeper `Workbench` surface for review, runtime, audit, evidence, incident, and settings work.
 
-## AIMXS
+## Commercial Extensions
 
-AIMXS stays outside this OSS repository.
-
-AIMXS is the premium path for teams that want a more mature decision kernel, stronger governance depth, more advanced evidence and approval packs, secure private connector paths for higher-consequence systems, and enterprise distribution and support. The OSS repo keeps the public integration boundary visible, but it does not ship the premium implementation itself.
-
-See [docs/oss-premium-policy.md](docs/oss-premium-policy.md) for the repo boundary.
+Commercial Epydios editions are aimed at teams that need a more mature decision layer, stronger governance depth, richer evidence and approval packs, private connector paths for higher-consequence systems, and enterprise distribution and support.
 
 ## Getting Started
 
 - [Getting started](docs/getting-started.md)
 - [OSS quality story](docs/quality-story.md)
 - [Desktop module guide](ui/desktop-ui/README.md)
-- [OSS versus premium policy](docs/oss-premium-policy.md)
 - [Release policy](docs/release-policy.md)
 
 ## Install And Evaluate
