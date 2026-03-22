@@ -24,6 +24,16 @@ This repository contains the public control plane, desktop app, native launcher,
 
 The desktop product currently opens in a live `Companion` posture for day-to-day operation and includes the deeper `Workbench` surface for review, runtime, audit, evidence, incident, and settings work.
 
+## How Epydios Is Used
+
+Epydios is not just an interposition layer.
+
+Teams can use it in three primary ways:
+
+- as an installable operator desktop for runtime, governance, audit, evidence, incident, and settings work
+- as a local gateway and SDK surface for governed execution from tools, scripts, and clients
+- as an explicit in-path control layer for supported clients when local interposition is intentionally enabled
+
 ## Commercial Extensions
 
 Commercial Epydios editions are aimed at teams that need a more mature decision layer, stronger governance depth, richer evidence and approval packs, private connector paths for higher-consequence systems, and enterprise distribution and support.
@@ -78,7 +88,20 @@ Epydios currently consists of:
 - a governed runtime path for requests, runs, receipts, and review
 - operator surfaces for runtime, governance, audit, evidence, incident, and settings work
 
-Codex-in-path interposition exists behind an explicit local switchable gateway path. The public OSS baseline focuses on visible, governed execution with auditability and operator control.
+## Current Client Scope
+
+The first proven interposition path in the public repository is the Codex and OpenAI-compatible `/responses` flow through the local gateway.
+
+That is the current leading path, not the only intended one. The operator desktop and local gateway are designed to support additional client surfaces over time.
+
+## What Is Next
+
+Current follow-on work is focused on:
+
+- expanding supported client paths beyond the first Codex-compatible interposition flow
+- continuing Companion and Workbench polish for daily operator use
+- strengthening installed desktop workflows across platforms
+- improving native-first control flows so less operator work depends on fallback or development paths
 
 ## Repository Guide
 
