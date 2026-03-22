@@ -8,7 +8,7 @@ Epydios gives teams a visible control plane for AI and tool execution. It combin
 
 Security seal says: security is seal-d. 
 
-I don't want a coffee, but your stars help keep this project alive (thank you). 
+I don't want a coffee, but your stars help keep this project alive...there is a lot more to come (thank you).
 
 ## Why Epydios
 
