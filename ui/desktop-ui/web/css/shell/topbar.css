@@ -191,6 +191,27 @@
     color-mix(in srgb, var(--surface) 94%, var(--panel));
 }
 
+.native-launcher-status-switch-callout.is-on {
+  border-color: color-mix(in srgb, var(--success) 40%, var(--line));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface) 90%, transparent), color-mix(in srgb, var(--success-bg) 42%, transparent)),
+    color-mix(in srgb, var(--success-bg) 18%, var(--surface));
+}
+
+.native-launcher-status-switch-callout.is-off {
+  border-color: color-mix(in srgb, var(--danger) 32%, var(--line));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface) 92%, transparent), color-mix(in srgb, var(--danger-bg) 34%, transparent)),
+    color-mix(in srgb, var(--danger-bg) 12%, var(--surface));
+}
+
+.native-launcher-status-switch-callout.is-pending {
+  border-color: color-mix(in srgb, var(--warning, var(--accent)) 32%, var(--line));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface) 92%, transparent), color-mix(in srgb, var(--warning-bg, var(--secondary-bg)) 34%, transparent)),
+    color-mix(in srgb, var(--warning-bg, var(--secondary-bg)) 12%, var(--surface));
+}
+
 .native-launcher-status-switch-row {
   display: flex;
   flex-wrap: wrap;

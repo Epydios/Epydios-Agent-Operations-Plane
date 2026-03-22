@@ -4,6 +4,8 @@ Installable operator desktop and local governance plane for agent and tool execu
 
 Epydios is for teams that want a governed execution path with policy decisions, receipts, audit, evidence, and operator review without hiding the control surface behind a generic agent shell.
 
+![Epydios Companion overview](docs/images/hero-overview.png)
+
 ## Current Public Baseline
 
 - `Companion` is the default live surface.
@@ -50,6 +52,20 @@ If you are on macOS and want the installed desktop path:
 ./ui/desktop-ui/bin/verify-m15-phase-c.sh
 open "$HOME/Applications/Epydios AgentOps Desktop.app"
 ```
+
+## Screenshots
+
+### Companion
+
+![Epydios Companion overview](docs/images/hero-overview.png)
+
+### Governed Request Flow
+
+![Epydios governed request flow](docs/images/governed-request-flow.png)
+
+### Audit And Evidence
+
+![Epydios audit and evidence](docs/images/audit-evidence.png)
 
 ## Product Shape
 

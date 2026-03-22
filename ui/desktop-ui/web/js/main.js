@@ -15184,14 +15184,14 @@ function getCurrentIncidentOpsEntry(entryId = "") {
           : "Paste upstream bearer token";
       } else {
         bearerTokenInput.value = "";
-        bearerTokenInput.placeholder = "Client passthrough mode uses the Authorization already present in compatible Codex requests.";
+        bearerTokenInput.placeholder = "Client passthrough mode uses the Authorization already present in compatible client requests.";
       }
     }
     const authHintNode = root.querySelector("[data-native-shell-field='interposition-auth-hint']");
     if (authHintNode instanceof HTMLElement) {
       authHintNode.textContent = usingSavedToken
-        ? "Save a dedicated upstream token here when you want Epydios to override Codex credentials for the OpenAI upstream."
-        : "Leave saved-token mode off to forward the Authorization already present in compatible Codex/OpenAI client requests.";
+        ? "Save a dedicated upstream token here when you want Epydios to override the upstream credentials."
+        : "Leave saved-token mode off to forward the Authorization already present in compatible client requests.";
     }
   }
   const readNativeInterpositionDraft = () => {
@@ -15265,8 +15265,8 @@ function getCurrentIncidentOpsEntry(entryId = "") {
       const interpositionStatus = String(interposition.status || "").trim().toLowerCase();
       const statusMessage = String(interposition.reason || "").trim() || (
         enabled
-          ? "Interposition is ON. Compatible /v1/responses traffic now enters the local governed proxy path."
-          : "Interposition is OFF. Compatible /v1/responses traffic will no longer enter the local governed proxy path."
+          ? "Interposition is ON. Compatible upstream requests now enter the local governed proxy path."
+          : "Interposition is OFF. Compatible upstream requests will no longer enter the local governed proxy path."
       );
       const feedbackTone =
         !Boolean(interposition.enabled) || interpositionStatus === "off"

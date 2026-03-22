@@ -1938,6 +1938,16 @@ func TestCompatibilityResponsesWebSocketFingerprintIncludesBodyHash(t *testing.T
 	}
 }
 
+func TestAppendGatewayRequestPathKeepsSingleV1Prefix(t *testing.T) {
+	got, err := appendGatewayRequestPath("https://api.openai.com/v1", "/v1/responses")
+	if err != nil {
+		t.Fatalf("append gateway request path: %v", err)
+	}
+	if got != "https://api.openai.com/v1/responses" {
+		t.Fatalf("request URL=%q want https://api.openai.com/v1/responses", got)
+	}
+}
+
 func waitForSingleGatewayRequestRecordState(t *testing.T, root string, wantState string) gatewayRequestRecord {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)

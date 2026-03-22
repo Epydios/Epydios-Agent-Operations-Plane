@@ -119,7 +119,7 @@ function describeInterpositionAuthMode(mode) {
       return "Saved token override";
     case "client_passthrough":
     default:
-      return "Codex/OpenAI credential passthrough";
+      return "Client credential passthrough";
   }
 }
 
@@ -134,6 +134,17 @@ function interpositionChipClass(state) {
     default:
       return "chip-neutral";
   }
+}
+
+function interpositionCalloutClass(enabled, status) {
+  const normalizedStatus = String(status || "").trim().toLowerCase();
+  if (enabled && normalizedStatus === "on") {
+    return "is-on";
+  }
+  if (!enabled || normalizedStatus === "off") {
+    return "is-off";
+  }
+  return "is-pending";
 }
 
 export function renderNativeLauncherStatus(shell = null) {
@@ -200,8 +211,8 @@ export function renderNativeLauncherStatus(shell = null) {
     <div class="native-launcher-status-controls">
       <div class="native-launcher-status-switch">
         <div class="title">Interposition ON/OFF</div>
-        <div class="meta">Put Epydios directly between Codex and OpenAI only when you intentionally turn it on.</div>
-        <div class="native-launcher-status-switch-callout">
+        <div class="meta">Put Epydios directly in the request path only when you intentionally turn it on.</div>
+        <div class="native-launcher-status-switch-callout ${escapeHTML(interpositionCalloutClass(interpositionEnabled, interpositionStatus))}">
           <div class="native-launcher-status-switch-row">
             <span class="chip chip-compact ${interpositionEnabled ? "chip-success" : "chip-neutral"}">${escapeHTML(
               interpositionEnabled ? "ON" : "OFF"
@@ -247,7 +258,7 @@ export function renderNativeLauncherStatus(shell = null) {
               data-native-shell-field="interposition-auth-mode"
               ${interpositionAuthMode === "client_passthrough" ? "checked" : ""}
             />
-            <span>Use Codex/OpenAI credentials already present in the client request</span>
+            <span>Use credentials already present in the client request</span>
           </label>
           <label class="native-launcher-status-auth-option">
             <input
@@ -271,7 +282,7 @@ export function renderNativeLauncherStatus(shell = null) {
                 ? interpositionTokenConfigured
                   ? "Saved token is configured. Enter a new token to replace it."
                   : "Paste upstream bearer token"
-                : "Client passthrough mode uses the Authorization already present in compatible Codex requests."
+                : "Client passthrough mode uses the Authorization already present in compatible client requests."
             )}"
             data-native-shell-field="interposition-upstream-bearer-token"
             ${interpositionAuthMode === "saved_token" ? "" : "disabled"}
@@ -283,8 +294,8 @@ export function renderNativeLauncherStatus(shell = null) {
           <div class="meta native-launcher-status-hint" data-native-shell-field="interposition-auth-hint">${
             escapeHTML(
               interpositionAuthMode === "saved_token"
-                ? "Save a dedicated upstream token here when you want Epydios to override Codex credentials for the OpenAI upstream."
-                : "Leave saved-token mode off to forward the Authorization already present in compatible Codex/OpenAI client requests."
+                ? "Save a dedicated upstream token here when you want Epydios to override the upstream credentials."
+                : "Leave saved-token mode off to forward the Authorization already present in compatible client requests."
             )
           }</div>
           <button class="btn btn-secondary btn-small" type="submit" data-native-shell-action="save-interposition-config">Save Upstream Config</button>

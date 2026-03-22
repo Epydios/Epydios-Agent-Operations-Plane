@@ -2722,10 +2722,16 @@ func appendGatewayRequestPath(baseURL, desiredPath string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("parse endpoint URL %q: %w", baseURL, err)
 	}
-	if strings.Contains(parsed.Path, strings.TrimSpace(desiredPath)) {
+	normalizedDesiredPath := strings.TrimSpace(desiredPath)
+	normalizedCurrentPath := strings.TrimSuffix(strings.TrimSpace(parsed.Path), "/")
+	if normalizedCurrentPath != "" && (normalizedDesiredPath == normalizedCurrentPath || strings.HasPrefix(normalizedDesiredPath, normalizedCurrentPath+"/")) {
+		parsed.Path = normalizedDesiredPath
 		return parsed.String(), nil
 	}
-	parsed.Path = joinGatewayURLPath(parsed.Path, desiredPath)
+	if strings.Contains(parsed.Path, normalizedDesiredPath) {
+		return parsed.String(), nil
+	}
+	parsed.Path = joinGatewayURLPath(parsed.Path, normalizedDesiredPath)
 	return parsed.String(), nil
 }
 

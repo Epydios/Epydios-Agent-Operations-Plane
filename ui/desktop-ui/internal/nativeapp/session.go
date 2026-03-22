@@ -581,35 +581,23 @@ func buildInterpositionRecord(opts LaunchOptions, gateway GatewayServiceRecord) 
 	switch {
 	case !record.Enabled:
 		record.Status = "off"
-		record.Reason = "Interposition is disabled. Codex-compatible requests will not enter the local governance path."
+		record.Reason = "Interposition is OFF. Compatible upstream requests will not enter the local governed proxy path."
 	case strings.TrimSpace(opts.Mode) != modeLive:
 		record.Status = "blocked_mock_mode"
-		record.Reason = "Switch the launcher to live posture before placing Epydios in the request path."
+		record.Reason = "Interposition cannot turn on until the launcher is in live posture."
 	case record.UpstreamBaseURL == "":
 		record.Status = "blocked_upstream_config"
-		record.Reason = "Configure the upstream base URL before turning interposition on. Leave the token blank to pass through Codex/OpenAI credentials, or save a token to override them."
+		record.Reason = "Interposition cannot turn on until an upstream base URL is configured."
 	case strings.EqualFold(strings.TrimSpace(gateway.State), "running") && strings.EqualFold(strings.TrimSpace(gateway.Health), "healthy"):
 		record.Status = "on"
 		record.Effective = true
-		if record.UpstreamAuthMode == "saved_token" {
-			record.Reason = "Codex-compatible requests can now enter the governed local proxy path using the saved upstream bearer token."
-		} else {
-			record.Reason = "Codex-compatible requests can now enter the governed local proxy path using the client request's existing upstream credentials."
-		}
+		record.Reason = "Interposition is ON. Compatible upstream requests now enter the local governed proxy path."
 	case strings.EqualFold(strings.TrimSpace(gateway.State), "running"):
 		record.Status = "warming"
-		if record.UpstreamAuthMode == "saved_token" {
-			record.Reason = "Interposition is enabled with a saved upstream bearer token, and the local gateway is warming up."
-		} else {
-			record.Reason = "Interposition is enabled in Codex/OpenAI credential passthrough mode, and the local gateway is warming up."
-		}
+		record.Reason = "Interposition is turning on. The local gateway is warming up."
 	default:
 		record.Status = "gateway_unavailable"
-		if record.UpstreamAuthMode == "saved_token" {
-			record.Reason = "Interposition is enabled with a saved upstream bearer token, but the local gateway is not ready yet."
-		} else {
-			record.Reason = "Interposition is enabled in Codex/OpenAI credential passthrough mode, but the local gateway is not ready yet."
-		}
+		record.Reason = "Interposition is ON, but the local gateway is not ready yet."
 	}
 	return record
 }

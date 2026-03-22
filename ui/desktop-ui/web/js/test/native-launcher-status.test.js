@@ -29,7 +29,7 @@ test("native launcher status renders ready mock launcher details", () => {
       enabled: false,
       effective: false,
       status: "off",
-      reason: "Interposition is disabled. Codex-compatible requests will not enter the local governance path.",
+      reason: "Interposition is OFF. Compatible upstream requests will not enter the local governed proxy path.",
       upstreamBaseUrl: "",
       upstreamBearerTokenConfigured: false,
       upstreamAuthMode: "client_passthrough"
@@ -52,11 +52,12 @@ test("native launcher status renders ready mock launcher details", () => {
   assert.match(html, /Background service not required/);
   assert.match(html, /Gateway stopped/);
   assert.match(html, /Interposition off/);
-  assert.match(html, /Codex\/OpenAI credential passthrough/);
+  assert.match(html, /Client credential passthrough/);
   assert.match(html, /Turn Interposition ON/);
   assert.match(html, /Upstream Base URL/);
   assert.match(html, /Upstream Auth/);
-  assert.match(html, /Use Codex\/OpenAI credentials already present in the client request/);
+  assert.match(html, /Use credentials already present in the client request/);
+  assert.match(html, /native-launcher-status-switch-callout is-off/);
   assert.match(html, /https:\/\/api\.openai\.com\/v1/);
   assert.doesNotMatch(html, /Session Manifest/);
   assert.doesNotMatch(html, /Gateway Token/);
@@ -88,7 +89,7 @@ test("native launcher status renders degraded launcher failure details", () => {
       enabled: true,
       effective: false,
       status: "gateway_unavailable",
-      reason: "Interposition is enabled with a saved upstream bearer token, but the local gateway is not ready yet.",
+      reason: "Interposition is ON, but the local gateway is not ready yet.",
       upstreamBaseUrl: "https://api.openai.com",
       upstreamBearerTokenConfigured: true,
       upstreamAuthMode: "saved_token"
@@ -115,5 +116,6 @@ test("native launcher status renders degraded launcher failure details", () => {
   assert.match(html, /Gateway not ready/);
   assert.match(html, /Saved token override/);
   assert.match(html, /Turn Interposition OFF/);
+  assert.match(html, /native-launcher-status-switch-callout is-pending/);
   assert.match(html, /https:\/\/api\.openai\.com/);
 });

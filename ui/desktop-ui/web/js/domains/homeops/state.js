@@ -402,6 +402,45 @@ function latestGatewayHold(context = {}) {
   return pickLatest(pendingGatewayHolds(context), ["updatedAtUtc", "createdAtUtc", "holdStartedAtUtc", "holdDeadlineAtUtc"]);
 }
 
+function createCompanionInterpositionFeedback(shell = {}) {
+  const interposition = readObject(shell.interposition);
+  const status = normalizeStatus(
+    interposition.status,
+    interposition.enabled ? "warming" : "off"
+  );
+  const reason = String(interposition.reason || "").trim();
+  switch (status) {
+    case "on":
+      return {
+        tone: "ok",
+        message: reason || "Interposition is ON. Compatible upstream requests now enter the local governed proxy path."
+      };
+    case "off":
+      return {
+        tone: "danger",
+        message: reason || "Interposition is OFF. Compatible upstream requests will not enter the local governed proxy path."
+      };
+    case "warming":
+      return {
+        tone: "warn",
+        message: reason || "Interposition is turning on. The local gateway is warming up."
+      };
+    case "gateway_unavailable":
+      return {
+        tone: "warn",
+        message: reason || "Interposition is ON, but the local gateway is not ready yet."
+      };
+    case "blocked_mock_mode":
+    case "blocked_upstream_config":
+      return {
+        tone: "danger",
+        message: reason || "Interposition cannot turn on until the launcher requirements are satisfied."
+      };
+    default:
+      return null;
+  }
+}
+
 function gatewayHoldSummaryTarget(item = {}) {
   return formatIdentityLabel(
     item?.requestSummary?.title ||
@@ -420,8 +459,15 @@ function createSystemStatusRegion(context = {}) {
   const aimxsPath = summarizeAimxsPath(context.settings, policy);
   const lastWorkbenchDomain = formatOpsLabel(context.lastWorkbenchDomain, "AgentOps");
   const startupError = formatIdentityLabel(shell.startupError, "");
+  const derivedFeedback = context.companionFeedback ||
+    (startupError
+      ? {
+          tone: "error",
+          message: startupError
+        }
+      : createCompanionInterpositionFeedback(shell));
   return {
-    feedback: context.companionFeedback || null,
+    feedback: derivedFeedback || null,
     cards: [
       {
         id: "companion-posture",

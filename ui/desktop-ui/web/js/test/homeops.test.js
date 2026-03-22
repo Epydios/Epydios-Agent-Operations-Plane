@@ -11,6 +11,12 @@ test("companionops page renders companion status, attention, recent governed act
       runtimeState: "service_running",
       runtimeProcessMode: "background_supervisor",
       bootstrapConfigState: "loaded",
+      interposition: {
+        enabled: true,
+        effective: true,
+        status: "on",
+        reason: "Interposition is ON. Compatible upstream requests now enter the local governed proxy path."
+      },
       runtimeService: {
         state: "running",
         health: "healthy"
@@ -163,6 +169,8 @@ test("companionops page renders companion status, attention, recent governed act
   assert.match(ui.homeOpsContent.innerHTML, /Launcher/);
   assert.match(ui.homeOpsContent.innerHTML, /Runtime Service/);
   assert.match(ui.homeOpsContent.innerHTML, /Gateway/);
+  assert.match(ui.homeOpsContent.innerHTML, /homeops-feedback ok/);
+  assert.match(ui.homeOpsContent.innerHTML, /Interposition is ON\. Compatible upstream requests now enter the local governed proxy path\./);
   assert.match(ui.homeOpsContent.innerHTML, /Open Workbench/);
   assert.match(ui.homeOpsContent.innerHTML, /Restart Services/);
   assert.match(ui.homeOpsContent.innerHTML, /Show Diagnostics/);
