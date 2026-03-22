@@ -18,11 +18,11 @@ I don't want a coffee, but your stars help keep this project alive (thank you).
 - Installable desktop workflow for live operator use, not just a browser demo path.
 - Public contracts and OSS baseline providers that remain usable without premium artifacts.
 
-## Open Source Baseline
+## Open Source
 
-This repository contains the public control plane, desktop app, native launcher, localhost gateway, public provider contracts, baseline OSS providers, and the operator surfaces required to inspect and govern execution locally.
+This repository contains the public control plane, desktop app, native launcher, localhost gateway, public provider contracts, baseline OSS providers and the operator surfaces required to inspect and govern execution locally.
 
-The desktop product currently opens in a live `Companion` posture for day-to-day operation and includes the deeper `Workbench` surface for review, runtime, audit, evidence, incident, and settings work.
+The desktop product currently opens in a live `Companion` posture for day-to-day operation and includes the deeper `Workbench` surface for review, runtime, audit, evidence, incident and settings work.
 
 ## How Epydios Is Used
 
@@ -34,9 +34,9 @@ Teams can use it in three primary ways:
 - as a local gateway and SDK surface for governed execution from tools, scripts, and clients
 - as an explicit in-path control layer for supported clients when local interposition is intentionally enabled
 
-## Commercial Extensions
+## Upcoming Extensions
 
-Commercial Epydios editions are aimed at teams that need a more mature decision layer, stronger governance depth, richer evidence and approval packs, private connector paths for higher-consequence systems, and enterprise distribution and support.
+Upcoming Epydios editions are aimed at teams that need a more mature decision layer, stronger governance depth, richer evidence and approval packs, private connector paths for higher-consequence systems and enterprise distribution and support.
 
 ## Getting Started
 
@@ -62,7 +62,7 @@ If you are on macOS and want the installed desktop path:
 open "$HOME/Applications/Epydios AgentOps Desktop.app"
 ```
 
-The verified installed path today is macOS. Linux packaging is exercised in Docker. Windows packaging exists, but a real Windows host acceptance pass is still pending.
+The verified installed path today is macOS. Linux packaging is exercised in Docker. Windows packaging exists, but Windows host acceptance pass is pending.
 
 ## Screenshots
 
@@ -92,7 +92,7 @@ Epydios currently consists of:
 
 The first proven interposition path in the public repository is the Codex and OpenAI-compatible `/responses` flow through the local gateway.
 
-That is the current leading path, not the only intended one. The operator desktop and local gateway are designed to support additional client surfaces over time.
+That is the current leading path, not the only intended one. The operator desktop and local gateway are designed to support additional client surfaces over time. If you have a certain agent that we should look at, please let us know. Anthropic, Google, AWS and other are all planned. 
 
 ## What Is Next
 
@@ -123,4 +123,3 @@ Current follow-on work is focused on:
 - [TRADEMARK.md](TRADEMARK.md)
 - [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 
-This is still a `v0.x` release line. The goal is not feature sprawl. The goal is governed execution that is concrete, inspectable, and operationally useful.
