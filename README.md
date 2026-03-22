@@ -2,33 +2,33 @@
 
 Installable operator desktop and local governance plane for agent and tool execution.
 
-Epydios is for teams that want a governed execution path with policy decisions, receipts, audit, evidence, and operator review without hiding the control surface behind a generic agent shell.
+Epydios gives teams a visible control plane for AI and tool execution. It combines an installable desktop operator console, a local launcher and supervisor, a loopback gateway, and a governed runtime path for policy enforcement, receipts, audit, evidence, incident review, and operator action.
 
 ![Epydios security seal](docs/images/security-seal.png)
 
-## Current Public Baseline
+## Why Epydios
 
-- `Companion` is the default live surface.
-- `Workbench` is the deeper operator console.
-- `Interposition OFF / ON` is explicit, not silent.
-- The verified installed desktop path today is macOS.
-- Linux packaging is verified in Docker.
-- Windows packaging exists, but a real Windows host acceptance pass is still pending.
-- The OSS baseline covers governed execution, audit, evidence, receipts, and `ALLOW` or `DENY` behavior.
-- Premium AIMXS adds the richer `DEFER` and approval-resume path.
+- Governed execution with a real operator surface instead of a hidden background policy layer.
+- Local request-path control through an explicit desktop launcher and loopback gateway.
+- First-class runtime, governance, audit, evidence, incident, and settings surfaces.
+- Installable desktop workflow for live operator use, not just a browser demo path.
+- Public contracts and OSS baseline providers that remain usable without premium artifacts.
 
-## What The OSS Repo Includes
+## Open Source Baseline
 
-- control-plane source
-- desktop UI and native launcher source
-- public provider contracts
-- baseline OSS providers
-- local launcher, background supervisor, and localhost gateway
-- governed execution, audit, evidence, incident, and review surfaces
+This repository contains the public control plane, desktop app, native launcher, localhost gateway, public provider contracts, baseline OSS providers, and the operator surfaces required to inspect and govern execution locally.
 
-Premium AIMXS stays outside this OSS repo and is governed by the public provider boundary described in [docs/oss-premium-policy.md](docs/oss-premium-policy.md).
+The desktop product currently opens in a live `Companion` posture for day-to-day operation and includes the deeper `Workbench` surface for review, runtime, audit, evidence, incident, and settings work.
 
-## Start Here
+## AIMXS
+
+AIMXS stays outside this OSS repository.
+
+AIMXS is the premium path for teams that want a more mature decision kernel, stronger governance depth, more advanced evidence and approval packs, secure private connector paths for higher-consequence systems, and enterprise distribution and support. The OSS repo keeps the public integration boundary visible, but it does not ship the premium implementation itself.
+
+See [docs/oss-premium-policy.md](docs/oss-premium-policy.md) for the repo boundary.
+
+## Getting Started
 
 - [Getting started](docs/getting-started.md)
 - [OSS quality story](docs/quality-story.md)
@@ -36,9 +36,9 @@ Premium AIMXS stays outside this OSS repo and is governed by the public provider
 - [OSS versus premium policy](docs/oss-premium-policy.md)
 - [Release policy](docs/release-policy.md)
 
-## What You Can Evaluate Today
+## Install And Evaluate
 
-If you want a quick repo-level confidence pass:
+If you want a quick repository-level confidence pass:
 
 ```bash
 ./platform/ci/bin/qc-preflight.sh
@@ -52,6 +52,8 @@ If you are on macOS and want the installed desktop path:
 ./ui/desktop-ui/bin/verify-m15-phase-c.sh
 open "$HOME/Applications/Epydios AgentOps Desktop.app"
 ```
+
+The verified installed path today is macOS. Linux packaging is exercised in Docker. Windows packaging exists, but a real Windows host acceptance pass is still pending.
 
 ## Screenshots
 
@@ -77,9 +79,9 @@ Epydios currently consists of:
 - a governed runtime path for requests, runs, receipts, and review
 - operator surfaces for runtime, governance, audit, evidence, incident, and settings work
 
-Codex-in-path interposition exists behind an explicit local switchable gateway path. The proven public baseline today is the local `ALLOW` path. Premium AIMXS remains the richer `DEFER` path.
+Codex-in-path interposition exists behind an explicit local switchable gateway path. The public OSS baseline focuses on visible, governed execution with auditability and operator control.
 
-## Repo Map
+## Repository Guide
 
 - [cmd/](cmd) - control-plane and provider entrypoints
 - [internal/](internal) - runtime, orchestration, provider routing, and gateway logic
@@ -88,7 +90,7 @@ Codex-in-path interposition exists behind an explicit local switchable gateway p
 - [ui/desktop-ui/](ui/desktop-ui) - desktop UI, launcher, native packaging, and localhost gateway
 - [examples/](examples) - example provider registration and deployment material
 
-## Quality And Trust
+## Trust, Policy, And Contribution
 
 - [OSS quality story](docs/quality-story.md)
 - [OSS versus premium policy](docs/oss-premium-policy.md)
