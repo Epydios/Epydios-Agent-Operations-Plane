@@ -8,7 +8,7 @@ Epydios gives teams a visible control plane for AI and tool execution. It combin
 
 Sentry seal says: security is seal-d. 
 
-Your stars help keep this project alive...there is a lot more to come (thank you).
+If this looks useful, please give the repo a star. It helps more people discover the project, use it and contribute to making it better.
 
 ## Why Epydios
 
