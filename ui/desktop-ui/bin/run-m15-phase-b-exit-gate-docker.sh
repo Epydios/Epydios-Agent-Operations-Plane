@@ -10,8 +10,8 @@ BUILD_CONTEXT="${M15_MODULE_ROOT}/docker/m15-linux-builder"
 MOUNT_ROOT="/workspace/agentops-desktop"
 HOST_KUBECONFIG_DIR="${M15_NON_GITHUB_ROOT}/internal-readiness/m15-native-phase-b-exit"
 HOST_KUBECONFIG_PATH="${HOST_KUBECONFIG_DIR}/docker-kind-kubeconfig.yaml"
-CONTAINER_KUBECONFIG_PATH="${MOUNT_ROOT}/EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/m15-native-phase-b-exit/docker-kind-kubeconfig.yaml"
-CONTAINER_CACHE_ROOT="${MOUNT_ROOT}/EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/m15-cache-linux-docker"
+CONTAINER_KUBECONFIG_PATH="${MOUNT_ROOT}/EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/.epydios/internal-readiness/m15-native-phase-b-exit/docker-kind-kubeconfig.yaml"
+CONTAINER_CACHE_ROOT="${MOUNT_ROOT}/EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/.epydios/m15-cache-linux-docker"
 
 mkdir -p "${HOST_KUBECONFIG_DIR}"
 

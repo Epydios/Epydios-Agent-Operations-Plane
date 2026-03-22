@@ -4,7 +4,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 WORKSPACE_ROOT="$(cd "${REPO_ROOT}/.." && pwd)"
-NON_GITHUB_ROOT="${NON_GITHUB_ROOT:-${WORKSPACE_ROOT}/EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB}"
+LOCAL_STATE_ROOT="${EPYDIOS_LOCAL_STATE_ROOT:-${REPO_ROOT}/.epydios}"
+NON_GITHUB_ROOT="${NON_GITHUB_ROOT:-${LOCAL_STATE_ROOT}}"
 
 ARTIFACT_DIR="${ARTIFACT_DIR:-}"
 DIGEST_MANIFEST_BASENAME="${DIGEST_MANIFEST_BASENAME:-release-image-digests.json}"
@@ -29,7 +30,7 @@ Required input:
     or downloaded per-component release-digest-* artifacts from a failed aggregate run
 
 What this does:
-  1) Archives release artifacts to EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/releases/<timestamp>/ by default
+  1) Archives release artifacts to .epydios/provenance/releases/<timestamp>/ by default
   2) Rebuilds ${DIGEST_MANIFEST_BASENAME} from component digest JSON files when needed
   3) Syncs provenance/images.lock.yaml from release digest manifest
   4) Syncs platform/overlays/production/patch-image-digests.yaml from release digest manifest

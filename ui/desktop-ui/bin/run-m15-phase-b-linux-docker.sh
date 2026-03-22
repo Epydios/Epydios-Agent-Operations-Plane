@@ -8,7 +8,7 @@ IMAGE_TAG="epydios-agentops-m15-phase-b-builder:local"
 DOCKERFILE_PATH="${M15_MODULE_ROOT}/docker/m15-linux-builder/Dockerfile"
 BUILD_CONTEXT="${M15_MODULE_ROOT}/docker/m15-linux-builder"
 MOUNT_ROOT="/workspace/agentops-desktop"
-CONTAINER_CACHE_ROOT="${MOUNT_ROOT}/EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/m15-cache-linux-docker"
+CONTAINER_CACHE_ROOT="${MOUNT_ROOT}/EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/.epydios/m15-cache-linux-docker"
 
 docker build \
   --platform linux/amd64 \

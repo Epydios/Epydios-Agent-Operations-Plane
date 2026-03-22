@@ -4,6 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 WORKSPACE_ROOT="$(cd "${REPO_ROOT}/.." && pwd)"
+LOCAL_STATE_ROOT="${EPYDIOS_LOCAL_STATE_ROOT:-${REPO_ROOT}/.epydios}"
 DEFAULT_UI_ROOT_INTERNAL="${REPO_ROOT}/ui/desktop-ui"
 DEFAULT_UI_ROOT_EXTERNAL="${WORKSPACE_ROOT}/EPYDIOS_AGENTOPS_DESKTOP_UI"
 if [ -n "${UI_ROOT:-}" ]; then
@@ -13,7 +14,7 @@ elif [ -d "${DEFAULT_UI_ROOT_INTERNAL}" ]; then
 else
   UI_ROOT="${DEFAULT_UI_ROOT_EXTERNAL}"
 fi
-NON_GITHUB_ROOT="${NON_GITHUB_ROOT:-${WORKSPACE_ROOT}/EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB}"
+NON_GITHUB_ROOT="${NON_GITHUB_ROOT:-${LOCAL_STATE_ROOT}}"
 OUTPUT_DIR="${OUTPUT_DIR:-${NON_GITHUB_ROOT}/provenance/desktop-closeout}"
 
 require_cmd() {
