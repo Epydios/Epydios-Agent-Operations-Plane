@@ -396,7 +396,7 @@ Runs macOS restricted-profile readiness assertions (`V-M14-MAC-001`):
 Runs the M14.7 closeout bundle (`V-M14-XOS-001`):
 - runs `V-M14-WIN-001` and `V-M14-MAC-001` verifiers as prerequisites
 - asserts cross-OS parity for restricted templates (contract/auth/path/capability shape)
-- emits machine-readable evidence JSON + SHA under non-GitHub provenance path
+- emits machine-readable evidence JSON + SHA under the repo-local ignored `.epydios` provenance path
 
 ```bash
 ./platform/local/bin/verify-m14-xos-parity.sh
@@ -472,7 +472,7 @@ RUN_M14_XOS_PARITY=1 ./platform/local/bin/verify-m13-desktop-daily-loop.sh
 
 ### M13/M14 closeout bundle (single-command closeout pass)
 
-Runs the coordinated closeout bundle and writes timestamped logs + summary under non-GitHub provenance:
+Runs the coordinated closeout bundle and writes timestamped logs + summary under the repo-local ignored `.epydios` provenance path:
 - M13 desktop daily loop
 - M14 UI daily loop
 - M14.6 Windows/macOS restricted-readiness verifiers
@@ -486,7 +486,7 @@ Runs the coordinated closeout bundle and writes timestamped logs + summary under
 ```
 
 Default output location:
-- `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/desktop-closeout/`
+- `../.epydios/provenance/desktop-closeout/`
 
 ### Openfang upstream drift check
 
@@ -679,7 +679,7 @@ RUN_M5_BASELINE=0 ./platform/local/bin/verify-m10-entitlement-deny.sh
 
 Validates release-grade packaging evidence for aimxs-full AIMXS mode:
 - consumes private metadata inputs from `~/.epydios/premium/release/aimxs/aimxs-full-release-inputs.vars` by default
-- accepts `provenance/aimxs/aimxs-full-release-inputs.vars` or `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/aimxs/aimxs-full-release-inputs.vars` as legacy compatibility overrides
+- accepts `provenance/aimxs/aimxs-full-release-inputs.vars` or `../.epydios/provenance/aimxs/aimxs-full-release-inputs.vars` as legacy compatibility overrides
 - requires strict staging log markers for M10.4/M10.5/M10.6 and full-gate pass
 - asserts signed packaging references, SBOM/signature references, air-gapped install/update bundle refs, and support/SLA references
 - verifies required runbooks:
@@ -1073,7 +1073,7 @@ WITH_SYSTEM_SMOKETEST=1 ./platform/local/bin/bootstrap-k3d.sh
 - `platform/local/bin/verify-m14-openfang-enablement-gate.sh` validates Openfang secure endpoint enablement gate posture for Windows/macOS restricted manifests and runbook criteria (`V-M14-WIN-003`, `V-M14-MAC-003`, `V-M14-XOS-003`)
 - `platform/local/bin/verify-m13-openfang-sandbox-rehearsal.sh` validates kind/k3d sandbox rehearsal posture (selection disabled, linux/sandbox defaults, restricted-host blocked)
 - `platform/local/bin/verify-m13-desktop-daily-loop.sh` runs the recommended local daily M13/M14 verifier loop (including qc-preflight)
-- `platform/local/bin/verify-m13-m14-closeout-bundle.sh` runs the coordinated M13/M14 closeout pass and writes logs/summary to non-GitHub provenance
+- `platform/local/bin/verify-m13-m14-closeout-bundle.sh` runs the coordinated M13/M14 closeout pass and writes logs/summary to the repo-local ignored `.epydios` provenance path
 - `platform/local/bin/check-openfang-upstream-drift.sh` compares pinned Openfang upstream tag/commit to latest remote semver tag and reports drift
 - `platform/local/bin/verify-m7-integration.sh` runs an end-to-end M0->M5 critical-path integration gate (optionally includes M7.2)
 - `platform/local/bin/verify-m7-cnpg-backup-restore.sh` runs the M7.2 CNPG backup/restore drill

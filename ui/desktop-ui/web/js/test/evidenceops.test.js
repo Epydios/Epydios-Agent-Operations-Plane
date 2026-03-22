@@ -294,7 +294,7 @@ test("evidenceops page renders bounded bundle, provenance, and artifact access b
   assert.match(ui.evidenceOpsContent.innerHTML, /incident-20260315T020100Z-run-20260315-001\.json/);
   assert.match(ui.evidenceOpsContent.innerHTML, /tenant-ops\/project-payments/);
   assert.match(ui.evidenceOpsContent.innerHTML, /EPYDIOS_AGENTOPS_DESKTOP_REPO\/provenance\//);
-  assert.match(ui.evidenceOpsContent.innerHTML, /EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB\/provenance\//);
+  assert.match(ui.evidenceOpsContent.innerHTML, /\.epydios\/provenance\//);
   assert.match(ui.evidenceOpsContent.innerHTML, /data-evidenceops-action="download-bundle-json"/);
   assert.match(ui.evidenceOpsContent.innerHTML, /data-evidenceops-action="open-bundle-run"/);
   assert.match(ui.evidenceOpsContent.innerHTML, /data-evidenceops-action="open-incidentops"/);

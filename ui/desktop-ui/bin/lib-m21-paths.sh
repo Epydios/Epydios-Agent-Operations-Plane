@@ -14,7 +14,7 @@ M21_HOME_ROOT="${HOME:-${M21_STATE_ROOT}}"
 M21_PREMIUM_ROOT="${EPYDIOS_PREMIUM_ROOT:-${M21_HOME_ROOT}/.epydios/premium}"
 M21_AIMXS_INSTALL_ROOT="${EPYDIOS_AIMXS_INSTALL_ROOT:-${M21_PREMIUM_ROOT}/aimxs}"
 M21_AIMXS_EXTRACTED_ROOT="${EPYDIOS_AIMXS_EXTRACTED_ROOT:-${M21_AIMXS_INSTALL_ROOT}/extracted}"
-M21_NON_GITHUB_ROOT="${EPYDIOS_NON_GITHUB_ROOT:-${M21_WORKSPACE_ROOT}/EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB}"
+M21_NON_GITHUB_ROOT="${EPYDIOS_NON_GITHUB_ROOT:-}"
 M21_CACHE_ROOT="${EPYDIOS_M21_CACHE_ROOT:-${M21_STATE_ROOT}/m21-local-cache}"
 
 m21_state_root() {
@@ -74,15 +74,20 @@ m21_local_ref_vault_root() {
 }
 
 m21_legacy_cache_root() {
+  [ -n "${M21_NON_GITHUB_ROOT}" ] || return 0
   printf "%s/internal-readiness/m21-local-cache\n" "${M21_NON_GITHUB_ROOT}"
 }
 
 m21_legacy_local_ref_vault_root() {
+  [ -n "${M21_NON_GITHUB_ROOT}" ] || return 0
   printf "%s/internal-readiness/local-ref-vault\n" "${M21_NON_GITHUB_ROOT}"
 }
 
 m21_legacy_local_aimxs_root() {
-  printf "%s/local-runtime/aimxs-full\n" "$(m21_legacy_cache_root)"
+  local legacy_cache_root
+  legacy_cache_root="$(m21_legacy_cache_root)"
+  [ -n "${legacy_cache_root}" ] || return 0
+  printf "%s/local-runtime/aimxs-full\n" "${legacy_cache_root}"
 }
 
 m21_local_ref_vault_index_path() {

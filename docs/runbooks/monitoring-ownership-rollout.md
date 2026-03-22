@@ -79,13 +79,13 @@ Status: COMPLETE (2026-03-01)
 Evidence:
 
 1. Staging strict profile proof:
-   - `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/promotion/staging-full-gate-20260301T183622Z.log`
-   - `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/promotion/staging-full-gate-20260301T183622Z.log.sha256`
-   - `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/promotion/staging-full-gate-20260301T183622Z.log.proof.json`
+   - `../.epydios/provenance/promotion/staging-full-gate-20260301T183622Z.log`
+   - `../.epydios/provenance/promotion/staging-full-gate-20260301T183622Z.log.sha256`
+   - `../.epydios/provenance/promotion/staging-full-gate-20260301T183622Z.log.proof.json`
 2. Prod strict profile proof:
-   - `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/promotion/prod-full-gate-20260301T184620Z.log`
-   - `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/promotion/prod-full-gate-20260301T184620Z.log.sha256`
-   - `../EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/promotion/prod-full-gate-20260301T184620Z.log.proof.json`
+   - `../.epydios/provenance/promotion/prod-full-gate-20260301T184620Z.log`
+   - `../.epydios/provenance/promotion/prod-full-gate-20260301T184620Z.log.sha256`
+   - `../.epydios/provenance/promotion/prod-full-gate-20260301T184620Z.log.proof.json`
 
 Ownership confirmation:
 

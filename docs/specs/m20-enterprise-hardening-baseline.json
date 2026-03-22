@@ -45,8 +45,8 @@
         "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/export_org_admin.go",
         "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api_export_profiles_test.go",
         "EPYDIOS_AGENTOPS_DESKTOP_REPO/platform/local/bin/verify-m20-enterprise-hardening-exit-gate.sh",
-        "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/m20-enterprise-hardening/verify-m20-enterprise-hardening-exit-gate-latest.log",
-        "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/m20-enterprise-hardening/verify-m20-enterprise-hardening-exit-gate-latest.summary.json"
+        ".epydios/internal-readiness/m20-enterprise-hardening/verify-m20-enterprise-hardening-exit-gate-latest.log",
+        ".epydios/internal-readiness/m20-enterprise-hardening/verify-m20-enterprise-hardening-exit-gate-latest.summary.json"
       ]
     },
     "worker_capabilities": {
@@ -100,8 +100,8 @@
         "EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/internal/runtimeclient/thread_envelope.go",
         "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api_run_projection_test.go",
         "EPYDIOS_AGENTOPS_DESKTOP_REPO/platform/local/bin/verify-m20-enterprise-hardening-exit-gate.sh",
-        "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/m20-enterprise-hardening/verify-m20-enterprise-hardening-exit-gate-latest.log",
-        "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/m20-enterprise-hardening/verify-m20-enterprise-hardening-exit-gate-latest.summary.json"
+        ".epydios/internal-readiness/m20-enterprise-hardening/verify-m20-enterprise-hardening-exit-gate-latest.log",
+        ".epydios/internal-readiness/m20-enterprise-hardening/verify-m20-enterprise-hardening-exit-gate-latest.summary.json"
       ]
     },
     "policy_packs": {
@@ -137,8 +137,8 @@
         "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/export_org_admin.go",
         "EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api_run_projection_test.go",
         "EPYDIOS_AGENTOPS_DESKTOP_REPO/platform/local/bin/verify-m20-enterprise-hardening-exit-gate.sh",
-        "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/m20-enterprise-hardening/verify-m20-enterprise-hardening-exit-gate-latest.log",
-        "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/m20-enterprise-hardening/verify-m20-enterprise-hardening-exit-gate-latest.summary.json"
+        ".epydios/internal-readiness/m20-enterprise-hardening/verify-m20-enterprise-hardening-exit-gate-latest.log",
+        ".epydios/internal-readiness/m20-enterprise-hardening/verify-m20-enterprise-hardening-exit-gate-latest.summary.json"
       ]
     }
   },
@@ -259,7 +259,7 @@
   },
   "verifier": {
     "path": "EPYDIOS_AGENTOPS_DESKTOP_REPO/platform/local/bin/verify-m20-enterprise-hardening-baseline.sh",
-    "latest_log": "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/m20-enterprise-hardening/verify-m20-enterprise-hardening-baseline-latest.log"
+    "latest_log": ".epydios/internal-readiness/m20-enterprise-hardening/verify-m20-enterprise-hardening-baseline-latest.log"
   },
   "third_shared_hardening_artifact": {
     "name": "runtime_export_profile_catalog",
@@ -393,8 +393,8 @@
   },
   "exit_gate": {
     "path": "EPYDIOS_AGENTOPS_DESKTOP_REPO/platform/local/bin/verify-m20-enterprise-hardening-exit-gate.sh",
-    "latest_log": "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/m20-enterprise-hardening/verify-m20-enterprise-hardening-exit-gate-latest.log",
-    "latest_summary": "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/m20-enterprise-hardening/verify-m20-enterprise-hardening-exit-gate-latest.summary.json",
+    "latest_log": ".epydios/internal-readiness/m20-enterprise-hardening/verify-m20-enterprise-hardening-exit-gate-latest.log",
+    "latest_summary": ".epydios/internal-readiness/m20-enterprise-hardening/verify-m20-enterprise-hardening-exit-gate-latest.summary.json",
     "status": "pass"
   },
   "follow_on_milestones": [

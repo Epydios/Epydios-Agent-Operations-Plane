@@ -233,10 +233,10 @@ test("run detail surfaces artifact roots and recommended date bucket", () => {
   assert.match(ui.runDetailContent.innerHTML, /data-domain-root="runtimeops"/);
   assert.match(ui.runDetailContent.innerHTML, /Artifact Access/);
   assert.match(ui.runDetailContent.innerHTML, /EPYDIOS_AGENTOPS_DESKTOP_REPO\/provenance\//);
-  assert.match(ui.runDetailContent.innerHTML, /EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB\/provenance\//);
-  assert.match(ui.runDetailContent.innerHTML, /EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB\/internal-readiness\/history\/20260228\//);
-  assert.match(ui.runDetailContent.innerHTML, /EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB\/internal-readiness\/history\/20260228\/run-20260228-001\//);
-  assert.match(ui.runDetailContent.innerHTML, /EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB\/internal-readiness\/incidents\/20260228\/run-20260228-001\//);
+  assert.match(ui.runDetailContent.innerHTML, /\.epydios\/provenance\//);
+  assert.match(ui.runDetailContent.innerHTML, /\.epydios\/internal-readiness\/history\/20260228\//);
+  assert.match(ui.runDetailContent.innerHTML, /\.epydios\/internal-readiness\/history\/20260228\/run-20260228-001\//);
+  assert.match(ui.runDetailContent.innerHTML, /\.epydios\/internal-readiness\/incidents\/20260228\/run-20260228-001\//);
   assert.match(ui.runDetailContent.innerHTML, /Copy Path/);
 });
 

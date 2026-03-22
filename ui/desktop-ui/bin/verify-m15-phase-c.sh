@@ -119,14 +119,14 @@ checklist = {
     "approvals_runs_incidents_settings_paths": {
         "status": "covered_by_existing_ui_evidence",
         "evidence": [
-            "/Users/maindrive/Dropbox (Personal)/1 chatGPT SHARED FILES/GITHUB/AGENTOPS DESKTOP/EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/manual-workflow-qa/20260306T211311Z/summary.json",
-            "/Users/maindrive/Dropbox (Personal)/1 chatGPT SHARED FILES/GITHUB/AGENTOPS DESKTOP/EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/v1-perfect-ui-rubric-assessment-latest.json"
+            "/Users/maindrive/Dropbox (Personal)/1 chatGPT SHARED FILES/GITHUB/AGENTOPS DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/.epydios/internal-readiness/manual-workflow-qa/20260306T211311Z/summary.json",
+            "/Users/maindrive/Dropbox (Personal)/1 chatGPT SHARED FILES/GITHUB/AGENTOPS DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/.epydios/internal-readiness/v1-perfect-ui-rubric-assessment-latest.json"
         ]
     },
     "incident_export_audit_handoff": {
         "status": "covered_by_existing_ui_evidence",
         "evidence": [
-            "/Users/maindrive/Dropbox (Personal)/1 chatGPT SHARED FILES/GITHUB/AGENTOPS DESKTOP/EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/desktop-closeout/m13-m14-closeout-latest.summary.json"
+            "/Users/maindrive/Dropbox (Personal)/1 chatGPT SHARED FILES/GITHUB/AGENTOPS DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/.epydios/provenance/desktop-closeout/m13-m14-closeout-latest.summary.json"
         ]
     },
     "install_bundle_path": installed_app_path,

@@ -71,8 +71,8 @@ function buildArtifactEntries(run) {
 
 const WORKSPACE_ARTIFACT_ROOTS = {
   repoProvenance: "EPYDIOS_AGENTOPS_DESKTOP_REPO/provenance/",
-  nonRepoProvenance: "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/",
-  nonRepoReadiness: "EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/internal-readiness/"
+  nonRepoProvenance: ".epydios/provenance/",
+  nonRepoReadiness: ".epydios/internal-readiness/"
 };
 
 function safePathSegment(value, fallback = "item") {

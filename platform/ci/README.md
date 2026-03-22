@@ -170,7 +170,7 @@ This directory contains CI entrypoint scripts invoked by GitHub Actions.
     - validates:
       - prerequisite `V-M14-WIN-001` and `V-M14-MAC-001` checks pass in the same run
       - cross-OS template parity for restricted profile contract/auth/capability shape
-      - machine-readable M14.7 closeout evidence artifact emission to non-GitHub provenance
+      - machine-readable M14.7 closeout evidence artifact emission to the repo-local ignored `.epydios` provenance path
   - M12.1 runtime SLO/SLI + error-budget verification:
     - `RUN_M12_SLO_SLI_PACK=1` in full mode (required)
     - `RUN_M12_SLO_SLI_PACK=0` default in fast mode
@@ -191,7 +191,7 @@ This directory contains CI entrypoint scripts invoked by GitHub Actions.
     - validates:
       - backup/restore integrity after simulated loss
       - explicit RPO/RTO threshold assertions
-      - machine-readable evidence artifact output under non-GitHub provenance path
+      - machine-readable evidence artifact output under the repo-local ignored `.epydios` provenance path
   - M12.3 failure-injection + rollback verification:
     - `RUN_M12_FAILURE_INJECTION=1` in full mode (required)
     - `RUN_M12_FAILURE_INJECTION=0` default in fast mode
@@ -204,7 +204,7 @@ This directory contains CI entrypoint scripts invoked by GitHub Actions.
       - runtime deployment outage + rollback recovery
       - policy-provider outage + rollback recovery and provider readiness
       - CNPG pod restart recovery for the control-plane database
-      - machine-readable evidence artifact output under non-GitHub provenance path
+      - machine-readable evidence artifact output under the repo-local ignored `.epydios` provenance path
   - M9 runtime authz checks in full mode (required, no skips):
     - `RUN_M9_AUTHN_AUTHZ=1`
     - `RUN_M9_AUTHZ_TENANCY=1`

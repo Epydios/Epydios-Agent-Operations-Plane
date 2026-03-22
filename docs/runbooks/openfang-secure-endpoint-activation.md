@@ -77,12 +77,12 @@ kubectl apply -k platform/provider-manifests/oss-desktop-openfang/xos-secure
 Sandbox rehearsal prerequisite:
 - local kind/k3d context CRD must support `providerType: DesktopProvider` for `ExtensionProvider`.
 
-5. Capture required evidence artifacts in non-GitHub provenance:
-- `EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/openfang/m13-openfang-adapter-<timestamp>.log`
-- `EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/openfang/m13-openfang-runtime-integration-<timestamp>.log`
-- `EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/openfang/m13-runtime-approvals-<timestamp>.log`
-- `EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/openfang/m13-openfang-sandbox-rehearsal-<timestamp>.log`
-- `EPYDIOS_AI_CONTROL_PLANE_NON_GITHUB/provenance/openfang/m13-openfang-daily-loop-<timestamp>.log`
+5. Capture required evidence artifacts in the repo-local ignored `.epydios` provenance path:
+- `.epydios/provenance/openfang/m13-openfang-adapter-<timestamp>.log`
+- `.epydios/provenance/openfang/m13-openfang-runtime-integration-<timestamp>.log`
+- `.epydios/provenance/openfang/m13-runtime-approvals-<timestamp>.log`
+- `.epydios/provenance/openfang/m13-openfang-sandbox-rehearsal-<timestamp>.log`
+- `.epydios/provenance/openfang/m13-openfang-daily-loop-<timestamp>.log`
 
 6. Enable provider routing only after gate criteria pass:
 
@@ -120,8 +120,8 @@ All criteria are required:
 - xOS endpoint workloads are deployed (`openfang-provider-windows`, `openfang-provider-macos`)
 - endpoint health + capabilities checks succeed under configured auth path
 
-4. Evidence package archived in non-GitHub provenance
-- logs and summary for all checks are stored under `..._NON_GITHUB/provenance/openfang/`
+4. Evidence package archived in the repo-local ignored `.epydios` provenance path
+- logs and summary for all checks are stored under `.epydios/provenance/openfang/`
 - evidence includes command lines, timestamps, and pass/fail outcomes
 
 5. Policy posture unchanged
