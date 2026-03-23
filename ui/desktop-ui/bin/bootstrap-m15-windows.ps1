@@ -33,15 +33,15 @@ function Ensure-UserPathEntry {
     $userPath = ""
   }
 
-  $segments = $userPath -split ';' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+  $segments = @($userPath -split ';' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
   if ($segments -notcontains $normalized) {
-    $updated = if ($segments.Count -gt 0) { ($segments + $normalized) -join ';' } else { $normalized }
+    $updated = if (@($segments).Count -gt 0) { (@($segments) + $normalized) -join ';' } else { $normalized }
     [Environment]::SetEnvironmentVariable("Path", $updated, "User")
   }
 
-  $envSegments = $env:Path -split ';' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+  $envSegments = @($env:Path -split ';' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
   if ($envSegments -notcontains $normalized) {
-    $env:Path = if ($envSegments.Count -gt 0) { ($envSegments + $normalized) -join ';' } else { $normalized }
+    $env:Path = if (@($envSegments).Count -gt 0) { (@($envSegments) + $normalized) -join ';' } else { $normalized }
   }
 }
 
@@ -59,7 +59,7 @@ function Install-WingetPackage {
   foreach ($id in $Ids) {
     try {
       Write-Host "Installing $id via winget..."
-      winget install -e --id $id --accept-package-agreements --accept-source-agreements | Out-Host
+      winget install -e --id $id --source winget --accept-package-agreements --accept-source-agreements | Out-Host
     } catch {
       continue
     }
