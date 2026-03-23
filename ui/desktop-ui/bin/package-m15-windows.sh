@@ -80,7 +80,7 @@ if [ "${HOST_OS}" != "linux" ] && ! is_windows_host; then
 fi
 
 missing=()
-required_tools=(wails makensis zip)
+required_tools=(wails makensis)
 if [ "${HOST_OS}" = "linux" ]; then
   required_tools+=(x86_64-w64-mingw32-gcc)
 fi

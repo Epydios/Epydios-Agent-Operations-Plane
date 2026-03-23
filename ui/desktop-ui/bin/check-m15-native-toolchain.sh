@@ -73,7 +73,6 @@ case "${host}" in
     require_cmd python3 "Python 3"
     require_cmd jq "jq"
     require_cmd makensis "NSIS"
-    require_cmd zip "zip"
     ;;
   *)
     echo "WARN unknown host '${host}'; skipping host-specific checks"
