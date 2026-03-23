@@ -128,6 +128,43 @@ function Install-JqFallback {
   throw "Unable to install jq via winget or direct official release download."
 }
 
+function Install-KubectlFallback {
+  $homeBin = Join-Path $HOME "bin"
+  if (-not (Test-Path $homeBin)) {
+    New-Item -ItemType Directory -Path $homeBin | Out-Null
+  }
+  Ensure-UserPathEntry $homeBin
+
+  $kubectlPath = Join-Path $homeBin "kubectl.exe"
+  $stableVersion = ""
+
+  try {
+    $stableVersion = (Invoke-RestMethod -UseBasicParsing -Uri "https://dl.k8s.io/release/stable.txt").Trim()
+  } catch {
+    $stableVersion = "v1.34.1"
+  }
+
+  $candidateUris = @(
+    "https://dl.k8s.io/release/${stableVersion}/bin/windows/amd64/kubectl.exe",
+    "https://dl.k8s.io/release/v1.34.1/bin/windows/amd64/kubectl.exe"
+  )
+
+  foreach ($uri in $candidateUris) {
+    try {
+      Write-Host "Falling back to direct kubectl download from $uri ..."
+      Invoke-WebRequest -UseBasicParsing -Uri $uri -OutFile $kubectlPath
+      if (Test-Path $kubectlPath) {
+        Write-Host "OK   installed kubectl fallback at $kubectlPath"
+        return
+      }
+    } catch {
+      continue
+    }
+  }
+
+  throw "Unable to install kubectl via winget or direct official download."
+}
+
 if (-not (Have-Command "winget")) {
   throw "bootstrap-m15-windows requires winget on the Windows host."
 }
@@ -144,6 +181,11 @@ try {
   Install-JqFallback
 }
 Install-WingetPackage -Ids @("NSIS.NSIS") -CommandName "makensis"
+try {
+  Install-WingetPackage -Ids @("Kubernetes.kubectl") -CommandName "kubectl"
+} catch {
+  Install-KubectlFallback
+}
 
 foreach ($candidate in (Get-CommonPathCandidates)) {
   Ensure-UserPathEntry $candidate

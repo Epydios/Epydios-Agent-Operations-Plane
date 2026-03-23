@@ -39,6 +39,15 @@ start_windows_app() {
   return 1
 }
 
+read_bootstrap_field() {
+  local jq_expr="$1"
+  if command -v jq >/dev/null 2>&1 && [ -f "${BOOTSTRAP_PATH}" ]; then
+    jq -r "${jq_expr}" "${BOOTSTRAP_PATH}" 2>/dev/null || true
+    return
+  fi
+  printf '\n'
+}
+
 LOCAL_APPDATA_ROOT="$(shell_path "${LOCALAPPDATA:-${USERPROFILE:-${HOME}}/AppData/Local}")"
 ROAMING_APPDATA_ROOT="$(shell_path "${APPDATA:-${USERPROFILE:-${HOME}}/AppData/Roaming}")"
 
@@ -61,6 +70,21 @@ latest_manifest_before="$(find "${SESSION_ROOT}" -name session.json -print 2>/de
   echo "launch-m15-windows-beta failed: bootstrap config missing at ${BOOTSTRAP_PATH}" >&2
   exit 1
 }
+
+bootstrap_mode="$(read_bootstrap_field '.mode // ""')"
+runtime_namespace="$(read_bootstrap_field '.runtimeNamespace // "epydios-system"')"
+runtime_service="$(read_bootstrap_field '.runtimeService // "orchestration-runtime"')"
+
+if [ "${bootstrap_mode}" = "live" ]; then
+  if ! command -v kubectl >/dev/null 2>&1; then
+    echo "launch-m15-windows-beta failed: live mode requires kubectl on the Windows host. Run bash ./ui/desktop-ui/bin/bootstrap-m15-windows.sh first." >&2
+    exit 1
+  fi
+  if ! kubectl -n "${runtime_namespace}" get svc "${runtime_service}" -o name >/dev/null 2>&1; then
+    echo "launch-m15-windows-beta failed: live mode requires a reachable Kubernetes service ${runtime_namespace}/${runtime_service}. The current kube context on this Windows host is not ready." >&2
+    exit 1
+  fi
+fi
 
 start_windows_app "${INSTALL_PATH_NATIVE}" "${INSTALL_ROOT_NATIVE}" "${BOOTSTRAP_PATH_NATIVE}" "$@"
 
