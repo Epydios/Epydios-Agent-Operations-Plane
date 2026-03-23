@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+shell_path() {
+  local candidate="$1"
+  if command -v cygpath >/dev/null 2>&1; then
+    cygpath -u "${candidate}"
+    return
+  fi
+  printf '%s\n' "${candidate}"
+}
+
 windows_path() {
   local candidate="$1"
   if command -v cygpath >/dev/null 2>&1; then
@@ -10,8 +19,8 @@ windows_path() {
   printf '%s\n' "${candidate}"
 }
 
-LOCAL_APPDATA_ROOT="${LOCALAPPDATA:-${USERPROFILE:-${HOME}}/AppData/Local}"
-ROAMING_APPDATA_ROOT="${APPDATA:-${USERPROFILE:-${HOME}}/AppData/Roaming}"
+LOCAL_APPDATA_ROOT="$(shell_path "${LOCALAPPDATA:-${USERPROFILE:-${HOME}}/AppData/Local}")"
+ROAMING_APPDATA_ROOT="$(shell_path "${APPDATA:-${USERPROFILE:-${HOME}}/AppData/Roaming}")"
 
 INSTALL_ROOT="${EPYDIOS_M15_WINDOWS_INSTALL_ROOT:-${LOCAL_APPDATA_ROOT}/EpydiosAgentOpsDesktop}"
 SUPPORT_ROOT="${EPYDIOS_M15_WINDOWS_SUPPORT_ROOT:-${ROAMING_APPDATA_ROOT}/EpydiosAgentOpsDesktop}"

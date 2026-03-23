@@ -115,9 +115,9 @@ EOF
 fi
 
 if [ "${USE_REAL_WINDOWS_BETA_HOME}" = "1" ]; then
-  USERPROFILE_ROOT="${USERPROFILE:-${HOME}}"
-  APPDATA_ROOT="${APPDATA:-${USERPROFILE_ROOT}/AppData/Roaming}"
-  LOCALAPPDATA_ROOT="${LOCALAPPDATA:-${USERPROFILE_ROOT}/AppData/Local}"
+  USERPROFILE_ROOT="$(m15_shell_path "${USERPROFILE:-${HOME}}")"
+  APPDATA_ROOT="$(m15_shell_path "${APPDATA:-${USERPROFILE_ROOT}/AppData/Roaming}")"
+  LOCALAPPDATA_ROOT="$(m15_shell_path "${LOCALAPPDATA:-${USERPROFILE_ROOT}/AppData/Local}")"
 else
   RUN_HOME="${RUN_ROOT}/windows-home"
   USERPROFILE_ROOT="${RUN_HOME}/UserProfile"
@@ -196,6 +196,7 @@ done
 
 python3 - <<'PY' "${SESSION_MANIFEST}" "${CHECKLIST_PATH}" "${LOG_PATH}" "${INSTALLED_APP_PATH}" "${BOOTSTRAP_PATH}" "${LAUNCHER_SH_PATH}"
 import json
+import ntpath
 import pathlib
 import sys
 
@@ -207,13 +208,16 @@ bootstrap_path = sys.argv[5]
 launcher_path = sys.argv[6]
 manifest = json.loads(manifest_path.read_text())
 
+def normalize_windowsish(path: str) -> str:
+    return ntpath.normcase(path.replace("/", "\\"))
+
 assert manifest["mode"] == "mock", manifest["mode"]
 assert manifest["launcherState"] == "ready", manifest["launcherState"]
 assert manifest["runtimeProcessMode"] == "mock_only", manifest["runtimeProcessMode"]
 assert manifest["bootstrapConfigState"] == "loaded", manifest["bootstrapConfigState"]
-assert manifest["bootstrapConfigPath"] == bootstrap_path, manifest["bootstrapConfigPath"]
+assert normalize_windowsish(manifest["bootstrapConfigPath"]) == normalize_windowsish(bootstrap_path), manifest["bootstrapConfigPath"]
 assert manifest["paths"]["gatewayRoot"].endswith("localhost-gateway"), manifest["paths"]["gatewayRoot"]
-assert manifest["gatewayService"]["statusPath"] == manifest["paths"]["gatewayStatusPath"], manifest["gatewayService"]["statusPath"]
+assert normalize_windowsish(manifest["gatewayService"]["statusPath"]) == normalize_windowsish(manifest["paths"]["gatewayStatusPath"]), manifest["gatewayService"]["statusPath"]
 
 checklist = {
     "startup_reliability": {

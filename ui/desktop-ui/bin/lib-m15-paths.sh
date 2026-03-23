@@ -52,3 +52,29 @@ m15_go_mod_cache_root() {
 m15_json_escape() {
   printf '%s' "${1:-}" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'
 }
+
+m15_shell_path() {
+  local candidate="${1:-}"
+  if [ -z "${candidate}" ]; then
+    printf '\n'
+    return
+  fi
+  if command -v cygpath >/dev/null 2>&1; then
+    cygpath -u "${candidate}"
+    return
+  fi
+  printf '%s\n' "${candidate}"
+}
+
+m15_windows_path() {
+  local candidate="${1:-}"
+  if [ -z "${candidate}" ]; then
+    printf '\n'
+    return
+  fi
+  if command -v cygpath >/dev/null 2>&1; then
+    cygpath -w "${candidate}"
+    return
+  fi
+  printf '%s\n' "${candidate}"
+}

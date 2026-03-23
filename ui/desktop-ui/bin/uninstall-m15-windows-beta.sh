@@ -13,8 +13,8 @@ LATEST_LOG="${PHASE_ROOT}/uninstall-m15-windows-beta-latest.log"
 LATEST_SUMMARY="${PHASE_ROOT}/uninstall-m15-windows-beta-latest.summary.json"
 mkdir -p "${RUN_ROOT}"
 
-LOCAL_APPDATA_ROOT="${LOCALAPPDATA:-${USERPROFILE:-${HOME}}/AppData/Local}"
-ROAMING_APPDATA_ROOT="${APPDATA:-${USERPROFILE:-${HOME}}/AppData/Roaming}"
+LOCAL_APPDATA_ROOT="$(m15_shell_path "${LOCALAPPDATA:-${USERPROFILE:-${HOME}}/AppData/Local}")"
+ROAMING_APPDATA_ROOT="$(m15_shell_path "${APPDATA:-${USERPROFILE:-${HOME}}/AppData/Roaming}")"
 
 INSTALL_ROOT="${EPYDIOS_M15_WINDOWS_INSTALL_ROOT:-${LOCAL_APPDATA_ROOT}/EpydiosAgentOpsDesktop}"
 SUPPORT_ROOT="${EPYDIOS_M15_WINDOWS_SUPPORT_ROOT:-${ROAMING_APPDATA_ROOT}/EpydiosAgentOpsDesktop}"

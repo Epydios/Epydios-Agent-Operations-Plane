@@ -39,17 +39,8 @@ WINDOWS_INSTALLER_PATH="$(jq -r '.installer_path // ""' "${PACKAGE_SUMMARY}")"
   exit 1
 }
 
-windows_path() {
-  local candidate="$1"
-  if command -v cygpath >/dev/null 2>&1; then
-    cygpath -w "${candidate}"
-    return
-  fi
-  printf '%s\n' "${candidate}"
-}
-
-LOCAL_APPDATA_ROOT="${LOCALAPPDATA:-${USERPROFILE:-${HOME}}/AppData/Local}"
-ROAMING_APPDATA_ROOT="${APPDATA:-${USERPROFILE:-${HOME}}/AppData/Roaming}"
+LOCAL_APPDATA_ROOT="$(m15_shell_path "${LOCALAPPDATA:-${USERPROFILE:-${HOME}}/AppData/Local}")"
+ROAMING_APPDATA_ROOT="$(m15_shell_path "${APPDATA:-${USERPROFILE:-${HOME}}/AppData/Roaming}")"
 
 INSTALL_ROOT="${EPYDIOS_M15_WINDOWS_INSTALL_ROOT:-${LOCAL_APPDATA_ROOT}/EpydiosAgentOpsDesktop}"
 SUPPORT_ROOT="${EPYDIOS_M15_WINDOWS_SUPPORT_ROOT:-${ROAMING_APPDATA_ROOT}/EpydiosAgentOpsDesktop}"
@@ -58,8 +49,8 @@ BOOTSTRAP_PATH="${SUPPORT_ROOT}/runtime-bootstrap.json"
 LAUNCHER_CMD_PATH="${INSTALL_ROOT}/${LAUNCHER_CMD_NAME}"
 LAUNCHER_SH_PATH="${SUPPORT_ROOT}/${LAUNCHER_SH_NAME}"
 
-INSTALL_PATH_NATIVE="$(windows_path "${INSTALL_PATH}")"
-BOOTSTRAP_PATH_NATIVE="$(windows_path "${BOOTSTRAP_PATH}")"
+INSTALL_PATH_NATIVE="$(m15_windows_path "${INSTALL_PATH}")"
+BOOTSTRAP_PATH_NATIVE="$(m15_windows_path "${BOOTSTRAP_PATH}")"
 
 write_summary() {
   cat > "${SUMMARY_PATH}" <<EOF
