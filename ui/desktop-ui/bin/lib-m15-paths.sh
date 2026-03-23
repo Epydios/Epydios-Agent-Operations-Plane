@@ -48,3 +48,7 @@ m15_go_cache_root() {
 m15_go_mod_cache_root() {
   printf "%s/go-mod-cache\n" "${M15_CACHE_ROOT}"
 }
+
+m15_json_escape() {
+  printf '%s' "${1:-}" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'
+}

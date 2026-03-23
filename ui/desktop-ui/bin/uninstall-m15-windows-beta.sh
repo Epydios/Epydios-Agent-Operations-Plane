@@ -32,14 +32,14 @@ LAUNCHER_SH_PATH="${SUPPORT_ROOT}/launch-epydios-agentops-desktop.sh"
 
 cat > "${SUMMARY_PATH}" <<EOF
 {
-  "generated_at_utc": "${STAMP}",
+  "generated_at_utc": "$(m15_json_escape "${STAMP}")",
   "status": "uninstalled_windows_beta_bundle",
-  "install_root": "${INSTALL_ROOT}",
-  "install_path": "${INSTALL_PATH}",
-  "support_root": "${SUPPORT_ROOT}",
-  "launcher_cmd_path": "${LAUNCHER_CMD_PATH}",
-  "launcher_sh_path": "${LAUNCHER_SH_PATH}",
-  "log_path": "${LOG_PATH}"
+  "install_root": "$(m15_json_escape "${INSTALL_ROOT}")",
+  "install_path": "$(m15_json_escape "${INSTALL_PATH}")",
+  "support_root": "$(m15_json_escape "${SUPPORT_ROOT}")",
+  "launcher_cmd_path": "$(m15_json_escape "${LAUNCHER_CMD_PATH}")",
+  "launcher_sh_path": "$(m15_json_escape "${LAUNCHER_SH_PATH}")",
+  "log_path": "$(m15_json_escape "${LOG_PATH}")"
 }
 EOF
 cp "${LOG_PATH}" "${LATEST_LOG}"

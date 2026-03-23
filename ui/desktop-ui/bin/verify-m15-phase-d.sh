@@ -54,11 +54,11 @@ is_windows_host() {
 if [[ "${PACKAGE_STATUS}" == blocked_* ]]; then
   cat > "${SUMMARY_PATH}" <<EOF
 {
-  "generated_at_utc": "${STAMP}",
+  "generated_at_utc": "$(m15_json_escape "${STAMP}")",
   "status": "phase_d_blocked_before_packaging",
-  "reason": "${PACKAGE_REASON}",
-  "package_summary_path": "${PACKAGE_SUMMARY}",
-  "log_path": "${LOG_PATH}"
+  "reason": "$(m15_json_escape "${PACKAGE_REASON}")",
+  "package_summary_path": "$(m15_json_escape "${PACKAGE_SUMMARY}")",
+  "log_path": "$(m15_json_escape "${LOG_PATH}")"
 }
 EOF
   : > "${LOG_PATH}"
@@ -92,13 +92,13 @@ if ! is_windows_host; then
 
   cat > "${SUMMARY_PATH}" <<EOF
 {
-  "generated_at_utc": "${STAMP}",
+  "generated_at_utc": "$(m15_json_escape "${STAMP}")",
   "status": "phase_d_packaging_baseline_and_verifier_foundation",
   "reason": "Windows installer baseline was packaged and the existing Windows parity verifier foundation passed. A real installed-launcher proof is still required on a Windows host to close the Phase D exit gate.",
-  "package_summary_path": "${PACKAGE_SUMMARY}",
-  "binary_path": "${PACKAGE_BINARY}",
-  "installer_path": "${PACKAGE_INSTALLER}",
-  "log_path": "${LOG_PATH}",
+  "package_summary_path": "$(m15_json_escape "${PACKAGE_SUMMARY}")",
+  "binary_path": "$(m15_json_escape "${PACKAGE_BINARY}")",
+  "installer_path": "$(m15_json_escape "${PACKAGE_INSTALLER}")",
+  "log_path": "$(m15_json_escape "${LOG_PATH}")",
   "verifiers": [
     "platform/local/bin/verify-m14-win-restricted-readiness.sh",
     "platform/local/bin/verify-m14-openfang-xos-adapters.sh",
@@ -232,19 +232,19 @@ PY
 if [ "${KEEP_WINDOWS_BETA_INSTALLED}" = "1" ]; then
   cat > "${SUMMARY_PATH}" <<EOF
 {
-  "generated_at_utc": "${STAMP}",
+  "generated_at_utc": "$(m15_json_escape "${STAMP}")",
   "status": "phase_d_beta_ready_installed",
   "reason": "Installed Windows launcher completed the package, install, launch, and session beta flow with bootstrap config and launcher diagnostics in place. The installed bundle was intentionally left in place for operator use.",
-  "package_summary_path": "${PACKAGE_SUMMARY}",
-  "binary_path": "${PACKAGE_BINARY}",
-  "installer_path": "${PACKAGE_INSTALLER}",
-  "installed_app_path": "${INSTALLED_APP_PATH}",
-  "launcher_path": "${LAUNCHER_SH_PATH}",
-  "bootstrap_path": "${BOOTSTRAP_PATH}",
-  "session_manifest_path": "${SESSION_MANIFEST}",
-  "event_log_path": "${EVENT_LOG}",
-  "operator_beta_checklist_path": "${CHECKLIST_PATH}",
-  "log_path": "${LOG_PATH}"
+  "package_summary_path": "$(m15_json_escape "${PACKAGE_SUMMARY}")",
+  "binary_path": "$(m15_json_escape "${PACKAGE_BINARY}")",
+  "installer_path": "$(m15_json_escape "${PACKAGE_INSTALLER}")",
+  "installed_app_path": "$(m15_json_escape "${INSTALLED_APP_PATH}")",
+  "launcher_path": "$(m15_json_escape "${LAUNCHER_SH_PATH}")",
+  "bootstrap_path": "$(m15_json_escape "${BOOTSTRAP_PATH}")",
+  "session_manifest_path": "$(m15_json_escape "${SESSION_MANIFEST}")",
+  "event_log_path": "$(m15_json_escape "${EVENT_LOG}")",
+  "operator_beta_checklist_path": "$(m15_json_escape "${CHECKLIST_PATH}")",
+  "log_path": "$(m15_json_escape "${LOG_PATH}")"
 }
 EOF
   cp "${LOG_PATH}" "${LATEST_LOG}"
@@ -271,19 +271,19 @@ EPYDIOS_M15_WINDOWS_SUPPORT_ROOT="${SUPPORT_ROOT}" \
 
 cat > "${SUMMARY_PATH}" <<EOF
 {
-  "generated_at_utc": "${STAMP}",
+  "generated_at_utc": "$(m15_json_escape "${STAMP}")",
   "status": "phase_d_beta_ready",
   "reason": "Installed Windows launcher completed the install, launch, session, and uninstall beta flow with bootstrap config and launcher diagnostics in place.",
-  "package_summary_path": "${PACKAGE_SUMMARY}",
-  "binary_path": "${PACKAGE_BINARY}",
-  "installer_path": "${PACKAGE_INSTALLER}",
-  "installed_app_path": "${INSTALLED_APP_PATH}",
-  "launcher_path": "${LAUNCHER_SH_PATH}",
-  "bootstrap_path": "${BOOTSTRAP_PATH}",
-  "session_manifest_path": "${SESSION_MANIFEST}",
-  "event_log_path": "${EVENT_LOG}",
-  "operator_beta_checklist_path": "${CHECKLIST_PATH}",
-  "log_path": "${LOG_PATH}"
+  "package_summary_path": "$(m15_json_escape "${PACKAGE_SUMMARY}")",
+  "binary_path": "$(m15_json_escape "${PACKAGE_BINARY}")",
+  "installer_path": "$(m15_json_escape "${PACKAGE_INSTALLER}")",
+  "installed_app_path": "$(m15_json_escape "${INSTALLED_APP_PATH}")",
+  "launcher_path": "$(m15_json_escape "${LAUNCHER_SH_PATH}")",
+  "bootstrap_path": "$(m15_json_escape "${BOOTSTRAP_PATH}")",
+  "session_manifest_path": "$(m15_json_escape "${SESSION_MANIFEST}")",
+  "event_log_path": "$(m15_json_escape "${EVENT_LOG}")",
+  "operator_beta_checklist_path": "$(m15_json_escape "${CHECKLIST_PATH}")",
+  "log_path": "$(m15_json_escape "${LOG_PATH}")"
 }
 EOF
 cp "${LOG_PATH}" "${LATEST_LOG}"

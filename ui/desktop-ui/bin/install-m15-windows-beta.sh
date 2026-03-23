@@ -64,17 +64,17 @@ BOOTSTRAP_PATH_NATIVE="$(windows_path "${BOOTSTRAP_PATH}")"
 write_summary() {
   cat > "${SUMMARY_PATH}" <<EOF
 {
-  "generated_at_utc": "${STAMP}",
+  "generated_at_utc": "$(m15_json_escape "${STAMP}")",
   "status": "installed_windows_beta_bundle",
-  "install_root": "${INSTALL_ROOT}",
-  "install_path": "${INSTALL_PATH}",
-  "support_root": "${SUPPORT_ROOT}",
-  "bootstrap_path": "${BOOTSTRAP_PATH}",
-  "launcher_cmd_path": "${LAUNCHER_CMD_PATH}",
-  "launcher_sh_path": "${LAUNCHER_SH_PATH}",
-  "log_path": "${LOG_PATH}",
-  "source_binary_path": "${WINDOWS_BINARY_PATH}",
-  "source_installer_path": "${WINDOWS_INSTALLER_PATH}"
+  "install_root": "$(m15_json_escape "${INSTALL_ROOT}")",
+  "install_path": "$(m15_json_escape "${INSTALL_PATH}")",
+  "support_root": "$(m15_json_escape "${SUPPORT_ROOT}")",
+  "bootstrap_path": "$(m15_json_escape "${BOOTSTRAP_PATH}")",
+  "launcher_cmd_path": "$(m15_json_escape "${LAUNCHER_CMD_PATH}")",
+  "launcher_sh_path": "$(m15_json_escape "${LAUNCHER_SH_PATH}")",
+  "log_path": "$(m15_json_escape "${LOG_PATH}")",
+  "source_binary_path": "$(m15_json_escape "${WINDOWS_BINARY_PATH}")",
+  "source_installer_path": "$(m15_json_escape "${WINDOWS_INSTALLER_PATH}")"
 }
 EOF
   cp "${LOG_PATH}" "${LATEST_LOG}"

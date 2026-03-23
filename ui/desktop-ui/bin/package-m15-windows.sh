@@ -43,14 +43,14 @@ write_summary() {
   host_installer_path="$(host_visible_path "${installer_path}")"
   cat > "${SUMMARY_PATH}" <<EOF
 {
-  "generated_at_utc": "${STAMP}",
-  "status": "${status}",
-  "host_os": "${HOST_OS}",
-  "host_arch": "${HOST_ARCH}",
-  "reason": "${reason}",
-  "log_path": "${host_log_path}",
-  "binary_path": "${host_binary_path}",
-  "installer_path": "${host_installer_path}"
+  "generated_at_utc": "$(m15_json_escape "${STAMP}")",
+  "status": "$(m15_json_escape "${status}")",
+  "host_os": "$(m15_json_escape "${HOST_OS}")",
+  "host_arch": "$(m15_json_escape "${HOST_ARCH}")",
+  "reason": "$(m15_json_escape "${reason}")",
+  "log_path": "$(m15_json_escape "${host_log_path}")",
+  "binary_path": "$(m15_json_escape "${host_binary_path}")",
+  "installer_path": "$(m15_json_escape "${host_installer_path}")"
 }
 EOF
   cp "${LOG_PATH}" "${LATEST_LOG}"
