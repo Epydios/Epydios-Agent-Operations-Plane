@@ -99,6 +99,35 @@ exec ${TargetCommand} "\$@"
   }
 }
 
+function Install-JqFallback {
+  $homeBin = Join-Path $HOME "bin"
+  if (-not (Test-Path $homeBin)) {
+    New-Item -ItemType Directory -Path $homeBin | Out-Null
+  }
+  Ensure-UserPathEntry $homeBin
+
+  $jqPath = Join-Path $homeBin "jq.exe"
+  $candidateUris = @(
+    "https://github.com/jqlang/jq/releases/latest/download/jq-windows-amd64.exe",
+    "https://github.com/jqlang/jq/releases/latest/download/jq-win64.exe"
+  )
+
+  foreach ($uri in $candidateUris) {
+    try {
+      Write-Host "Falling back to direct jq download from $uri ..."
+      Invoke-WebRequest -UseBasicParsing -Uri $uri -OutFile $jqPath
+      if (Test-Path $jqPath) {
+        Write-Host "OK   installed jq fallback at $jqPath"
+        return
+      }
+    } catch {
+      continue
+    }
+  }
+
+  throw "Unable to install jq via winget or direct official release download."
+}
+
 if (-not (Have-Command "winget")) {
   throw "bootstrap-m15-windows requires winget on the Windows host."
 }
@@ -109,7 +138,11 @@ Install-WingetPackage -Ids @("Git.Git") -CommandName "bash"
 Install-WingetPackage -Ids @("GoLang.Go") -CommandName "go"
 Install-WingetPackage -Ids @("OpenJS.NodeJS.LTS") -CommandName "node"
 Install-WingetPackage -Ids @("Python.Python.3.13", "Python.Python.3.12") -CommandName "python"
-Install-WingetPackage -Ids @("jqlang.jq") -CommandName "jq"
+try {
+  Install-WingetPackage -Ids @("jqlang.jq") -CommandName "jq"
+} catch {
+  Install-JqFallback
+}
 Install-WingetPackage -Ids @("NSIS.NSIS") -CommandName "makensis"
 
 foreach ($candidate in (Get-CommonPathCandidates)) {
