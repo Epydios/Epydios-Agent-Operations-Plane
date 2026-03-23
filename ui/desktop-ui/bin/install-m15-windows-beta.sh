@@ -50,6 +50,7 @@ LAUNCHER_CMD_PATH="${INSTALL_ROOT}/${LAUNCHER_CMD_NAME}"
 LAUNCHER_SH_PATH="${SUPPORT_ROOT}/${LAUNCHER_SH_NAME}"
 
 INSTALL_PATH_NATIVE="$(m15_windows_path "${INSTALL_PATH}")"
+INSTALL_ROOT_NATIVE="$(m15_windows_path "${INSTALL_ROOT}")"
 BOOTSTRAP_PATH_NATIVE="$(m15_windows_path "${BOOTSTRAP_PATH}")"
 
 write_summary() {
@@ -90,13 +91,23 @@ EOF
 @echo off
 setlocal
 set "EPYDIOS_NATIVEAPP_BOOTSTRAP_PATH=${BOOTSTRAP_PATH_NATIVE}"
-"${INSTALL_PATH_NATIVE}" %*
+start "" "${INSTALL_PATH_NATIVE}" %*
 EOF
   cat > "${LAUNCHER_SH_PATH}" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
-export EPYDIOS_NATIVEAPP_BOOTSTRAP_PATH="${BOOTSTRAP_PATH_NATIVE}"
-exec "${INSTALL_PATH}" "\$@"
+if command -v powershell.exe >/dev/null 2>&1; then
+  powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "[System.Environment]::SetEnvironmentVariable('EPYDIOS_NATIVEAPP_BOOTSTRAP_PATH','${BOOTSTRAP_PATH_NATIVE}','Process'); Start-Process -FilePath '${INSTALL_PATH_NATIVE}' -WorkingDirectory '${INSTALL_ROOT_NATIVE}'"
+  exit \$?
+fi
+
+if command -v cmd.exe >/dev/null 2>&1; then
+  cmd.exe //c "set \"EPYDIOS_NATIVEAPP_BOOTSTRAP_PATH=${BOOTSTRAP_PATH_NATIVE}\" && start \"\" \"${INSTALL_PATH_NATIVE}\""
+  exit \$?
+fi
+
+echo "launch-epydios-agentops-desktop: no Windows launcher runtime found (expected powershell.exe or cmd.exe)." >&2
+exit 1
 EOF
   chmod +x "${LAUNCHER_SH_PATH}"
 } >"${LOG_PATH}" 2>&1
