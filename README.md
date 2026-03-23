@@ -75,7 +75,7 @@ If you are on Linux and want to evaluate the beta installed desktop path:
 ./ui/desktop-ui/bin/launch-m15-linux-beta.sh
 ```
 
-If you are on Windows and want to evaluate the native beta desktop path from Git Bash:
+If you are on Windows and want to evaluate the native beta packaging and launch path from Git Bash:
 
 ```bash
 bash ./ui/desktop-ui/bin/bootstrap-m15-windows.sh
@@ -87,7 +87,7 @@ The primary verified installed operator path today remains macOS.
 
 Linux has a proven Ubuntu 24.04 x86_64 host-acceptance path.
 
-Windows now has a native Git Bash + PowerShell beta lane for packaging, install, and verification, but real Windows host acceptance is still in progress.
+Windows now has a native Git Bash + PowerShell beta lane with native packaging and launch proved on a real Windows host. The Windows live operator path is not yet fully proved.
 
 ## Screenshots
 
