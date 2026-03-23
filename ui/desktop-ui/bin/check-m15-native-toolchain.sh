@@ -26,6 +26,20 @@ require_cmd() {
   fi
 }
 
+require_one_cmd() {
+  local label="$1"
+  shift
+  local candidate
+  for candidate in "$@"; do
+    if have "${candidate}"; then
+      echo "OK   ${label}: ${candidate}"
+      return
+    fi
+  done
+  echo "MISS ${label}: ${*}"
+  fail=1
+}
+
 echo "M15 native app toolchain preflight"
 echo "host=$(uname -s) arch=$(uname -m)"
 
@@ -55,7 +69,11 @@ case "${host}" in
     fi
     ;;
   msys*|mingw*|cygwin*)
-    require_cmd powershell "PowerShell"
+    require_one_cmd "PowerShell" powershell.exe powershell pwsh.exe pwsh
+    require_cmd python3 "Python 3"
+    require_cmd jq "jq"
+    require_cmd makensis "NSIS"
+    require_cmd zip "zip"
     ;;
   *)
     echo "WARN unknown host '${host}'; skipping host-specific checks"

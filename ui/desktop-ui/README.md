@@ -9,6 +9,7 @@ This module contains the desktop UI, native launcher shell, local background sup
 - `Interposition OFF / ON` is explicit.
 - The verified installed operator path today is macOS.
 - Linux now has a proven Ubuntu 24.04 x86_64 host-acceptance path for native toolchain preflight, packaging/install, and native launcher startup, but remains beta.
+- Windows now has a native Git Bash + PowerShell beta lane for toolchain bootstrap, packaging, install, verify, and launch, but real host acceptance is still pending.
 - Browser `run-dev.sh` remains a development path, not the primary end-user story.
 
 ## What Is In This Module
@@ -55,6 +56,24 @@ What this currently proves:
 - launcher/bootstrap wiring can be verified after install
 - the native Linux launcher path has been exercised on Ubuntu 24.04 x86_64
 
+## Windows Beta Installed Path
+
+From Git Bash on Windows:
+
+```bash
+bash ./ui/desktop-ui/bin/bootstrap-m15-windows.sh
+bash ./ui/desktop-ui/bin/check-m15-native-toolchain.sh
+bash ./ui/desktop-ui/bin/verify-m15-windows-beta.sh
+bash ./ui/desktop-ui/bin/launch-m15-windows-beta.sh
+```
+
+What this currently proves:
+
+- the Windows host can bootstrap the required native packaging tools
+- the Windows Wails + NSIS packaging lane can run without Docker
+- the package, install, launcher, and session beta verification path is available on a native Windows host
+- the current Windows lane is still beta until a dedicated real host acceptance pass is completed
+
 ## Development Browser Path
 
 For UI iteration and browser-backed verification:
@@ -92,7 +111,7 @@ Current non-goals for the OSS baseline:
 ## Known Public Limits
 
 - Linux has a proven Ubuntu host-acceptance lane, but the primary broadly verified installed operator path is still macOS.
-- Windows packaging exists, but a real Windows host acceptance pass is still pending.
+- Windows now has a native beta packaging and verification lane, but a real Windows host acceptance pass is still pending.
 - The installed app currently degrades AIMXS activation and secure-ref helper actions rather than presenting them as a full native-first workflow.
 - Some Workbench density and visual shaping work is intentionally deferred until after release.
 

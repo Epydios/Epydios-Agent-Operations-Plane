@@ -51,6 +51,19 @@ If you are on Ubuntu and want to evaluate the beta installed desktop path:
 
 Ubuntu 24.04 x86_64 now has a proven host-acceptance path for native preflight, packaging and install, and launcher startup. Linux should still be treated as beta until broader host coverage is in place.
 
+## Installed Desktop Check On Windows
+
+If you are on Windows and want to evaluate the native beta path from Git Bash:
+
+```bash
+bash ./ui/desktop-ui/bin/bootstrap-m15-windows.sh
+bash ./ui/desktop-ui/bin/check-m15-native-toolchain.sh
+bash ./ui/desktop-ui/bin/verify-m15-windows-beta.sh
+bash ./ui/desktop-ui/bin/launch-m15-windows-beta.sh
+```
+
+This gives Windows a native packaging and verification lane without requiring Docker. It should still be treated as beta until a dedicated real host acceptance pass is complete.
+
 ## What To Read Next
 
 - [OSS quality story](quality-story.md)

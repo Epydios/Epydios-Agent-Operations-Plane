@@ -12,6 +12,7 @@ SUMMARY_PATH="${RUN_ROOT}/verify-m15-phase-d.summary.json"
 LATEST_LOG="${PHASE_ROOT}/verify-m15-phase-d-latest.log"
 LATEST_SUMMARY="${PHASE_ROOT}/verify-m15-phase-d-latest.summary.json"
 PACKAGE_SUMMARY="${PHASE_ROOT}/package-m15-windows-latest.summary.json"
+KEEP_WINDOWS_BETA_INSTALLED="${EPYDIOS_KEEP_WINDOWS_BETA_INSTALLED:-0}"
 mkdir -p "${RUN_ROOT}"
 
 [ -f "${PACKAGE_SUMMARY}" ] || {
@@ -219,6 +220,30 @@ checklist = {
 }
 checklist_path.write_text(json.dumps(checklist, indent=2) + "\n")
 PY
+
+if [ "${KEEP_WINDOWS_BETA_INSTALLED}" = "1" ]; then
+  cat > "${SUMMARY_PATH}" <<EOF
+{
+  "generated_at_utc": "${STAMP}",
+  "status": "phase_d_beta_ready_installed",
+  "reason": "Installed Windows launcher completed the package, install, launch, and session beta flow with bootstrap config and launcher diagnostics in place. The installed bundle was intentionally left in place for operator use.",
+  "package_summary_path": "${PACKAGE_SUMMARY}",
+  "binary_path": "${PACKAGE_BINARY}",
+  "installer_path": "${PACKAGE_INSTALLER}",
+  "installed_app_path": "${INSTALLED_APP_PATH}",
+  "launcher_path": "${LAUNCHER_SH_PATH}",
+  "bootstrap_path": "${BOOTSTRAP_PATH}",
+  "session_manifest_path": "${SESSION_MANIFEST}",
+  "event_log_path": "${EVENT_LOG}",
+  "operator_beta_checklist_path": "${CHECKLIST_PATH}",
+  "log_path": "${LOG_PATH}"
+}
+EOF
+  cp "${LOG_PATH}" "${LATEST_LOG}"
+  cp "${SUMMARY_PATH}" "${LATEST_SUMMARY}"
+  echo "M15 Phase D verifier passed."
+  exit 0
+fi
 
 USERPROFILE="${USERPROFILE_ROOT}" \
 APPDATA="${APPDATA_ROOT}" \

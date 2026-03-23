@@ -57,11 +57,22 @@ EOF
   cp "${SUMMARY_PATH}" "${LATEST_SUMMARY}"
 }
 
-if [ "${HOST_OS}" != "linux" ]; then
+is_windows_host() {
+  case "${HOST_OS}" in
+    msys*|mingw*|cygwin*)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+if [ "${HOST_OS}" != "linux" ] && ! is_windows_host; then
   : > "${LOG_PATH}"
   write_summary \
-    "blocked_active_host_non_linux_windows_builder_required" \
-    "Windows packaging baseline currently requires the Linux Docker builder with mingw-w64 and NSIS tooling." \
+    "blocked_active_host_unsupported_windows_builder" \
+    "Windows packaging baseline currently supports the Linux Docker builder or a native Windows host toolchain." \
     "" \
     ""
   echo "package-m15-windows: active host is ${HOST_OS}; blocker recorded at ${SUMMARY_PATH}" >&2
@@ -69,7 +80,11 @@ if [ "${HOST_OS}" != "linux" ]; then
 fi
 
 missing=()
-for required in wails x86_64-w64-mingw32-gcc makensis zip; do
+required_tools=(wails makensis zip)
+if [ "${HOST_OS}" = "linux" ]; then
+  required_tools+=(x86_64-w64-mingw32-gcc)
+fi
+for required in "${required_tools[@]}"; do
   if ! command -v "${required}" >/dev/null 2>&1; then
     missing+=("${required}")
   fi
@@ -118,8 +133,12 @@ export EPYDIOS_STAGE_WEB_DIST="$(m15_frontend_stage_root "phase-d-${STAMP}")"
   go test ./ui/desktop-ui/internal/nativeapp
   npm --prefix "${STAGE_MODULE_ROOT}/frontend" run build
   cd "${STAGE_MODULE_ROOT}"
-  export CC="x86_64-w64-mingw32-gcc"
-  export CXX="x86_64-w64-mingw32-g++"
+  if [ "${HOST_OS}" = "linux" ]; then
+    export CC="x86_64-w64-mingw32-gcc"
+    export CXX="x86_64-w64-mingw32-g++"
+  else
+    unset CC CXX || true
+  fi
   wails build \
     -platform windows/amd64 \
     -clean \

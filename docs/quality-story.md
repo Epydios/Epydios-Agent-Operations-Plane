@@ -55,6 +55,8 @@ This path proves that the public OSS repo can:
 - pass the desktop module baseline checks
 - build and verify the current installable macOS desktop path
 
+Windows also now has a native beta packaging and verification lane from Git Bash, but it is still below the macOS installed-path confidence level until a dedicated real host acceptance pass is complete.
+
 It does not prove premium AIMXS behavior, and it does not claim a fully verified Windows host path.
 
 For premium comparison later, use the separate AIMXS-specific runbooks and local verifier paths.
