@@ -1681,7 +1681,7 @@ function applyAdvancedToggleLabels(root = document) {
     }
     const enabled = isAdvancedSectionEnabled(section);
     toggle.setAttribute("aria-pressed", enabled ? "true" : "false");
-    toggle.textContent = enabled ? "Hide advanced details" : "Show advanced details";
+    toggle.textContent = enabled ? "Hide more options" : "Show more options";
   }
 }
 
@@ -2995,14 +2995,14 @@ function clearDataPanels() {
   };
   renderDeveloperOpsEmptyState(ui, {
     tone: "info",
-    title: "DeveloperOps",
-    message: "Developer diagnostics become available after runtime, settings, and advanced preview signals load."
+    title: "Diagnostics",
+    message: "Diagnostics become available after Epydios loads runtime, settings, and inspection context."
   });
   renderSettingsOpsEmptyState(ui, {
     tone: "empty",
-    title: "SettingsOps",
+    title: "Settings",
     message: "No configuration data loaded.",
-    detail: "Refresh the workspace. If settings should be present, verify scope and runtime endpoint availability."
+    detail: "Refresh the workspace. If settings should already be available, check launcher status and try again."
   });
   ui.approvalsFeedback.innerHTML = "";
   ui.approvalsContent.innerHTML = renderPanelStateMetric(
@@ -3071,7 +3071,7 @@ function renderPanelLoadingStates() {
   if (ui.homeOpsContent) {
     ui.homeOpsContent.innerHTML = renderPanelStateMetric(
       "loading",
-      "CompanionOps",
+      "Companion",
       "Loading companion status, attention queue, recent governed actions, and workbench handoffs..."
     );
   }
@@ -3169,11 +3169,11 @@ function renderPanelLoadingStates() {
     );
   }
   if (ui.developerOpsContent) {
-    ui.developerOpsContent.innerHTML = renderPanelStateMetric(
-      "loading",
-      "DeveloperOps",
-      "Loading debug tools, payload previews, and contract diagnostics..."
-    );
+      ui.developerOpsContent.innerHTML = renderPanelStateMetric(
+        "loading",
+        "Diagnostics",
+        "Loading debug tools, payload previews, and contract diagnostics..."
+      );
   }
 }
 
@@ -3273,8 +3273,8 @@ function renderDeveloperOpsPanel() {
   if (!latestDeveloperOpsContext?.settings) {
     renderDeveloperOpsEmptyState(ui, {
       tone: "info",
-      title: "DeveloperOps",
-      message: "Developer diagnostics become available after runtime, settings, and advanced preview signals load."
+      title: "Diagnostics",
+      message: "Diagnostics become available after Epydios loads runtime, settings, and inspection context."
     });
     return;
   }
@@ -4890,7 +4890,7 @@ async function main() {
       .join("");
     ui.companionHandoffBanner.innerHTML = `
       <div class="companion-handoff-summary">
-        <span class="native-launcher-status-badge">Opened From CompanionOps</span>
+        <span class="native-launcher-status-badge">Opened From Companion</span>
         <span class="chip chip-neutral chip-compact">${escapeHTML(
           String(handoff.kind || "handoff").trim() || "handoff"
         )}</span>
@@ -4937,7 +4937,7 @@ async function main() {
     }
     renderHomeOpsEmptyState(ui, {
       tone: "error",
-      title: "CompanionOps",
+      title: "Companion",
       message
     });
   };
@@ -15245,8 +15245,8 @@ function getCurrentIncidentOpsEntry(entryId = "") {
     setCompanionOpsFeedback(
       "info",
       enabled
-        ? "Turning interposition on. Epydios is applying the local request-path change."
-        : "Turning interposition off. Epydios is removing the local request-path change."
+        ? "Turning interposition on. Epydios is getting ready to govern supported requests."
+        : "Turning interposition off. Supported requests are returning to their normal client flow."
     );
     try {
       const sessionSummary = await bridgeContract.bindings.NativeInterpositionConfigure(
@@ -15265,8 +15265,8 @@ function getCurrentIncidentOpsEntry(entryId = "") {
       const interpositionStatus = String(interposition.status || "").trim().toLowerCase();
       const statusMessage = String(interposition.reason || "").trim() || (
         enabled
-          ? "Interposition is ON. Compatible upstream requests now enter the local governed proxy path."
-          : "Interposition is OFF. Compatible upstream requests will no longer enter the local governed proxy path."
+          ? "Interposition is ON. Epydios is governing supported requests."
+          : "Interposition is OFF. Epydios is not governing supported requests."
       );
       const feedbackTone =
         !Boolean(interposition.enabled) || interpositionStatus === "off"
@@ -15316,7 +15316,7 @@ function getCurrentIncidentOpsEntry(entryId = "") {
       }
       await syncNativeShellStateFromBindings();
       await refresh();
-      setCompanionOpsFeedback("ok", "Local runtime and gateway services restarted from CompanionOps.");
+      setCompanionOpsFeedback("ok", "Local runtime and gateway services restarted from Companion.");
       return true;
     } catch (error) {
       await syncNativeShellStateFromBindings().catch(() => {});
@@ -16127,7 +16127,7 @@ function getCurrentIncidentOpsEntry(entryId = "") {
 main().catch((error) => {
   renderHomeOpsEmptyState(ui, {
     tone: "error",
-    title: "CompanionOps",
+    title: "Companion",
     message: `Bootstrap failed: ${error.message}`
   });
 });

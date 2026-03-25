@@ -14,9 +14,9 @@ export function renderDeveloperOpsEmptyState(ui, options = {}) {
   }
   ui.developerOpsContent.innerHTML = renderPanelStateMetric(
     options.tone || "info",
-    options.title || "DeveloperOps",
-    options.message || "Developer diagnostics become available after runtime, settings, and advanced preview signals load.",
+    options.title || "Diagnostics",
+    options.message || "Diagnostics become available after Epydios loads runtime, settings, and inspection context.",
     options.detail ||
-      "Refresh the workspace. If developer tooling should already be present, verify runtime health, selected project scope, and advanced operations inputs."
+      "Refresh the workspace. If diagnostics should already be available, check launcher status, selected project scope, and current inspection inputs."
   );
 }

@@ -62,7 +62,7 @@ test("workspace shell reserves a native launcher status surface ahead of the wor
   assert.match(INDEX_HTML, /id="native-launcher-status"/);
   assert.match(INDEX_HTML, /class="native-launcher-status"/);
   assert.match(INDEX_HTML, /id="companion-handoff-banner"/);
-  assert.match(INDEX_HTML, /CompanionOps/);
+  assert.match(INDEX_HTML, /Companion/);
   assert.match(INDEX_HTML, /data-workspace-tab="companionops"/);
   assert.match(INDEX_HTML, /LogOps/);
   assert.match(INDEX_HTML, /data-workspace-tab="logops"/);

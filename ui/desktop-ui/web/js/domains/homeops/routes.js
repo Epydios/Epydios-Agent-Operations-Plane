@@ -15,10 +15,10 @@ export function renderHomeOpsEmptyState(ui, options = {}) {
   }
   ui.homeOpsContent.innerHTML = renderPanelStateMetric(
     options.tone || "info",
-    options.title || "CompanionOps",
+    options.title || "Companion",
     options.message ||
-      "CompanionOps becomes available after runtime, gateway, governance, and current workbench anchors load.",
+      "Companion becomes available after Epydios finishes loading your current workspace.",
     options.detail ||
-      "Refresh the workspace. If CompanionOps should already be populated, verify the current launcher, gateway, and owning-domain anchors before widening the shell."
+      "Refresh the workspace. If Companion should already be available, check launcher status and try again."
   );
 }

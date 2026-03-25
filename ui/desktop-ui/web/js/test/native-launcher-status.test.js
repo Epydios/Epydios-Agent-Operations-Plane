@@ -29,7 +29,7 @@ test("native launcher status renders ready mock launcher details", () => {
       enabled: false,
       effective: false,
       status: "off",
-      reason: "Interposition is OFF. Compatible upstream requests will not enter the local governed proxy path.",
+      reason: "Interposition is OFF. Epydios is not governing supported requests.",
       upstreamBaseUrl: "",
       upstreamBearerTokenConfigured: false,
       upstreamAuthMode: "client_passthrough"
@@ -89,7 +89,7 @@ test("native launcher status renders degraded launcher failure details", () => {
       enabled: true,
       effective: false,
       status: "gateway_unavailable",
-      reason: "Interposition is ON, but the local gateway is not ready yet.",
+      reason: "Interposition is ON, but Epydios is still getting ready.",
       upstreamBaseUrl: "https://api.openai.com",
       upstreamBearerTokenConfigured: true,
       upstreamAuthMode: "saved_token"

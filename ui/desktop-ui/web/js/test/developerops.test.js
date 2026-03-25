@@ -144,10 +144,10 @@ test("developerops page renders bounded debug, raw payload, and contract boards"
 test("developerops empty state renders without loaded debug posture", () => {
   const ui = { developerOpsContent: { innerHTML: "" } };
   renderDeveloperOpsEmptyState(ui, {
-    title: "DeveloperOps",
-    message: "Developer diagnostics become available after runtime, settings, and advanced preview signals load."
+    title: "Diagnostics",
+    message: "Diagnostics become available after Epydios loads runtime, settings, and inspection context."
   });
 
-  assert.match(ui.developerOpsContent.innerHTML, /DeveloperOps/);
-  assert.match(ui.developerOpsContent.innerHTML, /advanced preview signals load/i);
+  assert.match(ui.developerOpsContent.innerHTML, /Diagnostics/);
+  assert.match(ui.developerOpsContent.innerHTML, /loads runtime, settings, and inspection context/i);
 });

@@ -30,7 +30,7 @@
     <div class="workspace-shell">
       <nav class="workspace-nav" data-shell-nav aria-label="Workspace sections" role="tablist" aria-orientation="vertical">
         <button class="workspace-tab is-active" type="button" role="tab" aria-selected="true" data-workspace-tab="companionops">
-          CompanionOps
+          Companion
         </button>
         <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="agentops">
           AgentOps
@@ -76,7 +76,7 @@
           SettingsOps
         </button>
         <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="developerops">
-          DeveloperOps
+          Diagnostics
         </button>
       </nav>
 
@@ -84,7 +84,7 @@
       <section class="panel panel-dashboard" data-workspace-section="companionops">
         <div class="panel-header">
           <div class="panel-heading">
-            <h2>CompanionOps</h2>
+            <h2>Companion</h2>
             <p class="panel-lead">Default daily-use posture for system status, attention, recent governed actions, and exact handoff into Workbench depth.</p>
           </div>
           <button id="refresh-button" class="btn btn-secondary">Refresh</button>
@@ -95,14 +95,14 @@
       <section class="panel panel-developerops" data-workspace-section="developerops">
         <div class="panel-header">
           <div class="panel-heading">
-            <h2>DeveloperOps</h2>
-            <p class="panel-lead">Internal-only diagnostics, payload inspection, and contract debugging for advanced users.</p>
+            <h2>Diagnostics</h2>
+            <p class="panel-lead">Advanced diagnostics, payload inspection, and contract debugging when deeper review is needed.</p>
           </div>
           <button
             class="btn btn-secondary btn-small"
             type="button"
             data-advanced-toggle-section="operations"
-          >Show advanced details</button>
+          >Show more options</button>
         </div>
         <div id="developerops-content" class="stack"></div>
       </section>
@@ -618,7 +618,7 @@
                     class="btn btn-secondary btn-small"
                     type="button"
                     data-advanced-toggle-section="approvals"
-                  >Show advanced details</button>
+                  >Show more options</button>
                 </div>
                 <div class="action-group action-group-primary">
                   <button id="approvals-apply-button" class="btn btn-primary">Refresh</button>
@@ -635,7 +635,7 @@
             <div class="dialog-header">
               <div>
                 <h3 id="approval-review-modal-title">Approval Review</h3>
-                <p class="dialog-subtitle">Legacy review surface for approvals that do not yet expose inline controls.</p>
+                <p class="dialog-subtitle">Focused review surface for approvals that are easier to inspect in one place.</p>
               </div>
               <button class="btn btn-secondary btn-small" type="button" data-approval-modal-close>Close</button>
             </div>
@@ -715,7 +715,7 @@
                     class="btn btn-secondary btn-small"
                     type="button"
                     data-advanced-toggle-section="runs"
-                  >Show advanced details</button>
+                  >Show more options</button>
                 </div>
                 <div class="action-group action-group-primary">
                   <button id="runs-apply-button" class="btn btn-primary">Apply</button>
@@ -753,7 +753,7 @@
               class="btn btn-secondary btn-small"
               type="button"
               data-advanced-toggle-section="incidents"
-            >Show advanced details</button>
+            >Show more options</button>
           </div>
         </div>
         <div class="metric workflow-guide">

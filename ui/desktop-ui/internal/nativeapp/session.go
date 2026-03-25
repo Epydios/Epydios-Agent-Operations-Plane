@@ -581,23 +581,23 @@ func buildInterpositionRecord(opts LaunchOptions, gateway GatewayServiceRecord) 
 	switch {
 	case !record.Enabled:
 		record.Status = "off"
-		record.Reason = "Interposition is OFF. Compatible upstream requests will not enter the local governed proxy path."
+		record.Reason = "Interposition is OFF. Epydios is not governing supported requests."
 	case strings.TrimSpace(opts.Mode) != modeLive:
 		record.Status = "blocked_mock_mode"
-		record.Reason = "Interposition cannot turn on until the launcher is in live posture."
+		record.Reason = "Interposition cannot turn on until live mode is ready."
 	case record.UpstreamBaseURL == "":
 		record.Status = "blocked_upstream_config"
-		record.Reason = "Interposition cannot turn on until an upstream base URL is configured."
+		record.Reason = "Interposition cannot turn on until upstream access is configured."
 	case strings.EqualFold(strings.TrimSpace(gateway.State), "running") && strings.EqualFold(strings.TrimSpace(gateway.Health), "healthy"):
 		record.Status = "on"
 		record.Effective = true
-		record.Reason = "Interposition is ON. Compatible upstream requests now enter the local governed proxy path."
+		record.Reason = "Interposition is ON. Epydios is governing supported requests."
 	case strings.EqualFold(strings.TrimSpace(gateway.State), "running"):
 		record.Status = "warming"
-		record.Reason = "Interposition is turning on. The local gateway is warming up."
+		record.Reason = "Interposition is turning on. Epydios is getting ready."
 	default:
 		record.Status = "gateway_unavailable"
-		record.Reason = "Interposition is ON, but the local gateway is not ready yet."
+		record.Reason = "Interposition is ON, but Epydios is still getting ready."
 	}
 	return record
 }

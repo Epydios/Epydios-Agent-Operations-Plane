@@ -17,10 +17,10 @@ export function renderSettingsOpsEmptyState(ui, options = {}) {
       <div class="workbench-domain-empty-state">
         ${renderPanelStateMetric(
           options.tone || "info",
-          options.title || "SettingsOps",
-          options.message || "Settings become available after local configuration and runtime scope data load.",
+          options.title || "Settings",
+          options.message || "Settings become available after Epydios loads the current workspace configuration.",
           options.detail ||
-            "Refresh the workspace. If settings should already be present, verify scope and runtime endpoint availability."
+            "Refresh the workspace. If settings should already be available, check launcher status and try again."
         )}
       </div>
     </div>

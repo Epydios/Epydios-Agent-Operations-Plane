@@ -15,7 +15,7 @@ test("companionops page renders companion status, attention, recent governed act
         enabled: true,
         effective: true,
         status: "on",
-        reason: "Interposition is ON. Compatible upstream requests now enter the local governed proxy path."
+        reason: "Interposition is ON. Epydios is governing supported requests."
       },
       runtimeService: {
         state: "running",
@@ -170,7 +170,7 @@ test("companionops page renders companion status, attention, recent governed act
   assert.match(ui.homeOpsContent.innerHTML, /Runtime Service/);
   assert.match(ui.homeOpsContent.innerHTML, /Gateway/);
   assert.match(ui.homeOpsContent.innerHTML, /homeops-feedback ok/);
-  assert.match(ui.homeOpsContent.innerHTML, /Interposition is ON\. Compatible upstream requests now enter the local governed proxy path\./);
+  assert.match(ui.homeOpsContent.innerHTML, /Interposition is ON\. Epydios is governing supported requests\./);
   assert.match(ui.homeOpsContent.innerHTML, /Open Workbench/);
   assert.match(ui.homeOpsContent.innerHTML, /Restart Services/);
   assert.match(ui.homeOpsContent.innerHTML, /Show Diagnostics/);
@@ -193,10 +193,10 @@ test("companionops page renders companion status, attention, recent governed act
 test("homeops empty state renders without loaded domain anchors", () => {
   const ui = { homeOpsContent: { innerHTML: "" } };
   renderHomeOpsEmptyState(ui, {
-    title: "CompanionOps",
-    message: "CompanionOps becomes available after domain anchors load."
+    title: "Companion",
+    message: "Companion becomes available after Epydios finishes loading your current workspace."
   });
 
-  assert.match(ui.homeOpsContent.innerHTML, /CompanionOps/);
-  assert.match(ui.homeOpsContent.innerHTML, /domain anchors load/i);
+  assert.match(ui.homeOpsContent.innerHTML, /Companion/);
+  assert.match(ui.homeOpsContent.innerHTML, /finishes loading your current workspace/i);
 });

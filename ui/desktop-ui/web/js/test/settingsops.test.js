@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { renderSettingsOpsPage } from "../domains/settingsops/routes.js";
+import { renderSettingsOpsEmptyState, renderSettingsOpsPage } from "../domains/settingsops/routes.js";
 
 test("settingsops renders bounded preferences, secure refs, environment, integration, and recovery boards", () => {
   const ui = { settingsContent: { innerHTML: "" } };
@@ -155,4 +155,15 @@ test("settingsops renders bounded preferences, secure refs, environment, integra
   assert.doesNotMatch(html, /Current Policy Contract/);
   assert.doesNotMatch(html, /Provider Contract Matrix/);
   assert.doesNotMatch(html, /Local Demo Identity \+ Policy Overlay/);
+});
+
+test("settings empty state uses product-language recovery guidance", () => {
+  const ui = { settingsContent: { innerHTML: "" } };
+
+  renderSettingsOpsEmptyState(ui);
+
+  assert.match(ui.settingsContent.innerHTML, /Settings/);
+  assert.match(ui.settingsContent.innerHTML, /Epydios loads the current workspace configuration/i);
+  assert.match(ui.settingsContent.innerHTML, /check launcher status and try again/i);
+  assert.doesNotMatch(ui.settingsContent.innerHTML, /runtime endpoint availability/i);
 });

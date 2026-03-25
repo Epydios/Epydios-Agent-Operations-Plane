@@ -413,28 +413,28 @@ function createCompanionInterpositionFeedback(shell = {}) {
     case "on":
       return {
         tone: "ok",
-        message: reason || "Interposition is ON. Compatible upstream requests now enter the local governed proxy path."
+        message: reason || "Interposition is ON. Epydios is governing supported requests."
       };
     case "off":
       return {
         tone: "danger",
-        message: reason || "Interposition is OFF. Compatible upstream requests will not enter the local governed proxy path."
+        message: reason || "Interposition is OFF. Epydios is not governing supported requests."
       };
     case "warming":
       return {
         tone: "warn",
-        message: reason || "Interposition is turning on. The local gateway is warming up."
+        message: reason || "Interposition is turning on. Epydios is getting ready."
       };
     case "gateway_unavailable":
       return {
         tone: "warn",
-        message: reason || "Interposition is ON, but the local gateway is not ready yet."
+        message: reason || "Interposition is ON, but Epydios is still getting ready."
       };
     case "blocked_mock_mode":
     case "blocked_upstream_config":
       return {
         tone: "danger",
-        message: reason || "Interposition cannot turn on until the launcher requirements are satisfied."
+        message: reason || "Interposition cannot turn on until setup is complete."
       };
     default:
       return null;
