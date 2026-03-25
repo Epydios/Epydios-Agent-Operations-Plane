@@ -52,10 +52,13 @@ echo "TAG=${TAG} COMMIT=${COMMIT}"
 ./platform/local/bin/verify-m13-m14-closeout-bundle.sh
 ```
 
-5. Update governance artifacts:
-- `PIPELINE_LIVING.txt`
-- `PIPELINE_LIVING.json`
+5. Update governance artifacts as needed:
 - `folder_manifest.json`
+- relevant `OPS_DOCS/*.md` artifacts if the update changes active planning or release truth
+
+Historical note:
+
+- the old workspace pipeline trackers are retired historical artifacts and are no longer required update targets for this workflow
 
 ## Promotion Rule
 

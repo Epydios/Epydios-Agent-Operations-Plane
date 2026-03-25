@@ -24,8 +24,21 @@ fi
 rg -n 'check-ip-intake-register\.sh' "${REPO_ROOT}/platform/ci/bin/qc-preflight.sh" >/dev/null
 rg -n 'qc-preflight\.sh' "${REPO_ROOT}/platform/local/bin/verify-m13-desktop-daily-loop.sh" >/dev/null
 
+# Historical entries may still cite the retired pipeline trackers. Newer entries
+# should point at the active planning-control stack instead.
+PLANNING_EVIDENCE_FILTER='
+  def has_planning_evidence:
+    (
+      (index("PIPELINE_LIVING.txt") != null and index("PIPELINE_LIVING.json") != null)
+      or
+      (index("retired/PIPELINE_LIVING.txt") != null and index("retired/PIPELINE_LIVING.json") != null)
+      or
+      (index("OPS_MASTER_ROADMAP.md") != null and index("OPS_PUBLIC_USABILITY_BASELINE.md") != null)
+    );
+'
+
 # Ensure primary UI runtime entry remains governed with required approval metadata.
-jq -e '
+jq -e "${PLANNING_EVIDENCE_FILTER}"'
   any(.entries[];
     .id == "desktop-ui-governance-runtime"
     and .ip_type == "first_party_new_ip"
@@ -35,13 +48,12 @@ jq -e '
     )
     and .review.required == true
     and (.review.ticket | type == "string" and length > 0)
-    and (.review.evidence | index("PIPELINE_LIVING.txt") != null)
-    and (.review.evidence | index("PIPELINE_LIVING.json") != null)
+    and (.review.evidence | has_planning_evidence)
   )
 ' "${REGISTER_PATH}" >/dev/null
 
 # Ensure project-scoped integration editor surface has explicit new-IP registration.
-jq -e '
+jq -e "${PLANNING_EVIDENCE_FILTER}"'
   any(.entries[];
     .id == "desktop-ui-project-integration-editor"
     and .ip_type == "first_party_new_ip"
@@ -51,8 +63,7 @@ jq -e '
     )
     and .review.required == true
     and (.review.ticket | type == "string" and length > 0)
-    and (.review.evidence | index("PIPELINE_LIVING.txt") != null)
-    and (.review.evidence | index("PIPELINE_LIVING.json") != null)
+    and (.review.evidence | has_planning_evidence)
   )
 ' "${REGISTER_PATH}" >/dev/null
 
