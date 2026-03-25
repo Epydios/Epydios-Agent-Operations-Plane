@@ -92,9 +92,9 @@ export function renderGovernanceApprovalSummary(
     return Number.isFinite(deltaMs) && deltaMs > 0 && deltaMs <= 15 * 60 * 1000;
   }).length;
   const approvalStateSummary = nativeItems.length > 0
-    ? "Resolve pinned native decisions first so active thread work and interposed gateway holds do not drift away from the governing path."
+    ? "Resolve the pinned decisions first so the current request and any held follow-up work stay aligned."
     : pendingCount > 0
-      ? "Current thread is clear, but approval-queue items still need review in the active scope."
+      ? "The current request is clear, but queued approvals still need review in this scope."
       : "No pending approvals remain in the current scope.";
   const approvalStateTone = nativeItems.length > 0
     ? "chip chip-danger chip-compact"
@@ -105,11 +105,11 @@ export function renderGovernanceApprovalSummary(
     <div class="metric approval-state-card">
       <div class="metric-title-row">
         <div class="title">Approval State</div>
-        <span class="${approvalStateTone}">${escapeHTML(nativeItems.length > 0 ? "current thread blocked" : pendingCount > 0 ? "queue pending" : "clear")}</span>
+        <span class="${approvalStateTone}">${escapeHTML(nativeItems.length > 0 ? "pinned review pending" : pendingCount > 0 ? "queue pending" : "clear")}</span>
       </div>
       <div class="meta">${escapeHTML(approvalStateSummary)}</div>
       <div class="run-detail-chips">
-        <span class="chip chip-neutral chip-compact">currentThread=${escapeHTML(String(nativeItems.length))}</span>
+        <span class="chip chip-neutral chip-compact">pinned=${escapeHTML(String(nativeItems.length))}</span>
         <span class="chip chip-neutral chip-compact">queuePending=${escapeHTML(String(pendingCount))}</span>
         <span class="chip chip-neutral chip-compact">expiringSoon=${escapeHTML(String(expiringSoonCount))}</span>
         <span class="chip chip-neutral chip-compact">selected=${escapeHTML(selectedRunId || "-")}</span>
@@ -124,10 +124,10 @@ export function renderGovernanceApprovalSummary(
       const isSelected = selectedRunId && selectionId === selectedRunId;
       const isGatewayHold = String(item?.decisionType || "").trim().toLowerCase() === "gateway_hold";
       const title = isGatewayHold
-        ? "Interposed Request Hold"
+        ? "Held Request"
         : item?.decisionType === "proposal"
-          ? "Current Thread Proposal"
-          : "Current Thread Approval";
+          ? "Current Request Proposal"
+          : "Current Request Approval";
       const identifier = isGatewayHold
         ? String(item?.approvalId || "-")
         : item?.decisionType === "proposal"
@@ -138,7 +138,7 @@ export function renderGovernanceApprovalSummary(
             item?.summary ||
             item?.reason ||
             item?.governanceTarget?.targetRef ||
-            "No interposed request summary captured."
+            "No held request summary captured."
           )
         : item?.decisionType === "proposal"
           ? String(item?.summary || "No proposal summary captured.")
@@ -151,7 +151,7 @@ export function renderGovernanceApprovalSummary(
           </div>
           <div class="meta">${escapeHTML(String(item?.tenantId || "-"))} / ${escapeHTML(String(item?.projectId || "-"))}</div>
           <div class="run-detail-chips">
-            <span class="chip chip-neutral chip-compact">${escapeHTML(isGatewayHold ? "client" : "thread")}=${escapeHTML(
+            <span class="chip chip-neutral chip-compact">${escapeHTML(isGatewayHold ? "client" : "request")}=${escapeHTML(
               isGatewayHold
                 ? String(item?.sourceClient?.name || item?.sourceClient?.id || item?.clientLabel || "-")
                 : String(item?.taskId || "-")
@@ -183,10 +183,10 @@ export function renderGovernanceApprovalSummary(
     ? `
       <div class="metric">
         <div class="metric-title-row">
-          <div class="title">Pinned Native Decisions</div>
+          <div class="title">Pinned Decisions</div>
           <span class="chip chip-danger chip-compact">pending=${escapeHTML(String(nativeItems.length))}</span>
         </div>
-        <div class="meta">These governed decisions include active thread checkpoints and interposed gateway holds, all pinned into the same review surface.</div>
+        <div class="meta">These decisions stay pinned here so review, follow-through, and handoff remain in one place.</div>
         <div class="agent-approval-list">${nativeCards}</div>
       </div>
     `

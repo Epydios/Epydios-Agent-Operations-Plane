@@ -15,8 +15,8 @@ export function renderEvidenceOpsEmptyState(ui, options = {}) {
   ui.evidenceOpsContent.innerHTML = renderPanelStateMetric(
     options.tone || "info",
     options.title || "EvidenceOps",
-    options.message || "Evidence posture becomes available after governed runs, artifacts, and linked proof material load.",
+    options.message || "Evidence becomes available after recent runs, screenshots, and proof packages load.",
     options.detail ||
-      "Refresh the workspace. If evidence posture should already be present, verify governed run outputs, active thread evidence records, and linked incident packages."
+      "Refresh the workspace. If evidence should already be visible, open a recent run or handoff package and try again."
   );
 }

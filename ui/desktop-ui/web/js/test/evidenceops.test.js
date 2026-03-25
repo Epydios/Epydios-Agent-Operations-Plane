@@ -275,7 +275,7 @@ test("evidenceops page renders bounded bundle, provenance, and artifact access b
   assert.match(ui.evidenceOpsContent.innerHTML, /data-aimxs-spine-action="open-workspace"/);
   assert.match(ui.evidenceOpsContent.innerHTML, /Decision Binding Contract/);
   assert.match(ui.evidenceOpsContent.innerHTML, /Stable Or Replay Refs/);
-  assert.match(ui.evidenceOpsContent.innerHTML, /Artifact Access Board/);
+  assert.match(ui.evidenceOpsContent.innerHTML, /Evidence Access/);
   assert.match(ui.evidenceOpsContent.innerHTML, /Retention Board/);
   assert.match(ui.evidenceOpsContent.innerHTML, /Evidence To Control Mapping Board/);
   assert.match(ui.evidenceOpsContent.innerHTML, /bundle-governed-001/);
@@ -318,9 +318,9 @@ test("evidenceops empty state renders without loaded proof material", () => {
   const ui = { evidenceOpsContent: { innerHTML: "" } };
   renderEvidenceOpsEmptyState(ui, {
     title: "EvidenceOps",
-    message: "Evidence posture becomes available after governed runs, artifacts, and linked proof material load."
+    message: "Evidence becomes available after recent runs, screenshots, and proof packages load."
   });
 
   assert.match(ui.evidenceOpsContent.innerHTML, /EvidenceOps/);
-  assert.match(ui.evidenceOpsContent.innerHTML, /Evidence posture becomes available/);
+  assert.match(ui.evidenceOpsContent.innerHTML, /Evidence becomes available/);
 });

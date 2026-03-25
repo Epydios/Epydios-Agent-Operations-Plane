@@ -101,41 +101,41 @@ function buildArtifactAccessEntries(run, evidenceStages = []) {
     .filter((entry) => entry.path);
   const entries = [
     {
-      label: "Repo provenance root",
+      label: "Tracked evidence root",
       path: WORKSPACE_ARTIFACT_ROOTS.repoProvenance,
-      note: "Git-tracked provenance and repo-safe artifacts."
+      note: "Repo-safe evidence and provenance that should stay with the workspace."
     },
     {
-      label: "Non-repo provenance root",
+      label: "Evidence bundle root",
       path: WORKSPACE_ARTIFACT_ROOTS.nonRepoProvenance,
-      note: "Large governed evidence bundles and host-visible proof artifacts."
+      note: "Larger exported evidence bundles and proof packages kept outside the repo."
     },
     {
-      label: "Non-repo readiness root",
+      label: "Operator workspace root",
       path: WORKSPACE_ARTIFACT_ROOTS.nonRepoReadiness,
-      note: "Screenshots, manual QA, smoke evidence, and local operator artifacts."
+      note: "Screenshots, QA notes, smoke evidence, and local operator artifacts."
     }
   ];
   if (dateBucket) {
     entries.push({
-      label: "Suggested date bucket",
+      label: "Suggested evidence date folder",
       path: `${WORKSPACE_ARTIFACT_ROOTS.nonRepoReadiness}history/${dateBucket}/`,
-      note: "Recommended next folder for any new run-specific screenshots or operator notes."
+      note: "Recommended next folder for new run-specific screenshots, notes, and review exports."
     });
     entries.push({
-      label: "Suggested run folder",
+      label: "Suggested run handoff folder",
       path: `${WORKSPACE_ARTIFACT_ROOTS.nonRepoReadiness}history/${dateBucket}/${runFolderToken}/`,
       note: "Recommended home for run-specific notes, JSON exports, and operator evidence."
     });
     entries.push({
       label: "Suggested screenshots folder",
       path: `${WORKSPACE_ARTIFACT_ROOTS.nonRepoReadiness}history/${dateBucket}/${runFolderToken}/screenshots/`,
-      note: "Keep per-run screenshots and visual comparisons under the same date bucket."
+      note: "Keep per-run screenshots and visual comparisons under the same handoff folder."
     });
     entries.push({
-      label: "Suggested incidents folder",
+      label: "Suggested incident handoff folder",
       path: `${WORKSPACE_ARTIFACT_ROOTS.nonRepoReadiness}incidents/${dateBucket}/${runFolderToken}/`,
-      note: "Use this when the run graduates into durable incident packaging and handoff artifacts."
+      note: "Use this when the run turns into durable incident packaging and handoff material."
     });
   }
   return { entries: [...entries, ...screenshotURIs], dateBucket };
@@ -263,7 +263,7 @@ export function renderRuntimeRuns(ui, store, runPayload, filters) {
         <span class="chip chip-neutral chip-compact">decisionDeny=${escapeHTML(String(deniedCount))}</span>
         <span class="chip chip-neutral chip-compact">selected=${escapeHTML(selectedRunID || "-")}</span>
       </div>
-      <div class="meta">Use the Artifact Access section in run detail when you need repo-safe provenance or non-repo date-bucket storage.</div>
+      <div class="meta">Use the Evidence Handoff section in run detail when you need the right location for proof, screenshots, or incident packaging.</div>
     </div>
   `;
 
@@ -470,7 +470,7 @@ export function renderRuntimeRunDetail(ui, run, options = {}) {
                 type="button"
                 data-run-copy-path="${escapeHTML(entry.path)}"
                 data-run-copy-path-label="${escapeHTML(entry.label)}"
-              >Copy Path</button>
+              >Copy Location</button>
             </div>
           </div>
         </article>
@@ -554,12 +554,12 @@ export function renderRuntimeRunDetail(ui, run, options = {}) {
         </div>
       </div>
       <div class="metric">
-        <div class="title">5. Artifact Access</div>
-        <div class="meta metric-note">Copy the workspace roots you need before leaving Run Inventory. Repo provenance stays Git-safe; screenshots, run notes, and incident handoff artifacts belong in non-repo folders organized by date bucket and run ID.</div>
-        <div class="meta" data-run-path-feedback>Copy a path to send it to the clipboard.</div>
+        <div class="title">5. Evidence Handoff</div>
+        <div class="meta metric-note">Copy the location you need before leaving Run Inventory. Keep tracked evidence in the repo-safe root, and use the suggested handoff folders for screenshots, operator notes, and incident packages.</div>
+        <div class="meta" data-run-path-feedback>Copy a location to send it to the clipboard.</div>
         <div class="run-detail-chips">
-          <span class="chip chip-neutral chip-compact">dateBucket=${escapeHTML(artifactAccess.dateBucket || "-")}</span>
-          <span class="chip chip-neutral chip-compact">pathHints=${escapeHTML(String(artifactAccess.entries.length))}</span>
+          <span class="chip chip-neutral chip-compact">dateFolder=${escapeHTML(artifactAccess.dateBucket || "-")}</span>
+          <span class="chip chip-neutral chip-compact">handoffOptions=${escapeHTML(String(artifactAccess.entries.length))}</span>
           <span class="chip chip-neutral chip-compact">runFolder=${escapeHTML(safePathSegment(run?.runId, "run-id"))}</span>
         </div>
         <div class="artifact-path-grid">

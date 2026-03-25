@@ -159,6 +159,14 @@
   font-size: var(--font-size-sm);
 }
 
+.native-launcher-status-details {
+  margin-top: var(--space-2);
+}
+
+.native-launcher-status-summary-detail {
+  padding-top: var(--space-1);
+}
+
 .native-launcher-status-actions {
   margin-top: var(--space-2);
   display: flex;

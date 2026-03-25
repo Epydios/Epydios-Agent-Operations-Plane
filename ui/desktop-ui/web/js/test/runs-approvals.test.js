@@ -29,7 +29,7 @@ test("governance summary module renders embedded approval state and current thre
   );
 
   assert.match(target.innerHTML, /Approval State/);
-  assert.match(target.innerHTML, /Pinned Native Decisions/);
+  assert.match(target.innerHTML, /Pinned Decisions/);
   assert.match(target.innerHTML, /approval-org-admin-1/);
 });
 
@@ -57,8 +57,8 @@ test("governance summary module renders interposed request holds alongside nativ
     ]
   );
 
-  assert.match(target.innerHTML, /Pinned Native Decisions/);
-  assert.match(target.innerHTML, /Interposed Request Hold/);
+  assert.match(target.innerHTML, /Pinned Decisions/);
+  assert.match(target.innerHTML, /Held Request/);
   assert.match(target.innerHTML, /approval-20260319-001/);
   assert.match(target.innerHTML, /Codex/);
 });
@@ -105,7 +105,7 @@ test("approvals rail includes current thread decisions in the pending approvals 
   );
 
   assert.match(ui.approvalsContent.innerHTML, /Approval State/);
-  assert.match(ui.approvalsContent.innerHTML, /Pinned Native Decisions/);
+  assert.match(ui.approvalsContent.innerHTML, /Pinned Decisions/);
   assert.match(ui.approvalsContent.innerHTML, /approval-org-admin-1/);
   assert.match(ui.approvalsContent.innerHTML, /Hide Review/);
 });
@@ -177,7 +177,7 @@ test("approval side panel renders interposed request holds inline", () => {
 
   assert.equal(ui.approvalsDetailContent.dataset.selectedRunId, "run-20260319-001");
   assert.match(ui.approvalsDetailContent.innerHTML, /Pinned Approval Review/);
-  assert.match(ui.approvalsDetailContent.innerHTML, /Interposed Request Hold/);
+  assert.match(ui.approvalsDetailContent.innerHTML, /Held Request/);
   assert.match(ui.approvalsDetailContent.innerHTML, /approvalId=approval-20260319-001/);
   assert.match(ui.approvalsDetailContent.innerHTML, /data-native-decision-action="APPROVE"/);
 });
@@ -231,13 +231,13 @@ test("run detail surfaces artifact roots and recommended date bucket", () => {
   );
 
   assert.match(ui.runDetailContent.innerHTML, /data-domain-root="runtimeops"/);
-  assert.match(ui.runDetailContent.innerHTML, /Artifact Access/);
+  assert.match(ui.runDetailContent.innerHTML, /Evidence Handoff/);
   assert.match(ui.runDetailContent.innerHTML, /EPYDIOS_AGENTOPS_DESKTOP_REPO\/provenance\//);
   assert.match(ui.runDetailContent.innerHTML, /\.epydios\/provenance\//);
   assert.match(ui.runDetailContent.innerHTML, /\.epydios\/internal-readiness\/history\/20260228\//);
   assert.match(ui.runDetailContent.innerHTML, /\.epydios\/internal-readiness\/history\/20260228\/run-20260228-001\//);
   assert.match(ui.runDetailContent.innerHTML, /\.epydios\/internal-readiness\/incidents\/20260228\/run-20260228-001\//);
-  assert.match(ui.runDetailContent.innerHTML, /Copy Path/);
+  assert.match(ui.runDetailContent.innerHTML, /Copy Location/);
 });
 
 test("run detail surfaces governed-action policy richness from the stored provider response", () => {

@@ -193,14 +193,8 @@ export function renderNativeLauncherStatus(shell = null) {
     <div class="native-launcher-status-summary">
       <span class="native-launcher-status-badge">Native Launcher</span>
       <span class="chip chip-compact ${launcherState === "degraded" ? "chip-danger" : launcherState === "ready" ? "chip-success" : "chip-neutral"}">${escapeHTML(describeLauncherState(launcherState))}</span>
-      <span class="chip chip-neutral chip-compact">mode=${escapeHTML(mode)}</span>
-      <span class="chip chip-neutral chip-compact">runtime=${escapeHTML(runtimeState)}</span>
-      <span class="chip chip-neutral chip-compact">process=${escapeHTML(runtimeProcessMode)}</span>
       <span class="chip chip-compact ${serviceState === "running" ? "chip-success" : serviceState === "failed" || serviceState === "degraded" ? "chip-danger" : "chip-neutral"}">${escapeHTML(describeRuntimeServiceState(serviceState))}</span>
-      <span class="chip chip-neutral chip-compact">${escapeHTML(describeRuntimeServiceHealth(serviceHealth))}</span>
       <span class="chip chip-compact ${gatewayState === "running" ? "chip-success" : gatewayState === "failed" || gatewayState === "degraded" ? "chip-danger" : "chip-neutral"}">${escapeHTML(describeGatewayServiceState(gatewayState))}</span>
-      <span class="chip chip-neutral chip-compact">${escapeHTML(describeGatewayServiceHealth(gatewayHealth))}</span>
-      <span class="chip chip-neutral chip-compact">${escapeHTML(describeInterpositionAuthMode(interpositionAuthMode))}</span>
     </div>
     <div class="native-launcher-status-copy">${escapeHTML(copy)}</div>
     ${
@@ -208,6 +202,18 @@ export function renderNativeLauncherStatus(shell = null) {
         ? `<div class="native-launcher-status-error"><strong>Startup error:</strong> ${escapeHTML(startupError)}</div>`
         : ""
     }
+    <details class="details-shell native-launcher-status-details">
+      <summary>Technical status</summary>
+      <div class="native-launcher-status-summary native-launcher-status-summary-detail">
+        <span class="chip chip-neutral chip-compact">mode=${escapeHTML(mode)}</span>
+        <span class="chip chip-neutral chip-compact">runtime=${escapeHTML(runtimeState)}</span>
+        <span class="chip chip-neutral chip-compact">process=${escapeHTML(runtimeProcessMode)}</span>
+        <span class="chip chip-neutral chip-compact">bootstrap=${escapeHTML(bootstrapState)}</span>
+        <span class="chip chip-neutral chip-compact">${escapeHTML(describeRuntimeServiceHealth(serviceHealth))}</span>
+        <span class="chip chip-neutral chip-compact">${escapeHTML(describeGatewayServiceHealth(gatewayHealth))}</span>
+        <span class="chip chip-neutral chip-compact">${escapeHTML(describeInterpositionAuthMode(interpositionAuthMode))}</span>
+      </div>
+    </details>
     <div class="native-launcher-status-controls">
       <div class="native-launcher-status-switch">
         <div class="title">Interposition ON/OFF</div>

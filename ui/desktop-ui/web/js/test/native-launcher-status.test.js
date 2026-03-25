@@ -45,9 +45,11 @@ test("native launcher status renders ready mock launcher details", () => {
 
   assert.match(html, /Native Launcher/);
   assert.match(html, /Launcher ready/);
+  assert.match(html, /Technical status/);
   assert.match(html, /mode=mock/);
   assert.match(html, /runtime=mock_active/);
   assert.match(html, /process=mock_only/);
+  assert.match(html, /bootstrap=loaded/);
   assert.match(html, /Bootstrap config loaded/);
   assert.match(html, /Background service not required/);
   assert.match(html, /Gateway stopped/);
@@ -105,6 +107,7 @@ test("native launcher status renders degraded launcher failure details", () => {
   });
 
   assert.match(html, /Launcher degraded/);
+  assert.match(html, /Technical status/);
   assert.match(html, /mode=live/);
   assert.match(html, /runtime=service_failed/);
   assert.match(html, /Startup error:/);

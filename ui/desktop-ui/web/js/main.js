@@ -1670,6 +1670,12 @@ function isAdvancedSectionEnabled(sectionID) {
 }
 
 function applyAdvancedToggleLabels(root = document) {
+  const labels = {
+    operations: ["Show deeper tools", "Hide deeper tools"],
+    approvals: ["Show extra filters", "Hide extra filters"],
+    runs: ["Show extra filters", "Hide extra filters"],
+    incidents: ["Show extra tools", "Hide extra tools"]
+  };
   const toggles = Array.from(root.querySelectorAll("[data-advanced-toggle-section]") || []);
   for (const toggle of toggles) {
     if (!(toggle instanceof HTMLElement)) {
@@ -1681,7 +1687,8 @@ function applyAdvancedToggleLabels(root = document) {
     }
     const enabled = isAdvancedSectionEnabled(section);
     toggle.setAttribute("aria-pressed", enabled ? "true" : "false");
-    toggle.textContent = enabled ? "Hide more options" : "Show more options";
+    const [showLabel, hideLabel] = labels[section] || ["Show more options", "Hide more options"];
+    toggle.textContent = enabled ? hideLabel : showLabel;
   }
 }
 
@@ -2947,12 +2954,12 @@ function clearDataPanels() {
   renderAuditOpsEmptyState(ui, {
     tone: "info",
     title: "AuditOps",
-    message: "Audit posture becomes available after audit, run, approval, and decision trace signals load."
+    message: "Audit activity becomes available after recent runs, approvals, and review history load."
   });
   renderEvidenceOpsEmptyState(ui, {
     tone: "info",
     title: "EvidenceOps",
-    message: "Evidence posture becomes available after governed runs, artifacts, and linked proof material load."
+    message: "Evidence becomes available after recent runs, screenshots, and proof packages load."
   });
   renderComplianceOpsEmptyState(ui, {
     tone: "info",
@@ -3015,8 +3022,8 @@ function clearDataPanels() {
     ui.approvalsDetailContent.innerHTML = renderPanelStateMetric(
       "info",
       "Approval Review",
-      "Select an approval card to pin its context in Agent.",
-      "Use the pinned review section and run detail. Do not rely on the legacy review overlay."
+      "Select an approval card to keep its context pinned here.",
+      "Use the pinned review section and run detail together."
     );
     delete ui.approvalsDetailContent.dataset.selectedRunId;
   }
@@ -3046,7 +3053,7 @@ function clearDataPanels() {
     "empty",
     "Audit Events",
     "No audit data loaded.",
-    "Refresh the workspace, then verify audit source availability and current filters."
+    "Refresh the workspace, then reopen the run or approval you want to review."
   );
   if (ui.auditFeedback) {
     ui.auditFeedback.innerHTML = "";
@@ -3117,14 +3124,14 @@ function renderPanelLoadingStates() {
     ui.auditOpsContent.innerHTML = renderPanelStateMetric(
       "loading",
       "AuditOps",
-      "Loading audit event, actor activity, and decision trace posture..."
+      "Loading audit activity, actor history, and decision records..."
     );
   }
   if (ui.evidenceOpsContent) {
     ui.evidenceOpsContent.innerHTML = renderPanelStateMetric(
       "loading",
       "EvidenceOps",
-      "Loading evidence bundles, provenance, and artifact access posture..."
+      "Loading evidence bundles, screenshots, and handoff locations..."
     );
   }
   if (ui.complianceOpsContent) {
@@ -11539,10 +11546,10 @@ function getCurrentIncidentOpsEntry(entryId = "") {
     const submittedReason =
       String(reason || "").trim() ||
       (isGatewayHold
-        ? `Pinned Companion review ${decisionVerb} interposed request hold.`
+        ? `Pinned Companion review ${decisionVerb} held request.`
         : item?.decisionType === "proposal"
-          ? `Pinned Agent review ${decisionVerb} tool proposal.`
-          : `Pinned Agent review ${decisionVerb} approval checkpoint.`);
+          ? `Pinned review ${decisionVerb} tool proposal.`
+          : `Pinned review ${decisionVerb} approval checkpoint.`);
     const sessionId = String(item?.sessionId || "").trim();
     if ((!isGatewayHold && !sessionId) || !normalizedDecision) {
       return false;
@@ -11557,7 +11564,7 @@ function getCurrentIncidentOpsEntry(entryId = "") {
       status: "running",
       message:
         isGatewayHold
-          ? `Submitting ${normalizedDecision} for interposed request ${item.interpositionRequestId} on run ${item.runId}...`
+          ? `Submitting ${normalizedDecision} for held request ${item.approvalId || item.interpositionRequestId} on run ${item.runId}...`
           : item?.decisionType === "proposal"
           ? `Submitting ${normalizedDecision} for tool proposal ${item.proposalId} on session ${sessionId}...`
           : `Submitting ${normalizedDecision} for checkpoint ${item.checkpointId} on session ${sessionId}...`

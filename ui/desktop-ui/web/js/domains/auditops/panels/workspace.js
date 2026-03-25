@@ -208,7 +208,7 @@ function renderAuditEventBoard(snapshot) {
   return `
     <article class="metric auditops-card" data-domain-root="auditops" data-auditops-panel="audit-event-board">
       <div class="metric-title-row">
-        <div class="title">Audit Event Board</div>
+        <div class="title">Audit Activity</div>
         <span class="${chipClassForTone(board.tone)}">${escapeHTML(board.tone)}</span>
       </div>
       <div class="auditops-chip-row">
@@ -220,7 +220,7 @@ function renderAuditEventBoard(snapshot) {
       ${board.warning ? `<div class="meta">${escapeHTML(board.warning)}</div>` : ""}
       <div class="auditops-kv-list">${renderKeyValueRows(rows)}</div>
       <div class="auditops-subsection">
-        <div class="auditops-subtitle">Recent Events</div>
+        <div class="auditops-subtitle">Latest Activity</div>
         ${renderRecentEventRows(board.recentEvents)}
       </div>
     </article>

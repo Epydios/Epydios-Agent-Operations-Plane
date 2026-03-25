@@ -399,7 +399,7 @@ function renderArtifactAccessBoard(snapshot) {
   return `
     <article class="metric evidenceops-card" data-domain-root="evidenceops" data-evidenceops-panel="artifact-access-board">
       <div class="metric-title-row">
-        <div class="title">Artifact Access Board</div>
+        <div class="title">Evidence Access</div>
         <span class="${chipClassForTone(board.tone)}">${escapeHTML(board.tone)}</span>
       </div>
       <div class="evidenceops-chip-row">
@@ -415,7 +415,7 @@ function renderArtifactAccessBoard(snapshot) {
       ])}
       <div class="evidenceops-kv-list">${renderKeyValueRows(rows)}</div>
       <div class="evidenceops-subsection">
-        <div class="evidenceops-subtitle">Access Hints</div>
+        <div class="evidenceops-subtitle">Suggested Locations</div>
         ${renderAccessCards(board.accessEntries)}
       </div>
     </article>

@@ -358,6 +358,28 @@ function titleCaseToken(value, fallback = "-") {
     .join(" ");
 }
 
+function describeShellMode(value) {
+  switch (normalizeStatus(value, "")) {
+    case "live":
+      return "Live desktop path";
+    case "mock":
+      return "Preview path";
+    default:
+      return `${titleCaseToken(value, "Unknown")} path`;
+  }
+}
+
+function describeProcessMode(value) {
+  switch (normalizeStatus(value, "")) {
+    case "background_supervisor":
+      return "Managed in the background";
+    case "mock_only":
+      return "Running in preview mode only";
+    default:
+      return titleCaseToken(value, "Process mode unavailable");
+  }
+}
+
 function toneFromRuntimeStatus(value, fallback = "unknown") {
   const normalized = normalizeStatus(value, fallback);
   if (["ok", "healthy", "ready", "running", "loaded"].includes(normalized)) {
@@ -474,23 +496,23 @@ function createSystemStatusRegion(context = {}) {
         title: "Product Posture",
         tone: "ok",
         value: "Companion",
-        summary: `workbench=${lastWorkbenchDomain}`,
-        meta: `mode=${formatIdentityLabel(shell.mode, "unknown")}; aimxs=${aimxsPath.modeLabel}`
+        summary: `Workbench ready: ${lastWorkbenchDomain}`,
+        meta: `Decision layer: ${aimxsPath.modeLabel}. Shell: ${describeShellMode(shell.mode)}.`
       },
       {
         id: "launcher",
         title: "Launcher",
         tone: toneFromRuntimeStatus(shell.launcherState, "warn"),
         value: titleCaseToken(shell.launcherState, "Unknown"),
-        summary: `bootstrap=${titleCaseToken(shell.bootstrapConfigState, "unknown")}; runtime=${formatIdentityLabel(shell.runtimeState, runtime.status)}`,
-        meta: startupError || `process=${formatIdentityLabel(shell.runtimeProcessMode, "unknown")}`
+        summary: `Bootstrap config ${titleCaseToken(shell.bootstrapConfigState, "unknown").toLowerCase()}; runtime path ${titleCaseToken(shell.runtimeState, runtime.status).toLowerCase()}.`,
+        meta: startupError || describeProcessMode(shell.runtimeProcessMode)
       },
       {
         id: "runtime-service",
         title: "Runtime Service",
         tone: toneFromRuntimeStatus(runtimeService.state || runtime.status, "warn"),
         value: titleCaseToken(runtimeService.state || runtime.status, "Unknown"),
-        summary: `health=${formatIdentityLabel(runtimeService.health, runtime.status)}`,
+        summary: `Health: ${titleCaseToken(runtimeService.health || runtime.status, "Unknown").toLowerCase()}.`,
         meta: runtime.detail
       },
       {
@@ -498,27 +520,27 @@ function createSystemStatusRegion(context = {}) {
         title: "Gateway",
         tone: toneFromRuntimeStatus(gatewayService.state, "warn"),
         value: titleCaseToken(gatewayService.state, "Unknown"),
-        summary: `health=${formatIdentityLabel(gatewayService.health, "unknown")}`,
-        meta: `route=${platform.status}; policy=${policy.latestDecision}; provider=${aimxsPath.provider}`
+        summary: `Health: ${titleCaseToken(gatewayService.health, "unknown").toLowerCase()}.`,
+        meta: `Route: ${titleCaseToken(platform.status, "unknown")}. Latest policy: ${policy.latestDecision}. Provider: ${aimxsPath.provider}.`
       }
     ],
     actions: [
       {
         id: "open-workbench",
         label: "Open Workbench",
-        summary: `resume ${lastWorkbenchDomain}`,
+        summary: `Return to ${lastWorkbenchDomain}`,
         action: "open-workbench"
       },
       {
         id: "restart-services",
         label: "Restart Services",
-        summary: `mode=${formatIdentityLabel(shell.mode, "unknown")}`,
+        summary: "Recheck the local launcher, runtime, and gateway",
         action: "restart-services"
       },
       {
         id: "show-diagnostics",
         label: "Show Diagnostics",
-        summary: "inspect launcher, gateway, and local settings state",
+        summary: "Open deeper tools for launcher, gateway, and settings detail",
         action: "show-diagnostics"
       }
     ]
@@ -553,10 +575,10 @@ function createAttentionItems(context = {}) {
   if (pendingHolds.length > 0) {
     const holdDeadlineMs = parseTimeMs(latestHold?.holdDeadlineAtUtc);
     items.push({
-      title: "Interposed approval required",
+      title: "Held request review",
       tone: holdDeadlineMs > 0 && holdDeadlineMs - Date.now() <= 300000 ? "danger" : "warn",
       value: String(pendingHolds.length),
-      detail: `latest=${formatIdentityLabel(latestHold?.approvalId, "-")}; client=${deriveGatewayClientLabel(latestHold, context)}; deadline=${formatIdentityLabel(latestHold?.holdDeadlineAtUtc, "-")}`,
+      detail: `Latest approval ${formatIdentityLabel(latestHold?.approvalId, "-")} from ${deriveGatewayClientLabel(latestHold, context)} should be reviewed before ${formatIdentityLabel(latestHold?.holdDeadlineAtUtc, "-")}.`,
       action: "open-approval-item",
       actionLabel: "Open Approval",
       runId: String(latestHold?.runId || "").trim(),
@@ -567,7 +589,7 @@ function createAttentionItems(context = {}) {
       title: "Approval required",
       tone: countExpiringApprovals(approvals) > 0 ? "danger" : "warn",
       value: String(pendingApprovals.length),
-      detail: `latest=${formatIdentityLabel(latestPendingApproval?.approvalId, "-")}; expiring soon=${countExpiringApprovals(approvals)}`,
+      detail: `Latest approval ${formatIdentityLabel(latestPendingApproval?.approvalId, "-")}. ${countExpiringApprovals(approvals)} expiring soon.`,
       action: "open-approval-item",
       actionLabel: "Open Approval",
       runId: String(latestPendingApproval?.runId || "").trim(),
@@ -589,7 +611,7 @@ function createAttentionItems(context = {}) {
       title: `${affected} degraded`,
       tone: "danger",
       value: state,
-      detail: "Inspect diagnostics before trusting the current local governed path.",
+      detail: "Open Diagnostics before trusting the current local path.",
       action: "show-diagnostics",
       actionLabel: "Open Diagnostics"
     });
@@ -599,7 +621,7 @@ function createAttentionItems(context = {}) {
       title: "Runs requiring attention",
       tone: "danger",
       value: String(countAttentionRuns(runs)),
-      detail: `latest=${String(latestAttentionRun?.runId || "-").trim() || "-"}`,
+      detail: `Latest affected run: ${String(latestAttentionRun?.runId || "-").trim() || "-"}.`,
       action: "open-run-item",
       runId: String(latestAttentionRun?.runId || "").trim(),
       actionLabel: "Open Run"
@@ -610,7 +632,7 @@ function createAttentionItems(context = {}) {
       title: "Incident escalation pending",
       tone: incidents.high > 0 ? "danger" : "warn",
       value: String(incidents.total),
-      detail: `latest=${String(incidents.latest?.packageId || "-").trim() || "-"}`,
+      detail: `Latest incident package: ${String(incidents.latest?.packageId || "-").trim() || "-"}.`,
       action: "open-incident-item",
       actionLabel: "Open Incident",
       incidentId: String(incidents.latest?.id || "").trim(),
@@ -707,31 +729,31 @@ function createQuickActions(context = {}) {
     {
       id: "open-workbench",
       label: "Open Workbench",
-      summary: `resume ${formatOpsLabel(lastWorkbenchDomain)}`,
+      summary: `Return to ${formatOpsLabel(lastWorkbenchDomain)}`,
       action: "open-workbench"
     },
     {
       id: "open-approval-queue",
       label: "Open Approval Queue",
-      summary: `pending=${countPendingApprovals(approvals)}`,
+      summary: `${countPendingApprovals(approvals)} waiting for review`,
       action: "open-approval-queue"
     },
     {
       id: "open-recent-runs",
       label: "Open Recent Runs",
-      summary: `runs=${runs.length}`,
+      summary: `${runs.length} recent runs`,
       action: "open-recent-runs"
     },
     {
       id: "restart-services",
       label: "Restart Services",
-      summary: `mode=${formatIdentityLabel(shell.mode, "unknown")}`,
+      summary: "Recheck the local launcher, runtime, and gateway",
       action: "restart-services"
     },
     {
       id: "show-diagnostics",
       label: "Show Diagnostics",
-      summary: "settings, endpoint health, and native logs",
+      summary: "Open deeper tools for launcher, gateway, and settings detail",
       action: "show-diagnostics"
     }
   ];
@@ -752,18 +774,18 @@ function createConnectedClientContext(context = {}) {
         title: "Connected Client",
         tone: identity.authenticated ? "ok" : "warn",
         value: trafficClient,
-        summary: `subject=${formatIdentityLabel(identity.subject)}`,
+        summary: `Signed in as ${formatIdentityLabel(identity.subject)}.`,
         meta: latestHold
-          ? `surface=${formatIdentityLabel(latestHold?.clientSurface, "gateway")}; authority=${formatAuthorityBasis(identity.authorityBasis)}`
-          : `authority=${formatAuthorityBasis(identity.authorityBasis)}`
+          ? `Current request came from ${formatIdentityLabel(latestHold?.clientSurface, "gateway")}. Authority: ${formatAuthorityBasis(identity.authorityBasis)}.`
+          : `Authority: ${formatAuthorityBasis(identity.authorityBasis)}.`
       },
       {
         id: "agent-profile",
         title: "Agent Profile",
         tone: context.selectedAgentProfileId ? "ok" : "warn",
         value: formatIdentityLabel(context.selectedAgentProfileId),
-        summary: `scope=${formatScopeLabel(identity.tenantIds, identity.projectIds)}`,
-        meta: `roles=${identity.roles.length}`
+        summary: `Scope: ${formatScopeLabel(identity.tenantIds, identity.projectIds)}.`,
+        meta: `Roles available: ${identity.roles.length}.`
       },
       {
         id: "gateway-traffic",
@@ -771,11 +793,11 @@ function createConnectedClientContext(context = {}) {
         tone: toneFromRuntimeStatus(gatewayService.state, "warn"),
         value: `${gatewayTrafficCount} observed`,
         summary: latestHold
-          ? `latest=${formatIdentityLabel(latestHold?.runId)}`
-          : `latest=${formatIdentityLabel(latestRun?.runId)}`,
+          ? `Latest held run: ${formatIdentityLabel(latestHold?.runId)}.`
+          : `Latest run: ${formatIdentityLabel(latestRun?.runId)}.`,
         meta: latestHold
-          ? `approval=${formatIdentityLabel(latestHold?.approvalId)}`
-          : `request=${formatIdentityLabel(latestRun?.requestId)}`
+          ? `Pending approval: ${formatIdentityLabel(latestHold?.approvalId)}.`
+          : `Request reference: ${formatIdentityLabel(latestRun?.requestId)}.`
       }
     ]
   };

@@ -160,7 +160,7 @@ test("companionops page renders companion status, attention, recent governed act
   });
 
   assert.match(ui.homeOpsContent.innerHTML, /data-domain-root="companionops"/);
-  assert.match(ui.homeOpsContent.innerHTML, /Mode And System Status/);
+  assert.match(ui.homeOpsContent.innerHTML, /System Status/);
   assert.match(ui.homeOpsContent.innerHTML, /Attention Queue/);
   assert.match(ui.homeOpsContent.innerHTML, /Recent Governed Actions/);
   assert.match(ui.homeOpsContent.innerHTML, /Quick Actions/);
@@ -169,12 +169,14 @@ test("companionops page renders companion status, attention, recent governed act
   assert.match(ui.homeOpsContent.innerHTML, /Launcher/);
   assert.match(ui.homeOpsContent.innerHTML, /Runtime Service/);
   assert.match(ui.homeOpsContent.innerHTML, /Gateway/);
+  assert.match(ui.homeOpsContent.innerHTML, /Workbench ready: AgentOps/);
+  assert.match(ui.homeOpsContent.innerHTML, /Shell: Live desktop path\./);
   assert.match(ui.homeOpsContent.innerHTML, /homeops-feedback ok/);
   assert.match(ui.homeOpsContent.innerHTML, /Interposition is ON\. Epydios is governing supported requests\./);
   assert.match(ui.homeOpsContent.innerHTML, /Open Workbench/);
   assert.match(ui.homeOpsContent.innerHTML, /Restart Services/);
   assert.match(ui.homeOpsContent.innerHTML, /Show Diagnostics/);
-  assert.match(ui.homeOpsContent.innerHTML, /Interposed approval required/);
+  assert.match(ui.homeOpsContent.innerHTML, /Held request review/);
   assert.match(ui.homeOpsContent.innerHTML, /Runs requiring attention/);
   assert.match(ui.homeOpsContent.innerHTML, /Incident escalation pending/);
   assert.match(ui.homeOpsContent.innerHTML, /Open Approval/);

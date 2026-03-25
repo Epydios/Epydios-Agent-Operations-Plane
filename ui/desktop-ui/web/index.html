@@ -85,7 +85,7 @@
         <div class="panel-header">
           <div class="panel-heading">
             <h2>Companion</h2>
-            <p class="panel-lead">Default daily-use posture for system status, attention, recent governed actions, and exact handoff into Workbench depth.</p>
+            <p class="panel-lead">Daily status, the next items that need attention, and direct handoff into the deeper tools when you need them.</p>
           </div>
           <button id="refresh-button" class="btn btn-secondary">Refresh</button>
         </div>
@@ -96,13 +96,13 @@
         <div class="panel-header">
           <div class="panel-heading">
             <h2>Diagnostics</h2>
-            <p class="panel-lead">Advanced diagnostics, payload inspection, and contract debugging when deeper review is needed.</p>
+            <p class="panel-lead">Deeper tools for diagnostics, payload inspection, and contract review when the daily path is not enough.</p>
           </div>
           <button
             class="btn btn-secondary btn-small"
             type="button"
             data-advanced-toggle-section="operations"
-          >Show more options</button>
+          >Show deeper tools</button>
         </div>
         <div id="developerops-content" class="stack"></div>
       </section>
@@ -344,7 +344,7 @@
             <input id="ga-subject-id" class="filter-input" type="text" value="operator-governed-action" />
           </label>
           <details class="artifact-panel field-wide" data-detail-key="home.governed_action_advanced">
-            <summary>Advanced request fields</summary>
+            <summary>More request details</summary>
             <div class="run-builder-grid">
               <label class="field">
                 <span class="label">Action Type</span>
@@ -559,11 +559,11 @@
         <div class="panel-header">
           <div class="panel-heading">
             <h2>Pending Approvals</h2>
-            <p class="panel-lead">Review approvals without leaving the current Agent workspace.</p>
+            <p class="panel-lead">Review approvals without leaving the current Companion view.</p>
           </div>
         </div>
         <details class="details-shell agent-approvals-filters" data-detail-key="agent.approvals.filters">
-          <summary>Scope and Filters</summary>
+          <summary>Review filters</summary>
           <div class="filter-row filter-row-data filter-row-approvals">
             <div class="filter-group filter-group-scope">
               <span class="filter-group-label">Scope</span>
@@ -618,7 +618,7 @@
                     class="btn btn-secondary btn-small"
                     type="button"
                     data-advanced-toggle-section="approvals"
-                  >Show more options</button>
+                  >Show extra filters</button>
                 </div>
                 <div class="action-group action-group-primary">
                   <button id="approvals-apply-button" class="btn btn-primary">Refresh</button>
@@ -648,12 +648,12 @@
         <div class="panel-header">
           <div class="panel-heading">
             <h2>RuntimeOps</h2>
-            <p class="panel-lead">Inspect live runtime posture first, then review the current governed run inventory without mixing in platform release surfaces.</p>
+            <p class="panel-lead">Check live runtime health first, then review the governed run history that needs follow-through.</p>
           </div>
         </div>
         <div id="runtimeops-content" class="stack"></div>
         <details class="details-shell history-filters-card" data-detail-key="history.filters">
-          <summary>Run Inventory Filters and Scope</summary>
+          <summary>Run filters</summary>
           <div class="filter-row filter-row-data filter-row-runs">
             <div class="filter-group filter-group-scope">
               <span class="filter-group-label">Scope</span>
@@ -715,7 +715,7 @@
                     class="btn btn-secondary btn-small"
                     type="button"
                     data-advanced-toggle-section="runs"
-                  >Show more options</button>
+                  >Show extra filters</button>
                 </div>
                 <div class="action-group action-group-primary">
                   <button id="runs-apply-button" class="btn btn-primary">Apply</button>
@@ -753,7 +753,7 @@
               class="btn btn-secondary btn-small"
               type="button"
               data-advanced-toggle-section="incidents"
-            >Show more options</button>
+            >Show extra tools</button>
           </div>
         </div>
         <div class="metric workflow-guide">

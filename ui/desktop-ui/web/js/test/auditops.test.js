@@ -184,7 +184,7 @@ test("auditops page renders bounded audit event, actor activity, and decision tr
   });
 
   assert.match(ui.auditOpsContent.innerHTML, /data-domain-root="auditops"/);
-  assert.match(ui.auditOpsContent.innerHTML, /Audit Event Board/);
+  assert.match(ui.auditOpsContent.innerHTML, /Audit Activity/);
   assert.match(ui.auditOpsContent.innerHTML, /Actor Activity Board/);
   assert.match(ui.auditOpsContent.innerHTML, /Decision Trace Board/);
   assert.match(ui.auditOpsContent.innerHTML, /Admin Lifecycle Trace/);
@@ -238,9 +238,9 @@ test("auditops empty state renders without loaded audit posture", () => {
   const ui = { auditOpsContent: { innerHTML: "" } };
   renderAuditOpsEmptyState(ui, {
     title: "AuditOps",
-    message: "Audit posture becomes available after audit, run, approval, and decision trace signals load."
+    message: "Audit activity becomes available after recent runs, approvals, and review history load."
   });
 
   assert.match(ui.auditOpsContent.innerHTML, /AuditOps/);
-  assert.match(ui.auditOpsContent.innerHTML, /Audit posture becomes available/);
+  assert.match(ui.auditOpsContent.innerHTML, /Audit activity becomes available/);
 });

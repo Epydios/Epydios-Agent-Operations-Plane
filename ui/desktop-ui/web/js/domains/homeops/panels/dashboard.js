@@ -55,10 +55,10 @@ function renderRecentActionRow(item = {}) {
         </div>
       </div>
       <div class="homeops-recent-action-grid">
-        <div class="meta">client=${escapeHTML(item.clientLabel || "-")}</div>
-        <div class="meta">target=${escapeHTML(item.targetSummary || "-")}</div>
-        <div class="meta">run=${escapeHTML(item.runId || "-")}</div>
-        <div class="meta">time=${escapeHTML(formatTime(item.occurredAt || "-"))}</div>
+        <div class="meta">Client: ${escapeHTML(item.clientLabel || "-")}</div>
+        <div class="meta">Target: ${escapeHTML(item.targetSummary || "-")}</div>
+        <div class="meta">Run: ${escapeHTML(item.runId || "-")}</div>
+        <div class="meta">Time: ${escapeHTML(formatTime(item.occurredAt || "-"))}</div>
       </div>
       <div class="homeops-actions">
         <button
@@ -126,8 +126,8 @@ export function renderHomeWorkspace(snapshot = {}) {
     <div class="homeops-workspace" data-domain-root="companionops">
       <section class="homeops-board">
         <div class="homeops-board-header">
-          <h3>Mode And System Status</h3>
-          <p class="homeops-board-lead">Companion posture, native launcher state, runtime service state, and gateway readiness.</p>
+          <h3>System Status</h3>
+          <p class="homeops-board-lead">Daily status for Companion, the launcher, the runtime service, and the local gateway.</p>
         </div>
         ${
           feedback?.message
@@ -153,7 +153,7 @@ export function renderHomeWorkspace(snapshot = {}) {
       <section class="homeops-board">
         <div class="homeops-board-header">
           <h3>Recent Governed Actions</h3>
-          <p class="homeops-board-lead">Latest gateway-backed submissions with exact handoff into run or approval review.</p>
+          <p class="homeops-board-lead">Latest governed requests with direct handoff into the run or review that needs attention.</p>
         </div>
         <div class="homeops-recent-action-list">
           ${recentActions.length ? recentActions.map((item) => renderRecentActionRow(item)).join("") : renderEmptyMessage("No recent governed actions are available yet. Submit work through the local gateway to populate this surface.")}
@@ -162,7 +162,7 @@ export function renderHomeWorkspace(snapshot = {}) {
       <section class="homeops-board">
         <div class="homeops-board-header">
           <h3>Quick Actions</h3>
-          <p class="homeops-board-lead">Fast actions into Workbench depth, recent runs, diagnostics, and local service recovery.</p>
+          <p class="homeops-board-lead">Common next steps without digging through the full Workbench.</p>
         </div>
         <div class="homeops-pivot-grid">
           ${quickActions.map((action) => renderQuickAction(action)).join("")}
@@ -171,7 +171,7 @@ export function renderHomeWorkspace(snapshot = {}) {
       <section class="homeops-board">
         <div class="homeops-board-header">
           <h3>Connected Client Context</h3>
-          <p class="homeops-board-lead">Visible client, scope, and recent gateway activity without fake global interception theater.</p>
+          <p class="homeops-board-lead">Signed-in context, active scope, and recent request activity.</p>
         </div>
         <div class="homeops-summary-grid">
           ${connectedClientCards.map((item) => renderConnectedClientCard(item)).join("")}

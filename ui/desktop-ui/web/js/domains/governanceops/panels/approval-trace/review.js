@@ -122,41 +122,39 @@ function buildNativeDecisionReviewModel(item) {
             { label: "recordStatus", value: status || "UNKNOWN", tone: actionable ? "ok" : "warn" }
           ],
       isGatewayHold
-        ? "Use these identifiers when reviewing the interposed request that is paused in the local gateway path."
-        : "Use these identifiers when reviewing the current thread from the Agent workspace.",
+        ? "Use these identifiers when reviewing the held request and confirming the right work will continue."
+        : "Use these identifiers when reviewing the current request and keeping the decision pinned to the right context.",
       isGatewayHold
         ? [
-            `createdAt=${formatTime(createdAt)}`,
-            `approvalId=${identifierValue || "-"}`,
-            `interpositionRequestId=${String(item?.interpositionRequestId || "-")}`,
-            `gatewayRequestId=${String(item?.gatewayRequestId || "-")}`,
-            `reasonOptional=true; operatorDecisionSurface=companion-governance-review`
+            `Captured ${formatTime(createdAt)}`,
+            `Approval record ${identifierValue || "-"}`,
+            `Held request ${String(item?.interpositionRequestId || "-")}`,
+            `Gateway record ${String(item?.gatewayRequestId || "-")}`,
+            "Decision reason can be left blank; the review trail will note that the action came from this pinned review."
           ]
         : [
-            `createdAt=${formatTime(createdAt)}`,
-            `${identifierLabel}=${identifierValue || "-"}`,
-            `reasonOptional=true; operatorDecisionSurface=agent-approval-review`
+            `Captured ${formatTime(createdAt)}`,
+            `${identifierLabel} ${identifierValue || "-"}`,
+            "Decision reason can be left blank; the review trail will note that the action came from this pinned review."
           ]
     ),
     guardrails: [
       actionable
         ? isGatewayHold
-          ? "Decision controls are active because the interposed request is still held pending approval."
-          : "Decision controls are active because the current thread still has a pending governed decision."
+          ? "Decision controls are active because this request is still held pending approval."
+          : "Decision controls are active because this request still has a pending governed decision."
         : `Decision controls are locked because status=${status || "UNKNOWN"}.`,
+      "Decision reason is optional here; if you leave it blank, the audit trail still records that the action came from this pinned review.",
       isGatewayHold
-        ? "Decision reason is optional here; if omitted, the review surface submits a default audit note showing the action came from the pinned Companion review."
-        : "Decision reason is optional here; if omitted, the review surface submits a default audit note showing the action came from the pinned Agent review.",
-      isGatewayHold
-        ? "Approving resumes the interposed upstream request path; denying closes the held request and preserves the audit chain."
+        ? "Approving releases the held request to continue. Denying closes it while preserving the review trail."
         : isProposal
           ? "Confirm the proposal summary and command are appropriate before approval."
           : "Confirm the checkpoint reason and scope match the current thread state before approval.",
       isGatewayHold
-        ? "Review the source client, runId, approvalId, and held target before deciding so the release path matches the intended request."
-        : "Keep the pinned review aligned with the active native decision rather than switching to an unrelated queue item."
+        ? "Review the source client, run ID, approval record, and held target before deciding so the right request continues."
+        : "Keep the pinned review aligned with the current decision rather than switching to an unrelated queue item."
     ],
-    detailTitle: isGatewayHold ? "Interposed Request Hold" : isProposal ? "Tool Proposal" : "Approval Checkpoint",
+    detailTitle: isGatewayHold ? "Held Request" : isProposal ? "Tool Proposal" : "Approval Checkpoint",
     identifierLabel,
     identifierValue: identifierValue || "-",
     detailSummary: summary || "No decision summary captured.",
@@ -203,9 +201,9 @@ function buildApprovalReviewModel(approval) {
     ],
     "Use these identifiers when handing off or verifying the resulting decision record.",
     [
-      `createdAt=${formatTime(approval?.createdAt)}`,
-      `expiresAt=${ttl.expiresAtLabel}`,
-      `reasonRequired=true; operatorDecisionSurface=approval-review-inline-or-run-detail`
+      `Captured ${formatTime(approval?.createdAt)}`,
+      `Decision due ${ttl.expiresAtLabel}`,
+      "Decision reason is required in this view and becomes part of the audit record."
     ]
   );
   const guardrails = [
@@ -245,8 +243,8 @@ export function renderGovernanceApprovalReview(target, approval) {
     target.innerHTML = renderPanelStateMetric(
       "info",
       "Approval Review",
-      "Select an approval card to keep its decision context pinned in Agent.",
-      "Use the pinned review section and run detail from Agent."
+      "Select an approval card to keep its decision context pinned here.",
+      "Use the pinned review section and run detail together."
     );
     return;
   }
@@ -265,9 +263,9 @@ export function renderGovernanceApprovalReview(target, approval) {
       <div class="meta metric-note">${escapeHTML(
         model.hasInlineDecision
           ? model.decisionType === "gateway_hold"
-            ? "Keep the selected interposed request hold pinned here and approve or deny directly from this review surface."
-            : "Keep the selected current-thread decision pinned here and approve or deny directly from this review surface."
-          : "Keep the selected approval pinned here and use run detail for the underlying record."
+            ? "Keep the selected held request pinned here and approve or deny it directly from this review."
+            : "Keep the selected decision pinned here and approve or deny it directly from this review."
+          : "Keep the selected approval pinned here and use run detail for the related record."
       )}</div>
       <div class="run-detail-chips">
         <span class="chip chip-neutral chip-compact">${escapeHTML(model.runId ? "runId" : "thread")}=${escapeHTML(model.runId || model.approval?.taskId || "-")}</span>
@@ -283,9 +281,9 @@ export function renderGovernanceApprovalReview(target, approval) {
         <span class="chip chip-neutral chip-compact">created=${escapeHTML(formatTime(model.approval?.createdAt))}</span>
         <span class="chip chip-neutral chip-compact">expires=${escapeHTML(model.ttl.expiresAtLabel)}</span>
       </div>
-      <div class="meta">expiresAt=${escapeHTML(model.ttl.expiresAtLabel)}; createdAt=${escapeHTML(formatTime(model.approval?.createdAt))}</div>
-      <div class="meta">reason=${escapeHTML(String(model.detailSummary || model.approval?.reason || "").trim() || "-")}</div>
-      <div class="meta">Decision controls are ${escapeHTML(model.hasInlineDecision ? "live directly in this pinned review section" : model.actionable ? "not exposed inline for this approval type" : "locked because the approval is no longer actionable")}.</div>
+      <div class="meta">Captured ${escapeHTML(formatTime(model.approval?.createdAt))}; expires ${escapeHTML(model.ttl.expiresAtLabel)}</div>
+      <div class="meta">Current summary: ${escapeHTML(String(model.detailSummary || model.approval?.reason || "").trim() || "-")}</div>
+      <div class="meta">Decision controls are ${escapeHTML(model.hasInlineDecision ? "available directly in this pinned review section" : model.actionable ? "not shown inline for this approval type" : "locked because this approval is no longer actionable")}.</div>
       <div class="approval-actions action-hierarchy">
         ${
           model.hasInlineDecision
@@ -295,7 +293,7 @@ export function renderGovernanceApprovalReview(target, approval) {
                 <input
                   class="filter-input"
                   type="text"
-                  placeholder="optional; add context or leave blank to use the default rail note"
+                  placeholder="optional; add context or leave blank to use the default review note"
                   data-native-decision-reason
                 />
               </div>
@@ -331,7 +329,7 @@ export function renderGovernanceApprovalReview(target, approval) {
       <div class="meta metric-note">Requested capabilities and traceability stay visible here while you review the underlying run record.</div>
       <ul class="workflow-guide-list">${model.guardrails.map((item) => `<li>${escapeHTML(item)}</li>`).join("")}</ul>
       <ul class="quickstart-list">${model.capabilityRows}</ul>
-      ${model.runId && !model.hasInlineDecision ? `<div class="meta">Use Run Detail for the underlying approval record and artifact trail.</div>` : ""}
+      ${model.runId && !model.hasInlineDecision ? `<div class="meta">Use Run Detail for the related approval record and evidence trail.</div>` : ""}
     </div>
   `;
 }
@@ -345,7 +343,7 @@ export function renderGovernanceApprovalReviewModal(target, approval) {
     target.innerHTML = renderPanelStateMetric(
       "info",
       "Approval Review",
-      "Select a pending approval from Agent to inspect its detail if the legacy review surface is still present."
+      "Select a pending approval to inspect its detail here."
     );
     if (target.dataset) {
       delete target.dataset.selectedRunId;

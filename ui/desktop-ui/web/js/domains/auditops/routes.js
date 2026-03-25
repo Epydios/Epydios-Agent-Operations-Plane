@@ -15,8 +15,8 @@ export function renderAuditOpsEmptyState(ui, options = {}) {
   ui.auditOpsContent.innerHTML = renderPanelStateMetric(
     options.tone || "info",
     options.title || "AuditOps",
-    options.message || "Audit posture becomes available after audit, run, approval, and identity-linked trace signals load.",
+    options.message || "Audit activity becomes available after recent runs, approvals, and review history load.",
     options.detail ||
-      "Refresh the workspace. If audit posture should be present, verify audit source availability, current scope, and linked governance or runtime anchors."
+      "Refresh the workspace. If audit activity should already be visible, open a recent run or approval and try again."
   );
 }
