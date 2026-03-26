@@ -132,6 +132,66 @@ function renderEndpointInventoryRows(items = []) {
   `;
 }
 
+function renderConnectorProfileInventoryRows(items = []) {
+  const rows = (Array.isArray(items) ? items : [])
+    .map((item) => {
+      const profileID = String(item?.id || "").trim().toLowerCase();
+      if (!profileID) {
+        return "";
+      }
+      const tools = Array.isArray(item?.allowedTools) ? item.allowedTools : [];
+      const scopeParts = [
+        item?.databasePath && item.databasePath !== "-" ? `db=${item.databasePath}` : "",
+        item?.connectionUri && item.connectionUri !== "-" ? `uri=${item.connectionUri}` : "",
+        item?.rootPath && item.rootPath !== "-" ? `root=${item.rootPath}` : "",
+        Array.isArray(item?.allowedOwners) && item.allowedOwners.length > 0
+          ? `owners=${item.allowedOwners.join(", ")}`
+          : "",
+        Array.isArray(item?.allowedRepos) && item.allowedRepos.length > 0
+          ? `repos=${item.allowedRepos.join(", ")}`
+          : "",
+        Array.isArray(item?.allowedOrigins) && item.allowedOrigins.length > 0
+          ? `origins=${item.allowedOrigins.join(", ")}`
+          : "",
+        item?.endpointRef && item.endpointRef !== "-" ? `endpoint=${item.endpointRef}` : ""
+      ]
+        .filter(Boolean)
+        .join(" | ");
+      return `
+        <tr data-settings-connector-id="${escapeHTML(profileID)}">
+          <td data-label="Profile"><code>${escapeHTML(profileID)}</code></td>
+          <td data-label="Label">${escapeHTML(String(item?.label || profileID))}</td>
+          <td data-label="Driver">${escapeHTML(String(item?.driverLabel || item?.driver || "-"))}</td>
+          <td data-label="Tools">${escapeHTML(tools.join(", ") || "-")}</td>
+          <td data-label="Scope">${escapeHTML(scopeParts || "-")}</td>
+          <td data-label="State"><span class="${item?.enabled === false ? "chip chip-warn chip-compact" : "chip chip-ok chip-compact"}">${escapeHTML(item?.enabled === false ? "disabled" : "enabled")}</span></td>
+        </tr>
+      `;
+    })
+    .filter(Boolean)
+    .join("");
+  if (!rows) {
+    return '<div class="settingsops-empty">No connector profiles loaded.</div>';
+  }
+  return `
+    <div class="table-shell settingsops-endpoint-table">
+      <table class="settings-table">
+        <thead>
+          <tr>
+            <th>Profile</th>
+            <th>Label</th>
+            <th>Driver</th>
+            <th>Tools</th>
+            <th>Scope</th>
+            <th>State</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
 function renderAppPreferencesBoard(snapshot) {
   const board = snapshot.appPreferences;
   return `
@@ -339,6 +399,108 @@ function renderIntegrationSettingsBoard(snapshot) {
   `;
 }
 
+function renderConnectorGovernanceBoard(snapshot) {
+  const board = snapshot.connectorGovernance;
+  const scopePills = [
+    board.selectedDatabasePath !== "-" ? { label: "database", value: board.selectedDatabasePath, code: true } : null,
+    board.selectedConnectionUri !== "-" ? { label: "connection", value: board.selectedConnectionUri, code: true } : null,
+    board.selectedRootPath !== "-" ? { label: "root", value: board.selectedRootPath, code: true } : null,
+    board.selectedEndpointRef !== "-" ? { label: "endpoint ref", value: board.selectedEndpointRef, code: true } : null,
+    board.selectedCredentialRef !== "-" ? { label: "credential ref", value: board.selectedCredentialRef, code: true } : null,
+    board.selectedAllowedOwners.length > 0
+      ? { label: "owners", value: board.selectedAllowedOwners.join(", ") }
+      : null,
+    board.selectedAllowedRepos.length > 0
+      ? { label: "repos", value: board.selectedAllowedRepos.join(", ") }
+      : null,
+    board.selectedAllowedOrigins.length > 0
+      ? { label: "origins", value: board.selectedAllowedOrigins.join(", ") }
+      : null
+  ].filter(Boolean);
+  const driverMix = board.driverLabels.length > 0 ? board.driverLabels.join(", ") : "-";
+  return `
+    <article
+      class="metric settingsops-card settingsops-card-wide"
+      data-domain-root="settingsops"
+      data-settingsops-panel="connector-governance"
+    >
+      <div class="metric-title-row">
+        <div class="title">Connector Governance</div>
+        <span class="${chipClassForTone(board.tone)}">${escapeHTML(board.tone)}</span>
+      </div>
+      <div class="settingsops-chip-row">
+        <span class="chip chip-neutral chip-compact">selected=${escapeHTML(board.selectedConnectorId)}</span>
+        <span class="chip chip-neutral chip-compact">driver=${escapeHTML(board.selectedDriverLabel)}</span>
+        <span class="chip chip-neutral chip-compact">profiles=${escapeHTML(String(board.profileCount))}</span>
+        <span class="chip chip-neutral chip-compact">source=${escapeHTML(board.source)}</span>
+      </div>
+      <div class="settingsops-kv-list">
+        ${renderKeyValueRows([
+          {
+            label: "Current Connector Lane",
+            value: renderValuePills([
+              { label: "profile", value: board.selectedConnectorLabel },
+              { label: "profile id", value: board.selectedConnectorId, code: true },
+              { label: "driver", value: board.selectedDriverLabel, code: true },
+              { label: "state", value: board.selectedEnabled ? "enabled" : "disabled" },
+              { label: "posture", value: board.approvalPosture }
+            ])
+          },
+          {
+            label: "Allowed Tools",
+            value:
+              board.selectedAllowedTools.length > 0
+                ? renderValuePills(
+                    board.selectedAllowedTools.map((tool, index) => ({
+                      label: index === 0 ? "tool" : "tool+",
+                      value: tool,
+                      code: true
+                    }))
+                  )
+                : '<span class="settingsops-empty">No connector tools are configured.</span>'
+          },
+          {
+            label: "Bounded Scope",
+            value:
+              scopePills.length > 0
+                ? renderValuePills(scopePills)
+                : '<span class="settingsops-empty">No bounded scope details are currently recorded for the selected connector.</span>'
+          },
+          {
+            label: "Profile Coverage",
+            value: renderValuePills([
+              { label: "enabled", value: String(board.enabledProfileCount) },
+              { label: "total", value: String(board.profileCount) },
+              { label: "driver mix", value: driverMix },
+              { label: "updated", value: board.updatedAt, code: true }
+            ])
+          }
+        ])}
+      </div>
+      <details class="details-shell">
+        <summary>Show connector profile inventory</summary>
+        <div class="settingsops-kv-list">
+          ${renderKeyValueRows([
+            {
+              label: "Connector Profiles",
+              value: renderConnectorProfileInventoryRows(board.profiles)
+            },
+            {
+              label: "Connector Endpoint",
+              value: renderValuePills([
+                { label: "state", value: board.endpointState, code: true },
+                { label: "detail", value: board.endpointDetail },
+                { label: "tenant", value: board.scopeTenant, code: true },
+                { label: "project", value: board.projectScope, code: true }
+              ])
+            }
+          ])}
+        </div>
+      </details>
+    </article>
+  `;
+}
+
 function renderSettingsWorkflowRecoveryBoard(snapshot) {
   const board = snapshot.workflowRecovery;
   return `
@@ -421,10 +583,11 @@ export function renderSettingsWorkspace(context = {}) {
             <p class="workbench-domain-cluster-lead">Edit the supported workspace setup, keep recovery steps visible, and leave deeper diagnostics for the dedicated advanced lane.</p>
           </div>
           <div class="workbench-domain-cluster-body settingsops-board-grid settingsops-cluster-grid">
-            ${renderIntegrationSettingsBoard(snapshot)}
-            ${renderSettingsWorkflowRecoveryBoard(snapshot)}
-          </div>
-        </section>
+          ${renderIntegrationSettingsBoard(snapshot)}
+          ${renderConnectorGovernanceBoard(snapshot)}
+          ${renderSettingsWorkflowRecoveryBoard(snapshot)}
+        </div>
+      </section>
       </div>
     </div>
   `;

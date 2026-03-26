@@ -183,6 +183,21 @@ func (o *Orchestrator) ExecuteRun(ctx context.Context, req RunCreateRequest) (*R
 		"context":  normalizedReq.Context,
 	}
 
+	connectorRequested := connectorRequestEnabled(normalizedReq.Connector)
+	var connectorPlan *connectorExecutionPlan
+	if connectorRequested {
+		connectorSettings, settingsErr := loadConnectorIntegrationSettings(ctx, o.Store, normalizedReq.Meta.TenantID, normalizedReq.Meta.ProjectID)
+		if settingsErr != nil {
+			return failRun(fmt.Errorf("load connector settings: %w", settingsErr))
+		}
+		connectorPlan, err = deriveConnectorExecutionPlan(normalizedReq, connectorSettings)
+		if err != nil {
+			return failRun(fmt.Errorf("derive connector execution plan: %w", err))
+		}
+	}
+
+	policyContext := mergeConnectorPlanIntoContext(normalizedReq.Context, connectorPlan)
+
 	var profileResp map[string]interface{}
 	if err := callProvider("ProfileResolver", "profile-resolve", profileProvider, "/v1alpha1/profile-resolver/resolve", profileReq, &profileResp); err != nil {
 		return failRun(fmt.Errorf("profile provider call: %w", err))
@@ -224,7 +239,7 @@ func (o *Orchestrator) ExecuteRun(ctx context.Context, req RunCreateRequest) (*R
 		"subject":  normalizedReq.Subject,
 		"action":   normalizedReq.Action,
 		"resource": normalizedReq.Resource,
-		"context":  normalizedReq.Context,
+		"context":  policyContext,
 		"mode":     normalizedReq.Mode,
 		"dryRun":   normalizedReq.DryRun,
 	}
@@ -300,6 +315,57 @@ func (o *Orchestrator) ExecuteRun(ctx context.Context, req RunCreateRequest) (*R
 	run.UpdatedAt = time.Now().UTC()
 	if err := o.Store.UpsertRun(ctx, run); err != nil {
 		return failRun(fmt.Errorf("persist policy stage: %w", err))
+	}
+
+	var connectorPayload map[string]interface{}
+	if connectorRequested {
+		connectorPayload = map[string]interface{}{
+			"requested": true,
+		}
+		connectorPayload["tier"] = connectorPlan.Tier
+		connectorPayload["connector"] = connectorProfileMetadata(connectorPlan.Profile)
+		connectorPayload["toolName"] = connectorPlan.ToolName
+		connectorPayload["classification"] = cloneJSONObject(connectorPlan.Classification)
+		if note := strings.TrimSpace(connectorPlan.ApprovalNote); note != "" {
+			connectorPayload["approvalNote"] = note
+		}
+		if decisionUpper != "ALLOW" {
+			connectorPayload["state"] = "skipped"
+			connectorPayload["reason"] = "policy_not_allow"
+			connectorPayload["policyDecision"] = decisionUpper
+			emitAuditEvent(ctx, "runtime.connector.skipped", map[string]interface{}{
+				"runId":          run.RunID,
+				"requestId":      run.RequestID,
+				"policyDecision": decisionUpper,
+				"reason":         "policy_not_allow",
+				"connectorId":    connectorPlan.Profile.ID,
+				"toolName":       connectorPlan.ToolName,
+			})
+		} else {
+			connectorResult, execErr := executeConnectorPlan(ctx, connectorPlan)
+			if execErr != nil {
+				return failRun(fmt.Errorf("execute connector plan: %w", execErr))
+			}
+			connectorPayload["state"] = "completed"
+			connectorPayload["result"] = connectorResult
+			executedPayload := map[string]interface{}{
+				"runId":       run.RunID,
+				"requestId":   run.RequestID,
+				"connectorId": connectorPlan.Profile.ID,
+				"toolName":    connectorPlan.ToolName,
+				"tier":        connectorPlan.Tier,
+			}
+			if rowCount, ok := connectorResult["rowCount"]; ok {
+				executedPayload["rowCount"] = rowCount
+			}
+			if entryCount, ok := connectorResult["entryCount"]; ok {
+				executedPayload["entryCount"] = entryCount
+			}
+			if bytesRead, ok := connectorResult["bytesRead"]; ok {
+				executedPayload["bytesRead"] = bytesRead
+			}
+			emitAuditEvent(ctx, "runtime.connector.executed", executedPayload)
+		}
 	}
 
 	desktopRequested := desktopRequestEnabled(normalizedReq.Desktop)
@@ -484,7 +550,10 @@ func (o *Orchestrator) ExecuteRun(ctx context.Context, req RunCreateRequest) (*R
 	recordPayload := map[string]interface{}{
 		"profile": profileResp,
 		"policy":  sanitizedPolicyResp,
-		"context": normalizedReq.Context,
+		"context": policyContext,
+	}
+	if len(connectorPayload) > 0 {
+		recordPayload["connector"] = connectorPayload
 	}
 	if len(desktopPayload) > 0 {
 		recordPayload["desktop"] = desktopPayload
@@ -540,6 +609,7 @@ func (o *Orchestrator) ExecuteRun(ctx context.Context, req RunCreateRequest) (*R
 			"selectedPolicyProvider":   run.SelectedPolicyProvider,
 			"selectedEvidenceProvider": run.SelectedEvidenceProvider,
 			"selectedDesktopProvider":  run.SelectedDesktopProvider,
+			"connectorRequested":       connectorRequested,
 			"decision":                 decisionUpper,
 		},
 	}
@@ -567,6 +637,7 @@ func (o *Orchestrator) ExecuteRun(ctx context.Context, req RunCreateRequest) (*R
 		"policyProvider":   run.SelectedPolicyProvider,
 		"evidenceProvider": run.SelectedEvidenceProvider,
 		"desktopProvider":  run.SelectedDesktopProvider,
+		"connector":        connectorRequested,
 		"grantPresent":     run.PolicyGrantTokenPresent,
 		"grantSha256":      run.PolicyGrantTokenSHA256,
 	})

@@ -29,20 +29,21 @@ type ObjectMeta struct {
 }
 
 type RunCreateRequest struct {
-	Meta           ObjectMeta               `json:"meta"`
-	Subject        JSONObject               `json:"subject"`
-	Action         JSONObject               `json:"action"`
-	Resource       JSONObject               `json:"resource,omitempty"`
-	Task           JSONObject               `json:"task,omitempty"`
-	Defaults       JSONObject               `json:"defaults,omitempty"`
-	Context        JSONObject               `json:"context,omitempty"`
-	Mode           string                   `json:"mode,omitempty"`
-	DryRun         bool                     `json:"dryRun,omitempty"`
-	RetentionClass string                   `json:"retentionClass,omitempty"`
-	Profile        JSONObject               `json:"profile,omitempty"`
-	Workload       JSONObject               `json:"workload,omitempty"`
-	Annotations    JSONObject               `json:"annotations,omitempty"`
-	Desktop        *DesktopExecutionRequest `json:"desktop,omitempty"`
+	Meta           ObjectMeta                 `json:"meta"`
+	Subject        JSONObject                 `json:"subject"`
+	Action         JSONObject                 `json:"action"`
+	Resource       JSONObject                 `json:"resource,omitempty"`
+	Task           JSONObject                 `json:"task,omitempty"`
+	Defaults       JSONObject                 `json:"defaults,omitempty"`
+	Context        JSONObject                 `json:"context,omitempty"`
+	Mode           string                     `json:"mode,omitempty"`
+	DryRun         bool                       `json:"dryRun,omitempty"`
+	RetentionClass string                     `json:"retentionClass,omitempty"`
+	Profile        JSONObject                 `json:"profile,omitempty"`
+	Workload       JSONObject                 `json:"workload,omitempty"`
+	Annotations    JSONObject                 `json:"annotations,omitempty"`
+	Desktop        *DesktopExecutionRequest   `json:"desktop,omitempty"`
+	Connector      *ConnectorExecutionRequest `json:"connector,omitempty"`
 }
 
 type RunRecord struct {
@@ -139,12 +140,35 @@ type IntegrationSettingsRecord struct {
 	UpdatedAt time.Time       `json:"updatedAt"`
 }
 
+type ConnectorSettingsRecord struct {
+	TenantID  string          `json:"tenantId,omitempty"`
+	ProjectID string          `json:"projectId,omitempty"`
+	Settings  json.RawMessage `json:"settings"`
+	CreatedAt time.Time       `json:"createdAt"`
+	UpdatedAt time.Time       `json:"updatedAt"`
+}
+
 type IntegrationSettingsUpsertRequest struct {
 	Meta     ObjectMeta      `json:"meta"`
 	Settings json.RawMessage `json:"settings"`
 }
 
+type ConnectorSettingsUpsertRequest struct {
+	Meta     ObjectMeta      `json:"meta"`
+	Settings json.RawMessage `json:"settings"`
+}
+
 type IntegrationSettingsResponse struct {
+	Source      string          `json:"source,omitempty"`
+	TenantID    string          `json:"tenantId,omitempty"`
+	ProjectID   string          `json:"projectId,omitempty"`
+	HasSettings bool            `json:"hasSettings"`
+	Settings    json.RawMessage `json:"settings"`
+	CreatedAt   *time.Time      `json:"createdAt,omitempty"`
+	UpdatedAt   *time.Time      `json:"updatedAt,omitempty"`
+}
+
+type ConnectorSettingsResponse struct {
 	Source      string          `json:"source,omitempty"`
 	TenantID    string          `json:"tenantId,omitempty"`
 	ProjectID   string          `json:"projectId,omitempty"`
@@ -217,6 +241,18 @@ type DesktopExecutionRequest struct {
 	PostAction             JSONObject `json:"postAction,omitempty"`
 	HumanApprovalGranted   bool       `json:"humanApprovalGranted,omitempty"`
 	RestrictedHostOptIn    bool       `json:"restrictedHostOptIn,omitempty"`
+}
+
+type ConnectorExecutionRequest struct {
+	Enabled              bool       `json:"enabled,omitempty"`
+	Tier                 int        `json:"tier,omitempty"`
+	ConnectorID          string     `json:"connectorId,omitempty"`
+	Driver               string     `json:"driver,omitempty"`
+	ToolName             string     `json:"toolName,omitempty"`
+	Arguments            JSONObject `json:"arguments,omitempty"`
+	ApprovalNote         string     `json:"approvalNote,omitempty"`
+	ApprovalID           string     `json:"approvalId,omitempty"`
+	HumanApprovalGranted bool       `json:"humanApprovalGranted,omitempty"`
 }
 
 type DesktopVerifierPolicy struct {

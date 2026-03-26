@@ -420,6 +420,112 @@ function renderActionReviewBoard(snapshot) {
   `;
 }
 
+function renderConnectorApprovalsBoard(snapshot) {
+  const board = snapshot.connectorApprovalQueue;
+  if (!board?.available || !board.selected) {
+    return `
+      <article class="metric governanceops-card" data-domain-root="governanceops" data-governanceops-panel="connector-approval-queue">
+        <div class="metric-title-row">
+          <div class="title">Connector Approvals</div>
+          <span class="chip chip-neutral chip-compact">idle</span>
+        </div>
+        <div class="governanceops-kv-list">
+          ${renderKeyValueRows([
+            {
+              label: "Status",
+              value: '<span class="governanceops-empty">No pending connector approval is currently waiting in the local gateway hold lane.</span>'
+            },
+            {
+              label: "Connector Coverage",
+              value: renderValuePills([
+                { label: "enabled profiles", value: String(board?.enabledProfileCount || 0) },
+                { label: "known profiles", value: String(board?.profileCount || 0) },
+                { label: "selected", value: board?.selectedConnectorLabel || "-" }
+              ])
+            }
+          ])}
+        </div>
+      </article>
+    `;
+  }
+
+  const item = board.selected;
+  return `
+    <article class="metric governanceops-card governanceops-card-wide" data-domain-root="governanceops" data-governanceops-panel="connector-approval-queue">
+      <div class="metric-title-row">
+        <div class="title">Connector Approvals</div>
+        <span class="chip chip-warn chip-compact">pending</span>
+      </div>
+      <div class="governanceops-chip-row">
+        <span class="chip chip-neutral chip-compact">driver=${escapeHTML(item.driverLabel)}</span>
+        <span class="chip chip-neutral chip-compact">tool=${escapeHTML(item.toolName)}</span>
+        <span class="chip chip-neutral chip-compact">pending=${escapeHTML(String(board.pendingCount || 0))}</span>
+        <span class="chip chip-neutral chip-compact">source=${escapeHTML(board.source)}</span>
+      </div>
+      <div class="governanceops-kv-list">
+        ${renderKeyValueRows([
+          {
+            label: "Current Connector Hold",
+            value: renderValuePills([
+              { label: "approval", value: item.approvalId, code: true },
+              { label: "run", value: item.runId, code: true },
+              { label: "request", value: item.interpositionRequestId, code: true },
+              { label: "connector", value: item.driverLabel },
+              { label: "tool", value: item.toolName, code: true }
+            ])
+          },
+          {
+            label: "Governance Target",
+            value: renderValuePills([
+              { label: "title", value: item.requestTitle },
+              { label: "target", value: item.targetRef, code: true },
+              { label: "client", value: item.clientLabel },
+              { label: "surface", value: item.clientSurface, code: true }
+            ])
+          },
+          {
+            label: "Hold Timing",
+            value: renderValuePills([
+              { label: "started", value: item.holdStartedAt, code: true },
+              { label: "deadline", value: item.holdDeadlineAt, code: true },
+              { label: "gateway", value: item.gatewayRequestId, code: true },
+              { label: "environment", value: item.environmentId, code: true }
+            ])
+          },
+          {
+            label: "Reason And Coverage",
+            value: `
+              ${renderValuePills([
+                { label: "reason", value: item.reason },
+                { label: "selected profile", value: board.selectedConnectorLabel || "-" },
+                { label: "enabled profiles", value: String(board.enabledProfileCount || 0) },
+                { label: "known profiles", value: String(board.profileCount || 0) }
+              ])}
+              <div class="governanceops-action-row">
+                <button
+                  class="btn btn-primary btn-small"
+                  type="button"
+                  data-governanceops-open-run-id="${escapeHTML(item.runId)}"
+                >Open Run Detail</button>
+                <button
+                  class="btn btn-secondary btn-small"
+                  type="button"
+                  data-governanceops-open-view="runtimeops"
+                >Open RuntimeOps</button>
+                <button
+                  class="btn btn-secondary btn-small"
+                  type="button"
+                  data-governanceops-open-view="settingsops"
+                >Open SettingsOps</button>
+              </div>
+            `
+          }
+        ])}
+      </div>
+    </article>
+  `;
+}
+
 function renderApprovalQueueBoard(snapshot) {
   const board = snapshot.approvalQueue;
   if (!board.available) {
@@ -859,6 +965,7 @@ export function renderGovernanceWorkspace(context = {}) {
       ${renderAdminProposalReviewBoard(snapshot)}
       ${renderActionReviewBoard(snapshot)}
       <div class="governanceops-primary-grid">
+        ${renderConnectorApprovalsBoard(snapshot)}
         ${renderApprovalQueueBoard(snapshot)}
         ${renderAuthorityLadderBoard(snapshot)}
         ${renderDecisionReceiptBoard(snapshot)}

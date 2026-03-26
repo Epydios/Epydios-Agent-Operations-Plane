@@ -153,6 +153,90 @@ function summarizeApprovalQueue(approvals = {}, nowValue = new Date()) {
   };
 }
 
+function connectorActionDriverLabel(actionType = "") {
+  const normalized = normalizeString(actionType).toLowerCase();
+  if (normalized.startsWith("connector.sqlite.")) {
+    return "SQLite MCP";
+  }
+  if (normalized.startsWith("connector.postgres.")) {
+    return "Postgres MCP";
+  }
+  if (normalized.startsWith("connector.filesystem.")) {
+    return "Filesystem MCP";
+  }
+  if (normalized.startsWith("connector.github.")) {
+    return "GitHub MCP";
+  }
+  if (normalized.startsWith("connector.browser.")) {
+    return "Browser MCP";
+  }
+  return normalized ? "Connector" : "-";
+}
+
+function connectorActionToolLabel(actionType = "") {
+  const normalized = normalizeString(actionType).toLowerCase();
+  if (!normalized.startsWith("connector.")) {
+    return "-";
+  }
+  const parts = normalized.split(".");
+  return parts[parts.length - 1] || "-";
+}
+
+function summarizeConnectorApprovalQueue(nativeGatewayHolds = [], settings = {}, viewState = {}) {
+  const connectorSettings = readObject(settings?.connectors);
+  const selectedRunId = normalizeString(viewState?.selectedRunId);
+  const items = (Array.isArray(nativeGatewayHolds) ? nativeGatewayHolds : [])
+    .filter((item) => normalizeString(item?.state).toLowerCase() === "held_pending_approval")
+    .map((item) => {
+      const actionType = normalizeString(item?.governanceTarget?.actionType);
+      if (!actionType.toLowerCase().startsWith("connector.")) {
+        return null;
+      }
+      return {
+        interpositionRequestId: normalizeString(item?.interpositionRequestId, "-"),
+        gatewayRequestId: normalizeString(item?.gatewayRequestId, "-"),
+        runId: normalizeString(item?.runId, "-"),
+        approvalId: normalizeString(item?.approvalId, "-"),
+        tenantId: normalizeString(item?.tenantId, "-"),
+        projectId: normalizeString(item?.projectId, "-"),
+        environmentId: normalizeString(item?.environmentId, "-"),
+        holdStartedAt: normalizeString(item?.holdStartedAtUtc || item?.createdAtUtc, "-"),
+        holdDeadlineAt: normalizeString(item?.holdDeadlineAtUtc, "-"),
+        clientSurface: normalizeString(item?.clientSurface, "-"),
+        clientLabel: normalizeString(item?.sourceClient?.name || item?.sourceClient?.id, "-"),
+        requestTitle: normalizeString(item?.requestSummary?.title, "-"),
+        reason: normalizeString(item?.holdReason || item?.requestSummary?.reason, "-"),
+        actionType,
+        driverLabel: connectorActionDriverLabel(actionType),
+        toolName: connectorActionToolLabel(actionType),
+        targetRef: normalizeString(item?.governanceTarget?.targetRef, "-"),
+        selected:
+          selectedRunId &&
+          [item?.runId, item?.approvalId, `native:hold:${normalizeString(item?.interpositionRequestId)}`]
+            .map((value) => normalizeString(value))
+            .includes(selectedRunId)
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => parseTimeMs(b?.holdStartedAt) - parseTimeMs(a?.holdStartedAt));
+  const selected =
+    items.find((item) => item.selected) ||
+    items[0] ||
+    null;
+
+  return {
+    available: items.length > 0,
+    source: items.length > 0 ? "local-gateway" : normalizeString(connectorSettings.source, "unknown"),
+    pendingCount: items.length,
+    profileCount: Number(connectorSettings.profileCount || 0),
+    enabledProfileCount: Number(connectorSettings.enabledProfileCount || 0),
+    selectedConnectorId: normalizeString(connectorSettings.selectedConnectorId || connectorSettings.selectedProfileId, "-"),
+    selectedConnectorLabel: normalizeString(connectorSettings.selectedProfileLabel, "-"),
+    selected,
+    items: items.slice(0, 3)
+  };
+}
+
 function summarizeOperationalFeedback(viewState = {}) {
   const feedback = readObject(viewState?.feedback);
   const message = normalizeString(feedback?.message);
@@ -787,6 +871,11 @@ export function createGovernanceWorkspaceSnapshot(context = {}) {
     operationalFeedback: summarizeOperationalFeedback(viewState),
     adminProposalReview: summarizeAdminProposalReview(context?.adminQueueItems, viewState),
     actionReview: summarizeActionReview(approvals, runs, nowValue, viewState),
+    connectorApprovalQueue: summarizeConnectorApprovalQueue(
+      context?.nativeGatewayHolds,
+      settings,
+      viewState
+    ),
     approvalQueue: summarizeApprovalQueue(approvals, nowValue),
     authorityLadder: summarizeAuthorityLadder(settings, approvals, runs, session),
     decisionReceipt: summarizeDecisionReceipt(approvals, runs, nowValue),

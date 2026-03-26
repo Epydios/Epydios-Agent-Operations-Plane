@@ -7,6 +7,13 @@ test("governanceops page renders runtime approvals plus identity admin proposal 
   const ui = { governanceOpsContent: { innerHTML: "" } };
   renderGovernanceOpsPage(ui, {
     settings: {
+      connectors: {
+        source: "runtime-endpoint",
+        selectedConnectorId: "browser-proof",
+        selectedProfileLabel: "Browser Proof",
+        profileCount: 3,
+        enabledProfileCount: 3
+      },
       identity: {
         source: "runtime.auth.context",
         authorityBasis: "bearer_token_jwt",
@@ -126,6 +133,34 @@ test("governanceops page renders runtime approvals plus identity admin proposal 
         }
       ]
     },
+    nativeGatewayHolds: [
+      {
+        interpositionRequestId: "ixr-browser-001",
+        gatewayRequestId: "gateway-browser-001",
+        runId: "run-connector-browser-001",
+        approvalId: "approval-connector-browser-001",
+        state: "held_pending_approval",
+        holdStartedAtUtc: "2026-03-14T21:01:00Z",
+        holdDeadlineAtUtc: "2026-03-14T21:11:00Z",
+        holdReason: "Destructive browser click needs explicit approval.",
+        clientSurface: "mcp",
+        sourceClient: {
+          id: "client-mcp",
+          name: "Phase2 Test Shim"
+        },
+        tenantId: "tenant-demo",
+        projectId: "project-core",
+        environmentId: "staging",
+        governanceTarget: {
+          actionType: "connector.browser.click_destructive_button",
+          targetRef: "https://app.example.com/settings/danger"
+        },
+        requestSummary: {
+          title: "Browser MCP click_destructive_button call",
+          reason: "Danger-zone control is bounded and approval-gated."
+        }
+      }
+    ],
     session: {
       claims: {
         sub: "demo.operator",
@@ -196,6 +231,7 @@ test("governanceops page renders runtime approvals plus identity admin proposal 
   assert.match(ui.governanceOpsContent.innerHTML, /Decision Binding Contract/);
   assert.match(ui.governanceOpsContent.innerHTML, /Stable Or Replay Refs/);
   assert.match(ui.governanceOpsContent.innerHTML, /Approval Queue/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Connector Approvals/);
   assert.match(ui.governanceOpsContent.innerHTML, /Authority Ladder/);
   assert.match(ui.governanceOpsContent.innerHTML, /Decision Receipt/);
   assert.match(ui.governanceOpsContent.innerHTML, /Active Review/);
@@ -211,6 +247,12 @@ test("governanceops page renders runtime approvals plus identity admin proposal 
   assert.match(ui.governanceOpsContent.innerHTML, /runtime\.auth\.context/);
   assert.match(ui.governanceOpsContent.innerHTML, /runtime-approval-endpoint/);
   assert.match(ui.governanceOpsContent.innerHTML, /identityops-admin/);
+  assert.match(ui.governanceOpsContent.innerHTML, /approval-connector-browser-001/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Browser MCP/);
+  assert.match(ui.governanceOpsContent.innerHTML, /click_destructive_button/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Phase2 Test Shim/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Open SettingsOps/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Open RuntimeOps/);
   assert.match(ui.governanceOpsContent.innerHTML, /aimxs-policy-primary/);
   assert.match(ui.governanceOpsContent.innerHTML, /recorded/);
   assert.match(ui.governanceOpsContent.innerHTML, /grant token/);

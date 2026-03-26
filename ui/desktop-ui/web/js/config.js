@@ -25,6 +25,7 @@ const DEFAULT_CONFIG = {
     approvalsQueue: "/v1alpha1/runtime/approvals",
     approvalDecisionPrefix: "/v1alpha1/runtime/approvals/",
     integrationSettings: "/v1alpha1/runtime/integrations/settings",
+    connectorSettings: "/v1alpha1/runtime/connectors/settings",
     integrationInvoke: "/v1alpha1/runtime/integrations/invoke"
   },
   ui: {

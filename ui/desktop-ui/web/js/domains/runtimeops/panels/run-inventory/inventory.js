@@ -35,6 +35,181 @@ function hasValue(value) {
   return true;
 }
 
+function readPlainObject(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+function connectorDriverLabel(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "mcp_sqlite") {
+    return "SQLite MCP";
+  }
+  if (normalized === "mcp_postgres") {
+    return "Postgres MCP";
+  }
+  if (normalized === "mcp_filesystem") {
+    return "Filesystem MCP";
+  }
+  if (normalized === "mcp_github") {
+    return "GitHub MCP";
+  }
+  if (normalized === "mcp_browser") {
+    return "Browser MCP";
+  }
+  return normalized || "-";
+}
+
+function renderDetailValuePills(items = []) {
+  const values = (Array.isArray(items) ? items : [])
+    .map((item) => {
+      const label = String(item?.label || "").trim();
+      const value = String(item?.value || "").trim();
+      if (!label || !value) {
+        return "";
+      }
+      return `
+        <span class="runtimeops-value-pill">
+          <span class="runtimeops-value-key">${escapeHTML(label)}</span>
+          <span class="runtimeops-value-text${item?.code ? " runtimeops-value-text-code" : ""}">
+            ${item?.code ? `<code>${escapeHTML(value)}</code>` : escapeHTML(value)}
+          </span>
+        </span>
+      `;
+    })
+    .filter(Boolean);
+  if (values.length === 0) {
+    return '<span class="runtimeops-empty">not available</span>';
+  }
+  return `<div class="runtimeops-value-group">${values.join("")}</div>`;
+}
+
+function renderDetailKeyValueRows(rows = []) {
+  return (Array.isArray(rows) ? rows : [])
+    .map((row) => {
+      const label = String(row?.label || "").trim();
+      const value = String(row?.value || "").trim();
+      if (!label) {
+        return "";
+      }
+      return `
+        <div class="runtimeops-row">
+          <div class="runtimeops-row-label">${escapeHTML(label)}</div>
+          <div class="runtimeops-row-value">${value || '<span class="runtimeops-empty">-</span>'}</div>
+        </div>
+      `;
+    })
+    .filter(Boolean)
+    .join("");
+}
+
+function buildConnectorContinuity(run = {}, approval = null) {
+  const requestPayload = readPlainObject(run?.requestPayload);
+  const requestContext = readPlainObject(requestPayload?.context);
+  const connectorRequest = readPlainObject(requestPayload?.connector);
+  const connectorContext = readPlainObject(requestContext?.connector);
+  const connectorMcp = readPlainObject(requestContext?.connector_mcp);
+  const evidenceRecordResponse = readPlainObject(run?.evidenceRecordResponse);
+  const evidencePayload = readPlainObject(evidenceRecordResponse?.payloadEcho);
+  const connectorPayload = readPlainObject(evidencePayload?.connector);
+  const connectorProfile = readPlainObject(connectorPayload?.connector);
+  const connectorClassification = readPlainObject(connectorPayload?.classification);
+  const connectorResult = readPlainObject(connectorPayload?.result);
+  const annotations = readPlainObject(run?.annotations);
+
+  const driver = String(
+    annotations?.connectorDriver ||
+      connectorProfile?.driver ||
+      connectorRequest?.driver ||
+      connectorContext?.driver ||
+      ""
+  )
+    .trim()
+    .toLowerCase();
+  const toolName = String(
+    annotations?.connectorToolName ||
+      connectorPayload?.toolName ||
+      connectorRequest?.toolName ||
+      connectorContext?.toolName ||
+      ""
+  )
+    .trim()
+    .toLowerCase();
+  const state = String(connectorPayload?.state || "").trim().toLowerCase();
+  const connectorId = String(
+    connectorProfile?.connectorId ||
+      connectorProfile?.id ||
+      connectorRequest?.connectorId ||
+      connectorContext?.connectorId ||
+      connectorMcp?.connectorId ||
+      ""
+  ).trim();
+  const connectorLabel = String(
+    connectorProfile?.connectorLabel ||
+      connectorProfile?.label ||
+      connectorMcp?.connectorLabel ||
+      ""
+  ).trim();
+  const approvalId = String(
+    connectorMcp?.approvalId || connectorContext?.approvalId || approval?.approvalId || ""
+  ).trim();
+  const requestEntries = [
+    connectorRequest?.arguments?.query ? { label: "query", value: String(connectorRequest.arguments.query), code: true } : null,
+    connectorRequest?.arguments?.path ? { label: "path", value: String(connectorRequest.arguments.path), code: true } : null,
+    connectorRequest?.arguments?.url ? { label: "url", value: String(connectorRequest.arguments.url), code: true } : null,
+    connectorRequest?.arguments?.owner ? { label: "owner", value: String(connectorRequest.arguments.owner), code: true } : null,
+    connectorRequest?.arguments?.repo ? { label: "repo", value: String(connectorRequest.arguments.repo), code: true } : null,
+    connectorRequest?.arguments?.pull_number
+      ? { label: "pull", value: String(connectorRequest.arguments.pull_number), code: true }
+      : null,
+    connectorRequest?.arguments?.selector
+      ? { label: "selector", value: String(connectorRequest.arguments.selector), code: true }
+      : null,
+    connectorRequest?.arguments?.expected_label
+      ? { label: "label", value: String(connectorRequest.arguments.expected_label) }
+      : null
+  ].filter(Boolean);
+  const resultEntries = [
+    connectorResult?.rowCount !== undefined ? { label: "rows", value: String(connectorResult.rowCount), code: true } : null,
+    connectorResult?.entryCount !== undefined ? { label: "entries", value: String(connectorResult.entryCount), code: true } : null,
+    connectorResult?.bytesRead !== undefined ? { label: "bytes", value: String(connectorResult.bytesRead), code: true } : null,
+    connectorResult?.pullTitle ? { label: "pull title", value: String(connectorResult.pullTitle) } : null,
+    connectorResult?.pullState ? { label: "pull state", value: String(connectorResult.pullState), code: true } : null,
+    connectorResult?.title ? { label: "title", value: String(connectorResult.title) } : null,
+    connectorResult?.finalUrl ? { label: "final url", value: String(connectorResult.finalUrl), code: true } : null,
+    connectorResult?.textPreview ? { label: "text preview", value: String(connectorResult.textPreview) } : null,
+    connectorResult?.resolvedLabel ? { label: "resolved label", value: String(connectorResult.resolvedLabel) } : null
+  ].filter(Boolean);
+
+  return {
+    available:
+      Boolean(driver) ||
+      Boolean(toolName) ||
+      Boolean(connectorId) ||
+      Boolean(connectorPayload?.requested),
+    driver,
+    driverLabel: connectorDriverLabel(driver),
+    toolName: toolName || "-",
+    connectorId: connectorId || "-",
+    connectorLabel: connectorLabel || "-",
+    state: state || "unknown",
+    tier: String(connectorPayload?.tier || connectorRequest?.tier || "-").trim() || "-",
+    interpositionRequestId: String(connectorPayload?.interpositionRequestId || connectorMcp?.interpositionRequestId || "").trim() || "-",
+    clientSurface: String(connectorMcp?.clientSurface || "").trim() || "-",
+    protocol: String(connectorMcp?.protocol || annotations?.connectorProtocol || "").trim() || "-",
+    transport: String(connectorMcp?.transport || annotations?.connectorTransport || "").trim() || "-",
+    approvalId: approvalId || "-",
+    approvalGranted:
+      connectorMcp?.approvalGranted === true ||
+      connectorContext?.humanApprovalGranted === true,
+    classification: {
+      statementClass: String(connectorClassification?.statementClass || "-").trim() || "-",
+      reason: String(connectorClassification?.reason || connectorPayload?.reason || run?.errorMessage || "-").trim() || "-"
+    },
+    requestEntries,
+    resultEntries
+  };
+}
+
 function desktopEvidenceStage(run, key, label) {
   const payload = run?.[key];
   if (!payload || typeof payload !== "object") {
@@ -407,6 +582,7 @@ export function renderRuntimeRunDetail(ui, run, options = {}) {
   ].filter(Boolean);
   const artifactEntries = buildArtifactEntries(run);
   const artifactAccess = buildArtifactAccessEntries(run, evidenceStages);
+  const connectorContinuity = buildConnectorContinuity(run, approval);
   const runStatus = String(run?.status || "").toUpperCase();
   const runDecision = String(run?.policyDecision || "").toUpperCase();
   const runStatusChipClass = runStatus ? chipClassForStatus(runStatus) : "chip chip-neutral";
@@ -554,7 +730,74 @@ export function renderRuntimeRunDetail(ui, run, options = {}) {
         </div>
       </div>
       <div class="metric">
-        <div class="title">5. Evidence Handoff</div>
+        <div class="title">5. Connector Continuity</div>
+        <div class="meta metric-note">Use this only for connector-governed runs. It keeps the connector request, approval linkage, and evidence summary in one place before handoff.</div>
+        <div class="run-detail-chips">
+          <span class="chip chip-neutral chip-compact">driver=${escapeHTML(connectorContinuity.driverLabel)}</span>
+          <span class="chip chip-neutral chip-compact">tool=${escapeHTML(connectorContinuity.toolName)}</span>
+          <span class="chip chip-neutral chip-compact">state=${escapeHTML(connectorContinuity.state)}</span>
+          <span class="chip chip-neutral chip-compact">approval=${escapeHTML(connectorContinuity.approvalId)}</span>
+        </div>
+        <div class="runtimeops-kv-list">
+          ${
+            connectorContinuity.available
+              ? renderDetailKeyValueRows([
+                  {
+                    label: "Connector Profile",
+                    value: renderDetailValuePills([
+                      { label: "profile", value: connectorContinuity.connectorLabel },
+                      { label: "connector id", value: connectorContinuity.connectorId, code: true },
+                      { label: "driver", value: connectorContinuity.driverLabel, code: true },
+                      { label: "tier", value: connectorContinuity.tier, code: true }
+                    ])
+                  },
+                  {
+                    label: "Gateway And Approval",
+                    value: renderDetailValuePills([
+                      { label: "protocol", value: connectorContinuity.protocol, code: true },
+                      { label: "transport", value: connectorContinuity.transport, code: true },
+                      { label: "client surface", value: connectorContinuity.clientSurface, code: true },
+                      { label: "approval", value: connectorContinuity.approvalId, code: true },
+                      {
+                        label: "approval granted",
+                        value: connectorContinuity.approvalGranted ? "yes" : "no",
+                        code: true
+                      },
+                      {
+                        label: "interposition",
+                        value: connectorContinuity.interpositionRequestId,
+                        code: true
+                      }
+                    ])
+                  },
+                  {
+                    label: "Bounded Request",
+                    value:
+                      connectorContinuity.requestEntries.length > 0
+                        ? renderDetailValuePills(connectorContinuity.requestEntries)
+                        : '<span class="runtimeops-empty">No bounded connector request inputs were echoed into the current evidence record.</span>'
+                  },
+                  {
+                    label: "Classification And Result",
+                    value: `
+                      ${renderDetailValuePills([
+                        { label: "statement class", value: connectorContinuity.classification.statementClass, code: true },
+                        { label: "reason", value: connectorContinuity.classification.reason }
+                      ])}
+                      ${
+                        connectorContinuity.resultEntries.length > 0
+                          ? renderDetailValuePills(connectorContinuity.resultEntries)
+                          : '<div class="meta">Connector result details are not yet available for this run.</div>'
+                      }
+                    `
+                  }
+                ])
+              : '<div class="meta">No connector-specific continuity is recorded for this run.</div>'
+          }
+        </div>
+      </div>
+      <div class="metric">
+        <div class="title">6. Evidence Handoff</div>
         <div class="meta metric-note">Copy the location you need before leaving Run Inventory. Keep tracked evidence in the repo-safe root, and use the suggested handoff folders for screenshots, operator notes, and incident packages.</div>
         <div class="meta" data-run-path-feedback>Copy a location to send it to the clipboard.</div>
         <div class="run-detail-chips">
@@ -567,7 +810,7 @@ export function renderRuntimeRunDetail(ui, run, options = {}) {
         </div>
       </div>
       <div class="metric" data-advanced-section="runs">
-        <div class="title">6. Payload Drill-In</div>
+        <div class="title">7. Payload Drill-In</div>
         <div class="meta metric-note">Use payload drill-in only when the structured timeline and evidence summaries are not sufficient.</div>
         <div class="meta">artifactPayloads=${escapeHTML(String(artifactEntries.length))}</div>
         <div class="stack">
@@ -575,7 +818,7 @@ export function renderRuntimeRunDetail(ui, run, options = {}) {
         </div>
       </div>
       <div class="metric" data-advanced-section="runs">
-        <div class="title">7. Raw Run Record</div>
+        <div class="title">8. Raw Run Record</div>
         <div class="meta metric-note">Raw record is intentionally last. Review it only after the structured sections above.</div>
         <details class="artifact-panel" data-detail-key="runs.raw_record">
           <summary>Show raw run record</summary>

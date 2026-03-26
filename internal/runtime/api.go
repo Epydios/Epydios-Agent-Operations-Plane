@@ -101,6 +101,7 @@ func (s *APIServer) Routes() http.Handler {
 	mux.HandleFunc("/v1alpha1/runtime/audit/events", s.handleAuditEvents)
 	mux.HandleFunc("/v1alpha1/runtime/terminal/sessions", s.handleTerminalSessions)
 	mux.HandleFunc("/v1alpha1/runtime/integrations/settings", s.handleIntegrationSettings)
+	mux.HandleFunc("/v1alpha1/runtime/connectors/settings", s.handleConnectorSettings)
 	mux.HandleFunc("/v1alpha1/runtime/integrations/invoke", s.handleIntegrationInvoke)
 	mux.HandleFunc("/v1alpha2/runtime/tasks", s.handleTasksV1Alpha2)
 	mux.HandleFunc("/v1alpha2/runtime/tasks/", s.handleTaskByIDV1Alpha2)
@@ -1253,6 +1254,25 @@ func (s *APIServer) handleIntegrationSettings(w http.ResponseWriter, r *http.Req
 	}
 }
 
+func (s *APIServer) handleConnectorSettings(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		ctx, ok := s.authorizeRequest(w, r, PermissionRunRead)
+		if !ok {
+			return
+		}
+		s.handleGetConnectorSettings(w, r.WithContext(ctx))
+	case http.MethodPut:
+		ctx, ok := s.authorizeRequest(w, r, PermissionRunCreate)
+		if !ok {
+			return
+		}
+		s.handleUpsertConnectorSettings(w, r.WithContext(ctx))
+	default:
+		writeAPIError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "method not allowed", false, nil)
+	}
+}
+
 func (s *APIServer) handleIntegrationInvoke(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeAPIError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "method not allowed", false, nil)
@@ -1735,6 +1755,230 @@ func (s *APIServer) handleUpsertIntegrationSettings(w http.ResponseWriter, r *ht
 		TenantID:    req.Meta.TenantID,
 		ProjectID:   req.Meta.ProjectID,
 		HasSettings: true,
+		Settings:    settingsJSON,
+		CreatedAt:   &createdAt,
+		UpdatedAt:   &updatedAt,
+	})
+}
+
+func (s *APIServer) handleGetConnectorSettings(w http.ResponseWriter, r *http.Request) {
+	scope := ObjectMeta{
+		TenantID:  strings.TrimSpace(r.URL.Query().Get("tenantId")),
+		ProjectID: strings.TrimSpace(r.URL.Query().Get("projectId")),
+	}
+
+	identity, _ := RuntimeIdentityFromContext(r.Context())
+	if err := enforceRequestMetaScope(&scope, identity); err != nil {
+		emitAuditEvent(r.Context(), "runtime.scope.deny", map[string]interface{}{
+			"path":       r.URL.Path,
+			"method":     r.Method,
+			"permission": PermissionRunRead,
+			"tenantId":   scope.TenantID,
+			"projectId":  scope.ProjectID,
+			"error":      err.Error(),
+		})
+		s.writeAuthError(w, err)
+		return
+	}
+	if scope.TenantID == "" || scope.ProjectID == "" {
+		writeAPIError(
+			w,
+			http.StatusBadRequest,
+			"INVALID_SCOPE",
+			"tenantId and projectId are required",
+			false,
+			map[string]interface{}{"tenantId": scope.TenantID, "projectId": scope.ProjectID},
+		)
+		return
+	}
+	if err := s.authorizeScoped(identity, PermissionRunRead, scope.TenantID, scope.ProjectID); err != nil {
+		emitAuditEvent(r.Context(), "runtime.authz.policy.deny", map[string]interface{}{
+			"path":       r.URL.Path,
+			"method":     r.Method,
+			"permission": PermissionRunRead,
+			"tenantId":   scope.TenantID,
+			"projectId":  scope.ProjectID,
+			"error":      err.Error(),
+		})
+		s.writeAuthError(w, err)
+		return
+	}
+	emitAuditEvent(r.Context(), "runtime.authz.policy.allow", map[string]interface{}{
+		"path":       r.URL.Path,
+		"method":     r.Method,
+		"permission": PermissionRunRead,
+		"tenantId":   scope.TenantID,
+		"projectId":  scope.ProjectID,
+	})
+
+	record, source, err := loadConnectorSettingsRecord(r.Context(), s.store, scope.TenantID, scope.ProjectID)
+	if err != nil {
+		writeAPIError(
+			w,
+			http.StatusInternalServerError,
+			"STORE_QUERY_FAILED",
+			"failed to fetch connector settings",
+			true,
+			map[string]interface{}{"error": err.Error(), "tenantId": scope.TenantID, "projectId": scope.ProjectID},
+		)
+		return
+	}
+	if record == nil {
+		emitAuditEvent(r.Context(), "runtime.connectors.settings.read", map[string]interface{}{
+			"path":        r.URL.Path,
+			"method":      r.Method,
+			"tenantId":    scope.TenantID,
+			"projectId":   scope.ProjectID,
+			"hasSettings": false,
+			"source":      "connector-store",
+		})
+		writeJSON(w, http.StatusOK, ConnectorSettingsResponse{
+			Source:      "connector-store",
+			TenantID:    scope.TenantID,
+			ProjectID:   scope.ProjectID,
+			HasSettings: false,
+			Settings:    []byte("{}"),
+		})
+		return
+	}
+
+	hasSettings := connectorSettingsKeyCount(record.Settings) > 0
+	createdAt := record.CreatedAt.UTC()
+	updatedAt := record.UpdatedAt.UTC()
+	emitAuditEvent(r.Context(), "runtime.connectors.settings.read", map[string]interface{}{
+		"path":        r.URL.Path,
+		"method":      r.Method,
+		"tenantId":    scope.TenantID,
+		"projectId":   scope.ProjectID,
+		"hasSettings": hasSettings,
+		"updatedAt":   updatedAt.Format(time.RFC3339),
+		"source":      source,
+	})
+	writeJSON(w, http.StatusOK, ConnectorSettingsResponse{
+		Source:      source,
+		TenantID:    scope.TenantID,
+		ProjectID:   scope.ProjectID,
+		HasSettings: hasSettings,
+		Settings:    record.Settings,
+		CreatedAt:   &createdAt,
+		UpdatedAt:   &updatedAt,
+	})
+}
+
+func (s *APIServer) handleUpsertConnectorSettings(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+
+	var req ConnectorSettingsUpsertRequest
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, integrationRequestMaxBytes)).Decode(&req); err != nil {
+		writeAPIError(w, http.StatusBadRequest, "INVALID_JSON", "invalid JSON body", false, map[string]interface{}{"error": err.Error()})
+		return
+	}
+	if len(req.Settings) == 0 {
+		writeAPIError(w, http.StatusBadRequest, "INVALID_SETTINGS", "settings object is required", false, nil)
+		return
+	}
+
+	identity, _ := RuntimeIdentityFromContext(r.Context())
+	if err := enforceRequestMetaScope(&req.Meta, identity); err != nil {
+		emitAuditEvent(r.Context(), "runtime.scope.deny", map[string]interface{}{
+			"path":       r.URL.Path,
+			"method":     r.Method,
+			"permission": PermissionRunCreate,
+			"tenantId":   req.Meta.TenantID,
+			"projectId":  req.Meta.ProjectID,
+			"error":      err.Error(),
+		})
+		s.writeAuthError(w, err)
+		return
+	}
+	if req.Meta.TenantID == "" || req.Meta.ProjectID == "" {
+		writeAPIError(
+			w,
+			http.StatusBadRequest,
+			"INVALID_SCOPE",
+			"meta.tenantId and meta.projectId are required",
+			false,
+			map[string]interface{}{"tenantId": req.Meta.TenantID, "projectId": req.Meta.ProjectID},
+		)
+		return
+	}
+	if err := s.authorizeScoped(identity, PermissionRunCreate, req.Meta.TenantID, req.Meta.ProjectID); err != nil {
+		emitAuditEvent(r.Context(), "runtime.authz.policy.deny", map[string]interface{}{
+			"path":       r.URL.Path,
+			"method":     r.Method,
+			"permission": PermissionRunCreate,
+			"tenantId":   req.Meta.TenantID,
+			"projectId":  req.Meta.ProjectID,
+			"error":      err.Error(),
+		})
+		s.writeAuthError(w, err)
+		return
+	}
+	emitAuditEvent(r.Context(), "runtime.authz.policy.allow", map[string]interface{}{
+		"path":       r.URL.Path,
+		"method":     r.Method,
+		"permission": PermissionRunCreate,
+		"tenantId":   req.Meta.TenantID,
+		"projectId":  req.Meta.ProjectID,
+	})
+
+	settingsJSON, normalizeErr := normalizeConnectorSettingsJSON(req.Settings)
+	if normalizeErr != nil {
+		writeAPIError(w, http.StatusBadRequest, "INVALID_SETTINGS", "settings must be a JSON object", false, map[string]interface{}{"error": normalizeErr.Error()})
+		return
+	}
+	validationErrors := validateConnectorSettingsJSON(settingsJSON)
+	if len(validationErrors) > 0 {
+		writeAPIError(
+			w,
+			http.StatusBadRequest,
+			"INVALID_SETTINGS",
+			"connector settings failed validation",
+			false,
+			map[string]interface{}{"errors": validationErrors},
+		)
+		return
+	}
+
+	now := time.Now().UTC()
+	record := &ConnectorSettingsRecord{
+		TenantID:  req.Meta.TenantID,
+		ProjectID: req.Meta.ProjectID,
+		Settings:  settingsJSON,
+		UpdatedAt: now,
+	}
+	if existing, err := s.store.GetConnectorSettings(r.Context(), req.Meta.TenantID, req.Meta.ProjectID); err == nil && existing != nil {
+		record.CreatedAt = existing.CreatedAt.UTC()
+	} else {
+		record.CreatedAt = now
+	}
+	if err := s.store.UpsertConnectorSettings(r.Context(), record); err != nil {
+		writeAPIError(
+			w,
+			http.StatusInternalServerError,
+			"STORE_UPDATE_FAILED",
+			"failed to persist connector settings",
+			true,
+			map[string]interface{}{"error": err.Error(), "tenantId": req.Meta.TenantID, "projectId": req.Meta.ProjectID},
+		)
+		return
+	}
+
+	createdAt := record.CreatedAt.UTC()
+	updatedAt := record.UpdatedAt.UTC()
+	emitAuditEvent(r.Context(), "runtime.connectors.settings.update", map[string]interface{}{
+		"path":         r.URL.Path,
+		"method":       r.Method,
+		"tenantId":     req.Meta.TenantID,
+		"projectId":    req.Meta.ProjectID,
+		"settingCount": connectorSettingsKeyCount(settingsJSON),
+		"updatedAt":    updatedAt.Format(time.RFC3339),
+	})
+	writeJSON(w, http.StatusOK, ConnectorSettingsResponse{
+		Source:      "connector-store",
+		TenantID:    req.Meta.TenantID,
+		ProjectID:   req.Meta.ProjectID,
+		HasSettings: connectorSettingsKeyCount(settingsJSON) > 0,
 		Settings:    settingsJSON,
 		CreatedAt:   &createdAt,
 		UpdatedAt:   &updatedAt,

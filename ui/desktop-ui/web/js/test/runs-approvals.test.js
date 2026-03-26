@@ -240,6 +240,91 @@ test("run detail surfaces artifact roots and recommended date bucket", () => {
   assert.match(ui.runDetailContent.innerHTML, /Copy Location/);
 });
 
+test("run detail surfaces connector continuity for governed connector runs", () => {
+  const ui = { runDetailContent: { innerHTML: "", dataset: {} } };
+  renderRunDetail(
+    ui,
+    {
+      runId: "run-browser-connector-001",
+      tenantId: "tenant-demo",
+      projectId: "project-core",
+      status: "POLICY_EVALUATED",
+      policyDecision: "ALLOW",
+      createdAt: "2026-03-19T05:00:00Z",
+      updatedAt: "2026-03-19T05:01:00Z",
+      annotations: {
+        connectorDriver: "mcp_browser",
+        connectorToolName: "click_destructive_button",
+        connectorProtocol: "mcp",
+        connectorTransport: "stdio_jsonrpc"
+      },
+      requestPayload: {
+        connector: {
+          connectorId: "browser-proof",
+          tier: 1,
+          toolName: "click_destructive_button",
+          arguments: {
+            url: "https://app.example.com/settings/danger",
+            selector: "#danger-delete",
+            expected_label: "Delete workspace"
+          }
+        },
+        context: {
+          connector_mcp: {
+            connectorId: "browser-proof",
+            connectorLabel: "Browser Proof",
+            clientSurface: "mcp",
+            approvalId: "approval-browser-001",
+            interpositionRequestId: "ixr-browser-001",
+            protocol: "mcp",
+            transport: "stdio_jsonrpc",
+            approvalGranted: false
+          }
+        }
+      },
+      evidenceRecordResponse: {
+        status: "recorded",
+        payloadEcho: {
+          connector: {
+            requested: true,
+            state: "awaiting_approval",
+            toolName: "click_destructive_button",
+            reason: "eligible destructive click requires operator approval",
+            connector: {
+              connectorId: "browser-proof",
+              connectorLabel: "Browser Proof",
+              driver: "mcp_browser"
+            },
+            classification: {
+              statementClass: "destructive_button_click",
+              reason: "eligible destructive click requires operator approval"
+            },
+            result: {
+              finalUrl: "https://app.example.com/settings/danger",
+              resolvedLabel: "Delete workspace"
+            }
+          }
+        }
+      }
+    },
+    {
+      selectedRunId: "run-browser-connector-001",
+      approval: {
+        approvalId: "approval-browser-001",
+        status: "PENDING"
+      }
+    }
+  );
+
+  assert.match(ui.runDetailContent.innerHTML, /Connector Continuity/);
+  assert.match(ui.runDetailContent.innerHTML, /Browser MCP/);
+  assert.match(ui.runDetailContent.innerHTML, /click_destructive_button/);
+  assert.match(ui.runDetailContent.innerHTML, /ixr-browser-001/);
+  assert.match(ui.runDetailContent.innerHTML, /approval-browser-001/);
+  assert.match(ui.runDetailContent.innerHTML, /destructive_button_click/);
+  assert.match(ui.runDetailContent.innerHTML, /Delete workspace/);
+});
+
 test("run detail surfaces governed-action policy richness from the stored provider response", () => {
   const ui = { runDetailContent: { innerHTML: "", dataset: {} } };
   renderRunDetail(

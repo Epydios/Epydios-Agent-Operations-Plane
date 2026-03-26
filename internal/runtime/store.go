@@ -17,6 +17,8 @@ type RunStore interface {
 	PruneRuns(context.Context, RunPruneQuery) (*RunPruneResult, error)
 	UpsertIntegrationSettings(context.Context, *IntegrationSettingsRecord) error
 	GetIntegrationSettings(context.Context, string, string) (*IntegrationSettingsRecord, error)
+	UpsertConnectorSettings(context.Context, *ConnectorSettingsRecord) error
+	GetConnectorSettings(context.Context, string, string) (*ConnectorSettingsRecord, error)
 	UpsertTask(context.Context, *TaskRecord) error
 	GetTask(context.Context, string) (*TaskRecord, error)
 	ListTasks(context.Context, TaskListQuery) ([]TaskRecord, error)
@@ -106,6 +108,18 @@ func (s *PostgresRunStore) EnsureSchema(ctx context.Context) error {
 		`ALTER TABLE orchestration_integration_settings ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`,
 		`ALTER TABLE orchestration_integration_settings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`,
 		`CREATE INDEX IF NOT EXISTS idx_orchestration_integration_settings_updated_at ON orchestration_integration_settings (updated_at DESC)`,
+		`CREATE TABLE IF NOT EXISTS orchestration_connector_settings (
+			tenant_id TEXT NOT NULL,
+			project_id TEXT NOT NULL,
+			settings JSONB NOT NULL DEFAULT '{}'::jsonb,
+			created_at TIMESTAMPTZ NOT NULL,
+			updated_at TIMESTAMPTZ NOT NULL,
+			PRIMARY KEY (tenant_id, project_id)
+		)`,
+		`ALTER TABLE orchestration_connector_settings ADD COLUMN IF NOT EXISTS settings JSONB NOT NULL DEFAULT '{}'::jsonb`,
+		`ALTER TABLE orchestration_connector_settings ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`,
+		`ALTER TABLE orchestration_connector_settings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`,
+		`CREATE INDEX IF NOT EXISTS idx_orchestration_connector_settings_updated_at ON orchestration_connector_settings (updated_at DESC)`,
 	}
 	stmts = append(stmts, m16SchemaStatements()...)
 
@@ -625,6 +639,96 @@ WHERE tenant_id = $1 AND project_id = $2
 
 	var (
 		record      IntegrationSettingsRecord
+		settingsRaw []byte
+	)
+	if err := s.db.QueryRowContext(ctx, q, tenantID, projectID).Scan(
+		&record.TenantID,
+		&record.ProjectID,
+		&settingsRaw,
+		&record.CreatedAt,
+		&record.UpdatedAt,
+	); err != nil {
+		return nil, err
+	}
+	record.Settings = settingsRaw
+	return &record, nil
+}
+
+func (s *PostgresRunStore) UpsertConnectorSettings(ctx context.Context, record *ConnectorSettingsRecord) error {
+	if record == nil {
+		return fmt.Errorf("connector settings record is required")
+	}
+	tenantID := strings.TrimSpace(record.TenantID)
+	projectID := strings.TrimSpace(record.ProjectID)
+	if tenantID == "" {
+		return fmt.Errorf("connector settings tenantId is required")
+	}
+	if projectID == "" {
+		return fmt.Errorf("connector settings projectId is required")
+	}
+
+	const q = `
+INSERT INTO orchestration_connector_settings (
+	tenant_id,
+	project_id,
+	settings,
+	created_at,
+	updated_at
+) VALUES ($1,$2,$3,$4,$5)
+ON CONFLICT (tenant_id, project_id) DO UPDATE SET
+	settings = EXCLUDED.settings,
+	updated_at = EXCLUDED.updated_at
+`
+
+	createdAt := record.CreatedAt.UTC()
+	if createdAt.IsZero() {
+		createdAt = time.Now().UTC()
+		record.CreatedAt = createdAt
+	}
+	updatedAt := record.UpdatedAt.UTC()
+	if updatedAt.IsZero() {
+		updatedAt = createdAt
+		record.UpdatedAt = updatedAt
+	}
+
+	_, err := s.db.ExecContext(
+		ctx,
+		q,
+		tenantID,
+		projectID,
+		jsonBytesOrEmptyObject(record.Settings),
+		createdAt,
+		updatedAt,
+	)
+	if err != nil {
+		return fmt.Errorf("upsert connector settings tenant=%s project=%s: %w", tenantID, projectID, err)
+	}
+	return nil
+}
+
+func (s *PostgresRunStore) GetConnectorSettings(ctx context.Context, tenantID, projectID string) (*ConnectorSettingsRecord, error) {
+	tenantID = strings.TrimSpace(tenantID)
+	projectID = strings.TrimSpace(projectID)
+	if tenantID == "" {
+		return nil, fmt.Errorf("connector settings tenantId is required")
+	}
+	if projectID == "" {
+		return nil, fmt.Errorf("connector settings projectId is required")
+	}
+
+	const q = `
+SELECT
+	tenant_id,
+	project_id,
+	settings,
+	created_at,
+	updated_at
+FROM orchestration_connector_settings
+WHERE tenant_id = $1 AND project_id = $2
+`
+
+	var (
+		record      ConnectorSettingsRecord
 		settingsRaw []byte
 	)
 	if err := s.db.QueryRowContext(ctx, q, tenantID, projectID).Scan(

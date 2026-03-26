@@ -4228,6 +4228,8 @@ async function main() {
   const api = new AgentOpsApi(config, () => getSession().token);
   runtimeApiClient = api;
   const runtimeIntegrationSyncStateByProject = {};
+  const runtimeConnectorSyncStateByProject = {};
+  const runtimeConnectorSettingsByProject = {};
   const resolveIntegrationScope = (currentSession, projectHint = "") => {
     const tenantID = activeTenantScope(currentSession);
     const projectID = String(projectHint || activeProjectScope(currentSession) || "").trim();
@@ -4291,7 +4293,62 @@ async function main() {
     resolveProjectChoices(scope.projectId, runtimeDraft.selectedAgentProfileId);
     runtimeIntegrationSyncStateByProject[key] = "loaded";
   };
-  await syncProjectIntegrationSettings(initialProjectScope, session, { force: true });
+  const resolveProjectConnectorSettings = (projectID) => {
+    const key = normalizeProjectScopeKey(projectID);
+    const current = runtimeConnectorSettingsByProject[key];
+    if (current && typeof current === "object") {
+      return current;
+    }
+    return {
+      source: runtimeConnectorSyncStateByProject[key] || "unloaded",
+      hasSettings: false,
+      settings: {},
+      tenantId: activeTenantScope(session),
+      projectId: String(projectID || "").trim()
+    };
+  };
+  const syncProjectConnectorSettings = async (projectID, currentSession, options = {}) => {
+    const scope = resolveIntegrationScope(currentSession, projectID);
+    const key = normalizeProjectScopeKey(scope.projectId);
+    const currentState = runtimeConnectorSyncStateByProject[key];
+    if (!options.force && (currentState === "loaded" || currentState === "loaded-empty")) {
+      return;
+    }
+    if (!scope.tenantId || !scope.projectId) {
+      runtimeConnectorSyncStateByProject[key] = "scope-unavailable";
+      runtimeConnectorSettingsByProject[key] = {
+        source: "scope-unavailable",
+        hasSettings: false,
+        warning: "tenantId and projectId are required to read connector settings.",
+        tenantId: scope.tenantId,
+        projectId: scope.projectId,
+        settings: {}
+      };
+      return;
+    }
+
+    runtimeConnectorSyncStateByProject[key] = "loading";
+    const response = await api.getConnectorSettings(scope);
+    runtimeConnectorSettingsByProject[key] =
+      response && typeof response === "object"
+        ? response
+        : {
+            source: "unknown",
+            hasSettings: false,
+            tenantId: scope.tenantId,
+            projectId: scope.projectId,
+            settings: {}
+          };
+    if (response?.source === "runtime-endpoint" || response?.source === "mock") {
+      runtimeConnectorSyncStateByProject[key] = response?.hasSettings ? "loaded" : "loaded-empty";
+      return;
+    }
+    runtimeConnectorSyncStateByProject[key] = response?.source || "fallback";
+  };
+  await Promise.all([
+    syncProjectIntegrationSettings(initialProjectScope, session, { force: true }),
+    syncProjectConnectorSettings(initialProjectScope, session, { force: true })
+  ]);
   initialChoices = resolveProjectChoices(initialProjectScope);
   refreshGovernedActionPreview(session);
   refreshRunBuilderPreview(session);
@@ -4308,6 +4365,7 @@ async function main() {
       selectedAgentProfileId: initialAgentID,
       runtimeIdentity: null,
       policyPacksCatalog: null,
+      connectorSettings: resolveProjectConnectorSettings(initialProjectScope),
       aimxsActivation: aimxsActivationSnapshot,
       localSecureRefs: localSecureRefSnapshot
     }),
@@ -4339,9 +4397,11 @@ async function main() {
     approvals: {},
     runs: {},
     session,
-    orgAdminProfiles: null
+    orgAdminProfiles: null,
+    nativeGatewayHolds: Array.isArray(config.nativeGatewayHolds) ? config.nativeGatewayHolds : []
   };
   let latestRuntimeOpsContext = {
+    settings: latestSettingsSnapshot,
     health: {},
     pipeline: {},
     providers: {},
@@ -7550,7 +7610,10 @@ async function main() {
     session = getSession();
     setAuthDisplay(ui, session);
     let projectID = activeProjectScope(session);
-    await syncProjectIntegrationSettings(projectID, session);
+    await Promise.all([
+      syncProjectIntegrationSettings(projectID, session),
+      syncProjectConnectorSettings(projectID, session)
+    ]);
     let currentChoices = resolveProjectChoices(projectID);
     refreshGovernedActionPreview(session);
     refreshRunBuilderPreview(session);
@@ -7634,7 +7697,10 @@ async function main() {
           session = getSession();
           setAuthDisplay(ui, session);
           projectID = activeProjectScope(session);
-          await syncProjectIntegrationSettings(projectID, session, { force: true });
+          await Promise.all([
+            syncProjectIntegrationSettings(projectID, session, { force: true }),
+            syncProjectConnectorSettings(projectID, session, { force: true })
+          ]);
           currentChoices = resolveProjectChoices(projectID);
           refreshGovernedActionPreview(session);
           refreshRunBuilderPreview(session);
@@ -7669,6 +7735,7 @@ async function main() {
           audit,
           runtimeIdentity,
           policyPacksCatalog,
+          connectorSettings: resolveProjectConnectorSettings(projectID),
           themeMode: selectedThemeMode,
           selectedAgentProfileId,
           aimxsActivation: aimxsActivationSnapshot,
@@ -7731,7 +7798,8 @@ async function main() {
           approvals,
           runs,
           session,
-          orgAdminProfiles: desktopGovernedExportCatalogState?.orgAdminProfiles || null
+          orgAdminProfiles: desktopGovernedExportCatalogState?.orgAdminProfiles || null,
+          nativeGatewayHolds: Array.isArray(config.nativeGatewayHolds) ? config.nativeGatewayHolds : []
         });
         renderAuditOpsPanel({
           audit,
@@ -7788,6 +7856,7 @@ async function main() {
           runs
         });
         renderRuntimeOpsPanel({
+          settings: settingsWithConfigChanges,
           health,
           pipeline,
           providers,
@@ -11672,7 +11741,10 @@ function getCurrentIncidentOpsEntry(entryId = "") {
         readSavedValue(PROJECT_PREF_KEY) || session.claims.project_id || ""
       ).trim();
       applyProjectContext(activeProject);
-      await syncProjectIntegrationSettings(activeProject, session, { force: true });
+      await Promise.all([
+        syncProjectIntegrationSettings(activeProject, session, { force: true }),
+        syncProjectConnectorSettings(activeProject, session, { force: true })
+      ]);
       const currentChoices = resolveProjectChoices(activeProject);
       refreshGovernedActionPreview(session);
       refreshRunBuilderPreview(session);
@@ -11893,7 +11965,10 @@ function getCurrentIncidentOpsEntry(entryId = "") {
     const selectedProject = String(ui.contextProjectSelect?.value || "").trim();
     saveValue(PROJECT_PREF_KEY, selectedProject);
     applyProjectContext(selectedProject);
-    await syncProjectIntegrationSettings(selectedProject, getSession(), { force: true });
+    await Promise.all([
+      syncProjectIntegrationSettings(selectedProject, getSession(), { force: true }),
+      syncProjectConnectorSettings(selectedProject, getSession(), { force: true })
+    ]);
     const nextChoices = resolveProjectChoices(selectedProject);
     refreshGovernedActionPreview(getSession());
     refreshRunBuilderPreview(getSession());

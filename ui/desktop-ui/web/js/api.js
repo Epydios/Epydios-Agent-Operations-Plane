@@ -27,6 +27,102 @@ function normalizeStatus(value) {
   return String(value || "").trim().toUpperCase();
 }
 
+function normalizeSnapshotString(value, fallback = "") {
+  const normalized = String(value || "").trim();
+  return normalized || fallback;
+}
+
+function normalizeSnapshotStringList(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return Array.from(
+    new Set(
+      value
+        .map((item) => normalizeSnapshotString(item).toLowerCase())
+        .filter(Boolean)
+    )
+  );
+}
+
+function connectorDriverLabel(driver) {
+  const normalized = normalizeSnapshotString(driver).toLowerCase();
+  if (normalized === "mcp_sqlite") {
+    return "SQLite MCP";
+  }
+  if (normalized === "mcp_postgres") {
+    return "Postgres MCP";
+  }
+  if (normalized === "mcp_filesystem") {
+    return "Filesystem MCP";
+  }
+  if (normalized === "mcp_github") {
+    return "GitHub MCP";
+  }
+  if (normalized === "mcp_browser") {
+    return "Browser MCP";
+  }
+  return normalized || "-";
+}
+
+function normalizeConnectorProfileSnapshot(profile = {}) {
+  const driver = normalizeSnapshotString(profile?.driver).toLowerCase();
+  const id = normalizeSnapshotString(profile?.id).toLowerCase();
+  return {
+    id,
+    label: normalizeSnapshotString(profile?.label, id || "-"),
+    driver,
+    driverLabel: connectorDriverLabel(driver),
+    databasePath: normalizeSnapshotString(profile?.databasePath, "-"),
+    connectionUri: normalizeSnapshotString(profile?.connectionUri, "-"),
+    rootPath: normalizeSnapshotString(profile?.rootPath, "-"),
+    endpointRef: normalizeSnapshotString(profile?.endpointRef, "-"),
+    credentialRef: normalizeSnapshotString(profile?.credentialRef, "-"),
+    allowedTools: normalizeSnapshotStringList(profile?.allowedTools),
+    allowedOwners: normalizeSnapshotStringList(profile?.allowedOwners),
+    allowedRepos: normalizeSnapshotStringList(profile?.allowedRepos),
+    allowedOrigins: normalizeSnapshotStringList(profile?.allowedOrigins),
+    enabled: profile?.enabled !== false
+  };
+}
+
+function buildConnectorSettingsSnapshot(payload = {}, fallbackSource = "unknown") {
+  const raw = payload && typeof payload === "object" ? payload : {};
+  const settings = raw.settings && typeof raw.settings === "object" ? raw.settings : {};
+  const profiles = Array.isArray(settings.profiles)
+    ? settings.profiles.map((item) => normalizeConnectorProfileSnapshot(item)).filter((item) => item.id)
+    : [];
+  const selectedConnectorId = normalizeSnapshotString(
+    settings.selectedConnectorId || profiles[0]?.id
+  ).toLowerCase();
+  const selectedProfile =
+    profiles.find((item) => item.id === selectedConnectorId) ||
+    profiles[0] ||
+    {};
+  const driverLabels = Array.from(
+    new Set(profiles.map((item) => normalizeSnapshotString(item.driverLabel)).filter(Boolean))
+  );
+  return {
+    source: normalizeSnapshotString(raw.source, fallbackSource),
+    tenantId: normalizeSnapshotString(raw.tenantId),
+    projectId: normalizeSnapshotString(raw.projectId),
+    hasSettings: Boolean(raw.hasSettings) || profiles.length > 0,
+    warning: normalizeSnapshotString(raw.warning),
+    createdAt: normalizeSnapshotString(raw.createdAt),
+    updatedAt: normalizeSnapshotString(raw.updatedAt),
+    selectedConnectorId,
+    selectedProfileId: normalizeSnapshotString(selectedProfile?.id, "-"),
+    selectedProfileLabel: normalizeSnapshotString(selectedProfile?.label, "-"),
+    selectedDriver: normalizeSnapshotString(selectedProfile?.driver, "-"),
+    selectedDriverLabel: normalizeSnapshotString(selectedProfile?.driverLabel, "-"),
+    profileCount: profiles.length,
+    enabledProfileCount: profiles.filter((item) => item.enabled).length,
+    driverCount: driverLabels.length,
+    drivers: driverLabels,
+    profiles
+  };
+}
+
 function summarizeRun(item) {
   return {
     runId: item.runId,
@@ -1027,6 +1123,53 @@ function createMockState() {
     runByID,
     approvals: seedMockApprovals(),
     integrationSettingsByScope: {},
+    connectorSettingsByScope: {
+      [integrationScopeKey("tenant-demo", "project-core")]: {
+        settings: {
+          selectedConnectorId: "browser-proof",
+          profiles: [
+            {
+              id: "browser-proof",
+              label: "Browser Proof",
+              driver: "mcp_browser",
+              allowedTools: ["get_page_metadata", "extract_text", "click_destructive_button"],
+              allowedOrigins: ["https://app.example.com"],
+              enabled: true
+            },
+            {
+              id: "github-proof",
+              label: "GitHub Proof",
+              driver: "mcp_github",
+              endpointRef: "ref://projects/{projectId}/connectors/github/api-endpoint",
+              credentialRef: "ref://projects/{projectId}/connectors/github/token",
+              allowedTools: ["get_pull_request"],
+              allowedOwners: ["epydios"],
+              allowedRepos: ["epydios-agentops-control-plane"],
+              enabled: true
+            }
+          ]
+        },
+        createdAt: "2026-03-20T10:00:00Z",
+        updatedAt: "2026-03-20T10:00:00Z"
+      },
+      [integrationScopeKey("tenant-local", "project-local")]: {
+        settings: {
+          selectedConnectorId: "browser-proof",
+          profiles: [
+            {
+              id: "browser-proof",
+              label: "Browser Proof",
+              driver: "mcp_browser",
+              allowedTools: ["get_page_metadata", "extract_text", "click_destructive_button"],
+              allowedOrigins: ["https://app.example.com"],
+              enabled: true
+            }
+          ]
+        },
+        createdAt: "2026-03-20T10:05:00Z",
+        updatedAt: "2026-03-20T10:05:00Z"
+      }
+    },
     tasksById: {},
     sessionTimelinesById: {}
   };
@@ -1279,6 +1422,31 @@ function mockGetIntegrationSettings(scope = {}) {
   const projectID = String(scope.projectId || "").trim();
   const key = integrationScopeKey(tenantID, projectID);
   const hit = MOCK_STATE.integrationSettingsByScope[key];
+  if (!hit) {
+    return {
+      source: "mock",
+      tenantId: tenantID,
+      projectId: projectID,
+      hasSettings: false,
+      settings: {}
+    };
+  }
+  return deepClone({
+    source: "mock",
+    tenantId: tenantID,
+    projectId: projectID,
+    hasSettings: true,
+    settings: hit.settings,
+    createdAt: hit.createdAt,
+    updatedAt: hit.updatedAt
+  });
+}
+
+function mockGetConnectorSettings(scope = {}) {
+  const tenantID = String(scope.tenantId || "").trim();
+  const projectID = String(scope.projectId || "").trim();
+  const key = integrationScopeKey(tenantID, projectID);
+  const hit = MOCK_STATE.connectorSettingsByScope[key];
   if (!hit) {
     return {
       source: "mock",
@@ -2804,6 +2972,11 @@ export class AgentOpsApi {
         detail: "Not checked yet.",
         updatedAt: ""
       },
+      connectorSettings: {
+        state: "unknown",
+        detail: "Not checked yet.",
+        updatedAt: ""
+      },
       integrationInvoke: {
         state: "unknown",
         detail: "Not checked yet.",
@@ -2830,6 +3003,10 @@ export class AgentOpsApi {
   getSettingsSnapshot(context = {}) {
     const choices = context.choices || {};
     const endpointSnapshot = this.getEndpointStatusSnapshot();
+    const connectorSettings = buildConnectorSettingsSnapshot(
+      context.connectorSettings,
+      this.config.mockMode ? "mock" : "runtime-endpoint"
+    );
     const themeMode = String(context.themeMode || choices?.theme?.mode || "system")
       .trim()
       .toLowerCase();
@@ -2967,6 +3144,12 @@ export class AgentOpsApi {
           ...(endpointSnapshot.integrationSettings || {})
         },
         {
+          id: "connectorSettings",
+          label: "Runtime Connector Settings",
+          path: this.config?.endpoints?.connectorSettings || "",
+          ...(endpointSnapshot.connectorSettings || {})
+        },
+        {
           id: "integrationInvoke",
           label: "Runtime Integration Invoke",
           path: this.config?.endpoints?.integrationInvoke || "",
@@ -2986,6 +3169,7 @@ export class AgentOpsApi {
         providerContracts,
         selectedAgentProfileId: selectedAgentProfileID || String(agentProfiles[0]?.id || "")
       },
+      connectors: connectorSettings,
       realtime: deepClone(choices?.realtime || {}),
       storage: deepClone(choices?.storage || {}),
       terminal: deepClone(choices?.terminal || {}),
@@ -4136,6 +4320,78 @@ export class AgentOpsApi {
         "integrationSettings",
         "error",
         `Runtime integration settings request failed (${error.message}).`
+      );
+      throw error;
+    }
+  }
+
+  async getConnectorSettings(scope = {}) {
+    const tenantID = String(scope.tenantId || "").trim();
+    const projectID = String(scope.projectId || "").trim();
+    if (!tenantID || !projectID) {
+      return {
+        source: "scope-unavailable",
+        hasSettings: false,
+        warning: "tenantId and projectId are required to read connector settings.",
+        tenantId: tenantID,
+        projectId: projectID
+      };
+    }
+
+    if (this.config.mockMode) {
+      this.updateEndpointStatus("connectorSettings", "mock", "Mock mode enabled.");
+      return mockGetConnectorSettings({ tenantId: tenantID, projectId: projectID });
+    }
+
+    const endpoint = this.config?.endpoints?.connectorSettings;
+    if (!endpoint) {
+      this.updateEndpointStatus(
+        "connectorSettings",
+        "unavailable",
+        "No connector settings endpoint configured."
+      );
+      return {
+        source: "endpoint-unavailable",
+        hasSettings: false,
+        warning: "Runtime connector settings endpoint is not configured.",
+        tenantId: tenantID,
+        projectId: projectID
+      };
+    }
+
+    try {
+      const response = await this.request(this.config.runtimeApiBaseUrl, endpoint, {
+        tenantId: tenantID,
+        projectId: projectID
+      });
+      this.updateEndpointStatus(
+        "connectorSettings",
+        "available",
+        "Runtime connector settings endpoint responded."
+      );
+      return {
+        ...response,
+        source: "runtime-endpoint"
+      };
+    } catch (error) {
+      if (error.status === 404 || error.status === 405 || error.status === 501) {
+        this.updateEndpointStatus(
+          "connectorSettings",
+          "unavailable",
+          `Runtime connector settings endpoint returned HTTP ${error.status}.`
+        );
+        return {
+          source: "endpoint-unavailable",
+          hasSettings: false,
+          warning: `Runtime connector settings endpoint returned HTTP ${error.status}.`,
+          tenantId: tenantID,
+          projectId: projectID
+        };
+      }
+      this.updateEndpointStatus(
+        "connectorSettings",
+        "error",
+        `Runtime connector settings request failed (${error.message}).`
       );
       throw error;
     }

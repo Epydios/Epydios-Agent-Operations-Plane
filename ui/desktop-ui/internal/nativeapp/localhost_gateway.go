@@ -503,15 +503,8 @@ func RunGatewayService(opts LaunchOptions) error {
 		return err
 	}
 
-	mux := http.NewServeMux()
 	state := &gatewayServiceState{record: record, token: token, opts: opts}
-	mux.HandleFunc("/healthz", state.handleHealthz)
-	mux.HandleFunc("/readyz", state.handleReadyz)
-	mux.HandleFunc("/responses", state.handleCompatibilityResponsesIngress)
-	mux.HandleFunc("/v1/responses", state.handleCompatibilityResponses)
-	mux.HandleFunc("/v1/governed-actions", state.handleGovernedActions)
-	mux.HandleFunc("/v1/governed-actions/", state.handleGovernedActionByID)
-	mux.HandleFunc("/v1/runs/", state.handleRunByID)
+	mux := newGatewayHTTPHandler(state)
 
 	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", opts.GatewayLocalPort))
 	if err != nil {
@@ -551,9 +544,10 @@ type gatewayServiceState struct {
 	token  string
 	opts   LaunchOptions
 
-	createRunHook            func(ctx context.Context, req runtimeapi.RunCreateRequest) (*runtimeapi.RunRecord, int, *runtimeapi.APIError)
-	fetchRunHook             func(ctx context.Context, runID string) (*runtimeapi.RunRecord, int, *runtimeapi.APIError)
-	forwardCompatibilityHook func(ctx context.Context, req compatibilityForwardRequest) (*compatibilityForwardResponse, error)
+	createRunHook              func(ctx context.Context, req runtimeapi.RunCreateRequest) (*runtimeapi.RunRecord, int, *runtimeapi.APIError)
+	fetchRunHook               func(ctx context.Context, runID string) (*runtimeapi.RunRecord, int, *runtimeapi.APIError)
+	fetchConnectorSettingsHook func(ctx context.Context, tenantID string, projectID string) (*runtimeapi.ConnectorSettingsResponse, int, *runtimeapi.APIError)
+	forwardCompatibilityHook   func(ctx context.Context, req compatibilityForwardRequest) (*compatibilityForwardResponse, error)
 }
 
 func (s *gatewayServiceState) handleHealthz(w http.ResponseWriter, r *http.Request) {
@@ -2479,7 +2473,7 @@ func findGatewayRequestRecordByInterpositionRetryKey(root string, interposition 
 		if incomingBodySHA != "" && existingBodySHA != "" && incomingBodySHA != existingBodySHA {
 			continue
 		}
-			return item, true
+		return item, true
 	}
 	return gatewayRequestRecord{}, false
 }

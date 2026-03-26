@@ -92,6 +92,39 @@ test("settingsops renders bounded preferences, secure refs, environment, support
       },
       diagnostics: {
         providerContracts: []
+      },
+      connectors: {
+        source: "runtime-endpoint",
+        tenantId: "tenant-local",
+        projectId: "project-local",
+        hasSettings: true,
+        selectedConnectorId: "browser-proof",
+        selectedProfileLabel: "Browser Proof",
+        profileCount: 2,
+        enabledProfileCount: 2,
+        profiles: [
+          {
+            id: "browser-proof",
+            label: "Browser Proof",
+            driver: "mcp_browser",
+            driverLabel: "Browser MCP",
+            allowedTools: ["get_page_metadata", "extract_text", "click_destructive_button"],
+            allowedOrigins: ["https://app.example.com"],
+            enabled: true
+          },
+          {
+            id: "github-proof",
+            label: "GitHub Proof",
+            driver: "mcp_github",
+            driverLabel: "GitHub MCP",
+            endpointRef: "ref://projects/{projectId}/connectors/github/api-endpoint",
+            credentialRef: "ref://projects/{projectId}/connectors/github/token",
+            allowedTools: ["get_pull_request"],
+            allowedOwners: ["epydios"],
+            allowedRepos: ["epydios-agentops-control-plane"],
+            enabled: true
+          }
+        ]
       }
     },
     viewState: {
@@ -138,9 +171,15 @@ test("settingsops renders bounded preferences, secure refs, environment, support
   assert.match(html, /Secure Refs/);
   assert.match(html, /Local Environment/);
   assert.match(html, /Supported Setup/);
+  assert.match(html, /Connector Governance/);
   assert.match(html, /Setup Recovery/);
   assert.match(html, /Supported Setup Editor/);
   assert.match(html, /Setup Status/);
+  assert.match(html, /Current Connector Lane/);
+  assert.match(html, /Browser MCP/);
+  assert.match(html, /approval-gated destructive click/);
+  assert.match(html, /Show connector profile inventory/);
+  assert.match(html, /data-settings-connector-id="browser-proof"/);
   assert.match(html, /Endpoint Inventory/);
   assert.match(html, /data-settings-endpoint-id="integrationsettings"/);
   assert.match(html, /Apply Saved/);

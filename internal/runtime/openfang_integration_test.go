@@ -17,6 +17,7 @@ type memoryRunStore struct {
 	mu                  sync.RWMutex
 	runs                map[string]*RunRecord
 	integrationSettings map[string]*IntegrationSettingsRecord
+	connectorSettings   map[string]*ConnectorSettingsRecord
 	tasks               map[string]*TaskRecord
 	sessions            map[string]*SessionRecord
 	sessionWorkers      map[string]*SessionWorkerRecord
@@ -30,6 +31,7 @@ func newMemoryRunStore() *memoryRunStore {
 	return &memoryRunStore{
 		runs:                make(map[string]*RunRecord),
 		integrationSettings: make(map[string]*IntegrationSettingsRecord),
+		connectorSettings:   make(map[string]*ConnectorSettingsRecord),
 		tasks:               make(map[string]*TaskRecord),
 		sessions:            make(map[string]*SessionRecord),
 		sessionWorkers:      make(map[string]*SessionWorkerRecord),
@@ -142,6 +144,46 @@ func (s *memoryRunStore) GetIntegrationSettings(_ context.Context, tenantID, pro
 		return nil, sql.ErrNoRows
 	}
 	return cloneIntegrationSettingsRecord(record), nil
+}
+
+func (s *memoryRunStore) UpsertConnectorSettings(_ context.Context, record *ConnectorSettingsRecord) error {
+	if record == nil {
+		return fmt.Errorf("connector settings record is required")
+	}
+	tenantID := strings.TrimSpace(record.TenantID)
+	projectID := strings.TrimSpace(record.ProjectID)
+	if tenantID == "" {
+		return fmt.Errorf("connector settings tenantId is required")
+	}
+	if projectID == "" {
+		return fmt.Errorf("connector settings projectId is required")
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key := integrationSettingsKey(tenantID, projectID)
+	s.connectorSettings[key] = cloneConnectorSettingsRecord(record)
+	return nil
+}
+
+func (s *memoryRunStore) GetConnectorSettings(_ context.Context, tenantID, projectID string) (*ConnectorSettingsRecord, error) {
+	tenantID = strings.TrimSpace(tenantID)
+	projectID = strings.TrimSpace(projectID)
+	if tenantID == "" {
+		return nil, fmt.Errorf("connector settings tenantId is required")
+	}
+	if projectID == "" {
+		return nil, fmt.Errorf("connector settings projectId is required")
+	}
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	key := integrationSettingsKey(tenantID, projectID)
+	record, ok := s.connectorSettings[key]
+	if !ok {
+		return nil, sql.ErrNoRows
+	}
+	return cloneConnectorSettingsRecord(record), nil
 }
 
 func (s *memoryRunStore) UpsertTask(_ context.Context, record *TaskRecord) error {
@@ -467,6 +509,17 @@ func cloneIntegrationSettingsRecord(in *IntegrationSettingsRecord) *IntegrationS
 	}
 	out := *in
 	out.Settings = cloneBytes(in.Settings)
+	return &out
+}
+
+func cloneConnectorSettingsRecord(in *ConnectorSettingsRecord) *ConnectorSettingsRecord {
+	if in == nil {
+		return nil
+	}
+	out := *in
+	if len(in.Settings) > 0 {
+		out.Settings = append([]byte(nil), in.Settings...)
+	}
 	return &out
 }
 

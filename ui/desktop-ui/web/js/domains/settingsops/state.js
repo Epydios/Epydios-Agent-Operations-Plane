@@ -40,6 +40,134 @@ function resolveSelectedAgentProfile(integrations, selectedAgentProfileId) {
   );
 }
 
+function connectorDriverLabel(value) {
+  const normalized = normalizeString(value).toLowerCase();
+  if (normalized === "mcp_sqlite") {
+    return "SQLite MCP";
+  }
+  if (normalized === "mcp_postgres") {
+    return "Postgres MCP";
+  }
+  if (normalized === "mcp_filesystem") {
+    return "Filesystem MCP";
+  }
+  if (normalized === "mcp_github") {
+    return "GitHub MCP";
+  }
+  if (normalized === "mcp_browser") {
+    return "Browser MCP";
+  }
+  return normalized || "-";
+}
+
+function normalizeConnectorProfiles(connectors) {
+  const profiles = Array.isArray(connectors?.profiles) ? connectors.profiles : [];
+  return profiles
+    .map((item) => ({
+      id: normalizeString(item?.id).toLowerCase(),
+      label: normalizeString(item?.label, normalizeString(item?.id, "-")),
+      driver: normalizeString(item?.driver).toLowerCase(),
+      driverLabel: connectorDriverLabel(item?.driver),
+      databasePath: normalizeString(item?.databasePath, "-"),
+      connectionUri: normalizeString(item?.connectionUri, "-"),
+      rootPath: normalizeString(item?.rootPath, "-"),
+      endpointRef: normalizeString(item?.endpointRef, "-"),
+      credentialRef: normalizeString(item?.credentialRef, "-"),
+      allowedTools: Array.isArray(item?.allowedTools)
+        ? item.allowedTools.map((entry) => normalizeString(entry).toLowerCase()).filter(Boolean)
+        : [],
+      allowedOwners: Array.isArray(item?.allowedOwners)
+        ? item.allowedOwners.map((entry) => normalizeString(entry).toLowerCase()).filter(Boolean)
+        : [],
+      allowedRepos: Array.isArray(item?.allowedRepos)
+        ? item.allowedRepos.map((entry) => normalizeString(entry).toLowerCase()).filter(Boolean)
+        : [],
+      allowedOrigins: Array.isArray(item?.allowedOrigins)
+        ? item.allowedOrigins.map((entry) => normalizeString(entry).toLowerCase()).filter(Boolean)
+        : [],
+      enabled: item?.enabled !== false
+    }))
+    .filter((item) => item.id);
+}
+
+function connectorApprovalPosture(profile = {}) {
+  const tools = Array.isArray(profile?.allowedTools) ? profile.allowedTools : [];
+  if (tools.includes("click_destructive_button")) {
+    return "approval-gated destructive click";
+  }
+  return "bounded read-only";
+}
+
+function buildConnectorGovernanceSnapshot(settings, session) {
+  const connectors = readObject(settings.connectors);
+  const endpoints = Array.isArray(settings.endpoints) ? settings.endpoints : [];
+  const connectorEndpoint =
+    endpoints.find((item) => normalizeString(item?.id).toLowerCase() === "connectorsettings") || {};
+  const profiles = normalizeConnectorProfiles(connectors);
+  const selectedId = normalizeString(connectors.selectedConnectorId || connectors.selectedProfileId)
+    .toLowerCase();
+  const selectedProfile =
+    profiles.find((item) => item.id === selectedId) ||
+    profiles[0] ||
+    {};
+  const driverLabels = Array.from(
+    new Set(profiles.map((item) => normalizeString(item.driverLabel)).filter(Boolean))
+  );
+  const scopeProject = normalizeString(
+    settings.summary?.projectId || session?.claims?.project_id,
+    "-"
+  );
+  const scopeTenant = normalizeString(
+    settings.summary?.tenantId || session?.claims?.tenant_id,
+    "-"
+  );
+  const source = normalizeString(connectors.source, "none").toLowerCase();
+  const endpointState = normalizeString(connectorEndpoint.state, "unknown").toLowerCase();
+  return {
+    projectScope: scopeProject,
+    scopeTenant,
+    source,
+    endpointState,
+    endpointDetail: normalizeString(connectorEndpoint.detail, "-"),
+    warning: normalizeString(connectors.warning),
+    updatedAt: normalizeString(connectors.updatedAt, "-"),
+    hasSettings: connectors.hasSettings === true || profiles.length > 0,
+    selectedConnectorId: normalizeString(selectedProfile.id, "-"),
+    selectedConnectorLabel: normalizeString(selectedProfile.label, "-"),
+    selectedDriver: normalizeString(selectedProfile.driver, "-"),
+    selectedDriverLabel: normalizeString(selectedProfile.driverLabel, "-"),
+    selectedEnabled: selectedProfile.enabled !== false,
+    selectedAllowedTools: Array.isArray(selectedProfile.allowedTools)
+      ? selectedProfile.allowedTools
+      : [],
+    selectedAllowedOwners: Array.isArray(selectedProfile.allowedOwners)
+      ? selectedProfile.allowedOwners
+      : [],
+    selectedAllowedRepos: Array.isArray(selectedProfile.allowedRepos)
+      ? selectedProfile.allowedRepos
+      : [],
+    selectedAllowedOrigins: Array.isArray(selectedProfile.allowedOrigins)
+      ? selectedProfile.allowedOrigins
+      : [],
+    selectedDatabasePath: normalizeString(selectedProfile.databasePath, "-"),
+    selectedConnectionUri: normalizeString(selectedProfile.connectionUri, "-"),
+    selectedRootPath: normalizeString(selectedProfile.rootPath, "-"),
+    selectedEndpointRef: normalizeString(selectedProfile.endpointRef, "-"),
+    selectedCredentialRef: normalizeString(selectedProfile.credentialRef, "-"),
+    approvalPosture: connectorApprovalPosture(selectedProfile),
+    profiles,
+    profileCount: profiles.length,
+    enabledProfileCount: profiles.filter((item) => item.enabled).length,
+    driverLabels,
+    tone: postureTone(
+      endpointState,
+      source,
+      profiles.length > 0 ? "ok" : "unknown",
+      selectedProfile.enabled === false ? "warn" : "ok"
+    )
+  };
+}
+
 function buildIntegrationSettingsSnapshot(settings, editorState, session) {
   const integrations = readObject(settings.integrations);
   const draft = readObject(editorState.draft);
@@ -238,6 +366,7 @@ export function createSettingsWorkspaceSnapshot(context = {}) {
   const projectId = normalizeString(summary.projectId || session?.claims?.project_id, "-");
   const environmentId = normalizeString(summary.environmentId || summary.environment || aimxs.mode, "-");
   const integrationSettings = buildIntegrationSettingsSnapshot(settings, editorState, session);
+  const connectorGovernance = buildConnectorGovernanceSnapshot(settings, session);
   const workflowRecovery = buildWorkflowRecoverySnapshot(editorState, integrationSettings);
 
   return {
@@ -286,6 +415,7 @@ export function createSettingsWorkspaceSnapshot(context = {}) {
       )
     },
     integrationSettings,
+    connectorGovernance,
     workflowRecovery
   };
 }
