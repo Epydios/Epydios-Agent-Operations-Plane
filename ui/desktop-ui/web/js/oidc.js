@@ -129,12 +129,12 @@ function mockLoginSession() {
 }
 
 export async function beginLogin(config) {
-  if (config.mockMode) {
+  const auth = config.auth || {};
+  if (config.mockMode || auth.mockLogin) {
     mockLoginSession();
     return;
   }
 
-  const auth = config.auth || {};
   const usePkce = auth.usePkce !== false && String(auth.responseType || "code").includes("code");
   const authorizeURLBase = auth.authorizationEndpoint || new URL("authorize", auth.issuer).toString();
   const authorizeUrl = new URL(authorizeURLBase);

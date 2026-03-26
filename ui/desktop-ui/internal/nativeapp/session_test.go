@@ -215,6 +215,128 @@ func TestPrepareSessionDisablesAuthForLiveMode(t *testing.T) {
 	}
 }
 
+func TestPrepareSessionAllowsVerifierScopedAuthOverrideForLiveMode(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(tempHome, ".cache"))
+
+	assets := fstest.MapFS{
+		"web/config/runtime-config.json": {
+			Data: []byte(`{
+  "environment": "local",
+  "mockMode": true,
+  "runtimeApiBaseUrl": "http://127.0.0.1:8080",
+  "registryApiBaseUrl": "http://127.0.0.1:8080",
+  "auth": {
+    "enabled": true
+  }
+}`),
+		},
+		"web/index.html": {Data: []byte("<html></html>")},
+	}
+
+	authEnabled := true
+	opts := DefaultLaunchOptions()
+	opts.Mode = modeLive
+	opts.AuthEnabledOverride = &authEnabled
+	opts.AuthMockLogin = true
+	session, err := PrepareSession(assets, opts)
+	if err != nil {
+		t.Fatalf("prepare live session with verifier auth override: %v", err)
+	}
+
+	content, err := os.ReadFile(filepath.Join(session.Manifest.Paths.WebDir, "config", "runtime-config.json"))
+	if err != nil {
+		t.Fatalf("read patched live config: %v", err)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(content, &payload); err != nil {
+		t.Fatalf("decode patched live config: %v", err)
+	}
+	auth, ok := payload["auth"].(map[string]any)
+	if !ok {
+		t.Fatal("expected auth block")
+	}
+	if got := auth["enabled"]; got != true {
+		t.Fatalf("expected auth.enabled=true when verifier overrides it, got %#v", got)
+	}
+	if got := auth["mockLogin"]; got != true {
+		t.Fatalf("expected auth.mockLogin=true when verifier enables it, got %#v", got)
+	}
+}
+
+func TestPrepareSessionUsesBootstrapScopedConfigRootForLiveMode(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(tempHome, ".cache"))
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tempHome, ".config"))
+
+	bootstrapRoot := filepath.Join(tempHome, "verifier-run")
+	bootstrapPath := filepath.Join(bootstrapRoot, "runtime-bootstrap.json")
+	if err := os.MkdirAll(filepath.Dir(bootstrapPath), 0o755); err != nil {
+		t.Fatalf("create bootstrap dir: %v", err)
+	}
+	if err := os.WriteFile(bootstrapPath, []byte(`{"mode":"live"}`), 0o644); err != nil {
+		t.Fatalf("write bootstrap config: %v", err)
+	}
+
+	assets := fstest.MapFS{
+		"web/config/runtime-config.json": {
+			Data: []byte(`{
+  "environment": "local",
+  "mockMode": false,
+  "runtimeApiBaseUrl": "http://127.0.0.1:8080",
+  "registryApiBaseUrl": "http://127.0.0.1:8080",
+  "auth": {
+    "enabled": true
+  }
+}`),
+		},
+		"web/index.html": {Data: []byte("<html></html>")},
+	}
+
+	opts := DefaultLaunchOptions()
+	opts.Mode = modeLive
+	opts.BootstrapConfigPath = bootstrapPath
+	session, err := PrepareSession(assets, opts)
+	if err != nil {
+		t.Fatalf("prepare session: %v", err)
+	}
+
+	expectedConfigRoot := bootstrapRoot
+	if got := session.Manifest.Paths.ConfigRoot; got != expectedConfigRoot {
+		t.Fatalf("expected bootstrap-scoped config root %q, got %q", expectedConfigRoot, got)
+	}
+	if got := session.Manifest.Paths.GatewayRoot; got != filepath.Join(expectedConfigRoot, "localhost-gateway") {
+		t.Fatalf("expected bootstrap-scoped gateway root, got %q", got)
+	}
+	if got := session.Manifest.Paths.GatewayRequestsRoot; got != filepath.Join(expectedConfigRoot, "localhost-gateway", "requests") {
+		t.Fatalf("expected bootstrap-scoped gateway requests root, got %q", got)
+	}
+	if got := session.Manifest.GatewayService.StatusPath; got != filepath.Join(expectedConfigRoot, "localhost-gateway", "gateway-service.json") {
+		t.Fatalf("expected bootstrap-scoped gateway status path, got %q", got)
+	}
+
+	content, err := os.ReadFile(filepath.Join(session.Manifest.Paths.WebDir, "config", "runtime-config.json"))
+	if err != nil {
+		t.Fatalf("read patched runtime config: %v", err)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(content, &payload); err != nil {
+		t.Fatalf("decode patched runtime config: %v", err)
+	}
+	nativeShell, ok := payload["nativeShell"].(map[string]any)
+	if !ok {
+		t.Fatal("expected nativeShell block")
+	}
+	if got := nativeShell["configRoot"]; got != expectedConfigRoot {
+		t.Fatalf("expected nativeShell.configRoot=%q, got %#v", expectedConfigRoot, got)
+	}
+	if got := nativeShell["gatewayStatusPath"]; got != filepath.Join(expectedConfigRoot, "localhost-gateway", "gateway-service.json") {
+		t.Fatalf("expected nativeShell gateway status path to match bootstrap root, got %#v", got)
+	}
+}
+
 func TestParseLaunchOptionsUsesBootstrapDefaultsAndAllowsCliOverride(t *testing.T) {
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
@@ -326,6 +448,30 @@ func TestParseLaunchOptionsAppliesEnvironmentInterpositionOverrides(t *testing.T
 	}
 	if opts.InterpositionUpstreamBearerToken != "env-token" {
 		t.Fatalf("expected environment upstream bearer token, got %q", opts.InterpositionUpstreamBearerToken)
+	}
+}
+
+func TestParseLaunchOptionsAppliesVerifierScopedRuntimeAndAuthOverrides(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tempHome, ".config"))
+
+	t.Setenv("EPYDIOS_NATIVEAPP_RUNTIME_MANAGED_EXTERNALLY", "true")
+	t.Setenv("EPYDIOS_NATIVEAPP_AUTH_ENABLED", "true")
+	t.Setenv("EPYDIOS_NATIVEAPP_AUTH_MOCK_LOGIN", "true")
+
+	opts, err := ParseLaunchOptions(nil)
+	if err != nil {
+		t.Fatalf("parse launch options with verifier overrides: %v", err)
+	}
+	if !opts.RuntimeManagedExternally {
+		t.Fatal("expected runtime managed externally override to be applied")
+	}
+	if opts.AuthEnabledOverride == nil || !*opts.AuthEnabledOverride {
+		t.Fatalf("expected auth enabled override to be applied, got %#v", opts.AuthEnabledOverride)
+	}
+	if !opts.AuthMockLogin {
+		t.Fatal("expected auth mock login override to be applied")
 	}
 }
 

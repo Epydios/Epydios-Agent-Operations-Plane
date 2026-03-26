@@ -32,9 +32,12 @@ type LaunchOptions struct {
 	GatewayLocalPort                 int
 	RuntimeNamespace                 string
 	RuntimeService                   string
+	RuntimeManagedExternally         bool
 	InterpositionEnabled             bool
 	InterpositionUpstreamBaseURL     string
 	InterpositionUpstreamBearerToken string
+	AuthEnabledOverride              *bool
+	AuthMockLogin                    bool
 	TargetExecutionProfile           string
 	AllowRestrictedHost              bool
 	BootstrapConfigPath              string
@@ -232,6 +235,9 @@ func PrepareSession(assets fs.FS, opts LaunchOptions) (*Session, error) {
 	stamp := time.Now().UTC().Format("20060102T150405Z")
 	productCacheRoot := filepath.Join(cacheRoot, "EpydiosAgentOpsDesktop")
 	productConfigRoot := filepath.Join(configRoot, "EpydiosAgentOpsDesktop")
+	if strings.TrimSpace(opts.BootstrapConfigPath) != "" {
+		productConfigRoot = resolveProductConfigRoot(opts.BootstrapConfigPath)
+	}
 	sessionRoot := filepath.Join(productCacheRoot, "native-shell", stamp)
 	paths := SessionPaths{
 		ConfigRoot:          productConfigRoot,
@@ -443,8 +449,20 @@ func patchRuntimeConfig(webDir string, opts LaunchOptions, manifest SessionManif
 	payload["runtimeApiBaseUrl"] = manifest.RuntimeAPIBaseURL
 	payload["registryApiBaseUrl"] = manifest.RegistryAPIBaseURL
 	authValue, ok := payload["auth"].(map[string]any)
-	if ok && opts.Mode == modeLive {
-		authValue["enabled"] = false
+	if !ok {
+		authValue = map[string]any{}
+	}
+	if opts.Mode == modeLive {
+		authEnabled := false
+		if opts.AuthEnabledOverride != nil {
+			authEnabled = *opts.AuthEnabledOverride
+		}
+		authValue["enabled"] = authEnabled
+		if opts.AuthMockLogin {
+			authValue["mockLogin"] = true
+		} else {
+			delete(authValue, "mockLogin")
+		}
 		payload["auth"] = authValue
 	}
 	payload["nativeShell"] = map[string]any{
@@ -711,6 +729,27 @@ func applyBootstrapLaunchOptions(opts *LaunchOptions) error {
 func applyEnvironmentLaunchOptions(opts *LaunchOptions) error {
 	if opts == nil {
 		return nil
+	}
+	if runtimeManagedRaw, ok := os.LookupEnv("EPYDIOS_NATIVEAPP_RUNTIME_MANAGED_EXTERNALLY"); ok {
+		runtimeManaged, err := parseLaunchBool(runtimeManagedRaw)
+		if err != nil {
+			return fmt.Errorf("decode runtime managed externally override: %w", err)
+		}
+		opts.RuntimeManagedExternally = runtimeManaged
+	}
+	if authEnabledRaw, ok := os.LookupEnv("EPYDIOS_NATIVEAPP_AUTH_ENABLED"); ok {
+		authEnabled, err := parseLaunchBool(authEnabledRaw)
+		if err != nil {
+			return fmt.Errorf("decode auth enabled override: %w", err)
+		}
+		opts.AuthEnabledOverride = &authEnabled
+	}
+	if authMockLoginRaw, ok := os.LookupEnv("EPYDIOS_NATIVEAPP_AUTH_MOCK_LOGIN"); ok {
+		authMockLogin, err := parseLaunchBool(authMockLoginRaw)
+		if err != nil {
+			return fmt.Errorf("decode auth mock login override: %w", err)
+		}
+		opts.AuthMockLogin = authMockLogin
 	}
 	if enabledRaw, ok := os.LookupEnv("EPYDIOS_NATIVEAPP_INTERPOSITION_ENABLED"); ok {
 		enabled, err := parseLaunchBool(enabledRaw)

@@ -37,6 +37,14 @@ open "$HOME/Applications/Epydios AgentOps Desktop.app"
 
 This is the current verified operator path for the installable desktop app.
 
+If you want the current supported end-to-end governed workflow proof on macOS, run:
+
+```bash
+./ui/desktop-ui/bin/verify-m15-phase-c-governed-request.sh
+```
+
+That verifier proves sign-in, `Interposition OFF / ON` clarity, one real governed Codex `/responses` request, approval resolution, and audit/evidence handoff on the supported macOS `live` lane.
+
 ## Installed Desktop Check On Linux
 
 If you are on Ubuntu and want to evaluate the beta installed desktop path:
@@ -62,7 +70,7 @@ bash ./ui/desktop-ui/bin/verify-m15-windows-beta.sh
 bash ./ui/desktop-ui/bin/launch-m15-windows-beta.sh
 ```
 
-This gives Windows a native packaging and verification lane without requiring Docker. It should still be treated as beta until a dedicated real host acceptance pass is complete.
+This gives Windows a native packaging and launch beta lane without requiring Docker. It should still be treated as beta until the Windows `live` operator path is proved.
 
 ## What To Read Next
 

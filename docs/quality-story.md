@@ -47,16 +47,33 @@ Expected result:
 M15 Phase C verifier passed.
 ```
 
-## 4. What This Proves
+## 4. Supported Governed Request Proof On macOS
+
+If you want the supported end-to-end governed workflow proof on macOS:
+
+```bash
+./ui/desktop-ui/bin/verify-m15-phase-c-governed-request.sh
+```
+
+Expected result:
+
+```text
+M15 Phase C governed-request verifier passed.
+```
+
+## 5. What This Proves
 
 This path proves that the public OSS repo can:
 
 - pass the repo QC baseline
 - pass the desktop module baseline checks
 - build and verify the current installable macOS desktop path
+- prove sign-in, `Interposition OFF / ON` clarity, one governed Codex `/responses` request, approval resolution, and audit/evidence handoff on the supported macOS `live` lane
 
-Windows also now has a native beta packaging and verification lane from Git Bash, but it is still below the macOS installed-path confidence level until a dedicated real host acceptance pass is complete.
+Linux also has a proven Ubuntu 24.04 host-acceptance beta path.
 
-It does not prove premium AIMXS behavior, and it does not claim a fully verified Windows host path.
+Windows also has native packaging and launch proved in beta posture from Git Bash on a real Windows host, but it is still below the macOS installed-path confidence level and does not have a proved `live` operator path yet.
+
+This quality story does not prove premium AIMXS behavior, and it does not claim platform-equal parity outside the supported macOS `live` lane.
 
 For premium comparison later, use the separate AIMXS-specific runbooks and local verifier paths.

@@ -51,6 +51,19 @@ These are the supported OSS entry paths:
 
 Anything outside those paths may exist, but is not part of the primary OSS support promise.
 
+## Supported Desktop Posture
+
+The public OSS desktop posture is intentionally explicit:
+
+- macOS installed desktop in `live` is the verified supported lane
+  - baseline installed-path proof: `ui/desktop-ui/bin/verify-m15-phase-c.sh`
+  - governed-request proof on the supported lane: `ui/desktop-ui/bin/verify-m15-phase-c-governed-request.sh`
+- Linux has a proven Ubuntu 24.04 host-acceptance beta lane
+- Windows has native packaging and launch proved in beta posture
+- Windows `live` is not part of the current OSS support promise
+
+Do not treat Linux or Windows as equal to the supported macOS `live` lane unless the public release artifacts are updated to reflect new host proof.
+
 ## Premium Modes
 
 Premium AIMXS is supported through the public provider boundary only:

@@ -122,6 +122,43 @@ func StartRuntimeService(opts LaunchOptions, session *Session) (RuntimeServiceRe
 		_ = stopRuntimeServiceByPID(record.PID)
 		_ = os.Remove(session.Manifest.Paths.ServicePIDPath)
 	}
+	if opts.RuntimeManagedExternally {
+		record = defaultRuntimeServiceRecord(opts, session.Manifest.Paths)
+		record.State = runtimeServiceStateStarting
+		record.Health = runtimeServiceHealthStarting
+		record.StartedAtUTC = time.Now().UTC().Format(time.RFC3339)
+		record.UpdatedAtUTC = record.StartedAtUTC
+		if err := writeRuntimeServiceRecord(record); err != nil {
+			return record, err
+		}
+		if err := session.UpdateRuntimeService(record); err != nil {
+			return record, err
+		}
+		if err := waitForRuntimeHealth(record.RuntimeAPIBaseURL + "/healthz"); err != nil {
+			record.State = runtimeServiceStateFailed
+			record.Health = runtimeServiceHealthUnreachable
+			record.LastError = err.Error()
+			record.UpdatedAtUTC = time.Now().UTC().Format(time.RFC3339)
+			if err := writeRuntimeServiceRecord(record); err != nil {
+				return record, err
+			}
+			if err := session.UpdateRuntimeService(record); err != nil {
+				return record, err
+			}
+			return record, err
+		}
+		record.State = runtimeServiceStateRunning
+		record.Health = runtimeServiceHealthHealthy
+		record.LastError = ""
+		record.UpdatedAtUTC = time.Now().UTC().Format(time.RFC3339)
+		if err := writeRuntimeServiceRecord(record); err != nil {
+			return record, err
+		}
+		if err := session.UpdateRuntimeService(record); err != nil {
+			return record, err
+		}
+		return record, nil
+	}
 
 	logFile, err := os.OpenFile(session.Manifest.Paths.ServiceLogPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {
@@ -213,6 +250,21 @@ func StopRuntimeService(opts LaunchOptions, session *Session) (RuntimeServiceRec
 	pid, _ := readRuntimeServicePID(session.Manifest.Paths.ServicePIDPath)
 	if pid > 0 {
 		record.PID = pid
+	}
+	if opts.RuntimeManagedExternally {
+		_ = os.Remove(session.Manifest.Paths.ServicePIDPath)
+		record.PID = 0
+		record.State = runtimeServiceStateStopped
+		record.Health = runtimeServiceHealthUnknown
+		record.LastError = ""
+		record.UpdatedAtUTC = time.Now().UTC().Format(time.RFC3339)
+		if err := writeRuntimeServiceRecord(record); err != nil {
+			return record, err
+		}
+		if err := session.UpdateRuntimeService(record); err != nil {
+			return record, err
+		}
+		return record, nil
 	}
 	if record.PID > 0 {
 		if err := stopRuntimeServiceByPID(record.PID); err != nil {

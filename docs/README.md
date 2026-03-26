@@ -8,11 +8,12 @@ Start here:
 - [OSS quality story](quality-story.md)
 - [Release policy](release-policy.md)
 - [OSS and premium policy](oss-premium-policy.md)
+
+Then move to:
+
 - [Runtime orchestration service](runtime-orchestration-service.md)
 - [Governed action request contract](specs/governed-action-request-contract.md)
 - [AIMXS governed action demo](runbooks/aimxs-governed-action-demo.md)
-
-If you are evaluating the repo for the first time, stay on those four pages first.
 
 ## Main Paths
 
