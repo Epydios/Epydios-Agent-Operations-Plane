@@ -118,11 +118,15 @@ Interposition is ready for between the agent API and:
 - Visual Studio Code
 - CODEX
 
-Not Yet Ready: 
+Coming Soon: 
 
 - CLI
-- Anthropic
-- 
+- Model Context Protocol (MCP)
+- Browser automation
+- SQL proxies 
+- Cloud Control Plane
+- Kubernetes Admission
+- LangGraph/Vercel/Orchestration Middleware
 
 ## Future Directions
 

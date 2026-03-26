@@ -97,14 +97,15 @@ func main() {
 	root.StringVar(&cfg.OutputFormat, "output", cfg.OutputFormat, "output format: text or json")
 	root.IntVar(&cfg.LiveFollowWait, "live-follow-wait-seconds", cfg.LiveFollowWait, "poll wait window for event follow")
 	root.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: %s [global flags] <tickets|approvals|proposals> <command> [flags]\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Usage: %s [global flags] <status|tickets|approvals|proposals> <command> [flags]\n", os.Args[0])
 		fmt.Fprintln(os.Stderr)
 		fmt.Fprintln(os.Stderr, "Global flags:")
 		root.PrintDefaults()
 		fmt.Fprintln(os.Stderr)
 		fmt.Fprintln(os.Stderr, "Commands:")
+		fmt.Fprintln(os.Stderr, "  status check")
 		fmt.Fprintln(os.Stderr, "  tickets intake --file payload.json [--render update|text|json]")
-		fmt.Fprintln(os.Stderr, "  tickets status (--task-id <taskId> | --ticket-id <ticketId>) [--workflow-id <workflowId>] [--source-system <source>] [--session-id <sessionId>] [--render comment|update|report|text|json]")
+		fmt.Fprintln(os.Stderr, "  tickets status (--task-id <taskId> | --ticket-id <ticketId>) [--workflow-id <workflowId>] [--source-system <source>] [--session-id <sessionId>] [--render comment|update|handoff|report|text|json]")
 		fmt.Fprintln(os.Stderr, "  tickets follow (--task-id <taskId> | --ticket-id <ticketId>) [--workflow-id <workflowId>] [--source-system <source>] [--session-id <sessionId>] [--render update|delta-update|report|delta-report|text|json]")
 		fmt.Fprintln(os.Stderr, "  tickets reply (--task-id <taskId> | --ticket-id <ticketId>) [--workflow-id <workflowId>] [--source-system <source>] --prompt <text> [--render update|text|json]")
 		fmt.Fprintln(os.Stderr, "  tickets resume (--task-id <taskId> | --ticket-id <ticketId>) [--workflow-id <workflowId>] [--source-system <source>] --prompt <text> [--render update|text|json]")
@@ -124,6 +125,8 @@ func main() {
 	ctx := context.Background()
 	var err error
 	switch args[0] {
+	case "status":
+		err = runWorkflowStatusCommand(ctx, client, cfg, args[1:])
 	case "tickets":
 		switch args[1] {
 		case "intake":
@@ -147,6 +150,28 @@ func main() {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
+	}
+}
+
+func runWorkflowStatusCommand(ctx context.Context, client *runtimeclient.Client, cfg runtimeclient.Config, args []string) error {
+	switch args[0] {
+	case "check":
+		fs := flag.NewFlagSet("status check", flag.ContinueOnError)
+		fs.SetOutput(os.Stderr)
+		if err := fs.Parse(args[1:]); err != nil {
+			return err
+		}
+		status, err := client.CheckConnection(ctx)
+		if err != nil {
+			return err
+		}
+		if cfg.OutputFormat == "json" {
+			return printJSON(status)
+		}
+		fmt.Print(renderConnectionStatus(status))
+		return nil
+	default:
+		return fmt.Errorf("unknown status command %q", args[0])
 	}
 }
 
@@ -258,7 +283,7 @@ func runTicketStatus(ctx context.Context, client *runtimeclient.Client, cfg runt
 	fs := flag.NewFlagSet("tickets status", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	sessionID := fs.String("session-id", "", "optional session id override")
-	render := fs.String("render", "text", "render mode: text, comment, update, report, or json")
+	render := fs.String("render", "text", "render mode: text, comment, update, handoff, report, or json")
 	reportSelection := runtimeclient.BindEnterpriseReportSelectionFlags(fs)
 	lookup := bindWorkflowLookupFlags(fs)
 	if err := fs.Parse(args); err != nil {
@@ -282,6 +307,10 @@ func runTicketStatus(ctx context.Context, client *runtimeclient.Client, cfg runt
 			return err
 		}
 		fmt.Print(rendered)
+		return nil
+	}
+	if format == "handoff" {
+		fmt.Print(renderWorkflowHandoff(report))
 		return nil
 	}
 	if format == "comment" || format == "update" {
@@ -825,6 +854,27 @@ func renderWorkflowDeltaUpdate(report *workflowStatusReport, items []runtimeapi.
 	return renderWorkflowEnvelope("follow_delta", summary, report, details, runtimeclient.RenderSessionEventLines(items, 4))
 }
 
+func renderWorkflowHandoff(report *workflowStatusReport) string {
+	if report == nil {
+		return ""
+	}
+	summary := "Workflow handoff package refreshed."
+	if len(report.PendingApprovals) == 0 && len(report.PendingProposals) == 0 && len(report.EvidenceRecords) > 0 {
+		summary = "Workflow handoff package is ready for review or escalation."
+	}
+	details := make([]string, 0, 4+len(report.ApprovalCheckpoints)+len(report.EvidenceRecords))
+	if title := strings.TrimSpace(report.Title); title != "" {
+		details = append(details, fmt.Sprintf("Title: %s", title))
+	}
+	if latest := strings.TrimSpace(report.LatestWorkerSummary); latest != "" {
+		details = append(details, fmt.Sprintf("Latest activity: %s", latest))
+	}
+	details = append(details, fmt.Sprintf("Audit continuity: %d session event(s) captured for %s.", len(report.SessionEvents), runtimeclient.NormalizeStringOrDefault(report.LatestSessionID, "-")))
+	details = append(details, workflowApprovalLinkageLines(report.ApprovalCheckpoints)...)
+	details = append(details, workflowEvidenceHandoffLines(report.EvidenceRecords)...)
+	return renderWorkflowEnvelope("handoff", summary, report, details, workflowRecentEventLines(report, 4))
+}
+
 func renderWorkflowReport(ctx context.Context, client *runtimeclient.Client, report *workflowStatusReport, selection runtimeclient.EnterpriseReportSelection) (string, error) {
 	if report == nil {
 		return "", nil
@@ -1069,6 +1119,44 @@ func renderWorkflowActionHints(report *workflowStatusReport) []string {
 	})
 }
 
+func workflowApprovalLinkageLines(items []runtimeapi.ApprovalCheckpointRecord) []string {
+	if len(items) == 0 {
+		return []string{"Approval linkage: no approval checkpoints recorded."}
+	}
+	lines := make([]string, 0, len(items))
+	for _, item := range items {
+		parts := []string{
+			runtimeclient.NormalizeStringOrDefault(strings.TrimSpace(item.CheckpointID), "-"),
+			runtimeclient.NormalizeStringOrDefault(strings.TrimSpace(item.Scope), "scope-unspecified"),
+			runtimeclient.NormalizeStringOrDefault(strings.TrimSpace(string(item.Status)), "-"),
+		}
+		lines = append(lines, fmt.Sprintf("Approval linkage: %s", strings.Join(parts, " | ")))
+	}
+	return lines
+}
+
+func workflowEvidenceHandoffLines(items []runtimeapi.EvidenceRecord) []string {
+	if len(items) == 0 {
+		return []string{"Evidence handoff: no evidence records captured yet."}
+	}
+	lines := make([]string, 0, len(items))
+	for _, item := range items {
+		parts := []string{
+			runtimeclient.NormalizeStringOrDefault(strings.TrimSpace(item.Kind), "-"),
+			runtimeclient.NormalizeStringOrDefault(strings.TrimSpace(item.EvidenceID), "-"),
+			runtimeclient.NormalizeStringOrDefault(strings.TrimSpace(item.URI), "-"),
+		}
+		if checkpointID := strings.TrimSpace(item.CheckpointID); checkpointID != "" {
+			parts = append(parts, "checkpoint="+checkpointID)
+		}
+		if toolActionID := strings.TrimSpace(item.ToolActionID); toolActionID != "" {
+			parts = append(parts, "toolAction="+toolActionID)
+		}
+		lines = append(lines, fmt.Sprintf("Evidence handoff: %s", strings.Join(parts, " | ")))
+	}
+	return lines
+}
+
 func buildWorkflowContextHint(report *workflowStatusReport) string {
 	if report == nil {
 		return "--task-id <taskId>"
@@ -1188,6 +1276,30 @@ func printWorkflowEventStream(items []runtimeapi.SessionEventRecord) {
 	for _, item := range items {
 		fmt.Printf("#%d %s %s | %s\n", item.Sequence, item.Timestamp.UTC().Format(time.RFC3339), runtimeclient.SummarizeEventLabel(string(item.EventType)), runtimeclient.SummarizeEventDetail(item))
 	}
+}
+
+func renderConnectionStatus(status *runtimeclient.ConnectionStatus) string {
+	if status == nil {
+		return ""
+	}
+	scopeSummary := runtimeclient.NormalizeStringOrDefault(status.ScopeLabel, "not configured")
+	authSummary := "bearer token missing"
+	if status.AuthReady {
+		authSummary = "bearer token configured"
+	}
+	if !strings.EqualFold(strings.TrimSpace(status.AuthMode), "bearer_token") && strings.TrimSpace(status.AuthMode) != "" {
+		authSummary = runtimeclient.NormalizeStringOrDefault(status.AuthMode, authSummary)
+	}
+	lines := []string{
+		fmt.Sprintf("State: %s", runtimeclient.NormalizeStringOrDefault(status.State, "unknown")),
+		fmt.Sprintf("Runtime API: %s", runtimeclient.NormalizeStringOrDefault(status.RuntimeAPIBaseURL, "-")),
+		fmt.Sprintf("Scope: %s", scopeSummary),
+		fmt.Sprintf("Auth: %s", authSummary),
+	}
+	if message := strings.TrimSpace(status.Message); message != "" {
+		lines = append(lines, fmt.Sprintf("Message: %s", message))
+	}
+	return strings.Join(lines, "\n") + "\n"
 }
 
 func printWorkflowTurnResult(invoke *runtimeapi.AgentInvokeResponse, report *workflowStatusReport) error {

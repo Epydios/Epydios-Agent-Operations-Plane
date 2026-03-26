@@ -280,6 +280,26 @@ func TestRenderWorkflowTurnUpdate(t *testing.T) {
 	}
 }
 
+func TestRenderConnectionStatus(t *testing.T) {
+	rendered := renderConnectionStatus(&runtimeclient.ConnectionStatus{
+		State:             "connected",
+		RuntimeAPIBaseURL: "http://127.0.0.1:18080",
+		ScopeLabel:        "tenant-local / project-local",
+		AuthMode:          "bearer_token",
+		AuthReady:         true,
+		Message:           "Runtime reachable. Scope and auth are ready.",
+	})
+	if !containsAll(rendered,
+		"State: connected",
+		"Runtime API: http://127.0.0.1:18080",
+		"Scope: tenant-local / project-local",
+		"Auth: bearer token configured",
+		"Message: Runtime reachable. Scope and auth are ready.",
+	) {
+		t.Fatalf("unexpected connection status: %s", rendered)
+	}
+}
+
 func TestRenderWorkflowDeltaUpdate(t *testing.T) {
 	report := &workflowStatusReport{
 		SourceSystem: "jira",
@@ -301,6 +321,52 @@ func TestRenderWorkflowDeltaUpdate(t *testing.T) {
 		"Tool Proposal: Tool proposal generated for shell execution.",
 	) {
 		t.Fatalf("unexpected workflow delta update: %s", update)
+	}
+}
+
+func TestRenderWorkflowHandoff(t *testing.T) {
+	report := &workflowStatusReport{
+		SourceSystem:        "jira",
+		TicketID:            "OPS-101",
+		WorkflowID:          "incident-response",
+		TaskID:              "task-1",
+		Title:               "Investigate checkout timeouts",
+		TaskStatus:          "IN_PROGRESS",
+		LatestSessionID:     "sess-1",
+		SessionStatus:       "RUNNING",
+		SelectedWorkerID:    "worker-1",
+		SelectedWorkerType:  "managed_agent",
+		SelectedWorkerState: "RUNNING",
+		OpenApprovals:       0,
+		ApprovalCheckpoints: []runtimeapi.ApprovalCheckpointRecord{
+			{CheckpointID: "approval-1", Scope: "runtime.apply", Status: runtimeapi.ApprovalStatusApproved},
+		},
+		SessionEvents: []runtimeapi.SessionEventRecord{
+			{Sequence: 1, EventType: runtimeapi.SessionEventType("worker.progress"), Payload: mustJSON(map[string]interface{}{"summary": "Worker collected deployment context."})},
+			{Sequence: 2, EventType: runtimeapi.SessionEventType("evidence.recorded"), Payload: mustJSON(map[string]interface{}{"kind": "audit_bundle"})},
+		},
+		EvidenceRecords: []runtimeapi.EvidenceRecord{
+			{EvidenceID: "evidence-1", Kind: "audit_bundle", URI: "memory://evidence-1", CheckpointID: "approval-1", ToolActionID: "tool-1"},
+		},
+		EvidenceCount:       1,
+		LatestWorkerSummary: "Ready for incident review.",
+		RecentEvents: []runtimeclient.EventSummary{
+			{Label: "Worker Progress", Detail: "Worker collected deployment context."},
+			{Label: "Evidence Recorded", Detail: "audit_bundle"},
+		},
+	}
+	rendered := renderWorkflowHandoff(report)
+	if !containsAll(rendered,
+		"AgentOps ticket update",
+		"Type: handoff",
+		"Workflow: jira | incident-response",
+		"Ticket: OPS-101",
+		"Summary: Workflow handoff package is ready for review or escalation.",
+		"Audit continuity: 2 session event(s) captured for sess-1.",
+		"Approval linkage: approval-1 | runtime.apply | APPROVED",
+		"Evidence handoff: audit_bundle | evidence-1 | memory://evidence-1 | checkpoint=approval-1 | toolAction=tool-1",
+	) {
+		t.Fatalf("unexpected workflow handoff: %s", rendered)
 	}
 }
 
