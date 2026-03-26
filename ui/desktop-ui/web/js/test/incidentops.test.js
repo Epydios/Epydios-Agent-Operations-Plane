@@ -117,11 +117,11 @@ test("incidentops page renders bounded queue, active incident, severity, timelin
 
   assert.match(ui.incidentOpsContent.innerHTML, /data-domain-root="incidentops"/);
   assert.match(ui.incidentOpsContent.innerHTML, /IncidentOps action feedback is visible\./);
-  assert.match(ui.incidentOpsContent.innerHTML, /Incident Queue/);
-  assert.match(ui.incidentOpsContent.innerHTML, /Active Incident Board/);
-  assert.match(ui.incidentOpsContent.innerHTML, /Severity Board/);
-  assert.match(ui.incidentOpsContent.innerHTML, /Response Timeline Board/);
-  assert.match(ui.incidentOpsContent.innerHTML, /Closure Board/);
+  assert.match(ui.incidentOpsContent.innerHTML, /Incident Packages/);
+  assert.match(ui.incidentOpsContent.innerHTML, /Current Incident Package/);
+  assert.match(ui.incidentOpsContent.innerHTML, /Package Priority/);
+  assert.match(ui.incidentOpsContent.innerHTML, /Incident Timeline/);
+  assert.match(ui.incidentOpsContent.innerHTML, /Closure Readiness/);
   assert.match(ui.incidentOpsContent.innerHTML, /AIMXS Decision-Binding Spine/);
   assert.match(ui.incidentOpsContent.innerHTML, /Authority Chain/);
   assert.match(ui.incidentOpsContent.innerHTML, /Grant Chain/);
@@ -160,9 +160,9 @@ test("incidentops empty state renders without loaded incident posture", () => {
   const ui = { incidentOpsContent: { innerHTML: "" } };
   renderIncidentOpsEmptyState(ui, {
     title: "IncidentOps",
-    message: "Incident posture becomes available after incident packages, linked runs, and audit anchors load."
+    message: "Incident packages appear here after a governed run, review decision, and audit trail are ready."
   });
 
   assert.match(ui.incidentOpsContent.innerHTML, /IncidentOps/);
-  assert.match(ui.incidentOpsContent.innerHTML, /incident packages, linked runs, and audit anchors load/i);
+  assert.match(ui.incidentOpsContent.innerHTML, /incident packages appear here after a governed run, review decision, and audit trail are ready/i);
 });

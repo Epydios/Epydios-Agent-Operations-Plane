@@ -518,14 +518,21 @@ function renderDecisionButtons(type, sessionId, item) {
   if (!id) {
     return "";
   }
+  const typeLabel = type === "approval" ? "checkpoint" : "proposal";
+  const approveDefaultReason = type === "approval"
+    ? "Approve the current checkpoint for this governed thread."
+    : "Approve the current tool proposal for this governed thread.";
+  const denyDefaultReason = type === "approval"
+    ? "Deny the current checkpoint for this governed thread."
+    : "Deny the current tool proposal for this governed thread.";
   const status = normalizedString(item?.status, "PENDING").toUpperCase();
   if (status !== "PENDING") {
     const reason = normalizedString(item?.reason);
-    return `<div class="decision-meta">decision=${escapeHtml(normalizedString(item?.decision, status))}${reason ? ` | ${escapeHtml(reason)}` : ""}</div>`;
+    return `<div class="decision-meta">${escapeHtml(typeLabel)} ${escapeHtml(id)} is ${escapeHtml(normalizedString(item?.decision, status))}${reason ? ` | ${escapeHtml(reason)}` : ""}</div>`;
   }
   return `<div class="decision-actions">
-    <button type="button" data-action="${type}:approve" data-session-id="${escapeHtml(sessionId)}" data-item-id="${escapeHtml(id)}">Approve</button>
-    <button type="button" data-action="${type}:deny" data-session-id="${escapeHtml(sessionId)}" data-item-id="${escapeHtml(id)}">Deny</button>
+    <button type="button" data-action="${type}:approve" data-session-id="${escapeHtml(sessionId)}" data-item-id="${escapeHtml(id)}" data-default-reason="${escapeHtml(approveDefaultReason)}">${type === "approval" ? "Approve Checkpoint" : "Approve Proposal"}</button>
+    <button type="button" data-action="${type}:deny" data-session-id="${escapeHtml(sessionId)}" data-item-id="${escapeHtml(id)}" data-default-reason="${escapeHtml(denyDefaultReason)}">${type === "approval" ? "Deny Checkpoint" : "Deny Proposal"}</button>
   </div>`;
 }
 
@@ -611,7 +618,7 @@ function renderHtml(model, selection = {}, connection = {}) {
     <li>
       <strong>${escapeHtml(normalizedString(item?.status, "PENDING"))}</strong>
       ${escapeHtml(normalizedString(item?.reason, normalizedString(item?.scope, "Approval checkpoint")))}
-      <div class="meta">checkpointId=${escapeHtml(normalizedString(item?.checkpointId, "-"))}</div>
+      <div class="meta">Checkpoint ${escapeHtml(normalizedString(item?.checkpointId, "-"))}${selectedSummary?.runId ? ` · run ${escapeHtml(normalizedString(selectedSummary.runId))}` : ""}</div>
       ${renderDecisionButtons("approval", selectedSessionId, item)}
     </li>
   `).join("") || "<li>None</li>";
@@ -619,7 +626,7 @@ function renderHtml(model, selection = {}, connection = {}) {
     <li>
       <strong>${escapeHtml(normalizedString(item?.status, "PENDING"))}</strong>
       ${escapeHtml(normalizedString(item?.command, normalizedString(item?.summary, item?.proposalType || "tool proposal")))}
-      <div class="meta">proposalId=${escapeHtml(normalizedString(item?.proposalId, "-"))}</div>
+      <div class="meta">Proposal ${escapeHtml(normalizedString(item?.proposalId, "-"))}${normalizedString(item?.toolActionId) ? ` · tool action ${escapeHtml(normalizedString(item?.toolActionId))}` : ""}</div>
       ${renderDecisionButtons("proposal", selectedSessionId, item)}
     </li>
   `).join("") || "<li>None</li>";
@@ -754,6 +761,7 @@ function renderHtml(model, selection = {}, connection = {}) {
     <div class="meta">${escapeHtml(normalizedString(handoff.summary, "Audit and evidence handoff is not ready yet."))}</div>
     <div class="chips">
       <span class="chip">session=${escapeHtml(normalizedString(handoff.sessionId, "-"))}</span>
+      <span class="chip">run=${escapeHtml(normalizedString(handoff.runId, "-"))}</span>
       <span class="chip">evidence=${escapeHtml(String(handoff.evidenceCount || 0))}</span>
       <span class="chip">audit=${escapeHtml(String(handoff.auditEventCount || 0))}</span>
       <span class="chip">openApprovals=${escapeHtml(String(handoff.openApprovals || 0))}</span>
@@ -763,6 +771,8 @@ function renderHtml(model, selection = {}, connection = {}) {
       <button type="button" data-action="copy-audit-evidence-handoff">Copy Handoff Summary</button>
       <button type="button" data-action="copy-governance-report">Copy Governed Report</button>
     </div>
+    ${renderEnvelopeSection("Run continuity", handoff.runContinuityLines)}
+    ${renderEnvelopeSection("Approval and review linkage", handoff.approvalLinkageLines)}
     ${renderEnvelopeSection("Evidence", handoff.evidenceLines)}
     ${renderEnvelopeSection("Recent audit and review", handoff.auditLines)}
     ${renderEnvelopeSection("Next truthful actions", handoff.actionHints)}
@@ -855,6 +865,7 @@ ul { margin: 8px 0 0; padding-left: 18px; }
     <h3>Managed Worker Review</h3>
     <div class="meta">session=${escapeHtml(normalizedString(model?.selectedSession?.sessionId, "-"))} | worker=${escapeHtml(normalizedString(selectedSummary?.selectedWorker?.workerId, "-"))}</div>
     <div class="chips">
+      <span class="chip">run=${escapeHtml(normalizedString(selectedSummary?.runId, "-"))}</span>
       <span class="chip">task=${escapeHtml(normalizedString(selectedActivity?.taskStatus, "-"))}</span>
       <span class="chip">session=${escapeHtml(normalizedString(selectedActivity?.sessionStatus, "-"))}</span>
       <span class="chip">worker=${escapeHtml(normalizedString(selectedActivity?.selectedWorkerStatus, "-"))}</span>
@@ -914,6 +925,7 @@ ul { margin: 8px 0 0; padding-left: 18px; }
     const action = button.dataset.action || '';
     const sessionId = button.dataset.sessionId || '';
     const itemId = button.dataset.itemId || '';
+    const defaultReason = button.dataset.defaultReason || '';
     if (action === 'select-governance-report-profile') {
       vscode.postMessage({ type: 'selectGovernanceReportProfile' });
       return;
@@ -926,7 +938,11 @@ ul { margin: 8px 0 0; padding-left: 18px; }
       vscode.postMessage({ type: 'copyAuditEvidenceHandoff' });
       return;
     }
-    const reason = window.prompt('Decision reason (optional):', '') || '';
+    const capturedReason = window.prompt('Decision reason (optional):', defaultReason);
+    if (capturedReason === null) {
+      return;
+    }
+    const reason = capturedReason || defaultReason;
     if (action === 'approval:approve' || action === 'approval:deny') {
       vscode.postMessage({
         type: 'approvalDecision',

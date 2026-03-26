@@ -138,13 +138,13 @@ function renderQueueList(items = []) {
           </div>
           ${renderActionButtons([
             {
-              label: item?.isSelected ? "Focused" : "Focus Incident",
+              label: item?.isSelected ? "Focused" : "Focus Package",
               command: "focus-incident",
               entryId: item?.id || "",
               disabled: Boolean(item?.isSelected)
             },
             {
-              label: "Open Linked Run",
+              label: "Open Governed Run",
               command: "open-linked-run",
               entryId: item?.id || "",
               disabled: !String(item?.runId || "").trim()
@@ -156,7 +156,7 @@ function renderQueueList(items = []) {
     .filter(Boolean)
     .join("");
   if (!list) {
-    return '<div class="incidentops-empty">No incident packages loaded.</div>';
+    return '<div class="incidentops-empty">No incident packages are ready yet.</div>';
   }
   return `<ol class="incidentops-list">${list}</ol>`;
 }
@@ -166,7 +166,7 @@ function renderIncidentQueueBoard(snapshot) {
   return `
     <article class="metric incidentops-card" data-incidentops-panel="incident-queue">
       <div class="metric-title-row">
-        <div class="title">Incident Queue</div>
+        <div class="title">Incident Packages</div>
         <span class="${chipClassForTone(board.tone)}">${escapeHTML(board.tone)}</span>
       </div>
       <div class="incidentops-chip-row">
@@ -178,20 +178,20 @@ function renderIncidentQueueBoard(snapshot) {
       <div class="incidentops-kv-list">
         ${renderKeyValueRows([
           {
-            label: "Queue Posture",
+            label: "Package Flow",
             value: renderValuePills([
               { label: "pending approvals", value: String(board.pendingApprovalCount) },
               { label: "audit sources", value: String(board.auditSourceCount) }
             ])
           },
           {
-            label: "Top Scopes",
+            label: "Active Scopes",
             value: renderValuePills((board.topScopes || []).map((item) => ({ label: item.value, value: String(item.count), code: true })))
           }
         ])}
       </div>
       <div class="incidentops-subsection">
-        <div class="incidentops-subtitle">Recent Queue</div>
+        <div class="incidentops-subtitle">Recent Packages</div>
         ${renderQueueList(board.recentItems)}
       </div>
     </article>
@@ -219,7 +219,7 @@ function renderActiveIncidentBoard(snapshot) {
   return `
     <article class="metric incidentops-card" data-incidentops-panel="active-incident-board">
       <div class="metric-title-row">
-        <div class="title">Active Incident Board</div>
+        <div class="title">Current Incident Package</div>
         <span class="${chipClassForTone(board.tone)}">${escapeHTML(board.severity || "low")}</span>
       </div>
       <div class="incidentops-chip-row">
@@ -230,30 +230,30 @@ function renderActiveIncidentBoard(snapshot) {
       </div>
       ${renderActionButtons([
         {
-          label: "Download Incident JSON",
+          label: "Download Package",
           command: "download-incident-json",
           entryId: board.entryId,
           disabled: !board.hasPayload
         },
         {
-          label: "Copy Handoff Summary",
+          label: "Copy Escalation Summary",
           command: "copy-handoff-summary",
           entryId: board.entryId,
           disabled: !board.hasHandoffText
         },
         {
-          label: "Open Linked Run",
+          label: "Open Governed Run",
           command: "open-linked-run",
           entryId: board.entryId,
           disabled: !board.runId
         },
         {
-          label: "Open AuditOps",
+          label: "Review Audit Trail",
           command: "open-auditops",
           entryId: board.entryId
         },
         {
-          label: "Open EvidenceOps",
+          label: "Review Evidence Handoff",
           command: "open-evidenceops",
           entryId: board.entryId
         }
@@ -261,14 +261,14 @@ function renderActiveIncidentBoard(snapshot) {
       <div class="incidentops-kv-list">
         ${renderKeyValueRows([
           {
-            label: "Package",
+            label: "Package File",
             value: renderValuePills([
               { label: "package", value: board.packageId || "-", code: true },
               { label: "file", value: board.fileName || "-", code: true }
             ])
           },
           {
-            label: "Linked Context",
+            label: "Linked Run And Review",
             value: renderValuePills([
               { label: "run", value: board.runId || "-", code: true },
               { label: "decision", value: board.decision || "-" },
@@ -277,7 +277,7 @@ function renderActiveIncidentBoard(snapshot) {
             ])
           },
           {
-            label: "Audit And Timing",
+            label: "Audit And Package Timing",
             value: renderValuePills([
               { label: "source", value: board.auditSource || "-", code: true },
               { label: "generated", value: board.generatedAt ? formatTime(board.generatedAt) : "-" },
@@ -295,7 +295,7 @@ function renderSeverityBoard(snapshot) {
   return `
     <article class="metric incidentops-card" data-incidentops-panel="severity-board">
       <div class="metric-title-row">
-        <div class="title">Severity Board</div>
+        <div class="title">Package Priority</div>
         <span class="${chipClassForTone(board.tone)}">${escapeHTML(board.tone)}</span>
       </div>
       <div class="incidentops-chip-row">
@@ -310,7 +310,7 @@ function renderSeverityBoard(snapshot) {
             value: renderValuePills((board.decisionCounts || []).map((item) => ({ label: item.value, value: String(item.count) })))
           },
           {
-            label: "Latest Audit Anchor",
+            label: "Latest Audit Trail",
             value: renderValuePills([
               { label: "event", value: board.latestAudit?.event || "-", code: true },
               { label: "decision", value: board.latestAudit?.decision || "-" },
@@ -318,7 +318,7 @@ function renderSeverityBoard(snapshot) {
             ])
           },
           {
-            label: "Highest Packages",
+            label: "Highest Priority Packages",
             value: renderValuePills((board.highestPackages || []).map((item) => ({ label: item.packageId, value: item.runId || "-", code: true })))
           }
         ])}
@@ -355,7 +355,7 @@ function renderTimelineList(events = []) {
     .filter(Boolean)
     .join("");
   if (!items) {
-    return '<div class="incidentops-empty">No bounded response timeline is available.</div>';
+    return '<div class="incidentops-empty">No incident timeline is available yet.</div>';
   }
   return `<ol class="incidentops-timeline">${items}</ol>`;
 }
@@ -365,7 +365,7 @@ function renderResponseTimelineBoard(snapshot) {
   return `
     <article class="metric incidentops-card" data-incidentops-panel="response-timeline-board">
       <div class="metric-title-row">
-        <div class="title">Response Timeline Board</div>
+        <div class="title">Incident Timeline</div>
         <span class="${chipClassForTone(board.tone)}">${escapeHTML(board.tone)}</span>
       </div>
       <div class="incidentops-chip-row">
@@ -377,7 +377,7 @@ function renderResponseTimelineBoard(snapshot) {
       <div class="incidentops-kv-list">
         ${renderKeyValueRows([
           {
-            label: "Active Scope",
+            label: "Current Package",
             value: renderValuePills([
               { label: "package", value: board.activePackageId || "-", code: true },
               { label: "run", value: board.activeRunId || "-", code: true },
@@ -387,7 +387,7 @@ function renderResponseTimelineBoard(snapshot) {
         ])}
       </div>
       <div class="incidentops-subsection">
-        <div class="incidentops-subtitle">Bounded Timeline</div>
+        <div class="incidentops-subtitle">Package Timeline</div>
         ${renderTimelineList(board.events)}
       </div>
     </article>
@@ -399,7 +399,7 @@ function renderClosureBoard(snapshot) {
   return `
     <article class="metric incidentops-card" data-incidentops-panel="closure-board">
       <div class="metric-title-row">
-        <div class="title">Closure Board</div>
+        <div class="title">Closure Readiness</div>
         <span class="${chipClassForTone(board.tone)}">${escapeHTML(board.closureState)}</span>
       </div>
       <div class="incidentops-chip-row">
@@ -419,7 +419,7 @@ function renderClosureBoard(snapshot) {
       <div class="incidentops-kv-list">
         ${renderKeyValueRows([
           {
-            label: "Closure Anchor",
+            label: "Closure Package",
             value: renderValuePills([
               { label: "package", value: board.packageId || "-", code: true },
               { label: "run", value: board.runId || "-", code: true },
@@ -428,14 +428,14 @@ function renderClosureBoard(snapshot) {
             ])
           },
           {
-            label: "Latest Audit",
+            label: "Latest Audit Link",
             value: renderValuePills([
               { label: "event", value: board.latestAuditEvent || "-", code: true },
               { label: "at", value: board.latestAuditAt ? formatTime(board.latestAuditAt) : "-" }
             ])
           },
           {
-            label: "Blockers",
+            label: "What Still Needs Attention",
             value: board.blockers.length
               ? renderValuePills(board.blockers.map((item) => ({ label: "needs", value: item })))
               : '<span class="incidentops-empty">No closure blockers remain.</span>'

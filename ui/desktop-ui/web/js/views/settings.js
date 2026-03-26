@@ -329,28 +329,28 @@ function renderSettingsRecoveryGuide(syncState, endpointState, projectScope, sel
     return "";
   }
 
-  const title = needsScopeRecovery ? "Settings Scope Recovery" : "Settings Endpoint Recovery";
+  const title = needsScopeRecovery ? "Workspace Setup Recovery" : "Connection Recovery";
   const chipClass = needsScopeRecovery ? "chip chip-danger chip-compact" : "chip chip-warn chip-compact";
-  const chipLabel = needsScopeRecovery ? "scope required" : "retry after diagnostics";
+  const chipLabel = needsScopeRecovery ? "choose workspace" : "check connection";
   const summary = needsScopeRecovery
-    ? "Project scope is not pinned, so saved settings cannot be verified against a concrete runtime target yet."
-    : "The runtime integration settings endpoint is not ready, so local fallback can diverge from the live runtime until diagnostics pass again.";
+    ? "A workspace is not selected yet, so Epydios cannot confirm this saved setup against a real target."
+    : "Live setup verification is not ready yet, so local fallback can drift from the active runtime until the connection is healthy again.";
   const diagnosticsInstruction =
     selectedSubview === "diagnostics"
-      ? "Diagnostics is already open. Inspect the Integration Sync Status card and the endpoint matrix before retrying."
-      : "Open Diagnostics first, then inspect the Integration Sync Status card and the endpoint matrix before retrying.";
+      ? "Diagnostics is already open. Check Setup Status and the endpoint details before retrying."
+      : "Open Diagnostics first, then check Setup Status and the endpoint details before retrying.";
   const steps = needsScopeRecovery
     ? [
-        "Choose the intended project from the workspace context bar so the editor is operating on a real tenant/project scope.",
-        "Return to Configuration and re-check the selected agent profile, routing mode, and endpoint references for that scope.",
-        "Save Draft again, then run Apply Saved only after the scope chip shows the intended project identifier.",
-        "Open Diagnostics and Audit Events to confirm the new scope and resulting control-plane trail."
+        "Choose the intended workspace from the context bar before editing or applying saved setup.",
+        "Return to Configuration and confirm the selected agent profile, routing mode, and secure refs for that workspace.",
+        "Save the draft again, then apply it only after the workspace indicator shows the intended project.",
+        "Review Diagnostics and the Audit Trail so the saved setup and the live result stay aligned."
       ]
     : [
         diagnosticsInstruction,
-        "Verify that the integrationSettings endpoint row is available or ready, and confirm the endpoint detail text is no longer reporting fallback-only conditions.",
-        "Retry Apply Saved or Reset Project Override only after endpoint health is restored; otherwise treat the current result as local fallback only.",
-        `Before closing the workflow, confirm the recorded change for ${projectScope} in Audit Events so fallback state and runtime state are not confused.`
+        "Wait until the setup connection shows a healthy state and the details no longer report fallback-only conditions.",
+        "Retry Apply Saved or Reset Project Override only after the live connection is healthy again; otherwise treat the result as local fallback only.",
+        `Before closing this workflow, review the Audit Trail entry for ${projectScope} so the saved setup and the live runtime state do not get confused.`
       ];
 
   return `
@@ -387,8 +387,8 @@ function renderSettingsWorkflowPanel(settings, editorState, selectedSubview) {
       state: selectedSubview === "configuration" ? "active" : "ready",
       detail:
         selectedSubview === "configuration"
-          ? "Configuration is open. Confirm routing, profile contract, and current project scope before editing."
-          : "Open Configuration to inspect editable routing and profile defaults for the active scope."
+          ? "Configuration is open. Confirm the current workspace, routing choice, and agent profile before editing."
+          : "Open Configuration to review the editable setup for the current workspace."
     },
     {
       label: "Edit draft values",
@@ -404,8 +404,8 @@ function renderSettingsWorkflowPanel(settings, editorState, selectedSubview) {
       label: "Save draft",
       state: editorState?.hasSavedOverride ? "complete" : editorStatus === "dirty" ? "ready" : "pending",
       detail: editorState?.hasSavedOverride
-        ? "A project-scoped draft is saved and available for apply."
-        : "No saved project draft exists yet. Use Save Draft to create a recoverable checkpoint before apply."
+        ? "A workspace draft is saved and ready to apply."
+        : "No saved draft exists yet. Use Save Draft to create a recoverable checkpoint before applying changes."
     },
     {
       label: "Apply saved values",
@@ -418,41 +418,41 @@ function renderSettingsWorkflowPanel(settings, editorState, selectedSubview) {
               ? "ready"
               : "pending",
       detail: editorState?.applied
-        ? "Saved values are active for this project scope. Open Diagnostics and Audit Events before closing the workflow."
+        ? "Saved values are active for this workspace. Review Diagnostics and the Audit Trail before closing the workflow."
         : syncState === "scope-unavailable"
-          ? "Tenant/project scope is unavailable. Re-establish scope from the context bar, then save and apply again."
+          ? "The current workspace is not available. Re-establish it from the context bar, then save and apply again."
         : syncState === "endpoint-unavailable"
-          ? "Runtime endpoint is unavailable, so Apply Saved updates local fallback state only. Open Diagnostics, verify endpoint health, then retry before relying on the change."
+          ? "Live setup verification is unavailable, so Apply Saved updates local fallback state only. Open Diagnostics, verify connection health, then retry before relying on the change."
           : endpointState === "error" || endpointState === "unknown"
-            ? "Endpoint health is not ready for verification. Use Diagnostics first, then retry Apply Saved after the endpoint row returns to a ready state."
-          : "Apply Saved promotes the last saved draft into active runtime choices for this project scope."
+            ? "Connection health is not ready for verification. Use Diagnostics first, then retry Apply Saved after the connection returns to a ready state."
+          : "Apply Saved promotes the last saved draft into the active setup for this workspace."
     },
     {
       label: "Verify diagnostics and audit trail",
       state: selectedSubview === "diagnostics" ? "active" : "ready",
       detail:
         selectedSubview === "diagnostics"
-          ? "Diagnostics is open. Review endpoint state, recent changes, and contract matrices, then open Audit Events if you need the runtime trail."
-          : "Open Diagnostics to verify endpoint health and recent changes, then open Audit Events for the matching runtime trail."
+          ? "Diagnostics is open. Review connection health and recent changes, then open the Audit Trail if you need the recorded result."
+          : "Open Diagnostics to verify connection health and recent changes, then open the Audit Trail for the matching record."
     }
   ];
 
   return `
     <div class="metric settings-workflow-panel">
       <div class="metric-title-row">
-        <div class="title focus-anchor" tabindex="-1" data-focus-anchor="settings-workflow">Settings Workflow Status</div>
+        <div class="title focus-anchor" tabindex="-1" data-focus-anchor="settings-workflow">Setup Progress</div>
         <span class="${chipClassForEditorStatus(editorStatus)} chip-compact">editor=${escapeHTML(editorStatus)}</span>
         <span class="${chipClassForSyncState(syncState)} chip-compact">sync=${escapeHTML(syncState)}</span>
       </div>
       <div class="run-detail-chips">
-        <span class="chip chip-neutral chip-compact">projectScope=${escapeHTML(projectScope)}</span>
-        <span class="${chipClassForEndpointState(endpointState)}">endpoint=${escapeHTML(endpointState)}</span>
+        <span class="chip chip-neutral chip-compact">workspace=${escapeHTML(projectScope)}</span>
+        <span class="${chipClassForEndpointState(endpointState)}">connection=${escapeHTML(endpointState)}</span>
         <span class="${chipClassForIntegrationSource(source)}">source=${escapeHTML(source)}</span>
         <span class="chip chip-neutral chip-compact">view=${escapeHTML(selectedSubview)}</span>
       </div>
-      <div class="meta">Use Configuration to edit and checkpoint project-scoped settings. Use Diagnostics and Audit Events to confirm endpoint health and the resulting control-plane trail.</div>
-      ${savedAt ? `<div class="meta">draftSavedAt=${escapeHTML(savedAt)}</div>` : ""}
-      ${appliedAt ? `<div class="meta">appliedAt=${escapeHTML(appliedAt)}</div>` : ""}
+      <div class="meta">Use Configuration for the supported setup path. Use Diagnostics and the Audit Trail to confirm the live result before relying on a change.</div>
+      ${savedAt ? `<div class="meta">Draft saved: ${escapeHTML(savedAt)}</div>` : ""}
+      ${appliedAt ? `<div class="meta">Applied: ${escapeHTML(appliedAt)}</div>` : ""}
       ${recoveryGuide}
       <ol class="settings-workflow-list">
         ${workflowSteps
@@ -476,7 +476,7 @@ function renderSettingsWorkflowPanel(settings, editorState, selectedSubview) {
           </div>
           <div class="action-group action-group-secondary">
             <button class="btn btn-secondary btn-small" type="button" data-settings-subtab="diagnostics" data-advanced-section="settings">Open Diagnostics</button>
-            <button class="btn btn-secondary btn-small" type="button" data-settings-config-open-audit="1" data-settings-config-event="" data-settings-config-provider="" data-settings-config-decision="">Open Audit Events</button>
+            <button class="btn btn-secondary btn-small" type="button" data-settings-config-open-audit="1" data-settings-config-event="" data-settings-config-provider="" data-settings-config-decision="">Review Audit Trail</button>
           </div>
         </div>
       </div>
@@ -638,26 +638,29 @@ export function renderIntegrationSyncStatus(settings, editorState, options = {})
   const scopeProject = String(editorState?.scopeProjectId || editorState?.projectId || "").trim() || "-";
   const recoveryDetail =
     syncState === "scope-unavailable"
-      ? "Recovery: choose a project from the workspace context bar, review Integration Settings Board, then retry save/apply."
+      ? "Recovery: choose the intended workspace, review the supported setup, then retry saving or applying."
       : syncState === "endpoint-unavailable" || endpointState === "error" || endpointState === "unknown"
-        ? "Recovery: verify the integrationSettings endpoint row in Integration Settings Board, then retry the change and confirm the resulting Audit Events record."
+        ? "Recovery: verify the live connection in Diagnostics, then retry the change and confirm the matching Audit Trail record."
         : "";
 
   return `
     <div class="metric settings-metric settings-metric-sync settings-int-sync-status">
-      <div class="title">${escapeHTML(String(options.title || "Integration Sync Status"))}</div>
+      <div class="title">${escapeHTML(String(options.title || "Setup Status"))}</div>
       <div class="meta">
-        syncState=<span id="settings-int-sync-state" class="${chipClassForSyncState(syncState)}">${escapeHTML(syncState)}</span>
+        Setup sync:
+        <span id="settings-int-sync-state" class="${chipClassForSyncState(syncState)}">${escapeHTML(syncState)}</span>
       </div>
       <div class="meta">
-        source=<span id="settings-int-sync-source" class="${chipClassForIntegrationSource(source)}">${escapeHTML(source)}</span>
+        Source:
+        <span id="settings-int-sync-source" class="${chipClassForIntegrationSource(source)}">${escapeHTML(source)}</span>
       </div>
-      <div class="meta">scopeTenant=${escapeHTML(scopeTenant)}; scopeProject=${escapeHTML(scopeProject)}</div>
+      <div class="meta">Workspace: ${escapeHTML(scopeTenant)} / ${escapeHTML(scopeProject)}</div>
       <div class="meta">
-        endpointState=<span id="settings-int-sync-endpoint-state" class="${chipClassForEndpointState(endpointState)}">${escapeHTML(endpointState)}</span>
+        Connection:
+        <span id="settings-int-sync-endpoint-state" class="${chipClassForEndpointState(endpointState)}">${escapeHTML(endpointState)}</span>
       </div>
       <div class="meta" id="settings-int-sync-endpoint-detail">${escapeHTML(String(integrationEndpoint?.detail || "-"))}</div>
-      <div class="meta">endpointUpdatedAt=${escapeHTML(endpointUpdatedAt)}</div>
+      <div class="meta">Last checked: ${escapeHTML(endpointUpdatedAt)}</div>
       ${recoveryDetail ? `<div class="meta settings-editor-warn">${escapeHTML(recoveryDetail)}</div>` : ""}
     </div>
   `;
@@ -683,14 +686,16 @@ function renderEditorFeedback(editorState) {
     lines.push(...warnings.map((item) => `<div class="meta settings-editor-warn">Review before apply: ${escapeHTML(item)}</div>`));
   }
   if (!message && errors.length === 0 && warnings.length === 0) {
-    lines.push("<div class=\"meta\">Next step: edit the draft, then Save Draft for a checkpoint or Apply Saved for the current project scope.</div>");
+    lines.push("<div class=\"meta\">Next step: edit the draft, then Save Draft for a checkpoint or Apply Saved for the current workspace.</div>");
   }
-  lines.push(`<div class="meta">draftSaved=${escapeHTML(String(hasSavedOverride))}; applied=${escapeHTML(String(applied))}</div>`);
+  lines.push(
+    `<div class="meta">Draft saved: ${escapeHTML(hasSavedOverride ? "yes" : "no")}; Applied: ${escapeHTML(applied ? "yes" : "no")}</div>`
+  );
   if (savedAt) {
-    lines.push(`<div class="meta">draftSavedAt=${escapeHTML(savedAt)}</div>`);
+    lines.push(`<div class="meta">Draft saved at: ${escapeHTML(savedAt)}</div>`);
   }
   if (appliedAt) {
-    lines.push(`<div class="meta">appliedAt=${escapeHTML(appliedAt)}</div>`);
+    lines.push(`<div class="meta">Applied at: ${escapeHTML(appliedAt)}</div>`);
   }
   return lines.join("");
 }
@@ -772,8 +777,8 @@ export function renderIntegrationEditor(settings, editorState, options = {}) {
 
   return `
     <div class="metric settings-metric settings-metric-editor" data-settings-int-project-id="${escapeHTML(projectID)}">
-      <div class="title">${escapeHTML(String(options.title || "Project Integration Editor"))}</div>
-      <div class="meta">projectScope=${escapeHTML(projectID)}; reference-only values only (ref://).</div>
+      <div class="title">${escapeHTML(String(options.title || "Supported Setup Editor"))}</div>
+      <div class="meta">Workspace: ${escapeHTML(projectID)}. Use secure refs for sensitive values.</div>
       <div class="settings-editor-grid">
         <label class="field">
           <span class="label">Agent Profile</span>
@@ -784,29 +789,13 @@ export function renderIntegrationEditor(settings, editorState, options = {}) {
         <label class="field">
           <span class="label">Model Routing</span>
           <select id="settings-int-model-routing" class="filter-input" data-settings-int-field="modelRouting">
-            <option value="gateway_first" ${selectedAttr(modelRouting, "gateway_first")}>gateway_first</option>
-            <option value="direct_first" ${selectedAttr(modelRouting, "direct_first")}>direct_first</option>
+            <option value="gateway_first" ${selectedAttr(modelRouting, "gateway_first")}>Gateway first</option>
+            <option value="direct_first" ${selectedAttr(modelRouting, "direct_first")}>Direct first</option>
           </select>
         </label>
         <label class="field">
           <span class="label">Gateway Provider</span>
           <input id="settings-int-gateway-provider" class="filter-input" type="text" value="${escapeHTML(gatewayProviderId)}" data-settings-int-field="gatewayProviderId" />
-        </label>
-        <label class="field">
-          <span class="label">Gateway Token Ref</span>
-          <input id="settings-int-gateway-token-ref" class="filter-input" type="text" value="${escapeHTML(gatewayTokenRef)}" data-settings-int-field="gatewayTokenRef" />
-        </label>
-        <label class="field">
-          <span class="label">Gateway mTLS Cert Ref</span>
-          <input id="settings-int-gateway-mtls-cert-ref" class="filter-input" type="text" value="${escapeHTML(gatewayMtlsCertRef)}" data-settings-int-field="gatewayMtlsCertRef" />
-        </label>
-        <label class="field">
-          <span class="label">Gateway mTLS Key Ref</span>
-          <input id="settings-int-gateway-mtls-key-ref" class="filter-input" type="text" value="${escapeHTML(gatewayMtlsKeyRef)}" data-settings-int-field="gatewayMtlsKeyRef" />
-        </label>
-        <label class="field field-checkbox">
-          <input id="settings-int-direct-fallback" type="checkbox" ${checkedAttr(allowDirectProviderFallback)} data-settings-int-field="allowDirectProviderFallback" />
-          <span>Allow direct provider fallback</span>
         </label>
         <div class="field">
           <span class="label">Profile Contract</span>
@@ -828,19 +817,40 @@ export function renderIntegrationEditor(settings, editorState, options = {}) {
           <span class="label">Profile Credential Ref</span>
           <input id="settings-int-profile-credential-ref" class="filter-input" type="text" value="${escapeHTML(profileCredentialRef)}" data-settings-int-field="profileCredentialRef" />
         </label>
-        <label class="field">
-          <span class="label">Credential Scope</span>
-          <select id="settings-int-profile-credential-scope" class="filter-input" data-settings-int-field="profileCredentialScope">
-            <option value="project" ${selectedAttr(profileCredentialScope, "project")}>project</option>
-            <option value="tenant" ${selectedAttr(profileCredentialScope, "tenant")}>tenant</option>
-            <option value="workspace" ${selectedAttr(profileCredentialScope, "workspace")}>workspace</option>
-          </select>
-        </label>
-        <label class="field field-checkbox">
-          <input id="settings-int-profile-enabled" type="checkbox" ${checkedAttr(profileEnabled)} data-settings-int-field="profileEnabled" />
-          <span>Profile enabled</span>
-        </label>
       </div>
+      <details class="details-shell">
+        <summary>Show advanced provider and credential details</summary>
+        <div class="settings-editor-grid">
+          <label class="field">
+            <span class="label">Gateway Token Ref</span>
+            <input id="settings-int-gateway-token-ref" class="filter-input" type="text" value="${escapeHTML(gatewayTokenRef)}" data-settings-int-field="gatewayTokenRef" />
+          </label>
+          <label class="field">
+            <span class="label">Gateway mTLS Cert Ref</span>
+            <input id="settings-int-gateway-mtls-cert-ref" class="filter-input" type="text" value="${escapeHTML(gatewayMtlsCertRef)}" data-settings-int-field="gatewayMtlsCertRef" />
+          </label>
+          <label class="field">
+            <span class="label">Gateway mTLS Key Ref</span>
+            <input id="settings-int-gateway-mtls-key-ref" class="filter-input" type="text" value="${escapeHTML(gatewayMtlsKeyRef)}" data-settings-int-field="gatewayMtlsKeyRef" />
+          </label>
+          <label class="field field-checkbox">
+            <input id="settings-int-direct-fallback" type="checkbox" ${checkedAttr(allowDirectProviderFallback)} data-settings-int-field="allowDirectProviderFallback" />
+            <span>Allow direct provider fallback</span>
+          </label>
+          <label class="field">
+            <span class="label">Credential Scope</span>
+            <select id="settings-int-profile-credential-scope" class="filter-input" data-settings-int-field="profileCredentialScope">
+              <option value="project" ${selectedAttr(profileCredentialScope, "project")}>Project</option>
+              <option value="tenant" ${selectedAttr(profileCredentialScope, "tenant")}>Tenant</option>
+              <option value="workspace" ${selectedAttr(profileCredentialScope, "workspace")}>Workspace</option>
+            </select>
+          </label>
+          <label class="field field-checkbox">
+            <input id="settings-int-profile-enabled" type="checkbox" ${checkedAttr(profileEnabled)} data-settings-int-field="profileEnabled" />
+            <span>Profile enabled</span>
+          </label>
+        </div>
+      </details>
       <div class="filter-row settings-editor-actions">
         <div class="action-hierarchy">
           <div class="action-group action-group-primary">
@@ -1290,8 +1300,8 @@ export function renderSettings(ui, settingsPayload, editorState = {}, viewState 
   ui.settingsContent.innerHTML = `
     <div class="metric settings-metric settings-metric-scope">
       <div class="title">Settings Scope</div>
-      <div class="meta">Use Configuration for editable controls and Diagnostics for health, traceability, and contract inspection.</div>
-      <div class="meta">Project overrides are applied to current workspace context unless explicitly reset.</div>
+      <div class="meta">Use Configuration for the supported setup path. Use Diagnostics for deeper health, traceability, and contract inspection.</div>
+      <div class="meta">Project overrides apply to the current workspace until they are explicitly reset.</div>
     </div>
     ${settingsWorkflowPanel}
     <div class="settings-subtabs" role="tablist" aria-label="Settings views" aria-orientation="horizontal">

@@ -101,11 +101,11 @@ function buildWorkflowRecoverySnapshot(editorState, integrationSettings) {
     return {
       tone: "warn",
       status: "blocked draft",
-      summary: "Fix the blocked integration values before saving or applying this project-scoped configuration.",
+      summary: "Fix the blocked setup values before saving or applying this workspace setup.",
       steps: [
-        "Correct the invalid fields in Integration Settings Board.",
-        "Save Draft again after the editor returns to a valid state.",
-        "Apply Saved only after the draft is clean enough to activate."
+        "Correct the blocked fields in Supported Setup.",
+        "Save Draft again after the setup returns to a valid state.",
+        "Apply Saved only after the draft is ready to use."
       ],
       savedAt,
       appliedAt,
@@ -120,11 +120,11 @@ function buildWorkflowRecoverySnapshot(editorState, integrationSettings) {
     return {
       tone: "warn",
       status: "scope recovery",
-      summary: "A concrete tenant/project scope is required before the runtime-backed integration change can be trusted.",
+      summary: "Choose the intended workspace before this setup can be trusted.",
       steps: [
-        "Pin the intended project from the workspace context bar.",
-        "Review the selected profile and routing values again for that scope.",
-        "Save Draft and Apply Saved again after scope is restored."
+        "Pick the intended project from the workspace context bar.",
+        "Review the selected profile and routing values again for that workspace.",
+        "Save Draft and Apply Saved again after the workspace is restored."
       ],
       savedAt,
       appliedAt,
@@ -143,11 +143,11 @@ function buildWorkflowRecoverySnapshot(editorState, integrationSettings) {
     return {
       tone: "warn",
       status: "endpoint recovery",
-      summary: "The integration endpoint is not ready, so current settings should be treated as local-only until a successful retry is recorded.",
+      summary: "Live setup verification is not ready, so treat the current result as local-only until the connection is healthy again.",
       steps: [
-        "Retry Apply Saved after the integration endpoint returns to a ready state.",
-        "Use Open Audit Events after the retry to confirm the recorded runtime change.",
-        "Do not rely on the current result as live runtime state until that audit trail is present."
+        "Open Diagnostics and confirm the setup connection is ready again.",
+        "Retry Apply Saved after the connection returns to a healthy state.",
+        "Review Audit Trail after the retry to confirm the recorded runtime change."
       ],
       savedAt,
       appliedAt,
@@ -162,11 +162,11 @@ function buildWorkflowRecoverySnapshot(editorState, integrationSettings) {
     return {
       tone: "neutral",
       status: "draft pending",
-      summary: "There are unsaved integration edits for this project scope.",
+      summary: "You have unsaved setup changes for this workspace.",
       steps: [
-        "Review the current values in Integration Settings Board.",
-        "Save Draft to checkpoint the configuration.",
-        "Apply Saved when the draft is ready to activate."
+        "Review the current values in Supported Setup.",
+        "Save Draft to create a recoverable checkpoint.",
+        "Apply Saved when the draft is ready to use."
       ],
       savedAt,
       appliedAt,
@@ -181,11 +181,11 @@ function buildWorkflowRecoverySnapshot(editorState, integrationSettings) {
     return {
       tone: "ok",
       status: "saved draft ready",
-      summary: "A saved project-scoped integration draft is ready to apply.",
+      summary: "A saved setup draft is ready to apply for this workspace.",
       steps: [
-        "Review the saved values in Integration Settings Board.",
-        "Run Apply Saved when the project-scoped draft is ready to activate.",
-        "Use Open Audit Events after apply to confirm the resulting control-plane trail."
+        "Review the saved values in Supported Setup.",
+        "Run Apply Saved when the draft is ready to use.",
+        "Review Audit Trail after apply to confirm the recorded change."
       ],
       savedAt,
       appliedAt,
@@ -199,11 +199,11 @@ function buildWorkflowRecoverySnapshot(editorState, integrationSettings) {
   return {
     tone: "ok",
     status: "stable",
-    summary: "The bounded settings workflow is stable for this project scope.",
+    summary: "This setup workflow is stable for the current workspace.",
     steps: [
-      "Use Save Draft before risky integration changes.",
-      "Use Apply Saved to activate project-scoped integration defaults.",
-      "Use Open Audit Events after meaningful changes to confirm the recorded trail."
+      "Use Save Draft before risky setup changes.",
+      "Use Apply Saved to activate the saved workspace setup.",
+      "Review Audit Trail after meaningful changes to confirm the recorded result."
     ],
     savedAt,
     appliedAt,

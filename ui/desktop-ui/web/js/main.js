@@ -2430,16 +2430,16 @@ function renderSettingsEditorFeedbackInline(state) {
     parts.push(`<div class="meta settings-editor-warn">Review before apply: ${escapeHTML(item)}</div>`);
   }
   if (!message && errors.length === 0 && warnings.length === 0) {
-    parts.push("<div class=\"meta\">Next step: edit the draft, then Save Draft for a checkpoint or Apply Saved for this project scope.</div>");
+    parts.push("<div class=\"meta\">Next step: edit the draft, then Save Draft for a checkpoint or Apply Saved for this workspace.</div>");
   }
   parts.push(
-    `<div class="meta">draftSaved=${escapeHTML(String(Boolean(state?.hasSavedOverride)))}; applied=${escapeHTML(String(Boolean(state?.applied)))}</div>`
+    `<div class="meta">Draft saved: ${escapeHTML(Boolean(state?.hasSavedOverride) ? "yes" : "no")}; Applied: ${escapeHTML(Boolean(state?.applied) ? "yes" : "no")}</div>`
   );
   if (state?.savedAt) {
-    parts.push(`<div class="meta">draftSavedAt=${escapeHTML(String(state.savedAt))}</div>`);
+    parts.push(`<div class="meta">Draft saved at: ${escapeHTML(String(state.savedAt))}</div>`);
   }
   if (state?.appliedAt) {
-    parts.push(`<div class="meta">appliedAt=${escapeHTML(String(state.appliedAt))}</div>`);
+    parts.push(`<div class="meta">Applied at: ${escapeHTML(String(state.appliedAt))}</div>`);
   }
   feedback.innerHTML = parts.join("");
 }
@@ -2969,7 +2969,7 @@ function clearDataPanels() {
   renderIncidentOpsEmptyState(ui, {
     tone: "info",
     title: "IncidentOps",
-    message: "Incident posture becomes available after incident packages, linked runs, and audit anchors load."
+    message: "Incident packages appear here after a governed run, review decision, and audit trail are ready."
   });
   renderNetworkOpsEmptyState(ui, {
     tone: "info",
@@ -3145,7 +3145,7 @@ function renderPanelLoadingStates() {
     ui.incidentOpsContent.innerHTML = renderPanelStateMetric(
       "loading",
       "IncidentOps",
-      "Loading incident queue, active package posture, and severity anchors..."
+      "Loading incident packages, linked run activity, and closure readiness..."
     );
   }
   if (ui.logOpsContent) {
@@ -3762,10 +3762,10 @@ function renderIncidentHistorySummary(totalCount, visibleCount, selectedCount, v
     <div class="incident-history-actions">
       <div class="action-hierarchy">
         <div class="action-group action-group-primary">
-          <button class="btn btn-primary btn-small" type="button" data-incident-summary-action="copy-latest" ${latestVisible?.handoffText ? "" : "disabled"}>Copy Latest Handoff</button>
+          <button class="btn btn-primary btn-small" type="button" data-incident-summary-action="copy-latest" ${latestVisible?.handoffText ? "" : "disabled"}>Copy Latest Package Summary</button>
         </div>
         <div class="action-group action-group-secondary">
-          <button class="btn btn-secondary btn-small" type="button" data-incident-summary-action="open-audit">Open Audit Events</button>
+          <button class="btn btn-secondary btn-small" type="button" data-incident-summary-action="open-audit">Review Audit Trail</button>
           <button class="btn btn-secondary btn-small" type="button" data-incident-summary-action="show-needs-closure">Needs Closure</button>
           <button class="btn btn-secondary btn-small" type="button" data-incident-summary-action="show-all">Show All</button>
           <button class="btn btn-secondary btn-small" type="button" data-incident-summary-action="clear-selection" ${selectedCount > 0 ? "" : "disabled"}>Clear Selection</button>
@@ -3776,7 +3776,7 @@ function renderIncidentHistorySummary(totalCount, visibleCount, selectedCount, v
   ui.incidentHistorySummary.innerHTML = `
     <div class="metric">
       <div class="metric-title-row">
-        <div class="title">Incident Queue Summary</div>
+        <div class="title">Incident Package Summary</div>
         <span class="chip chip-neutral chip-compact">queueTotal=${escapeHTML(String(totalCount || 0))}</span>
         <span class="chip chip-neutral chip-compact">visible=${escapeHTML(String(visibleCount || 0))}</span>
         <span class="${selectedCount > 0 ? "chip chip-warn chip-compact" : "chip chip-neutral chip-compact"}">selected=${escapeHTML(String(selectedCount || 0))}</span>
@@ -3832,7 +3832,7 @@ function renderIncidentHistoryPanel() {
   if (!Array.isArray(allItems) || allItems.length === 0) {
     ui.incidentHistoryContent.innerHTML = renderPanelStateMetric(
       "empty",
-      "Incident Queue",
+      "Incident Packages",
       "No incident packages are currently tracked.",
       "Start in Audit Events: open a run detail, then export an incident package to seed this queue."
     );
@@ -3841,7 +3841,7 @@ function renderIncidentHistoryPanel() {
   if (items.length === 0) {
     ui.incidentHistoryContent.innerHTML = renderPanelStateMetric(
       "empty",
-      "Incident Queue",
+      "Incident Packages",
       "No incident packages match the current queue filters.",
       "Clear filters or widen scope, then review drafted or filed packages."
     );
@@ -13691,7 +13691,7 @@ function getCurrentIncidentOpsEntry(entryId = "") {
       persistIntegrationOverrides();
       const savedState = {
         status: "saved",
-        message: "Draft saved for this project scope. Review warnings if present, then run Apply Saved when you are ready to activate it.",
+        message: "Draft saved for this workspace. Review any warnings, then run Apply Saved when you are ready to activate it.",
         errors: [],
         warnings: validation.warnings,
         hasSavedOverride: true,
@@ -13734,7 +13734,7 @@ function getCurrentIncidentOpsEntry(entryId = "") {
       const scope = resolveIntegrationScope(getSession(), projectID);
       const now = new Date().toISOString();
       let appliedMessage =
-        "Saved draft applied to active runtime choices for this project scope. Review Integration Settings Board to verify endpoint state and traceability.";
+        "Saved draft applied to the active setup for this workspace. Review Supported Setup and Diagnostics to confirm the live result.";
       let appliedWarnings = [];
       let appliedAt = now;
       let savedAt = String(entry?.savedAt || now).trim();
@@ -13754,23 +13754,23 @@ function getCurrentIncidentOpsEntry(entryId = "") {
           appliedAt = String(result?.updatedAt || now).trim() || now;
           savedAt = appliedAt;
           appliedMessage =
-            "Saved draft applied via runtime endpoint and activated for this project scope. Review Integration Settings Board and Audit Events to verify the recorded change.";
+            "Saved draft applied through the live setup path and activated for this workspace. Review Supported Setup and the Audit Trail to verify the recorded change.";
           runtimeIntegrationSyncStateByProject[key] = "loaded";
         } else if (result?.source === "endpoint-unavailable") {
           appliedMessage =
-            "Runtime integration settings endpoint is unavailable; applied local fallback for this project scope. Review the integrationSettings endpoint row in Integration Settings Board, then retry Apply Saved before relying on the change.";
+            "Live setup verification is unavailable; local fallback was updated for this workspace only. Review Diagnostics, then retry Apply Saved before relying on the change.";
           appliedWarnings = [
-            "Runtime state may still differ from the local fallback until the integrationSettings endpoint returns to ready or available.",
-            `Retry Apply Saved after the endpoint is ready, then open Audit Events for ${String(scope.projectId || projectID || "project:any")} to confirm the recorded runtime trail.`
+            "Runtime state can still differ from the local fallback until the live setup connection is healthy again.",
+            `Retry Apply Saved after the connection is healthy, then review the Audit Trail for ${String(scope.projectId || projectID || "project:any")} to confirm the recorded result.`
           ];
           runtimeIntegrationSyncStateByProject[key] = "endpoint-unavailable";
         }
       } else {
         appliedMessage =
-          "Tenant/project scope is unavailable. Local fallback was updated only. Choose the intended project in the context bar, then save and apply again before relying on the change.";
+          "A workspace is not selected. Local fallback was updated only. Choose the intended workspace in the context bar, then save and apply again before relying on the change.";
         appliedWarnings = [
-          "A runtime endpoint write cannot be verified until both tenant and project scope are present.",
-          "After scope is restored, review Integration Settings Board, confirm the project scope chip, then rerun Save Draft and Apply Saved."
+          "A live setup write cannot be verified until both tenant and project scope are present.",
+          "After the workspace is restored, review Supported Setup, confirm the workspace indicator, then rerun Save Draft and Apply Saved."
         ];
       }
 
@@ -13844,7 +13844,7 @@ function getCurrentIncidentOpsEntry(entryId = "") {
       const now = new Date().toISOString();
       let source = "local-fallback";
       let statusMessage =
-        "Project override reset to baseline defaults in local fallback mode. Review the resulting values before editing again.";
+        "This workspace was reset to baseline defaults in local fallback mode. Review the resulting values before editing again.";
       let resetWarnings = [];
       let syncedAt = now;
 
@@ -13861,23 +13861,23 @@ function getCurrentIncidentOpsEntry(entryId = "") {
           source = "runtime-endpoint";
           syncedAt = String(result?.updatedAt || now).trim() || now;
           statusMessage =
-            "Project override reset to baseline defaults via runtime endpoint. Review Integration Settings Board and Audit Events to confirm the new baseline.";
+            "This workspace was reset to baseline defaults through the live setup path. Review Supported Setup and the Audit Trail to confirm the new baseline.";
           runtimeIntegrationSyncStateByProject[key] = "loaded";
         } else if (result?.source === "endpoint-unavailable") {
           runtimeIntegrationSyncStateByProject[key] = "endpoint-unavailable";
           statusMessage =
-            "Runtime integration settings endpoint is unavailable; baseline defaults were applied locally only. Review the integrationSettings endpoint row in Integration Settings Board, then retry Reset Project Override before relying on this reset.";
+            "Live setup verification is unavailable; baseline defaults were applied locally only. Review Diagnostics, then retry Reset Project Override before relying on this reset.";
           resetWarnings = [
-            "Local baseline values can drift from runtime state until the integrationSettings endpoint is healthy again.",
-            `After endpoint recovery, rerun Reset Project Override and inspect Audit Events for ${String(scope.projectId || projectID || "project:any")}.`
+            "Local baseline values can drift from runtime state until the live setup connection is healthy again.",
+            `After recovery, rerun Reset Project Override and review the Audit Trail for ${String(scope.projectId || projectID || "project:any")}.`
           ];
         }
       } else {
         statusMessage =
-          "Tenant/project scope is unavailable. Baseline defaults were applied locally only. Re-establish scope from the context bar, then retry the reset before relying on it.";
+          "A workspace is not selected. Baseline defaults were applied locally only. Re-establish the workspace from the context bar, then retry the reset before relying on it.";
         resetWarnings = [
-          "Scope must be restored before a runtime-backed reset can be confirmed.",
-          "After scope is restored, review Integration Settings Board, confirm project scope, rerun the reset, then verify Audit Events."
+          "The workspace must be restored before a live reset can be confirmed.",
+          "After the workspace is restored, review Supported Setup, rerun the reset, then verify the Audit Trail."
         ];
       }
 

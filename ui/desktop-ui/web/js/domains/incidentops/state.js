@@ -287,7 +287,7 @@ function buildClosureBoard(latestItem, latestAudit) {
       closureState: "unavailable",
       blockerCount: 0,
       blockers: [],
-      nextAction: "Load an incident package to inspect closure posture.",
+      nextAction: "Open an incident package to review what is ready and what still needs attention.",
       handoffReady: false,
       approvalCleared: false,
       auditLinked: false,
@@ -326,20 +326,20 @@ function buildClosureBoard(latestItem, latestAudit) {
 
   let closureState = "blocked";
   let tone = "danger";
-  let nextAction = "Complete the missing closure anchors before recording closure.";
+  let nextAction = "Finish the missing package links before recording closure.";
 
   if (isClosed) {
     closureState = "closed";
     tone = "ok";
-    nextAction = "Keep the incident available for bounded reopen or audit review only if new activity appears.";
+    nextAction = "Keep this package available for bounded reopen or audit review only if new activity appears.";
   } else if (blockers.length === 0) {
     closureState = "ready";
     tone = "ok";
-    nextAction = "Record the bounded closure note and keep the linked run, approval, and audit anchors attached.";
+    nextAction = "Record the closure note and keep the linked run, review, and audit trail attached.";
   } else if (isFiled) {
     closureState = "pending";
     tone = "warn";
-    nextAction = "The incident is filed but still needs one or more closure anchors before it can be closed cleanly.";
+    nextAction = "This package is filed but still needs one or more linked items before it can be closed cleanly.";
   }
 
   return {

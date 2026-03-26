@@ -262,7 +262,7 @@ test("evidenceops page renders bounded bundle, provenance, and artifact access b
   assert.match(ui.evidenceOpsContent.innerHTML, /data-domain-root="evidenceops"/);
   assert.match(ui.evidenceOpsContent.innerHTML, /EvidenceOps Action Complete/);
   assert.match(ui.evidenceOpsContent.innerHTML, /Evidence bundle review JSON downloaded/);
-  assert.match(ui.evidenceOpsContent.innerHTML, /Evidence Bundle Board/);
+  assert.match(ui.evidenceOpsContent.innerHTML, /Evidence Package/);
   assert.match(ui.evidenceOpsContent.innerHTML, /Provenance Board/);
   assert.match(ui.evidenceOpsContent.innerHTML, /Admin Change Provenance/);
   assert.match(ui.evidenceOpsContent.innerHTML, /AIMXS Lifecycle Ribbon/);
@@ -275,7 +275,7 @@ test("evidenceops page renders bounded bundle, provenance, and artifact access b
   assert.match(ui.evidenceOpsContent.innerHTML, /data-aimxs-spine-action="open-workspace"/);
   assert.match(ui.evidenceOpsContent.innerHTML, /Decision Binding Contract/);
   assert.match(ui.evidenceOpsContent.innerHTML, /Stable Or Replay Refs/);
-  assert.match(ui.evidenceOpsContent.innerHTML, /Evidence Access/);
+  assert.match(ui.evidenceOpsContent.innerHTML, /Package Handoff Locations/);
   assert.match(ui.evidenceOpsContent.innerHTML, /Retention Board/);
   assert.match(ui.evidenceOpsContent.innerHTML, /Evidence To Control Mapping Board/);
   assert.match(ui.evidenceOpsContent.innerHTML, /bundle-governed-001/);

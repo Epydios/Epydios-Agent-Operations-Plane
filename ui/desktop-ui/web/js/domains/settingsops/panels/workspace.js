@@ -137,7 +137,7 @@ function renderAppPreferencesBoard(snapshot) {
   return `
     <article class="metric settingsops-card" data-domain-root="settingsops" data-settingsops-panel="app-preferences">
       <div class="metric-title-row">
-        <div class="title">App Preferences Board</div>
+        <div class="title">App Preferences</div>
         <span class="${chipClassForTone(board.tone)}">${escapeHTML(board.tone)}</span>
       </div>
       <div class="settingsops-chip-row">
@@ -148,7 +148,7 @@ function renderAppPreferencesBoard(snapshot) {
       <div class="settingsops-kv-list">
         ${renderKeyValueRows([
           {
-            label: "Selected Defaults",
+            label: "Daily Defaults",
             value: renderValuePills([
               { label: "agent profile", value: board.selectedAgentLabel },
               { label: "agent id", value: board.selectedAgentProfileId, code: true },
@@ -156,7 +156,7 @@ function renderAppPreferencesBoard(snapshot) {
             ])
           },
           {
-            label: "Runtime Defaults",
+            label: "Everyday Runtime",
             value: renderValuePills([
               { label: "realtime", value: board.realtimeMode, code: true },
               { label: "poll ms", value: board.pollIntervalMs, code: true },
@@ -165,8 +165,8 @@ function renderAppPreferencesBoard(snapshot) {
             ])
           },
           {
-            label: "Edit Path",
-            value: '<span class="settingsops-note">Use the header controls to change theme mode and the active agent profile without opening another domain.</span>'
+            label: "Quick Changes",
+            value: '<span class="settingsops-note">Use the header controls to change theme mode and the active agent profile without leaving the current workspace.</span>'
           }
         ])}
       </div>
@@ -184,7 +184,7 @@ function renderSecureRefBoard(snapshot) {
         <span class="chip chip-neutral chip-compact">service=${escapeHTML(board.service)}</span>
       </div>
       ${renderLocalSecureRefPanel(snapshot.settings, snapshot.viewState?.localSecureRefEditor || {}, {
-        title: "Secure Ref Board"
+        title: "Secure Refs"
       })}
     </article>
   `;
@@ -195,7 +195,7 @@ function renderLocalEnvironmentBoard(snapshot) {
   return `
     <article class="metric settingsops-card settingsops-card-environment" data-domain-root="settingsops" data-settingsops-panel="local-environment">
       <div class="metric-title-row">
-        <div class="title">Local Environment Board</div>
+        <div class="title">Local Environment</div>
         <span class="${chipClassForTone(board.tone)}">${escapeHTML(board.tone)}</span>
       </div>
       <div class="settingsops-chip-row">
@@ -207,19 +207,16 @@ function renderLocalEnvironmentBoard(snapshot) {
         <div class="settingsops-kv-list">
           ${renderKeyValueRows([
             {
-              label: "Scope And Endpoints",
+              label: "Current Workspace",
               value: renderValuePills([
                 { label: "environment", value: board.environmentId, code: true },
-                { label: "runtime api", value: board.runtimeApiBaseUrl, code: true },
-                { label: "registry api", value: board.registryApiBaseUrl, code: true },
                 { label: "platform", value: board.runtimePlatform, code: true }
               ])
             },
             {
-              label: "Local Paths",
+              label: "Storage Summary",
               value: renderValuePills([
                 { label: "base", value: board.baseDir, code: true },
-                { label: "logs", value: board.logsDir, code: true },
                 { label: "exports", value: board.exportsDir, code: true }
               ])
             },
@@ -231,6 +228,33 @@ function renderLocalEnvironmentBoard(snapshot) {
                 { label: "terminal", value: String(board.retention.terminalHistory), code: true },
                 { label: "runs", value: String(board.retention.runSnapshots), code: true }
               ])
+            },
+            {
+              label: "Advanced Local Details",
+              value: `
+                <details class="details-shell">
+                  <summary>Show endpoints and local paths</summary>
+                  <div class="settingsops-kv-list">
+                    ${renderKeyValueRows([
+                      {
+                        label: "Endpoints",
+                        value: renderValuePills([
+                          { label: "runtime api", value: board.runtimeApiBaseUrl, code: true },
+                          { label: "registry api", value: board.registryApiBaseUrl, code: true }
+                        ])
+                      },
+                      {
+                        label: "Local Paths",
+                        value: renderValuePills([
+                          { label: "base", value: board.baseDir, code: true },
+                          { label: "logs", value: board.logsDir, code: true },
+                          { label: "exports", value: board.exportsDir, code: true }
+                        ])
+                      }
+                    ])}
+                  </div>
+                </details>
+              `
             }
           ])}
         </div>
@@ -255,7 +279,7 @@ function renderIntegrationSettingsBoard(snapshot) {
       data-settingsops-panel="integration-settings"
     >
       <div class="metric-title-row">
-        <div class="title">Integration Settings Board</div>
+        <div class="title">Supported Setup</div>
         <span class="${chipClassForTone(board.tone)}">${escapeHTML(board.tone)}</span>
       </div>
       <div class="settingsops-chip-row">
@@ -266,13 +290,13 @@ function renderIntegrationSettingsBoard(snapshot) {
       <div class="settingsops-integration-grid">
         <div class="settingsops-region">
           ${renderIntegrationSyncStatus(snapshot.settings, snapshot.editorState, {
-            title: "Integration Sync Summary"
+            title: "Setup Status"
           })}
         </div>
         <div class="settingsops-kv-list">
           ${renderKeyValueRows([
             {
-              label: "Selected Integration Defaults",
+              label: "Current Setup",
               value: renderValuePills([
                 { label: "agent", value: board.selectedAgentProfileId, code: true },
                 { label: "routing", value: board.modelRouting, code: true },
@@ -285,7 +309,7 @@ function renderIntegrationSettingsBoard(snapshot) {
               ])
             },
             {
-              label: "Endpoint Posture",
+              label: "Connection Status",
               value: renderValuePills([
                 { label: "endpoint state", value: board.endpointState, code: true },
                 { label: "detail", value: board.endpointDetail },
@@ -295,17 +319,20 @@ function renderIntegrationSettingsBoard(snapshot) {
           ])}
         </div>
       </div>
-      <div class="settingsops-kv-list">
-        ${renderKeyValueRows([
-          {
-            label: "Endpoint Inventory",
-            value: renderEndpointInventoryRows(board.endpoints)
-          }
-        ])}
-      </div>
+      <details class="details-shell">
+        <summary>Show endpoint details</summary>
+        <div class="settingsops-kv-list">
+          ${renderKeyValueRows([
+            {
+              label: "Endpoint Inventory",
+              value: renderEndpointInventoryRows(board.endpoints)
+            }
+          ])}
+        </div>
+      </details>
       <div class="settingsops-region">
         ${renderIntegrationEditor(snapshot.settings, snapshot.editorState, {
-          title: "Project Integration Editor"
+          title: "Supported Setup Editor"
         })}
       </div>
     </article>
@@ -321,7 +348,7 @@ function renderSettingsWorkflowRecoveryBoard(snapshot) {
       data-settingsops-panel="workflow-recovery"
     >
       <div class="metric-title-row">
-        <div class="title">Settings Workflow Recovery</div>
+        <div class="title">Setup Recovery</div>
         <span class="${chipClassForTone(board.tone)}">${escapeHTML(board.status)}</span>
       </div>
       <div class="settingsops-chip-row">
@@ -358,7 +385,7 @@ function renderSettingsWorkflowRecoveryBoard(snapshot) {
           .join("")}
       </ol>
       <div class="filter-row settingsops-action-row">
-        <a class="btn btn-secondary btn-small" href="#settingsops-integration-board">Review Integration Settings Board</a>
+        <a class="btn btn-secondary btn-small" href="#settingsops-integration-board">Review Supported Setup</a>
         <button
           class="btn btn-secondary btn-small"
           type="button"
@@ -366,7 +393,7 @@ function renderSettingsWorkflowRecoveryBoard(snapshot) {
           data-settings-config-event=""
           data-settings-config-provider=""
           data-settings-config-decision=""
-        >Open Audit Events</button>
+        >Review Audit Trail</button>
       </div>
     </article>
   `;
@@ -379,8 +406,8 @@ export function renderSettingsWorkspace(context = {}) {
       <div class="workbench-domain-cluster-grid" data-workbench-cluster-layout="split">
         <section class="workbench-domain-cluster">
           <div class="workbench-domain-cluster-header">
-            <h3 class="workbench-domain-cluster-title">App And Local Environment</h3>
-            <p class="workbench-domain-cluster-lead">Keep local preferences, secure refs, and the active environment together so SettingsOps still reads as a real local control surface.</p>
+            <h3 class="workbench-domain-cluster-title">Preferences And Local Environment</h3>
+            <p class="workbench-domain-cluster-lead">Keep everyday preferences, secure refs, and the active workspace together so setup stays readable without hiding local ownership.</p>
           </div>
           <div class="workbench-domain-cluster-body settingsops-board-grid settingsops-cluster-grid">
             ${renderAppPreferencesBoard(snapshot)}
@@ -390,8 +417,8 @@ export function renderSettingsWorkspace(context = {}) {
         </section>
         <section class="workbench-domain-cluster">
           <div class="workbench-domain-cluster-header">
-            <h3 class="workbench-domain-cluster-title">Integrations And Recovery</h3>
-            <p class="workbench-domain-cluster-lead">Review sync posture, edit integration defaults, and keep workflow recovery visible without sending these surfaces back into a generic settings bucket.</p>
+            <h3 class="workbench-domain-cluster-title">Supported Setup And Recovery</h3>
+            <p class="workbench-domain-cluster-lead">Edit the supported workspace setup, keep recovery steps visible, and leave deeper diagnostics for the dedicated advanced lane.</p>
           </div>
           <div class="workbench-domain-cluster-body settingsops-board-grid settingsops-cluster-grid">
             ${renderIntegrationSettingsBoard(snapshot)}

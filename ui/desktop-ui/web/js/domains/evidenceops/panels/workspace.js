@@ -67,7 +67,7 @@ function renderKeyValueRows(rows = []) {
 
 function renderAccessCards(entries = []) {
   if (!Array.isArray(entries) || entries.length === 0) {
-    return '<div class="evidenceops-empty">No artifact access references are currently available.</div>';
+    return '<div class="evidenceops-empty">No handoff locations are currently available.</div>';
   }
   return `
     <div class="evidenceops-access-grid">
@@ -85,8 +85,8 @@ function renderAccessCards(entries = []) {
                   class="btn btn-secondary btn-small"
                   type="button"
                   data-evidenceops-copy-path="${escapeHTML(entry.path || "")}"
-                  data-evidenceops-copy-path-label="${escapeHTML(entry.label || "Path")}"
-                >Copy Path</button>
+                  data-evidenceops-copy-path-label="${escapeHTML(entry.label || "Location")}"
+                >Copy Location</button>
               </div>
             </article>
           `
@@ -160,7 +160,7 @@ function renderEvidenceBundleBoard(snapshot) {
       ])
     },
     {
-      label: "Bounded Links",
+      label: "Package Links",
       value: renderValuePills([
         { label: "approval", value: board.latestBundle.approvalId, code: true },
         { label: "scope", value: board.latestBundle.scope, code: true },
@@ -181,7 +181,7 @@ function renderEvidenceBundleBoard(snapshot) {
   return `
     <article class="metric evidenceops-card" data-domain-root="evidenceops" data-evidenceops-panel="evidence-bundle-board">
       <div class="metric-title-row">
-        <div class="title">Evidence Bundle Board</div>
+        <div class="title">Evidence Package</div>
         <span class="${chipClassForTone(board.tone)}">${escapeHTML(board.tone)}</span>
       </div>
       <div class="evidenceops-chip-row">
@@ -191,13 +191,13 @@ function renderEvidenceBundleBoard(snapshot) {
         <span class="chip chip-neutral chip-compact">degraded=${escapeHTML(String(board.degradedCount))}</span>
       </div>
       ${renderActionButtons([
-        { label: "Download Bundle JSON", command: "download-bundle-json", disabled: !board.canExportReview },
-        { label: "Open Linked Run", command: "open-bundle-run", disabled: !board.canOpenRun },
-        { label: "Open IncidentOps", command: "open-incidentops", disabled: !board.canOpenIncidentOps }
+        { label: "Download Evidence Package", command: "download-bundle-json", disabled: !board.canExportReview },
+        { label: "Open Governed Run", command: "open-bundle-run", disabled: !board.canOpenRun },
+        { label: "Open Incident Packages", command: "open-incidentops", disabled: !board.canOpenIncidentOps }
       ])}
       <div class="evidenceops-kv-list">${renderKeyValueRows(rows)}</div>
       <div class="evidenceops-subsection">
-        <div class="evidenceops-subtitle">Top Scopes</div>
+        <div class="evidenceops-subtitle">Active Scopes</div>
         ${renderValuePills((board.topScopes || []).map((item) => ({ label: item.value, value: String(item.count), code: true })))}
       </div>
     </article>
@@ -359,7 +359,7 @@ function renderArtifactAccessBoard(snapshot) {
   const board = snapshot.artifactAccessBoard;
   const rows = [
     {
-      label: "Access Coverage",
+      label: "Handoff Coverage",
       value: renderValuePills([
         { label: "artifacts", value: String(board.artifactCount) },
         { label: "direct uris", value: String(board.directUriCount) },
@@ -368,7 +368,7 @@ function renderArtifactAccessBoard(snapshot) {
       ])
     },
     {
-      label: "Latest Reachable Artifact",
+      label: "Latest Reachable Evidence",
       value: renderValuePills([
         { label: "artifact", value: board.latestArtifact.artifactId, code: true },
         { label: "kind", value: board.latestArtifact.kind },
@@ -378,7 +378,7 @@ function renderArtifactAccessBoard(snapshot) {
       ])
     },
     {
-      label: "Linked Governance",
+      label: "Linked Review And Incident Flow",
       value: renderValuePills([
         { label: "bundles", value: board.latestBundle.bundleId, code: true },
         { label: "bundle status", value: board.latestBundle.status },
@@ -399,7 +399,7 @@ function renderArtifactAccessBoard(snapshot) {
   return `
     <article class="metric evidenceops-card" data-domain-root="evidenceops" data-evidenceops-panel="artifact-access-board">
       <div class="metric-title-row">
-        <div class="title">Evidence Access</div>
+        <div class="title">Package Handoff Locations</div>
         <span class="${chipClassForTone(board.tone)}">${escapeHTML(board.tone)}</span>
       </div>
       <div class="evidenceops-chip-row">
@@ -409,13 +409,13 @@ function renderArtifactAccessBoard(snapshot) {
         <span class="chip chip-neutral chip-compact">paths=${escapeHTML(String((board.accessEntries || []).length))}</span>
       </div>
       ${renderActionButtons([
-        { label: "Copy Latest Artifact URI", command: "copy-latest-uri", disabled: !board.canCopyLatestUri },
-        { label: "Copy Suggested Run Folder", command: "copy-suggested-run-folder", disabled: !board.canCopySuggestedRunFolder },
-        { label: "Open Linked Run", command: "open-artifact-run", disabled: !board.canOpenRun }
+        { label: "Copy Latest Evidence Location", command: "copy-latest-uri", disabled: !board.canCopyLatestUri },
+        { label: "Copy Suggested Package Folder", command: "copy-suggested-run-folder", disabled: !board.canCopySuggestedRunFolder },
+        { label: "Open Governed Run", command: "open-artifact-run", disabled: !board.canOpenRun }
       ])}
       <div class="evidenceops-kv-list">${renderKeyValueRows(rows)}</div>
       <div class="evidenceops-subsection">
-        <div class="evidenceops-subtitle">Suggested Locations</div>
+        <div class="evidenceops-subtitle">Handoff Locations</div>
         ${renderAccessCards(board.accessEntries)}
       </div>
     </article>

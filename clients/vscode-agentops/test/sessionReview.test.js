@@ -7,20 +7,23 @@ test("buildThreadReviewModel surfaces managed worker review state", () => {
     task: {
       taskId: "task-1",
       status: "IN_PROGRESS",
-      title: "Thread one"
+      title: "Thread one",
+      latestRunId: "run-17"
     },
     sessionViews: [
       {
-        session: { sessionId: "sess-1", status: "RUNNING" },
+        session: { sessionId: "sess-1", status: "RUNNING", runId: "run-17" },
         timeline: {
-          session: { sessionId: "sess-1", status: "RUNNING" },
+          session: { sessionId: "sess-1", status: "RUNNING", runId: "run-17" },
           task: { taskId: "task-1", status: "IN_PROGRESS" },
           selectedWorker: { workerId: "worker-1", workerType: "managed_agent", adapterId: "codex", status: "RUNNING" },
           toolActions: [
             {
               toolActionId: "tool-1",
               toolType: "managed_agent_turn",
+              status: "RUNNING",
               resultPayload: {
+                runId: "run-17",
                 route: "managed_worker_gateway_process",
                 boundaryProviderId: "agentops_gateway",
                 rawResponse: [{ type: "message", text: "ok" }]
@@ -40,6 +43,8 @@ test("buildThreadReviewModel surfaces managed worker review state", () => {
   }, "sess-1");
   assert.equal(model.selectedSummary.executionMode, "managed_codex_worker");
   assert.equal(model.selectedSummary.boundaryProviderId, "agentops_gateway");
+  assert.equal(model.selectedSummary.runId, "run-17");
+  assert.equal(model.selectedSummary.latestToolActionId, "tool-1");
   assert.equal(model.selectedSummary.toolProposals.length, 1);
   assert.equal(model.selectedTranscript.toolActionId, "tool-1");
 });

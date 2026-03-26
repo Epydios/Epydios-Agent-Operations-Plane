@@ -15,8 +15,8 @@ export function renderIncidentOpsEmptyState(ui, options = {}) {
   ui.incidentOpsContent.innerHTML = renderPanelStateMetric(
     options.tone || "info",
     options.title || "IncidentOps",
-    options.message || "Incident posture becomes available after incident packages, linked runs, and audit anchors load.",
+    options.message || "Incident packages appear here after a governed run, review decision, and audit trail are ready.",
     options.detail ||
-      "Refresh the workspace. If incident posture should already be present, verify packaged incident history, linked audit events, and governed run anchors."
+      "Refresh the workspace. If an incident package should already be here, check the linked run, audit activity, and evidence handoff."
   );
 }

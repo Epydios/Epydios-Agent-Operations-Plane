@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { renderSettingsOpsEmptyState, renderSettingsOpsPage } from "../domains/settingsops/routes.js";
 
-test("settingsops renders bounded preferences, secure refs, environment, integration, and recovery boards", () => {
+test("settingsops renders bounded preferences, secure refs, environment, supported setup, and recovery boards", () => {
   const ui = { settingsContent: { innerHTML: "" } };
 
   renderSettingsOpsPage(ui, {
@@ -132,25 +132,33 @@ test("settingsops renders bounded preferences, secure refs, environment, integra
   });
 
   const html = ui.settingsContent.innerHTML;
-  assert.match(html, /App And Local Environment/);
-  assert.match(html, /Integrations And Recovery/);
-  assert.match(html, /App Preferences Board/);
-  assert.match(html, /Secure Ref Board/);
-  assert.match(html, /Local Environment Board/);
-  assert.match(html, /Integration Settings Board/);
-  assert.match(html, /Settings Workflow Recovery/);
-  assert.match(html, /Project Integration Editor/);
-  assert.match(html, /Integration Sync Summary/);
+  assert.match(html, /Preferences And Local Environment/);
+  assert.match(html, /Supported Setup And Recovery/);
+  assert.match(html, /App Preferences/);
+  assert.match(html, /Secure Refs/);
+  assert.match(html, /Local Environment/);
+  assert.match(html, /Supported Setup/);
+  assert.match(html, /Setup Recovery/);
+  assert.match(html, /Supported Setup Editor/);
+  assert.match(html, /Setup Status/);
   assert.match(html, /Endpoint Inventory/);
   assert.match(html, /data-settings-endpoint-id="integrationsettings"/);
   assert.match(html, /Apply Saved/);
   assert.match(html, /Save Draft/);
-  assert.match(html, /Open Audit Events/);
+  assert.match(html, /Review Audit Trail/);
+  assert.match(html, /Show endpoint details/);
+  assert.match(html, /Show endpoints and local paths/);
+  assert.match(html, /Show advanced provider and credential details/);
   assert.match(html, /data-domain-root="settingsops"/);
   assert.match(html, /data-settings-local-ref-action="save"/);
   assert.match(html, /Activate AIMXS Mode/);
   assert.doesNotMatch(html, /Open Diagnostics/);
   assert.doesNotMatch(html, /reopen Configuration/i);
+  assert.doesNotMatch(html, /App Preferences Board/);
+  assert.doesNotMatch(html, /Integration Settings Board/);
+  assert.doesNotMatch(html, /Settings Workflow Recovery/);
+  assert.doesNotMatch(html, /Project Integration Editor/);
+  assert.doesNotMatch(html, /Integration Sync Summary/);
   assert.doesNotMatch(html, /Current Identity \+ Authority/);
   assert.doesNotMatch(html, /Current Policy Contract/);
   assert.doesNotMatch(html, /Provider Contract Matrix/);

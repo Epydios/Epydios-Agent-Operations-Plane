@@ -11,6 +11,16 @@ function clipText(value, maxLength = 220) {
   return `${text.slice(0, maxLength - 1)}...`;
 }
 
+function firstNormalized(values = [], fallback = "") {
+  for (const value of Array.isArray(values) ? values : []) {
+    const text = normalizedString(value);
+    if (text) {
+      return text;
+    }
+  }
+  return fallback;
+}
+
 function eventPayloadObject(item) {
   return item?.payload && typeof item.payload === "object" ? item.payload : {};
 }
@@ -168,6 +178,76 @@ function latestManagedWorkerTranscript(sessionView = {}) {
   };
 }
 
+function latestToolActionSummary(timeline = {}) {
+  const toolActions = Array.isArray(timeline?.toolActions) ? timeline.toolActions : [];
+  const latest = [...toolActions].reverse().find((item) => item && typeof item === "object");
+  if (!latest) {
+    return {
+      toolActionId: "",
+      toolType: "",
+      toolStatus: "",
+      toolSource: ""
+    };
+  }
+  const resultPayload = latest?.resultPayload && typeof latest.resultPayload === "object" ? latest.resultPayload : {};
+  return {
+    toolActionId: normalizedString(latest?.toolActionId),
+    toolType: normalizedString(latest?.toolType),
+    toolStatus: normalizedString(latest?.status),
+    toolSource: firstNormalized([
+      latest?.source,
+      resultPayload?.source,
+      resultPayload?.route,
+      resultPayload?.endpointRef
+    ])
+  };
+}
+
+function deriveRunId(timeline = {}, events = []) {
+  const session = timeline?.session && typeof timeline.session === "object" ? timeline.session : {};
+  const task = timeline?.task && typeof timeline.task === "object" ? timeline.task : {};
+  const selectedWorker = timeline?.selectedWorker && typeof timeline.selectedWorker === "object" ? timeline.selectedWorker : {};
+  const approvals = Array.isArray(timeline?.approvalCheckpoints) ? timeline.approvalCheckpoints : [];
+  const toolActions = Array.isArray(timeline?.toolActions) ? timeline.toolActions : [];
+  const evidenceRecords = Array.isArray(timeline?.evidenceRecords) ? timeline.evidenceRecords : [];
+  const eventValues = (Array.isArray(events) ? events : []).flatMap((item) => {
+    const payload = eventPayloadObject(item);
+    const nested = nestedEventPayload(payload);
+    return [payload?.runId, nested?.runId];
+  });
+  const toolActionValues = toolActions.flatMap((item) => {
+    const resultPayload = item?.resultPayload && typeof item.resultPayload === "object" ? item.resultPayload : {};
+    return [item?.runId, resultPayload?.runId];
+  });
+  return firstNormalized([
+    session?.runId,
+    task?.runId,
+    task?.latestRunId,
+    selectedWorker?.runId,
+    ...approvals.map((item) => item?.runId),
+    ...toolActionValues,
+    ...evidenceRecords.map((item) => item?.runId),
+    ...eventValues
+  ]);
+}
+
+function latestEvidenceRecord(timeline = {}) {
+  const evidenceRecords = Array.isArray(timeline?.evidenceRecords) ? timeline.evidenceRecords : [];
+  const latest = [...evidenceRecords].reverse().find((item) => item && typeof item === "object");
+  if (!latest) {
+    return {
+      evidenceId: "",
+      evidenceKind: "",
+      evidenceSummary: ""
+    };
+  }
+  return {
+    evidenceId: normalizedString(latest?.evidenceId),
+    evidenceKind: normalizedString(latest?.kind),
+    evidenceSummary: normalizedString(latest?.summary)
+  };
+}
+
 function buildSessionSummary(sessionView = {}) {
   const timeline = sessionView?.timeline && typeof sessionView.timeline === "object" ? sessionView.timeline : {};
   const session = timeline?.session && typeof timeline.session === "object" ? timeline.session : {};
@@ -184,6 +264,9 @@ function buildSessionSummary(sessionView = {}) {
     const managedTurn = [...toolActions].reverse().find((item) => normalizedString(item?.toolType).toLowerCase() === "managed_agent_turn");
     return managedTurn?.resultPayload && typeof managedTurn.resultPayload === "object" ? managedTurn.resultPayload : {};
   })();
+  const runId = deriveRunId(timeline, events);
+  const latestToolAction = latestToolActionSummary(timeline);
+  const latestEvidence = latestEvidenceRecord(timeline);
   return {
     session,
     task,
@@ -194,10 +277,18 @@ function buildSessionSummary(sessionView = {}) {
     toolProposals: listToolProposals(sessionView),
     events,
     transcript: latestManagedWorkerTranscript(sessionView),
+    runId,
     route: normalizedString(resultPayload?.route),
     endpointRef: normalizedString(resultPayload?.endpointRef),
     boundaryProviderId: normalizedString(resultPayload?.boundaryProviderId),
     boundaryBaseUrl: normalizedString(resultPayload?.boundaryBaseUrl),
+    latestToolActionId: latestToolAction.toolActionId,
+    latestToolType: latestToolAction.toolType,
+    latestToolStatus: latestToolAction.toolStatus,
+    latestToolSource: latestToolAction.toolSource,
+    latestEvidenceId: latestEvidence.evidenceId,
+    latestEvidenceKind: latestEvidence.evidenceKind,
+    latestEvidenceSummary: latestEvidence.evidenceSummary,
     latestWorkerSummary: normalizedString(latestWorkerEvent?.detail),
     taskStatus: normalizedString(task?.status).toUpperCase(),
     sessionStatus: normalizedString(session?.status).toUpperCase(),

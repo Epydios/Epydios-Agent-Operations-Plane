@@ -141,7 +141,7 @@ function renderHandoffPreview(preview) {
   }
   return `
     <div class="auditops-subsection">
-      <div class="auditops-subtitle">Handoff Preview</div>
+      <div class="auditops-subtitle">Package Summary Preview</div>
       <pre class="auditops-preview">${escapeHTML(text)}</pre>
     </div>
   `;
@@ -426,7 +426,7 @@ function renderExportBoard(snapshot) {
   const board = snapshot.exportBoard;
   const rows = [
     {
-      label: "Current Bundle",
+      label: "Current Package Set",
       value: renderValuePills([
         { label: "actor", value: board.actor, code: true },
         { label: "source", value: board.source },
@@ -435,7 +435,7 @@ function renderExportBoard(snapshot) {
       ])
     },
     {
-      label: "Export Shapes",
+      label: "Package Outputs",
       value: renderValuePills([
         { label: "json rows", value: String(board.matchedCount) },
         { label: "csv lines", value: String(board.csvLineCount) },
@@ -454,7 +454,7 @@ function renderExportBoard(snapshot) {
       ])
     },
     {
-      label: "Latest Export Anchor",
+      label: "Latest Incident Package",
       value: renderValuePills([
         { label: "package", value: board.latestIncident.packageId, code: true },
         { label: "status", value: board.latestIncident.filingStatus },
@@ -463,7 +463,7 @@ function renderExportBoard(snapshot) {
       ])
     },
     {
-      label: "Incident Export Readiness",
+      label: "Package Readiness",
       value: renderValuePills([
         { label: "selected run", value: board.selectedRun.runId, code: true },
         { label: "status", value: board.selectedRun.status },
@@ -474,7 +474,7 @@ function renderExportBoard(snapshot) {
   return `
     <article class="metric auditops-card" data-domain-root="auditops" data-auditops-panel="export-board">
       <div class="metric-title-row">
-        <div class="title">Export Board</div>
+        <div class="title">Incident Package Handoff</div>
         <span class="${chipClassForTone(board.tone)}">${escapeHTML(board.tone)}</span>
       </div>
       <div class="auditops-chip-row">
@@ -484,10 +484,10 @@ function renderExportBoard(snapshot) {
         <span class="chip chip-neutral chip-compact">queue=${escapeHTML(String(board.queueCount))}</span>
       </div>
       ${renderActionButtons([
-        { label: "Export Audit JSON", command: "export-json", disabled: !board.canExportJson },
-        { label: "Export Audit CSV", command: "export-csv", disabled: !board.canExportCsv },
-        { label: "Copy Audit Handoff", command: "copy-handoff", disabled: !board.canCopyHandoff },
-        { label: "Export Incident Package", command: "export-incident-package", disabled: !board.canExportIncident }
+        { label: "Download Audit JSON", command: "export-json", disabled: !board.canExportJson },
+        { label: "Download Audit CSV", command: "export-csv", disabled: !board.canExportCsv },
+        { label: "Copy Package Summary", command: "copy-handoff", disabled: !board.canCopyHandoff },
+        { label: "Download Incident Package", command: "export-incident-package", disabled: !board.canExportIncident }
       ])}
       <div class="auditops-kv-list">${renderKeyValueRows(rows)}</div>
       ${renderHandoffPreview(snapshot.handoffPreview)}
@@ -499,7 +499,7 @@ function renderInvestigationWorkspace(snapshot) {
   const board = snapshot.investigationWorkspace;
   const rows = [
     {
-      label: "Queue Status",
+      label: "Package Queue",
       value: renderValuePills([
         { label: "drafted", value: String(board.draftedCount) },
         { label: "filed", value: String(board.filedCount) },
@@ -517,7 +517,7 @@ function renderInvestigationWorkspace(snapshot) {
       ])
     },
     {
-      label: "Linked Trace",
+      label: "Linked Run And Review",
       value: renderValuePills([
         { label: "run", value: board.latestRun.runId, code: true },
         { label: "approval", value: board.latestApproval.approvalId, code: true },
@@ -533,7 +533,7 @@ function renderInvestigationWorkspace(snapshot) {
   return `
     <article class="metric auditops-card" data-domain-root="auditops" data-auditops-panel="investigation-workspace">
       <div class="metric-title-row">
-        <div class="title">Investigation Workspace</div>
+        <div class="title">Incident Package Flow</div>
         <span class="${chipClassForTone(board.tone)}">${escapeHTML(board.tone)}</span>
       </div>
       <div class="auditops-chip-row">
@@ -543,8 +543,8 @@ function renderInvestigationWorkspace(snapshot) {
         <span class="chip chip-neutral chip-compact">latest=${escapeHTML(board.latestIncident.packageId || "-")}</span>
       </div>
       ${renderActionButtons([
-        { label: "Open IncidentOps", command: "open-incidentops", disabled: !board.canOpenIncidentOps },
-        { label: "Copy Latest Handoff", command: "copy-latest-handoff", disabled: !board.canCopyLatestHandoff }
+        { label: "Open Incident Packages", command: "open-incidentops", disabled: !board.canOpenIncidentOps },
+        { label: "Copy Package Summary", command: "copy-latest-handoff", disabled: !board.canCopyLatestHandoff }
       ])}
       <div class="auditops-kv-list">${renderKeyValueRows(rows)}</div>
       <div class="auditops-subsection">

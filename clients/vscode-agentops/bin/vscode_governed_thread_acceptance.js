@@ -46,6 +46,7 @@ function createRuntimeState() {
     taskId: "task-vscode-proof-1",
     tenantId: "tenant-demo",
     projectId: "project-payments",
+    runId: "run-vscode-baseline",
     title: "Review governed VS Code request",
     intent: "Validate the first bounded VS Code governed turn path.",
     requestedBy: "operator@example.com",
@@ -58,6 +59,7 @@ function createRuntimeState() {
   const baselineTimeline = {
     session: {
       sessionId: "sess-vscode-baseline",
+      runId: "run-vscode-baseline",
       taskId: baseTask.taskId,
       tenantId: baseTask.tenantId,
       projectId: baseTask.projectId,
@@ -66,7 +68,7 @@ function createRuntimeState() {
       startedAt: isoNow(),
       updatedAt: isoNow()
     },
-    task: baseTask,
+      task: baseTask,
     selectedWorker: {
       workerId: "worker-baseline",
       workerType: "managed_agent",
@@ -76,22 +78,25 @@ function createRuntimeState() {
     },
     approvalCheckpoints: [],
     toolActions: [
-      {
-        toolActionId: "tool-baseline-1",
-        toolType: "managed_agent_turn",
-        status: "COMPLETED",
-        resultPayload: {
-          route: "managed_worker_gateway_process",
+        {
+          toolActionId: "tool-baseline-1",
+          toolType: "managed_agent_turn",
+          status: "COMPLETED",
+          runId: "run-vscode-baseline",
+          resultPayload: {
+            runId: "run-vscode-baseline",
+            route: "managed_worker_gateway_process",
           boundaryProviderId: "agentops_gateway",
           endpointRef: "vscode-proof-endpoint",
           rawResponse: [{ type: "message", text: "Baseline governed thread ready." }]
         }
       }
     ],
-    evidenceRecords: [
-      {
-        evidenceId: "evidence-baseline-1",
-        kind: "audit_bundle",
+      evidenceRecords: [
+        {
+          evidenceId: "evidence-baseline-1",
+          runId: "run-vscode-baseline",
+          kind: "audit_bundle",
         summary: "Initial governed review bundle is available."
       }
     ],
@@ -124,6 +129,7 @@ function createRuntimeState() {
     sessions: [
       {
         sessionId: baselineTimeline.session.sessionId,
+        runId: "run-vscode-baseline",
         taskId: baseTask.taskId,
         tenantId: baseTask.tenantId,
         projectId: baseTask.projectId,
@@ -165,6 +171,7 @@ function ensureGovernedSession(state) {
     state.timelines[sessionId] = {
       session: {
         sessionId,
+        runId: "run-vscode-proof-1",
         taskId: state.task.taskId,
         tenantId: state.task.tenantId,
         projectId: state.task.projectId,
@@ -184,6 +191,7 @@ function ensureGovernedSession(state) {
       approvalCheckpoints: [
         {
           checkpointId: "approval-vscode-proof-1",
+          runId: "run-vscode-proof-1",
           status: "PENDING",
           reason: "Review the first governed VS Code turn before execution continues."
         }
@@ -193,7 +201,9 @@ function ensureGovernedSession(state) {
           toolActionId: "tool-vscode-proof-1",
           toolType: "managed_agent_turn",
           status: "AWAITING_APPROVAL",
+          runId: "run-vscode-proof-1",
           resultPayload: {
+            runId: "run-vscode-proof-1",
             route: "managed_worker_gateway_process",
             boundaryProviderId: "agentops_gateway",
             endpointRef: "vscode-proof-endpoint",
@@ -207,6 +217,7 @@ function ensureGovernedSession(state) {
     };
     state.sessions.unshift({
       sessionId,
+      runId: "run-vscode-proof-1",
       taskId: state.task.taskId,
       tenantId: state.task.tenantId,
       projectId: state.task.projectId,
@@ -338,6 +349,7 @@ function startMockRuntime(log) {
       }
       pushEvent(timeline, "approval.status.changed", {
         checkpointId,
+        runId: "run-vscode-proof-1",
         status: checkpoint.status,
         decision: checkpoint.decision,
         reason: checkpoint.reason
@@ -359,6 +371,7 @@ function startMockRuntime(log) {
       const decision = normalizedString(body?.decision, "APPROVE").toUpperCase() === "DENY" ? "DENY" : "APPROVE";
       pushEvent(timeline, "tool_proposal.decided", {
         proposalId,
+        runId: "run-vscode-proof-1",
         status: decision === "DENY" ? "DENIED" : "APPROVED",
         decision,
         reason: normalizedString(body?.reason, "Operator accepted the proposed workspace summary command."),
@@ -375,11 +388,13 @@ function startMockRuntime(log) {
       }
       timeline.evidenceRecords.push({
         evidenceId: "evidence-vscode-proof-1",
+        runId: "run-vscode-proof-1",
         kind: "audit_bundle",
         summary: "Governed VS Code request bundle ready for downstream review."
       });
       pushEvent(timeline, "evidence.recorded", {
         evidenceId: "evidence-vscode-proof-1",
+        runId: "run-vscode-proof-1",
         kind: "audit_bundle",
         summary: "Governed VS Code request bundle ready for downstream review."
       });
@@ -513,9 +528,12 @@ async function main() {
     });
     const finalModel = buildThreadReviewModel(finalThread, "sess-vscode-proof");
     assert.equal(finalModel.selectedSummary.sessionStatus, "COMPLETED");
+    assert.equal(finalModel.selectedSummary.runId, "run-vscode-proof-1");
     assert.equal(finalModel.selectedSummary.evidenceRecords.length, 1);
     const handoff = buildAuditEvidenceHandoff(finalModel);
     assert.match(handoff.renderedText, /AgentOps Audit and Evidence Handoff/);
+    assert.match(handoff.renderedText, /Run: run-vscode-proof-1/);
+    assert.match(handoff.renderedText, /Resolved approvals: approval-vscode-proof-1 \(APPROVED\)/);
     assert.match(handoff.renderedText, /Governed VS Code request bundle ready for downstream review/);
     log("proved audit and evidence handoff output");
 

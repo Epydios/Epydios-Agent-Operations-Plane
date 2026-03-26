@@ -198,8 +198,8 @@ test("auditops page renders bounded audit event, actor activity, and decision tr
   assert.match(ui.auditOpsContent.innerHTML, /data-aimxs-spine-action="open-workspace"/);
   assert.match(ui.auditOpsContent.innerHTML, /Decision Binding Contract/);
   assert.match(ui.auditOpsContent.innerHTML, /Stable Or Replay Refs/);
-  assert.match(ui.auditOpsContent.innerHTML, /Export Board/);
-  assert.match(ui.auditOpsContent.innerHTML, /Investigation Workspace/);
+  assert.match(ui.auditOpsContent.innerHTML, /Incident Package Handoff/);
+  assert.match(ui.auditOpsContent.innerHTML, /Incident Package Flow/);
   assert.match(ui.auditOpsContent.innerHTML, /AuditOps Action Complete/);
   assert.match(ui.auditOpsContent.innerHTML, /Audit JSON exported to audit-export\.json\./);
   assert.match(ui.auditOpsContent.innerHTML, /audit-endpoint/);
@@ -227,7 +227,7 @@ test("auditops page renders bounded audit event, actor activity, and decision tr
   assert.match(ui.auditOpsContent.innerHTML, /data-auditops-action="export-incident-package"/);
   assert.match(ui.auditOpsContent.innerHTML, /data-auditops-action="open-incidentops"/);
   assert.match(ui.auditOpsContent.innerHTML, /data-auditops-action="copy-latest-handoff"/);
-  assert.match(ui.auditOpsContent.innerHTML, /Handoff Preview/);
+  assert.match(ui.auditOpsContent.innerHTML, /Package Summary Preview/);
   assert.match(ui.auditOpsContent.innerHTML, /selected run/);
   assert.match(ui.auditOpsContent.innerHTML, /drafted=1/);
   assert.match(ui.auditOpsContent.innerHTML, /filed=1/);
