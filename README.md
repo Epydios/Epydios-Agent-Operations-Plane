@@ -113,6 +113,17 @@ EpydiosOps currently consists of:
 - a governed runtime path for requests, runs, receipts and review
 - operator surfaces for runtime, governance, audit, evidence, incidents
 
+Interposition is ready for between the agent API and: 
+
+- Visual Studio Code
+- CODEX
+
+Not Yet Ready: 
+
+- CLI
+- Anthropic
+- 
+
 ## Future Directions
 
 We are building EpydiosOps toward a more complete agent operations plane for both individual operators and serious organizational use. Near-term work includes:
