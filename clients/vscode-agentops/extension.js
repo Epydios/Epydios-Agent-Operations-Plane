@@ -543,6 +543,16 @@ function renderEnvelopeSection(title, items = []) {
   return `<div class="envelope-section"><strong>${escapeHtml(title)}</strong><ul>${items.map((item) => `<li>${escapeHtml(normalizedString(item).replace(/^[-*]\s+/, ""))}</li>`).join("")}</ul></div>`;
 }
 
+function pendingApprovalItems(selectedSummary = {}) {
+  return (Array.isArray(selectedSummary?.approvals) ? selectedSummary.approvals : [])
+    .filter((item) => normalizedString(item?.status, "PENDING").toUpperCase() === "PENDING");
+}
+
+function pendingProposalItems(selectedSummary = {}) {
+  return (Array.isArray(selectedSummary?.toolProposals) ? selectedSummary.toolProposals : [])
+    .filter((item) => normalizedString(item?.status, "PENDING").toUpperCase() === "PENDING");
+}
+
 function buildThreadGovernanceReport(model = {}, selection = {}) {
   const selectedSessionId = normalizedString(model?.selectedSession?.sessionId);
   const selectedSummary = model?.selectedSummary || {};
@@ -597,6 +607,9 @@ function renderHtml(model, selection = {}, connection = {}) {
   const governedReport = buildThreadGovernanceReport(model, selection);
   const handoff = buildAuditEvidenceHandoff(model);
   const connectionStatus = renderConnectionStatus(connection);
+  const pendingApprovals = pendingApprovalItems(selectedSummary);
+  const pendingProposals = pendingProposalItems(selectedSummary);
+  const pendingDecisionCount = pendingApprovals.length + pendingProposals.length;
   const governedUpdate = buildGovernedUpdateEnvelope(model, {
     header: "AgentOps thread update",
     updateType: "review",
@@ -645,138 +658,231 @@ function renderHtml(model, selection = {}, connection = {}) {
   const transcriptBlock = transcript
     ? `<details><summary>Managed worker transcript</summary><pre>${escapeHtml(transcript.pretty)}</pre></details>`
     : "";
-  const governedUpdateBlock = `<section class="panel">
-    <h3>${escapeHtml(governedUpdate.header)}</h3>
-    <div class="meta">type=${escapeHtml(governedUpdate.updateType)} | ${escapeHtml(governedUpdate.contextLabel)}=${escapeHtml(governedUpdate.contextValue)} | ${escapeHtml(governedUpdate.subjectLabel)}=${escapeHtml(governedUpdate.subjectValue)}</div>
-    <div class="chips">
-      <span class="chip">task=${escapeHtml(normalizedString(governedUpdate.taskId, "-"))}</span>
-      <span class="chip">taskStatus=${escapeHtml(normalizedString(governedUpdate.taskStatus, "-"))}</span>
-      <span class="chip">session=${escapeHtml(normalizedString(governedUpdate.sessionId, "-"))}</span>
-      <span class="chip">sessionStatus=${escapeHtml(normalizedString(governedUpdate.sessionStatus, "-"))}</span>
-      <span class="chip">worker=${escapeHtml(normalizedString(governedUpdate.workerId, "-"))}</span>
-      <span class="chip">workerState=${escapeHtml(normalizedString(governedUpdate.workerState, "-"))}</span>
-      <span class="chip">openApprovals=${escapeHtml(String(governedUpdate.openApprovals))}</span>
-      <span class="chip">pendingProposals=${escapeHtml(String(governedUpdate.pendingProposalCount))}</span>
-      <span class="chip">orgAdminPending=${escapeHtml(String(governedUpdate.orgAdminPendingReviews || 0))}</span>
-    </div>
-    <p>${escapeHtml(normalizedString(governedUpdate.summary, "Governed thread state refreshed."))}</p>
-    ${normalizedString(governedUpdate.orgAdminProfileId) || normalizedString(governedUpdate.orgAdminProfileLabel)
-      ? `<div class="meta">orgAdminProfile=${escapeHtml(normalizedString(governedUpdate.orgAdminProfileLabel, normalizedString(governedUpdate.orgAdminProfileId, "-")))} | model=${escapeHtml(normalizedString(governedUpdate.orgAdminOrganizationModel, "-"))} | roleBundle=${escapeHtml(normalizedString(governedUpdate.orgAdminRoleBundle, "-"))}</div>`
-      : ""}
-    ${renderEnvelopeSection("Org-admin categories", governedUpdate.orgAdminCategories)}
-    ${renderEnvelopeSection("Org-admin decision bindings", governedUpdate.orgAdminDecisionBindings)}
-    ${renderEnvelopeSection("Org-admin directory-sync mappings", governedUpdate.orgAdminDirectoryMappings)}
-    ${renderEnvelopeSection("Org-admin exception profiles", governedUpdate.orgAdminExceptionProfiles)}
-    ${renderEnvelopeSection("Org-admin overlay profiles", governedUpdate.orgAdminOverlayProfiles)}
-    ${renderEnvelopeSection("Org-admin decision actor roles", governedUpdate.orgAdminDecisionActorRoles)}
-    ${renderEnvelopeSection("Org-admin decision surfaces", governedUpdate.orgAdminDecisionSurfaces)}
-    ${renderEnvelopeSection("Org-admin boundary requirements", governedUpdate.orgAdminBoundaryRequirements)}
-    ${renderEnvelopeSection("Org-admin input keys", governedUpdate.orgAdminInputKeys)}
-    ${renderEnvelopeSection("Org-admin input values", governedUpdate.orgAdminInputValues)}
-    ${renderEnvelopeSection("Org-admin artifact events", governedUpdate.orgAdminArtifactEvents)}
-    ${renderEnvelopeSection("Org-admin evidence kinds", governedUpdate.orgAdminArtifactEvidence)}
-    ${renderEnvelopeSection("Org-admin artifact retention classes", governedUpdate.orgAdminArtifactRetention)}
-    ${renderEnvelopeSection("Details", governedUpdate.details)}
-    ${renderEnvelopeSection("Recent activity", governedUpdate.recent)}
-    ${renderEnvelopeSection("Action hints", governedUpdate.actionHints)}
+  const focusedApproval = pendingDecisionCount === 1 && pendingApprovals.length === 1 ? pendingApprovals[0] : null;
+  const focusedProposal = pendingDecisionCount === 1 && pendingProposals.length === 1 ? pendingProposals[0] : null;
+  const reviewLaneSummary = pendingDecisionCount === 0
+    ? `No pending decisions remain${selectedSessionId ? ` in session ${selectedSessionId}` : ""}. Review the handoff or send the next governed turn.`
+    : pendingDecisionCount === 1
+      ? `One current decision is ready to resolve${selectedSessionId ? ` in session ${selectedSessionId}` : ""}.`
+      : `${pendingDecisionCount} pending decisions need review${selectedSessionId ? ` in session ${selectedSessionId}` : ""}.`;
+  const reviewLaneMeta = [
+    normalizedString(selectedSummary?.runId) ? `run ${normalizedString(selectedSummary.runId)}` : "",
+    selectedSessionId ? `session ${selectedSessionId}` : "",
+    pendingApprovals.length > 0 ? `${pendingApprovals.length} approval${pendingApprovals.length === 1 ? "" : "s"} pending` : "",
+    pendingProposals.length > 0 ? `${pendingProposals.length} proposal${pendingProposals.length === 1 ? "" : "s"} pending` : ""
+  ].filter(Boolean).join(" | ");
+  const focusedDecisionBlock = focusedApproval
+    ? `<div class="decision-card">
+      <h4>Approval Ready Now</h4>
+      <div><strong>${escapeHtml(normalizedString(focusedApproval?.status, "PENDING"))}</strong> ${escapeHtml(normalizedString(focusedApproval?.reason, normalizedString(focusedApproval?.scope, "Approval checkpoint")))}</div>
+      <div class="meta">Checkpoint ${escapeHtml(normalizedString(focusedApproval?.checkpointId, "-"))}${selectedSummary?.runId ? ` · run ${escapeHtml(normalizedString(selectedSummary.runId))}` : ""}</div>
+      ${renderDecisionButtons("approval", selectedSessionId, focusedApproval)}
+    </div>`
+    : focusedProposal
+      ? `<div class="decision-card">
+        <h4>Proposal Ready Now</h4>
+        <div><strong>${escapeHtml(normalizedString(focusedProposal?.status, "PENDING"))}</strong> ${escapeHtml(normalizedString(focusedProposal?.command, normalizedString(focusedProposal?.summary, focusedProposal?.proposalType || "Tool proposal")))}</div>
+        <div class="meta">Proposal ${escapeHtml(normalizedString(focusedProposal?.proposalId, "-"))}${normalizedString(focusedProposal?.toolActionId) ? ` · tool action ${escapeHtml(normalizedString(focusedProposal?.toolActionId))}` : ""}</div>
+        ${renderDecisionButtons("proposal", selectedSessionId, focusedProposal)}
+      </div>`
+      : "";
+  const pendingDecisionLists = pendingDecisionCount > 1
+    ? `<div class="decision-columns">
+      ${pendingApprovals.length > 0 ? `<div class="decision-column">
+        <h4>Pending Approvals</h4>
+        <ul>${pendingApprovals.map((item) => `
+          <li>
+            <strong>${escapeHtml(normalizedString(item?.status, "PENDING"))}</strong>
+            ${escapeHtml(normalizedString(item?.reason, normalizedString(item?.scope, "Approval checkpoint")))}
+            <div class="meta">Checkpoint ${escapeHtml(normalizedString(item?.checkpointId, "-"))}${selectedSummary?.runId ? ` · run ${escapeHtml(normalizedString(selectedSummary.runId))}` : ""}</div>
+            ${renderDecisionButtons("approval", selectedSessionId, item)}
+          </li>
+        `).join("")}</ul>
+      </div>` : ""}
+      ${pendingProposals.length > 0 ? `<div class="decision-column">
+        <h4>Pending Proposals</h4>
+        <ul>${pendingProposals.map((item) => `
+          <li>
+            <strong>${escapeHtml(normalizedString(item?.status, "PENDING"))}</strong>
+            ${escapeHtml(normalizedString(item?.command, normalizedString(item?.summary, item?.proposalType || "tool proposal")))}
+            <div class="meta">Proposal ${escapeHtml(normalizedString(item?.proposalId, "-"))}${normalizedString(item?.toolActionId) ? ` · tool action ${escapeHtml(normalizedString(item?.toolActionId))}` : ""}</div>
+            ${renderDecisionButtons("proposal", selectedSessionId, item)}
+          </li>
+        `).join("")}</ul>
+      </div>` : ""}
+    </div>`
+    : "";
+  const reviewLaneBlock = `<section class="panel panel-primary">
+    <h3>Current Decision</h3>
+    <div class="meta">${escapeHtml(reviewLaneSummary)}</div>
+    ${reviewLaneMeta ? `<div class="meta">${escapeHtml(reviewLaneMeta)}</div>` : ""}
+    ${renderEnvelopeSection("Current decision", handoff.currentDecisionLines)}
+    ${focusedDecisionBlock}
+    ${pendingDecisionLists}
+    ${pendingDecisionCount === 0 ? `<div class="meta">No operator action is waiting right now. Use the handoff below or send the next governed turn.</div>` : ""}
+    ${renderEnvelopeSection("Next actions", handoff.nextActionLines)}
   </section>`;
-  const governedReportBlock = `<section class="panel">
-    <h3>${escapeHtml(governedReport.header)}</h3>
-    <div class="meta">type=${escapeHtml(governedReport.reportType)} | export=${escapeHtml(governedReport.exportProfile)} | audience=${escapeHtml(governedReport.audience)} | retention=${escapeHtml(governedReport.retentionClass)} | surface=${escapeHtml(governedReport.clientSurface)}</div>
-    <div class="chips">
-      <span class="chip">task=${escapeHtml(normalizedString(governedReport.taskId, "-"))}</span>
-      <span class="chip">session=${escapeHtml(normalizedString(governedReport.sessionId, "-"))}</span>
-      <span class="chip">worker=${escapeHtml(normalizedString(governedReport.workerId, "-"))}</span>
-      <span class="chip">workerState=${escapeHtml(normalizedString(governedReport.workerState, "-"))}</span>
-      <span class="chip">exportCatalog=${escapeHtml(String((governedReport.exportProfileLabels || []).length))}</span>
-      <span class="chip">orgAdmin=${escapeHtml(String((governedReport.applicableOrgAdmins || []).length))}</span>
-      <span class="chip">policyPacks=${escapeHtml(String((governedReport.applicablePolicyPacks || []).length))}</span>
-      <span class="chip">roleBundles=${escapeHtml(String((governedReport.roleBundles || []).length))}</span>
-      <span class="chip">adminBundles=${escapeHtml(String((governedReport.adminRoleBundles || []).length))}</span>
-      <span class="chip">dlpFindings=${escapeHtml(String((governedReport.dlpFindings || []).length))}</span>
+  const governedUpdateBlock = `<details class="panel secondary-panel">
+    <summary>Governed update details</summary>
+    <div class="details-body">
+      <div class="meta">${escapeHtml(normalizedString(governedUpdate.summary, "Governed thread state refreshed."))}</div>
+      <div class="chips">
+        <span class="chip">task=${escapeHtml(normalizedString(governedUpdate.taskId, "-"))}</span>
+        <span class="chip">taskStatus=${escapeHtml(normalizedString(governedUpdate.taskStatus, "-"))}</span>
+        <span class="chip">session=${escapeHtml(normalizedString(governedUpdate.sessionId, "-"))}</span>
+        <span class="chip">sessionStatus=${escapeHtml(normalizedString(governedUpdate.sessionStatus, "-"))}</span>
+        <span class="chip">worker=${escapeHtml(normalizedString(governedUpdate.workerId, "-"))}</span>
+        <span class="chip">workerState=${escapeHtml(normalizedString(governedUpdate.workerState, "-"))}</span>
+        <span class="chip">openApprovals=${escapeHtml(String(governedUpdate.openApprovals))}</span>
+        <span class="chip">pendingProposals=${escapeHtml(String(governedUpdate.pendingProposalCount))}</span>
+        <span class="chip">orgAdminPending=${escapeHtml(String(governedUpdate.orgAdminPendingReviews || 0))}</span>
+      </div>
+      ${normalizedString(governedUpdate.orgAdminProfileId) || normalizedString(governedUpdate.orgAdminProfileLabel)
+        ? `<div class="meta">orgAdminProfile=${escapeHtml(normalizedString(governedUpdate.orgAdminProfileLabel, normalizedString(governedUpdate.orgAdminProfileId, "-")))} | model=${escapeHtml(normalizedString(governedUpdate.orgAdminOrganizationModel, "-"))} | roleBundle=${escapeHtml(normalizedString(governedUpdate.orgAdminRoleBundle, "-"))}</div>`
+        : ""}
+      ${renderEnvelopeSection("Org-admin categories", governedUpdate.orgAdminCategories)}
+      ${renderEnvelopeSection("Org-admin decision bindings", governedUpdate.orgAdminDecisionBindings)}
+      ${renderEnvelopeSection("Org-admin directory-sync mappings", governedUpdate.orgAdminDirectoryMappings)}
+      ${renderEnvelopeSection("Org-admin exception profiles", governedUpdate.orgAdminExceptionProfiles)}
+      ${renderEnvelopeSection("Org-admin overlay profiles", governedUpdate.orgAdminOverlayProfiles)}
+      ${renderEnvelopeSection("Org-admin decision actor roles", governedUpdate.orgAdminDecisionActorRoles)}
+      ${renderEnvelopeSection("Org-admin decision surfaces", governedUpdate.orgAdminDecisionSurfaces)}
+      ${renderEnvelopeSection("Org-admin boundary requirements", governedUpdate.orgAdminBoundaryRequirements)}
+      ${renderEnvelopeSection("Org-admin input keys", governedUpdate.orgAdminInputKeys)}
+      ${renderEnvelopeSection("Org-admin input values", governedUpdate.orgAdminInputValues)}
+      ${renderEnvelopeSection("Org-admin artifact events", governedUpdate.orgAdminArtifactEvents)}
+      ${renderEnvelopeSection("Org-admin evidence kinds", governedUpdate.orgAdminArtifactEvidence)}
+      ${renderEnvelopeSection("Org-admin artifact retention classes", governedUpdate.orgAdminArtifactRetention)}
+      ${renderEnvelopeSection("Details", governedUpdate.details)}
+      ${renderEnvelopeSection("Recent activity", governedUpdate.recent)}
+      ${renderEnvelopeSection("Action hints", governedUpdate.actionHints)}
     </div>
-    <p>${escapeHtml(normalizedString(governedReport.summary, "Governed thread state refreshed."))}</p>
-    <div class="toolbar">
-      <button type="button" data-action="select-governance-report-profile">Select Report Profile</button>
-      <button type="button" data-action="copy-governance-report">Copy Governed Report</button>
+  </details>`;
+  const governedReportBlock = `<details class="panel secondary-panel">
+    <summary>Governed report details</summary>
+    <div class="details-body">
+      <div class="meta">${escapeHtml(normalizedString(governedReport.summary, "Governed report is available."))}</div>
+      <div class="toolbar">
+        <button type="button" data-action="select-governance-report-profile">Select Report Profile</button>
+        <button type="button" data-action="copy-governance-report">Copy Governed Report</button>
+      </div>
+      <div class="chips">
+        <span class="chip">task=${escapeHtml(normalizedString(governedReport.taskId, "-"))}</span>
+        <span class="chip">session=${escapeHtml(normalizedString(governedReport.sessionId, "-"))}</span>
+        <span class="chip">worker=${escapeHtml(normalizedString(governedReport.workerId, "-"))}</span>
+        <span class="chip">workerState=${escapeHtml(normalizedString(governedReport.workerState, "-"))}</span>
+        <span class="chip">exportCatalog=${escapeHtml(String((governedReport.exportProfileLabels || []).length))}</span>
+        <span class="chip">orgAdmin=${escapeHtml(String((governedReport.applicableOrgAdmins || []).length))}</span>
+        <span class="chip">policyPacks=${escapeHtml(String((governedReport.applicablePolicyPacks || []).length))}</span>
+        <span class="chip">roleBundles=${escapeHtml(String((governedReport.roleBundles || []).length))}</span>
+        <span class="chip">adminBundles=${escapeHtml(String((governedReport.adminRoleBundles || []).length))}</span>
+        <span class="chip">dlpFindings=${escapeHtml(String((governedReport.dlpFindings || []).length))}</span>
+      </div>
+      ${renderEnvelopeSection("Details", governedReport.details)}
+      ${renderEnvelopeSection("Applicable org-admin profiles", governedReport.applicableOrgAdmins)}
+      ${renderEnvelopeSection("Export profile coverage", governedReport.exportProfileLabels)}
+      ${renderEnvelopeSection("Applicable policy packs", governedReport.applicablePolicyPacks)}
+      ${renderEnvelopeSection("Role bundles", governedReport.roleBundles)}
+      ${renderEnvelopeSection("Admin role bundles", governedReport.adminRoleBundles)}
+      ${renderEnvelopeSection("Delegation models", governedReport.delegationModels)}
+      ${renderEnvelopeSection("Delegated admin bundles", governedReport.delegatedAdminBundles)}
+      ${renderEnvelopeSection("Break-glass bundles", governedReport.breakGlassBundles)}
+      ${renderEnvelopeSection("Active org-admin categories", governedReport.activeOrgAdminCategories)}
+      ${renderEnvelopeSection("Active org-admin decision bindings", governedReport.activeOrgAdminDecisionBindings)}
+      ${renderEnvelopeSection("Active org-admin decision actor roles", governedReport.activeOrgAdminDecisionActorRoles)}
+      ${renderEnvelopeSection("Active org-admin decision surfaces", governedReport.activeOrgAdminDecisionSurfaces)}
+      ${renderEnvelopeSection("Active org-admin boundary requirements", governedReport.activeOrgAdminBoundaryRequirements)}
+      ${renderEnvelopeSection("Active org-admin input keys", governedReport.activeOrgAdminInputKeys)}
+      ${renderEnvelopeSection("Active org-admin directory-sync mappings", governedReport.activeOrgAdminDirectoryMappings)}
+      ${renderEnvelopeSection("Active org-admin exception profiles", governedReport.activeOrgAdminExceptionProfiles)}
+      ${renderEnvelopeSection("Active org-admin overlay profiles", governedReport.activeOrgAdminOverlayProfiles)}
+      ${renderEnvelopeSection("Active org-admin input values", governedReport.activeOrgAdminInputValues)}
+      ${renderEnvelopeSection("Active org-admin artifact events", governedReport.activeOrgAdminArtifactEvents)}
+      ${renderEnvelopeSection("Active org-admin evidence kinds", governedReport.activeOrgAdminArtifactEvidence)}
+      ${renderEnvelopeSection("Active org-admin artifact retention classes", governedReport.activeOrgAdminArtifactRetention)}
+      ${renderEnvelopeSection("Worker capability coverage", governedReport.workerCapabilityLabels)}
+      ${renderEnvelopeSection("Directory-sync inputs", governedReport.directorySyncInputs)}
+      ${renderEnvelopeSection("Residency profiles", governedReport.residencyProfiles)}
+      ${renderEnvelopeSection("Residency exceptions", governedReport.residencyExceptions)}
+      ${renderEnvelopeSection("Legal-hold profiles", governedReport.legalHoldProfiles)}
+      ${renderEnvelopeSection("Legal-hold exceptions", governedReport.legalHoldExceptions)}
+      ${renderEnvelopeSection("Network boundary profiles", governedReport.networkBoundaryProfiles)}
+      ${renderEnvelopeSection("Fleet rollout profiles", governedReport.fleetRolloutProfiles)}
+      ${renderEnvelopeSection("Quota dimensions", governedReport.quotaDimensions)}
+      ${renderEnvelopeSection("Quota overlays", governedReport.quotaOverlays)}
+      ${renderEnvelopeSection("Chargeback dimensions", governedReport.chargebackDimensions)}
+      ${renderEnvelopeSection("Chargeback overlays", governedReport.chargebackOverlays)}
+      ${renderEnvelopeSection("Enforcement hooks", governedReport.enforcementHooks)}
+      ${renderEnvelopeSection("Boundary requirements", governedReport.boundaryRequirements)}
+      ${renderEnvelopeSection("Decision surfaces", governedReport.decisionSurfaces)}
+      ${renderEnvelopeSection("Reporting surfaces", governedReport.reportingSurfaces)}
+      ${renderEnvelopeSection("Allowed audiences", governedReport.allowedAudiences)}
+      ${renderEnvelopeSection("Delivery channels", governedReport.deliveryChannels)}
+      ${renderEnvelopeSection("Redaction modes", governedReport.redactionModes)}
+      ${renderEnvelopeSection("Recent activity", governedReport.recent)}
+      ${renderEnvelopeSection("Action hints", governedReport.actionHints)}
+      ${renderEnvelopeSection("DLP findings", governedReport.dlpFindings)}
+      <details><summary>Rendered governed report</summary><pre>${escapeHtml(normalizedString(governedReport.renderedText))}</pre></details>
     </div>
-    ${renderEnvelopeSection("Details", governedReport.details)}
-    ${renderEnvelopeSection("Applicable org-admin profiles", governedReport.applicableOrgAdmins)}
-    ${renderEnvelopeSection("Export profile coverage", governedReport.exportProfileLabels)}
-    ${renderEnvelopeSection("Applicable policy packs", governedReport.applicablePolicyPacks)}
-    ${renderEnvelopeSection("Role bundles", governedReport.roleBundles)}
-    ${renderEnvelopeSection("Admin role bundles", governedReport.adminRoleBundles)}
-    ${renderEnvelopeSection("Delegation models", governedReport.delegationModels)}
-    ${renderEnvelopeSection("Delegated admin bundles", governedReport.delegatedAdminBundles)}
-    ${renderEnvelopeSection("Break-glass bundles", governedReport.breakGlassBundles)}
-    ${renderEnvelopeSection("Active org-admin categories", governedReport.activeOrgAdminCategories)}
-    ${renderEnvelopeSection("Active org-admin decision bindings", governedReport.activeOrgAdminDecisionBindings)}
-    ${renderEnvelopeSection("Active org-admin decision actor roles", governedReport.activeOrgAdminDecisionActorRoles)}
-    ${renderEnvelopeSection("Active org-admin decision surfaces", governedReport.activeOrgAdminDecisionSurfaces)}
-    ${renderEnvelopeSection("Active org-admin boundary requirements", governedReport.activeOrgAdminBoundaryRequirements)}
-    ${renderEnvelopeSection("Active org-admin input keys", governedReport.activeOrgAdminInputKeys)}
-    ${renderEnvelopeSection("Active org-admin directory-sync mappings", governedReport.activeOrgAdminDirectoryMappings)}
-    ${renderEnvelopeSection("Active org-admin exception profiles", governedReport.activeOrgAdminExceptionProfiles)}
-    ${renderEnvelopeSection("Active org-admin overlay profiles", governedReport.activeOrgAdminOverlayProfiles)}
-    ${renderEnvelopeSection("Active org-admin input values", governedReport.activeOrgAdminInputValues)}
-    ${renderEnvelopeSection("Active org-admin artifact events", governedReport.activeOrgAdminArtifactEvents)}
-    ${renderEnvelopeSection("Active org-admin evidence kinds", governedReport.activeOrgAdminArtifactEvidence)}
-    ${renderEnvelopeSection("Active org-admin artifact retention classes", governedReport.activeOrgAdminArtifactRetention)}
-    ${renderEnvelopeSection("Worker capability coverage", governedReport.workerCapabilityLabels)}
-    ${renderEnvelopeSection("Directory-sync inputs", governedReport.directorySyncInputs)}
-    ${renderEnvelopeSection("Residency profiles", governedReport.residencyProfiles)}
-    ${renderEnvelopeSection("Residency exceptions", governedReport.residencyExceptions)}
-    ${renderEnvelopeSection("Legal-hold profiles", governedReport.legalHoldProfiles)}
-    ${renderEnvelopeSection("Legal-hold exceptions", governedReport.legalHoldExceptions)}
-    ${renderEnvelopeSection("Network boundary profiles", governedReport.networkBoundaryProfiles)}
-    ${renderEnvelopeSection("Fleet rollout profiles", governedReport.fleetRolloutProfiles)}
-    ${renderEnvelopeSection("Quota dimensions", governedReport.quotaDimensions)}
-    ${renderEnvelopeSection("Quota overlays", governedReport.quotaOverlays)}
-    ${renderEnvelopeSection("Chargeback dimensions", governedReport.chargebackDimensions)}
-    ${renderEnvelopeSection("Chargeback overlays", governedReport.chargebackOverlays)}
-    ${renderEnvelopeSection("Enforcement hooks", governedReport.enforcementHooks)}
-    ${renderEnvelopeSection("Boundary requirements", governedReport.boundaryRequirements)}
-    ${renderEnvelopeSection("Decision surfaces", governedReport.decisionSurfaces)}
-    ${renderEnvelopeSection("Reporting surfaces", governedReport.reportingSurfaces)}
-    ${renderEnvelopeSection("Allowed audiences", governedReport.allowedAudiences)}
-    ${renderEnvelopeSection("Delivery channels", governedReport.deliveryChannels)}
-    ${renderEnvelopeSection("Redaction modes", governedReport.redactionModes)}
-    ${renderEnvelopeSection("Recent activity", governedReport.recent)}
-    ${renderEnvelopeSection("Action hints", governedReport.actionHints)}
-    ${renderEnvelopeSection("DLP findings", governedReport.dlpFindings)}
-    <details><summary>Rendered governed report</summary><pre>${escapeHtml(normalizedString(governedReport.renderedText))}</pre></details>
-  </section>`;
-  const connectionBlock = `<section class="panel">
-    <h3>Connection</h3>
-    <div class="meta">${escapeHtml(connectionStatus.message)}</div>
-    <div class="chips">
-      <span class="chip">status=${escapeHtml(connectionStatus.stateLabel)}</span>
-      <span class="chip">auth=${escapeHtml(connectionStatus.authMode)}</span>
-      <span class="chip">scope=${escapeHtml(connectionStatus.scopeLabel)}</span>
-      <span class="chip">runtime=${escapeHtml(connectionStatus.runtimeApiBaseUrl)}</span>
+  </details>`;
+  const connectionBlock = `<details class="panel secondary-panel">
+    <summary>Connection and runtime status</summary>
+    <div class="details-body">
+      <div class="meta">${escapeHtml(connectionStatus.message)}</div>
+      <div class="chips">
+        <span class="chip">status=${escapeHtml(connectionStatus.stateLabel)}</span>
+        <span class="chip">auth=${escapeHtml(connectionStatus.authMode)}</span>
+        <span class="chip">scope=${escapeHtml(connectionStatus.scopeLabel)}</span>
+        <span class="chip">runtime=${escapeHtml(connectionStatus.runtimeApiBaseUrl)}</span>
+      </div>
     </div>
-  </section>`;
-  const handoffBlock = `<section class="panel">
+  </details>`;
+  const handoffPrimaryLines = handoff.auditEvidenceHandoffLines.filter((item) => !normalizedString(item).startsWith("Evidence package:"));
+  const handoffTechnicalLines = handoff.auditEvidenceHandoffLines.filter((item) => normalizedString(item).startsWith("Evidence package:"));
+  const handoffOverview = [
+    normalizedString(handoff.sessionId) ? `Session ${normalizedString(handoff.sessionId)}` : "",
+    normalizedString(handoff.runId) ? `run ${normalizedString(handoff.runId)}` : "",
+    `${Number(handoff.evidenceCount || 0)} evidence record(s)`,
+    `${Number(handoff.auditEventCount || 0)} audit event(s)`
+  ].filter(Boolean).join(" | ");
+  const handoffBlock = `<section class="panel panel-primary">
     <h3>${escapeHtml(handoff.header)}</h3>
     <div class="meta">${escapeHtml(normalizedString(handoff.summary, "Audit and evidence handoff is not ready yet."))}</div>
-    <div class="chips">
-      <span class="chip">session=${escapeHtml(normalizedString(handoff.sessionId, "-"))}</span>
-      <span class="chip">run=${escapeHtml(normalizedString(handoff.runId, "-"))}</span>
-      <span class="chip">evidence=${escapeHtml(String(handoff.evidenceCount || 0))}</span>
-      <span class="chip">audit=${escapeHtml(String(handoff.auditEventCount || 0))}</span>
-      <span class="chip">openApprovals=${escapeHtml(String(handoff.openApprovals || 0))}</span>
-      <span class="chip">pendingProposals=${escapeHtml(String(handoff.pendingProposals || 0))}</span>
-    </div>
+    ${handoffOverview ? `<div class="meta">${escapeHtml(handoffOverview)}</div>` : ""}
     <div class="toolbar">
       <button type="button" data-action="copy-audit-evidence-handoff">Copy Handoff Summary</button>
-      <button type="button" data-action="copy-governance-report">Copy Governed Report</button>
     </div>
-    ${renderEnvelopeSection("Current decision", handoff.currentDecisionLines)}
-    ${renderEnvelopeSection("Run/session continuity", handoff.runSessionContinuityLines)}
-    ${renderEnvelopeSection("Approval/proposal linkage", handoff.approvalProposalLinkageLines)}
-    ${renderEnvelopeSection("Audit/evidence handoff", handoff.auditEvidenceHandoffLines)}
+    ${renderEnvelopeSection("Approval and review linkage", handoff.approvalProposalLinkageLines)}
+    ${renderEnvelopeSection("Audit and evidence handoff", handoffPrimaryLines)}
     ${renderEnvelopeSection("Next actions", handoff.nextActionLines)}
-    <details><summary>Rendered handoff summary</summary><pre>${escapeHtml(normalizedString(handoff.renderedText))}</pre></details>
+    <details class="inline-details">
+      <summary>Technical handoff details</summary>
+      <div class="details-body">
+        ${renderEnvelopeSection("Run/session continuity", handoff.runSessionContinuityLines)}
+        ${renderEnvelopeSection("Package records", handoffTechnicalLines)}
+        <details><summary>Rendered handoff summary</summary><pre>${escapeHtml(normalizedString(handoff.renderedText))}</pre></details>
+      </div>
+    </details>
+  </section>`;
+  const managedWorkerBlock = `<section class="panel">
+    <h3>Managed Worker Review</h3>
+    <div class="meta">session=${escapeHtml(normalizedString(model?.selectedSession?.sessionId, "-"))} | worker=${escapeHtml(normalizedString(selectedSummary?.selectedWorker?.workerId, "-"))}</div>
+    <div class="meta">${escapeHtml(normalizedString(selectedActivity?.latestWorkerSummary, selectedActivity?.resolutionMessage || "No worker summary available."))}</div>
+    ${transcriptBlock}
+    <details class="inline-details">
+      <summary>Execution details</summary>
+      <div class="details-body">
+        <div class="chips">
+          <span class="chip">run=${escapeHtml(normalizedString(selectedSummary?.runId, "-"))}</span>
+          <span class="chip">task=${escapeHtml(normalizedString(selectedActivity?.taskStatus, "-"))}</span>
+          <span class="chip">session=${escapeHtml(normalizedString(selectedActivity?.sessionStatus, "-"))}</span>
+          <span class="chip">worker=${escapeHtml(normalizedString(selectedActivity?.selectedWorkerStatus, "-"))}</span>
+          <span class="chip">mode=${escapeHtml(normalizedString(selectedActivity?.executionMode, "-"))}</span>
+          <span class="chip">route=${escapeHtml(normalizedString(selectedSummary?.route, "-"))}</span>
+          <span class="chip">boundary=${escapeHtml(normalizedString(selectedSummary?.boundaryProviderId, "-"))}</span>
+        </div>
+      </div>
+    </details>
   </section>`;
   const nonce = String(Date.now());
   return `<!DOCTYPE html>
@@ -795,12 +901,22 @@ textarea, input, select { width: 100%; box-sizing: border-box; padding: 6px 8px;
 textarea { min-height: 110px; resize: vertical; }
 .panel-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
 .panel { border: 1px solid var(--vscode-panel-border); border-radius: 8px; padding: 12px; background: color-mix(in srgb, var(--vscode-editor-background) 92%, white 8%); }
+.panel-primary { grid-column: 1 / -1; }
+.secondary-panel { padding: 0; overflow: hidden; }
+.secondary-panel > summary,
+.inline-details > summary { cursor: pointer; font-weight: 600; list-style: none; }
+.secondary-panel > summary { padding: 12px; }
+.details-body { display: grid; gap: 10px; padding-top: 10px; }
+.secondary-panel > .details-body { padding: 0 12px 12px; }
 .meta { color: var(--vscode-descriptionForeground); font-size: 12px; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 0; }
 .chip { border: 1px solid var(--vscode-panel-border); border-radius: 999px; padding: 2px 8px; font-size: 12px; }
 pre { white-space: pre-wrap; word-break: break-word; overflow: auto; }
 ul { margin: 8px 0 0; padding-left: 18px; }
 .toolbar, .form-row, .decision-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.decision-columns { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.decision-card, .decision-column { border: 1px solid var(--vscode-panel-border); border-radius: 8px; padding: 10px; background: color-mix(in srgb, var(--vscode-editor-background) 95%, white 5%); }
+.decision-card h4, .decision-column h4 { margin: 0 0 8px; }
 .form-col { display: grid; gap: 6px; }
 .form-col.compact { min-width: 140px; flex: 1 1 140px; }
 .form-col.wide { flex: 3 1 320px; }
@@ -821,9 +937,7 @@ ul { margin: 8px 0 0; padding-left: 18px; }
   </div>
 </header>
 <div class="panel-grid">
-  ${connectionBlock}
-  ${governedUpdateBlock}
-  ${governedReportBlock}
+  ${reviewLaneBlock}
   ${handoffBlock}
   <section class="panel">
     <h3>Governed Turn</h3>
@@ -861,27 +975,13 @@ ul { margin: 8px 0 0; padding-left: 18px; }
       <button id="send-turn" type="button">Send Governed Turn</button>
     </div>
   </section>
+  ${managedWorkerBlock}
   <section class="panel">
-    <h3>Managed Worker Review</h3>
-    <div class="meta">session=${escapeHtml(normalizedString(model?.selectedSession?.sessionId, "-"))} | worker=${escapeHtml(normalizedString(selectedSummary?.selectedWorker?.workerId, "-"))}</div>
-    <div class="chips">
-      <span class="chip">run=${escapeHtml(normalizedString(selectedSummary?.runId, "-"))}</span>
-      <span class="chip">task=${escapeHtml(normalizedString(selectedActivity?.taskStatus, "-"))}</span>
-      <span class="chip">session=${escapeHtml(normalizedString(selectedActivity?.sessionStatus, "-"))}</span>
-      <span class="chip">worker=${escapeHtml(normalizedString(selectedActivity?.selectedWorkerStatus, "-"))}</span>
-      <span class="chip">mode=${escapeHtml(normalizedString(selectedActivity?.executionMode, "-"))}</span>
-      <span class="chip">route=${escapeHtml(normalizedString(selectedSummary?.route, "-"))}</span>
-      <span class="chip">boundary=${escapeHtml(normalizedString(selectedSummary?.boundaryProviderId, "-"))}</span>
-    </div>
-    <div class="meta">${escapeHtml(normalizedString(selectedActivity?.latestWorkerSummary, selectedActivity?.resolutionMessage || "No worker summary available."))}</div>
-    ${transcriptBlock}
-  </section>
-  <section class="panel">
-    <h3>Approvals</h3>
+    <h3>All Approvals</h3>
     <ul>${approvals}</ul>
   </section>
   <section class="panel">
-    <h3>Tool Proposals</h3>
+    <h3>All Tool Proposals</h3>
     <ul>${proposals}</ul>
   </section>
   <section class="panel">
@@ -900,6 +1000,9 @@ ul { margin: 8px 0 0; padding-left: 18px; }
     <h3>Recent Events</h3>
     <ul>${events}</ul>
   </section>
+  ${connectionBlock}
+  ${governedUpdateBlock}
+  ${governedReportBlock}
 </div>
 <script nonce="${nonce}">
   const vscode = acquireVsCodeApi();
