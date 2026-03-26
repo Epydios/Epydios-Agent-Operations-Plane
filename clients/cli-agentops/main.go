@@ -28,12 +28,13 @@ func main() {
 	root.StringVar(&cfg.OutputFormat, "output", cfg.OutputFormat, "output format: text or json")
 	root.IntVar(&cfg.LiveFollowWait, "live-follow-wait-seconds", cfg.LiveFollowWait, "poll wait window for event follow")
 	root.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: %s [global flags] <threads|sessions|approvals|proposals|turns> <command> [flags]\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Usage: %s [global flags] <status|threads|sessions|approvals|proposals|turns> <command> [flags]\n", os.Args[0])
 		fmt.Fprintln(os.Stderr)
 		fmt.Fprintln(os.Stderr, "Global flags:")
 		root.PrintDefaults()
 		fmt.Fprintln(os.Stderr)
 		fmt.Fprintln(os.Stderr, "Commands:")
+		fmt.Fprintln(os.Stderr, "  status check")
 		fmt.Fprintln(os.Stderr, "  threads list")
 		fmt.Fprintln(os.Stderr, "  threads show (--task-id <taskId> | --session-id <sessionId>) [--render text|update|report]")
 		fmt.Fprintln(os.Stderr, "  sessions follow (--session-id <sessionId> | --task-id <taskId>) [--after-sequence N] [--wait-seconds N] [--once] [--render text|update|delta-update|report|delta-report]")
@@ -54,6 +55,8 @@ func main() {
 	ctx := context.Background()
 	var err error
 	switch args[0] {
+	case "status":
+		err = runStatusCommand(ctx, client, cfg, args[1:])
 	case "threads":
 		err = runThreadsCommand(ctx, client, cfg, args[1:])
 	case "sessions":
@@ -70,6 +73,28 @@ func main() {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
+	}
+}
+
+func runStatusCommand(ctx context.Context, client *runtimeclient.Client, cfg runtimeclient.Config, args []string) error {
+	switch args[0] {
+	case "check":
+		fs := flag.NewFlagSet("status check", flag.ContinueOnError)
+		fs.SetOutput(os.Stderr)
+		if err := fs.Parse(args[1:]); err != nil {
+			return err
+		}
+		status, err := client.CheckConnection(ctx)
+		if err != nil {
+			return err
+		}
+		if cfg.OutputFormat == "json" {
+			return printJSON(status)
+		}
+		fmt.Print(renderConnectionStatus(status))
+		return nil
+	default:
+		return fmt.Errorf("unknown status command %q", args[0])
 	}
 }
 
@@ -476,6 +501,30 @@ func printEventStream(items []runtimeapi.SessionEventRecord) {
 	for _, item := range items {
 		fmt.Printf("#%d %s %s | %s\n", item.Sequence, item.Timestamp.UTC().Format(time.RFC3339), runtimeclient.SummarizeEventLabel(string(item.EventType)), runtimeclient.SummarizeEventDetail(item))
 	}
+}
+
+func renderConnectionStatus(status *runtimeclient.ConnectionStatus) string {
+	if status == nil {
+		return ""
+	}
+	scopeSummary := runtimeclient.NormalizeStringOrDefault(status.ScopeLabel, "not configured")
+	authSummary := "bearer token missing"
+	if status.AuthReady {
+		authSummary = "bearer token configured"
+	}
+	if !strings.EqualFold(strings.TrimSpace(status.AuthMode), "bearer_token") && strings.TrimSpace(status.AuthMode) != "" {
+		authSummary = runtimeclient.NormalizeStringOrDefault(status.AuthMode, authSummary)
+	}
+	lines := []string{
+		fmt.Sprintf("State: %s", runtimeclient.NormalizeStringOrDefault(status.State, "unknown")),
+		fmt.Sprintf("Runtime API: %s", runtimeclient.NormalizeStringOrDefault(status.RuntimeAPIBaseURL, "-")),
+		fmt.Sprintf("Scope: %s", scopeSummary),
+		fmt.Sprintf("Auth: %s", authSummary),
+	}
+	if message := strings.TrimSpace(status.Message); message != "" {
+		lines = append(lines, fmt.Sprintf("Message: %s", message))
+	}
+	return strings.Join(lines, "\n") + "\n"
 }
 
 func printJSON(value interface{}) error {

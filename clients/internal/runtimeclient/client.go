@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -55,6 +56,34 @@ type SessionEventListResponse struct {
 	Count     int                             `json:"count"`
 	SessionID string                          `json:"sessionId"`
 	Items     []runtimeapi.SessionEventRecord `json:"items"`
+}
+
+type HTTPStatusError struct {
+	StatusCode int    `json:"statusCode"`
+	Status     string `json:"status,omitempty"`
+	Message    string `json:"message,omitempty"`
+}
+
+func (e *HTTPStatusError) Error() string {
+	if e == nil {
+		return ""
+	}
+	if strings.TrimSpace(e.Message) == "" {
+		return fmt.Sprintf("http %d", e.StatusCode)
+	}
+	return fmt.Sprintf("http %d: %s", e.StatusCode, strings.TrimSpace(e.Message))
+}
+
+type ConnectionStatus struct {
+	State             string `json:"state"`
+	RuntimeAPIBaseURL string `json:"runtimeApiBaseUrl"`
+	TenantID          string `json:"tenantId,omitempty"`
+	ProjectID         string `json:"projectId,omitempty"`
+	ScopeLabel        string `json:"scopeLabel,omitempty"`
+	ScopeReady        bool   `json:"scopeReady"`
+	AuthMode          string `json:"authMode,omitempty"`
+	AuthReady         bool   `json:"authReady"`
+	Message           string `json:"message,omitempty"`
 }
 
 func LoadConfigFromEnv() Config {
@@ -157,7 +186,11 @@ func (c *Client) request(ctx context.Context, method, requestPath string, query 
 		if message == "" {
 			message = resp.Status
 		}
-		return fmt.Errorf("http %d: %s", resp.StatusCode, message)
+		return &HTTPStatusError{
+			StatusCode: resp.StatusCode,
+			Status:     resp.Status,
+			Message:    message,
+		}
 	}
 	if target == nil {
 		return nil
@@ -181,10 +214,57 @@ func (c *Client) RequireScope() error {
 	return nil
 }
 
+func (c *Client) CheckConnection(ctx context.Context) (*ConnectionStatus, error) {
+	status := &ConnectionStatus{
+		RuntimeAPIBaseURL: NormalizeStringOrDefault(c.baseURL, "http://127.0.0.1:8080"),
+		TenantID:          strings.TrimSpace(c.tenantID),
+		ProjectID:         strings.TrimSpace(c.projectID),
+		ScopeLabel:        buildScopeLabel(c.tenantID, c.projectID),
+		ScopeReady:        strings.TrimSpace(c.tenantID) != "" && strings.TrimSpace(c.projectID) != "",
+		AuthMode:          "bearer_token",
+		AuthReady:         strings.TrimSpace(c.authToken) != "",
+	}
+	if !status.ScopeReady {
+		status.State = "scope_required"
+		status.Message = "Set tenantId and projectId before using governed thread commands."
+		return status, nil
+	}
+	_, err := c.ListTasks(ctx, 1, 0, "", "")
+	if err == nil {
+		status.State = "connected"
+		status.Message = "Runtime reachable. Scope and auth are ready."
+		return status, nil
+	}
+	var statusErr *HTTPStatusError
+	if errors.As(err, &statusErr) && (statusErr.StatusCode == http.StatusUnauthorized || statusErr.StatusCode == http.StatusForbidden) {
+		status.State = "auth_required"
+		if status.AuthReady {
+			status.Message = "Runtime rejected the configured bearer token."
+		} else {
+			status.Message = "Set a bearer token to reach the scoped runtime."
+		}
+		return status, nil
+	}
+	status.State = "unreachable"
+	status.Message = NormalizeStringOrDefault(err.Error(), "Runtime API did not respond.")
+	return status, nil
+}
+
 func (c *Client) TenantID() string            { return c.tenantID }
 func (c *Client) ProjectID() string           { return c.projectID }
 func (c *Client) IncludeLegacySessions() bool { return c.includeLegacy }
 func (c *Client) DefaultFollowWait() int      { return c.defaultFollowWait }
+
+func buildScopeLabel(tenantID, projectID string) string {
+	parts := make([]string, 0, 2)
+	if trimmed := strings.TrimSpace(tenantID); trimmed != "" {
+		parts = append(parts, trimmed)
+	}
+	if trimmed := strings.TrimSpace(projectID); trimmed != "" {
+		parts = append(parts, trimmed)
+	}
+	return strings.Join(parts, " / ")
+}
 
 func (c *Client) CreateTask(ctx context.Context, req runtimeapi.TaskCreateRequest) (*runtimeapi.TaskRecord, error) {
 	var task runtimeapi.TaskRecord

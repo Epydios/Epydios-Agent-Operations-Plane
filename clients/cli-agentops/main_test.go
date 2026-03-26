@@ -244,6 +244,28 @@ func TestRenderCLIThreadEnvelopeMatchesParityFixture(t *testing.T) {
 	}
 }
 
+func TestRenderConnectionStatus(t *testing.T) {
+	rendered := renderConnectionStatus(&runtimeclient.ConnectionStatus{
+		State:             "auth_required",
+		RuntimeAPIBaseURL: "http://127.0.0.1:8080",
+		ScopeLabel:        "tenant-demo / project-payments",
+		AuthMode:          "bearer_token",
+		AuthReady:         false,
+		Message:           "Set a bearer token to reach the scoped runtime.",
+	})
+	for _, part := range []string{
+		"State: auth_required",
+		"Runtime API: http://127.0.0.1:8080",
+		"Scope: tenant-demo / project-payments",
+		"Auth: bearer token missing",
+		"Message: Set a bearer token to reach the scoped runtime.",
+	} {
+		if !strings.Contains(rendered, part) {
+			t.Fatalf("missing %q in %s", part, rendered)
+		}
+	}
+}
+
 func TestRenderCLIThreadEnvelopeIncludesOrgAdminReviewHints(t *testing.T) {
 	view := &runtimeclient.ThreadReview{
 		Task: runtimeapi.TaskRecord{TaskID: "task-1", Title: "Thread one", Status: "IN_PROGRESS"},
