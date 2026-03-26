@@ -140,7 +140,7 @@ We are building EpydiosOps toward a more complete agent operations plane for bot
 - deeper governance and decision quality
 - richer audit, evidence and incident workflows
 - more polished desktop installs and platform support
-- a larger SDK and integration surface for tools, gateways, and providers
+- a larger SDK and integration surface for tools, gateways and providers
 
 ## Repository Guide
 
