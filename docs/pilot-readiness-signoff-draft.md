@@ -1,12 +1,43 @@
 # Pilot Readiness Sign-off (Draft)
 
-Last updated: 2026-03-01  
+Last updated: 2026-03-25  
 Status: Approved (all evidence complete and approvals recorded)
 
 ## Scope
 
 This draft defines the pilot sign-off package for the Epydios Agent Operations Plane.
 It is the human-facing companion to `docs/pilot-readiness-signoff-draft.json`.
+
+This artifact is still primarily the M8-M11 pilot sign-off record.
+
+It now also carries a release-baseline addendum for the current public desktop posture so pilot evidence and public-baseline proof do not drift apart.
+
+## Public Baseline Addendum
+
+Current truthful baseline:
+
+- macOS installed desktop in `live` is the supported lane
+- Linux has a proven Ubuntu 24.04 host-acceptance beta lane
+- Windows has native packaging and launch proved in beta posture
+- Windows `live` is not yet proved and remains deferred
+- the supported macOS `live` lane now has dedicated governed-request proof
+
+Current baseline proof:
+
+1. Supported macOS installed `live` lane
+   - Command: `./ui/desktop-ui/bin/verify-m15-phase-c.sh`
+   - Must include: installed launch, truthful launcher state, truthful runtime/gateway state, truthful interposition state, and stable tab hydration.
+   - Status: `pass`
+2. Supported macOS governed workflow end to end
+   - Command: `./ui/desktop-ui/bin/verify-m15-phase-c-governed-request.sh`
+   - Must include: sign-in, `Interposition OFF / ON` clarity, one real governed Codex `/responses` request, approval resolution, and audit/evidence handoff.
+   - Status: `pass`
+
+Explicit deferred items:
+
+1. Windows `live` operator path proof
+2. Linux promotion to macOS-equivalent wording
+3. Platform-equal installer maturity
 
 ## Required Evidence Checklist
 
@@ -68,4 +99,5 @@ It is the human-facing companion to `docs/pilot-readiness-signoff-draft.json`.
 
 ## Open Items Before Final Sign-off
 
-1. None. Maintain this record as a living approval artifact and refresh evidence on each release tag.
+1. Preserve the explicit beta/deferred posture for Linux and Windows in public release artifacts until new host proof exists.
+2. Maintain this record as a living approval artifact and refresh evidence on each release tag.

@@ -34,8 +34,17 @@ go test ./...
 node --test ui/desktop-ui/web/js/test/*.test.js
 ./platform/ci/bin/qc-preflight.sh
 ./ui/desktop-ui/bin/check-m1.sh
-./ui/desktop-ui/bin/verify-m14-ui-daily-loop.sh
+./ui/desktop-ui/bin/verify-m15-phase-c.sh
+./ui/desktop-ui/bin/verify-m15-phase-c-governed-request.sh
 ```
+
+Release-bar meaning:
+
+- `verify-m15-phase-c.sh` proves the supported macOS installed `live` lane
+- `verify-m15-phase-c-governed-request.sh` proves sign-in, `Interposition OFF / ON`, one governed Codex `/responses` request, approval resolution, and audit/evidence handoff on that supported lane
+- Linux remains a proved Ubuntu beta lane
+- Windows remains native packaging and launch beta only
+- Windows `live` is explicitly deferred and is not a release blocker for this runbook
 
 ## 2. Push The Release Commit
 
@@ -113,7 +122,8 @@ If you changed anything else between workflow dispatch and artifact ingest, reru
 
 ```bash
 ./ui/desktop-ui/bin/check-m1.sh
-./ui/desktop-ui/bin/verify-m14-ui-daily-loop.sh
+./ui/desktop-ui/bin/verify-m15-phase-c.sh
+./ui/desktop-ui/bin/verify-m15-phase-c-governed-request.sh
 ```
 
 ## 8. Commit The Synced Provenance State
@@ -141,5 +151,14 @@ Confirm:
 
 1. The tag `v0.3.0` exists on GitHub.
 2. The GHCR packages are published under the new `epydios-agent-operations-plane-*` names.
-3. The repo `README` and docs front door reflect `Epydios Agent Operations Plane`.
-4. `provenance/images.lock.yaml` and `platform/overlays/production/patch-image-digests.yaml` both reflect the released digests.
+3. The supporting release artifacts reflect the current truthful baseline:
+   - `docs/quality-story.md`
+   - `docs/getting-started.md`
+   - `docs/release-policy.md`
+   - `docs/images/README.md`
+4. Platform posture is still stated truthfully:
+   - macOS `live` supported
+   - Linux beta
+   - Windows native packaging and launch beta
+   - Windows `live` deferred
+5. `provenance/images.lock.yaml` and `platform/overlays/production/patch-image-digests.yaml` both reflect the released digests.

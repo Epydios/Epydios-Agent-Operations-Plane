@@ -2,7 +2,7 @@
 
 Installable operator desktop and local governance plane for agent and tool execution.
 
-EpydiosOps gives teams a visible control plane for AI and tool execution. It combines an installable desktop operator console, a local launcher and supervisor, a loopback gateway, and a governed runtime path for policy enforcement, receipts, audit, evidence, incident review, and operator action.
+EpydiosOps gives teams a visible control plane for AI and tool execution. It combines an installable desktop operator console, a local launcher and supervisor, a loopback gateway and a governed runtime path for policy enforcement, receipts, audit, evidence, incident review and operator action.
 
 ![Epydios security seal](docs/images/security-seal.png)
 
@@ -14,9 +14,9 @@ If this looks useful, please consider giving the repo a star. It helps more peop
 
 - Governed execution with a real operator surface instead of a hidden background policy layer.
 - Local request-path control through an explicit desktop launcher and loopback gateway.
-- First-class runtime, governance, audit, evidence, incident, and settings surfaces.
-- Installable desktop workflow for live operator use, not just a browser demo path.
-- Public contracts and OSS baseline providers that remain usable without premium artifacts.
+- First-class runtime, governance, audit, evidence, incident and settings surfaces.
+- Installable desktop workflow for live operator use.
+- Public contracts and OSS baseline providers that remain usable.
 
 ## Open Source
 
@@ -83,11 +83,11 @@ bash ./ui/desktop-ui/bin/verify-m15-windows-beta.sh
 bash ./ui/desktop-ui/bin/launch-m15-windows-beta.sh
 ```
 
-The primary verified installed operator path today remains macOS.
+The primary verified installed operator path is macOS.
 
-Linux has a proven Ubuntu 24.04 x86_64 host-acceptance path.
+Linux has a proven Ubuntu 24.04 x86_64 host path.
 
-Windows now has a native Git Bash + PowerShell beta lane with native packaging and launch proved on a real Windows host. The Windows live operator path is not yet fully proved.
+Windows now has a native Git Bash + PowerShell beta lane with native packaging and launch proved on Windows. The Windows live operator path is not yet fully validated, but should be working.
 
 ## Screenshots
 
@@ -112,12 +112,6 @@ EpydiosOps currently consists of:
 - a loopback localhost gateway
 - a governed runtime path for requests, runs, receipts and review
 - operator surfaces for runtime, governance, audit, evidence, incidents
-
-## Current Client Scope
-
-The first proven interposition path in the public repository is the Codex and OpenAI-compatible `/responses` flow through the local gateway.
-
-That is the current leading path, not the only intended one. The operator desktop and local gateway are designed to support additional client surfaces over time. If you have a certain agent that we should look at, please let us know. Anthropic, Google, AWS and other are all planned. 
 
 ## Future Directions
 

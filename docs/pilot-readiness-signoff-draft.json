@@ -1,11 +1,42 @@
 {
   "schema_version": 1,
   "document_type": "pilot_readiness_signoff_draft",
-  "last_updated": "2026-03-01",
+  "last_updated": "2026-03-25",
   "status": "approved",
   "approved_at_utc": "2026-03-01T19:30:00Z",
   "milestone": "M8-M11",
   "evidence_items": [
+    {
+      "id": "m15_supported_macos_live_lane",
+      "description": "Supported macOS installed live lane remains truthful and working",
+      "command": "./ui/desktop-ui/bin/verify-m15-phase-c.sh",
+      "status": "pass",
+      "artifacts": [
+        "ui/desktop-ui/bin/verify-m15-phase-c.sh",
+        "ui/desktop-ui/bin/install-m15-macos-beta.sh"
+      ],
+      "notes": [
+        "This is the current supported public desktop lane.",
+        "Linux and Windows remain below this lane in explicit beta posture."
+      ]
+    },
+    {
+      "id": "m15_supported_macos_governed_request",
+      "description": "Supported macOS live lane proves sign-in, interposition ON/OFF clarity, one governed Codex /responses request, approval resolution, and audit/evidence handoff",
+      "command": "./ui/desktop-ui/bin/verify-m15-phase-c-governed-request.sh",
+      "status": "pass",
+      "artifacts": [
+        "ui/desktop-ui/bin/verify-m15-phase-c-governed-request.sh",
+        "ui/desktop-ui/bin/m15_governed_request_harness.py",
+        "ui/desktop-ui/cmd/nativeapp_verifier_helper/main.go",
+        "ui/desktop-ui/.epydios/internal-readiness/m15-native-phase-c-governed-request/20260326T003207Z/verify-m15-phase-c-governed-request.summary.json",
+        "ui/desktop-ui/.epydios/internal-readiness/m15-native-phase-c-governed-request/20260326T003207Z/operator-governed-request-checklist.json"
+      ],
+      "notes": [
+        "This closes the supported-path governed workflow proof requirement for the current public baseline.",
+        "Windows live remains deferred and is not implied by this macOS proof."
+      ]
+    },
     {
       "id": "m8_1_full_gate_strict",
       "description": "Full strict gate pass with required M7/hardening/AIMXS/provenance checks",
@@ -154,7 +185,21 @@
     "release_tag": "v0.1.0",
     "release_artifact_bundle": "../.epydios/provenance/releases/20260301T181757Z/",
     "latest_staging_profile_log": "../.epydios/provenance/promotion/staging-full-gate-20260301T183622Z.log",
-    "latest_prod_profile_log": "../.epydios/provenance/promotion/prod-full-gate-20260301T184620Z.log"
+    "latest_prod_profile_log": "../.epydios/provenance/promotion/prod-full-gate-20260301T184620Z.log",
+    "supported_macos_live_summary": "ui/desktop-ui/.epydios/internal-readiness/m15-native-phase-c-governed-request/20260326T003207Z/verify-m15-phase-c-governed-request.summary.json",
+    "supported_macos_live_checklist": "ui/desktop-ui/.epydios/internal-readiness/m15-native-phase-c-governed-request/20260326T003207Z/operator-governed-request-checklist.json"
+  },
+  "public_baseline": {
+    "supported_lane": "macOS live",
+    "beta_lanes": [
+      "Linux Ubuntu 24.04 host-acceptance beta",
+      "Windows native packaging and launch beta"
+    ],
+    "deferred_items": [
+      "Windows live operator path proof",
+      "Linux promotion to macOS-equivalent wording",
+      "platform-equal installer maturity"
+    ]
   },
   "approvals": {
     "engineering_lead": "approved-2026-03-01",
