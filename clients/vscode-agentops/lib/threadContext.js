@@ -30,7 +30,7 @@ function resolvePendingTarget({
   const ids = normalizedItems
     .map((item) => normalizedString(item?.id, item?.label))
     .filter(Boolean);
-  throw new Error(`multiple pending ${targetPlural} matched the ${contextLabel}; choose --${explicitFlag} (${ids.join(", ")})`);
+  throw new Error(`multiple pending ${targetPlural} matched the ${contextLabel}; the current ${targetSingular} is not unambiguous, so choose --${explicitFlag} (${ids.join(", ")})`);
 }
 
 function listPendingApprovals(selectedSummary = {}) {
@@ -62,14 +62,18 @@ function buildDecisionActionHints(selectedSummary = {}, sessionId = "") {
   const approvalIds = listPendingApprovals(selectedSummary).map((item) => item.id);
   const proposalIds = listPendingProposals(selectedSummary).map((item) => item.id);
   if (approvalIds.length === 1) {
-    lines.push(`Approve or deny the pending approval in session ${resolvedSessionId}.`);
+    lines.push(`Current approval is focused automatically in session ${resolvedSessionId}. Use the approval action directly.`);
+    lines.push(`Secondary path: use checkpoint ${approvalIds[0]} only when you need to target it explicitly.`);
   } else if (approvalIds.length > 1) {
-    lines.push(`Choose one approval explicitly in session ${resolvedSessionId}: ${approvalIds.join(", ")}`);
+    lines.push(`Current approval is not unambiguous in session ${resolvedSessionId}. Choose the right checkpoint from the approvals list.`);
+    lines.push(`Secondary approval IDs: ${approvalIds.join(", ")}`);
   }
   if (proposalIds.length === 1) {
-    lines.push(`Approve or deny the pending proposal in session ${resolvedSessionId}.`);
+    lines.push(`Current proposal is focused automatically in session ${resolvedSessionId}. Use the proposal action directly.`);
+    lines.push(`Secondary path: use proposal ${proposalIds[0]} only when you need to target it explicitly.`);
   } else if (proposalIds.length > 1) {
-    lines.push(`Choose one proposal explicitly in session ${resolvedSessionId}: ${proposalIds.join(", ")}`);
+    lines.push(`Current proposal is not unambiguous in session ${resolvedSessionId}. Choose the right proposal from the proposals list.`);
+    lines.push(`Secondary proposal IDs: ${proposalIds.join(", ")}`);
   }
   return lines;
 }

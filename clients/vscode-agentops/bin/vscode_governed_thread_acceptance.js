@@ -533,8 +533,9 @@ async function main() {
     const handoff = buildAuditEvidenceHandoff(finalModel);
     assert.match(handoff.renderedText, /AgentOps Audit and Evidence Handoff/);
     assert.match(handoff.renderedText, /Run: run-vscode-proof-1/);
+    assert.match(handoff.renderedText, /Current decision:/);
     assert.match(handoff.renderedText, /Resolved approvals: approval-vscode-proof-1 \(APPROVED\)/);
-    assert.match(handoff.renderedText, /Governed VS Code request bundle ready for downstream review/);
+    assert.match(handoff.renderedText, /Evidence package: audit_bundle \| evidence-vscode-proof-1/);
     log("proved audit and evidence handoff output");
 
     const checklist = {

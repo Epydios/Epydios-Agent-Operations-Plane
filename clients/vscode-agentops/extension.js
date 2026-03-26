@@ -771,11 +771,11 @@ function renderHtml(model, selection = {}, connection = {}) {
       <button type="button" data-action="copy-audit-evidence-handoff">Copy Handoff Summary</button>
       <button type="button" data-action="copy-governance-report">Copy Governed Report</button>
     </div>
-    ${renderEnvelopeSection("Run continuity", handoff.runContinuityLines)}
-    ${renderEnvelopeSection("Approval and review linkage", handoff.approvalLinkageLines)}
-    ${renderEnvelopeSection("Evidence", handoff.evidenceLines)}
-    ${renderEnvelopeSection("Recent audit and review", handoff.auditLines)}
-    ${renderEnvelopeSection("Next truthful actions", handoff.actionHints)}
+    ${renderEnvelopeSection("Current decision", handoff.currentDecisionLines)}
+    ${renderEnvelopeSection("Run/session continuity", handoff.runSessionContinuityLines)}
+    ${renderEnvelopeSection("Approval/proposal linkage", handoff.approvalProposalLinkageLines)}
+    ${renderEnvelopeSection("Audit/evidence handoff", handoff.auditEvidenceHandoffLines)}
+    ${renderEnvelopeSection("Next actions", handoff.nextActionLines)}
     <details><summary>Rendered handoff summary</summary><pre>${escapeHtml(normalizedString(handoff.renderedText))}</pre></details>
   </section>`;
   const nonce = String(Date.now());

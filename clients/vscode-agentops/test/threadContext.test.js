@@ -48,6 +48,8 @@ test("buildDecisionActionHints lists pending target guidance", () => {
     },
     ""
   );
-  assert.equal(hints[0], "Approve or deny the pending approval in session sess-7.");
-  assert.match(hints[1], /Choose one proposal explicitly in session sess-7: prop-7a, prop-7b/);
+  assert.equal(hints[0], "Current approval is focused automatically in session sess-7. Use the approval action directly.");
+  assert.equal(hints[1], "Secondary path: use checkpoint appr-7 only when you need to target it explicitly.");
+  assert.equal(hints[2], "Current proposal is not unambiguous in session sess-7. Choose the right proposal from the proposals list.");
+  assert.equal(hints[3], "Secondary proposal IDs: prop-7a, prop-7b");
 });

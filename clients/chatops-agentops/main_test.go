@@ -198,11 +198,10 @@ func TestRenderChatopsUpdateIncludesRecentActivityAndActionHints(t *testing.T) {
 		"AgentOps thread update",
 		"Recent activity:",
 		"Worker Progress: Worker collected deployment context.",
-		"Action hints:",
-		"--checkpoint-id <id>",
-		"approval-1, approval-2",
-		"--proposal-id <id>",
-		"proposal-1, proposal-2",
+		"Current decision: Pending approval checkpoint approval-1",
+		"Current decision: Pending tool proposal proposal-1",
+		"Next actions: Current approval is not unambiguous: approvals decide --thread-id 1730.55 --source-system slack --channel-id C123 --checkpoint-id <id> --decision APPROVE|DENY",
+		"Next actions: Current proposal is not unambiguous: proposals decide --thread-id 1730.55 --source-system slack --channel-id C123 --proposal-id <id> --decision APPROVE|DENY",
 	) {
 		t.Fatalf("unexpected update: %s", update)
 	}
@@ -300,6 +299,56 @@ func TestRenderChatopsDeltaUpdate(t *testing.T) {
 		"Tool Proposal: Tool proposal generated for shell execution.",
 	) {
 		t.Fatalf("unexpected delta update: %s", update)
+	}
+}
+
+func TestRenderChatopsHandoff(t *testing.T) {
+	report := &chatopsStatusReport{
+		SourceSystem:        "slack",
+		ChannelID:           "C123",
+		ChannelName:         "ops-alerts",
+		ThreadID:            "1730.55",
+		TaskID:              "task-1",
+		TaskStatus:          "COMPLETED",
+		LatestSessionID:     "sess-1",
+		SessionStatus:       "COMPLETED",
+		LatestWorkerSummary: "Governed review completed and ready for handoff.",
+		ApprovalCheckpoints: []runtimeapi.ApprovalCheckpointRecord{
+			{CheckpointID: "approval-1", Scope: "runtime.apply", Status: runtimeapi.ApprovalStatusApproved},
+		},
+		SessionEvents: []runtimeapi.SessionEventRecord{
+			{Sequence: 1, EventType: runtimeapi.SessionEventType("approval.status.changed"), Payload: mustJSON(map[string]interface{}{"status": "APPROVED"})},
+			{Sequence: 2, EventType: runtimeapi.SessionEventType("evidence.recorded"), Payload: mustJSON(map[string]interface{}{"kind": "audit_bundle"})},
+		},
+		EvidenceRecords: []runtimeapi.EvidenceRecord{
+			{
+				EvidenceID:   "evidence-1",
+				Kind:         "audit_bundle",
+				URI:          "memory://evidence-1",
+				CheckpointID: "approval-1",
+				ToolActionID: "tool-1",
+			},
+		},
+		RecentEvents: []runtimeclient.EventSummary{
+			{Label: "Evidence Recorded", Detail: "Governed bundle is ready for handoff."},
+		},
+	}
+	rendered := renderChatopsHandoff(report)
+	if !containsAll(rendered,
+		"AgentOps thread update",
+		"Type: handoff",
+		"Summary: Conversation handoff package is ready for review or escalation.",
+		"Current decision: No pending approval checkpoints or tool proposals remain.",
+		"Approval/proposal linkage: Primary decision detail: approval checkpoint approval-1 (APPROVED) is the latest resolved record for conversation 1730.55.",
+		"Approval/proposal linkage: Resolved approvals: approval-1 (APPROVED)",
+		"Audit/evidence handoff: Primary evidence destination: latest audit bundle evidence is ready for conversation handoff package for thread 1730.55.",
+		"Audit/evidence handoff: Suggested escalation target: slack thread 1730.55 in channel C123.",
+		"Audit/evidence handoff: Suggested package target: conversation handoff package for thread 1730.55.",
+		"Audit/evidence handoff: Audit continuity: 2 session event(s) captured for sess-1.",
+		"Audit/evidence handoff: Evidence package: audit_bundle | evidence-1 | memory://evidence-1 | checkpoint=approval-1 | toolAction=tool-1",
+		"Next actions: Share this handoff summary or the governed report when downstream review needs the current proof package.",
+	) {
+		t.Fatalf("unexpected chatops handoff: %s", rendered)
 	}
 }
 
@@ -517,7 +566,11 @@ func TestRenderChatopsParityFixtureIncludesSharedGuidance(t *testing.T) {
 		},
 	}
 	rendered := renderChatopsUpdate(report)
-	for _, part := range append(fixture.Expected.EventLines, "Action hints:", "--checkpoint-id <id>", fixture.Expected.Summary) {
+	for _, part := range append(fixture.Expected.EventLines,
+		"Current decision: Pending approval checkpoint approval-1",
+		"Next actions: Current approval is not unambiguous: approvals decide --thread-id 1730.55 --source-system slack --channel-id C123 --checkpoint-id <id> --decision APPROVE|DENY",
+		fixture.Expected.Summary,
+	) {
 		if !strings.Contains(rendered, part) {
 			t.Fatalf("missing %q in %s", part, rendered)
 		}

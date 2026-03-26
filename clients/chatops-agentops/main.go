@@ -102,14 +102,15 @@ func main() {
 	root.StringVar(&cfg.OutputFormat, "output", cfg.OutputFormat, "output format: text or json")
 	root.IntVar(&cfg.LiveFollowWait, "live-follow-wait-seconds", cfg.LiveFollowWait, "poll wait window for event follow")
 	root.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: %s [global flags] <conversations|approvals|proposals> <command> [flags]\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Usage: %s [global flags] <status|conversations|approvals|proposals> <command> [flags]\n", os.Args[0])
 		fmt.Fprintln(os.Stderr)
 		fmt.Fprintln(os.Stderr, "Global flags:")
 		root.PrintDefaults()
 		fmt.Fprintln(os.Stderr)
 		fmt.Fprintln(os.Stderr, "Commands:")
+		fmt.Fprintln(os.Stderr, "  status check")
 		fmt.Fprintln(os.Stderr, "  conversations intake --file payload.json [--render update|text|json]")
-		fmt.Fprintln(os.Stderr, "  conversations status (--task-id <taskId> | --thread-id <threadId>) [--session-id <sessionId>] [--render update|report|text|json]")
+		fmt.Fprintln(os.Stderr, "  conversations status (--task-id <taskId> | --thread-id <threadId>) [--session-id <sessionId>] [--render update|handoff|report|text|json]")
 		fmt.Fprintln(os.Stderr, "  conversations follow (--task-id <taskId> | --thread-id <threadId>) [--session-id <sessionId>] [--render update|delta-update|report|delta-report|text|json]")
 		fmt.Fprintln(os.Stderr, "  conversations reply (--task-id <taskId> | --thread-id <threadId>) --prompt <text> [--render update|text|json]")
 		fmt.Fprintln(os.Stderr, "  conversations resume (--task-id <taskId> | --thread-id <threadId>) --prompt <text> [--render update|text|json]")
@@ -129,6 +130,8 @@ func main() {
 	ctx := context.Background()
 	var err error
 	switch args[0] {
+	case "status":
+		err = runChatopsStatusCommand(ctx, client, cfg, args[1:])
 	case "conversations":
 		switch args[1] {
 		case "intake":
@@ -152,6 +155,28 @@ func main() {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
+	}
+}
+
+func runChatopsStatusCommand(ctx context.Context, client *runtimeclient.Client, cfg runtimeclient.Config, args []string) error {
+	switch args[0] {
+	case "check":
+		fs := flag.NewFlagSet("status check", flag.ContinueOnError)
+		fs.SetOutput(os.Stderr)
+		if err := fs.Parse(args[1:]); err != nil {
+			return err
+		}
+		status, err := client.CheckConnection(ctx)
+		if err != nil {
+			return err
+		}
+		if cfg.OutputFormat == "json" {
+			return printJSON(status)
+		}
+		fmt.Print(renderConnectionStatus(status))
+		return nil
+	default:
+		return fmt.Errorf("unknown status command %q", args[0])
 	}
 }
 
@@ -276,7 +301,7 @@ func runConversationStatus(ctx context.Context, client *runtimeclient.Client, cf
 	fs := flag.NewFlagSet("conversations status", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	sessionID := fs.String("session-id", "", "optional session id override")
-	render := fs.String("render", "text", "render mode: update, report, text, or json")
+	render := fs.String("render", "text", "render mode: update, handoff, report, text, or json")
 	reportSelection := runtimeclient.BindEnterpriseReportSelectionFlags(fs)
 	lookup := bindChatopsLookupFlags(fs)
 	if err := fs.Parse(args); err != nil {
@@ -304,6 +329,10 @@ func runConversationStatus(ctx context.Context, client *runtimeclient.Client, cf
 	}
 	if format == "update" {
 		fmt.Print(renderChatopsUpdate(report))
+		return nil
+	}
+	if format == "handoff" {
+		fmt.Print(renderChatopsHandoff(report))
 		return nil
 	}
 	return printChatopsStatusReport(report)
@@ -841,17 +870,8 @@ func renderChatopsUpdate(report *chatopsStatusReport) string {
 		return ""
 	}
 	summary := runtimeclient.NormalizeStringOrDefault(report.LatestWorkerSummary, "Governed thread state refreshed.")
-	details := make([]string, 0, 1+len(report.PendingApprovals)+len(report.PendingProposals))
-	if report.Title != "" {
-		details = append(details, fmt.Sprintf("Title: %s", report.Title))
-	}
-	for _, item := range report.PendingApprovals {
-		details = append(details, fmt.Sprintf("Pending approval: %s (%s)", item.CheckpointID, runtimeclient.NormalizeStringOrDefault(item.Scope, "scope-unspecified")))
-	}
-	for _, item := range report.PendingProposals {
-		details = append(details, fmt.Sprintf("Pending proposal: %s (%s)", item.ProposalID, runtimeclient.NormalizeStringOrDefault(item.Summary, item.Command)))
-	}
-	return renderChatopsThreadEnvelope("status", summary, report, details, renderChatopsRecentEventLines(report, 3), renderChatopsActionHints(report))
+	details := runtimeclient.BuildReviewHandoffDetailLines(chatopsReviewHandoffSpec(report))
+	return renderChatopsThreadEnvelope("status", summary, report, details, renderChatopsRecentEventLines(report, 3), nil)
 }
 
 func renderChatopsTurnUpdate(invoke *runtimeapi.AgentInvokeResponse, report *chatopsStatusReport) string {
@@ -882,6 +902,18 @@ func renderChatopsDeltaUpdate(report *chatopsStatusReport, items []runtimeapi.Se
 	}
 	details := []string{fmt.Sprintf("New events: %d", len(items))}
 	return renderChatopsThreadEnvelope("follow_delta", summary, report, details, summarizeChatopsEventItems(items, 4), renderChatopsActionHints(report))
+}
+
+func renderChatopsHandoff(report *chatopsStatusReport) string {
+	if report == nil {
+		return ""
+	}
+	summary := "Conversation handoff package refreshed."
+	if len(report.PendingApprovals) == 0 && len(report.PendingProposals) == 0 && len(report.EvidenceRecords) > 0 {
+		summary = "Conversation handoff package is ready for review or escalation."
+	}
+	details := runtimeclient.BuildReviewHandoffDetailLines(chatopsReviewHandoffSpec(report))
+	return renderChatopsThreadEnvelope("handoff", summary, report, details, renderChatopsRecentEventLines(report, 4), nil)
 }
 
 func renderChatopsReport(ctx context.Context, client *runtimeclient.Client, report *chatopsStatusReport, selection runtimeclient.EnterpriseReportSelection) (string, error) {
@@ -1074,6 +1106,44 @@ func chatopsProposalIDs(items []runtimeclient.ToolProposalReview) []string {
 	return out
 }
 
+func chatopsApprovalLinkageLines(items []runtimeapi.ApprovalCheckpointRecord) []string {
+	if len(items) == 0 {
+		return []string{"Approval linkage: no approval checkpoints recorded."}
+	}
+	lines := make([]string, 0, len(items))
+	for _, item := range items {
+		parts := []string{
+			runtimeclient.NormalizeStringOrDefault(strings.TrimSpace(item.CheckpointID), "-"),
+			runtimeclient.NormalizeStringOrDefault(strings.TrimSpace(item.Scope), "scope-unspecified"),
+			runtimeclient.NormalizeStringOrDefault(strings.TrimSpace(string(item.Status)), "-"),
+		}
+		lines = append(lines, fmt.Sprintf("Approval linkage: %s", strings.Join(parts, " | ")))
+	}
+	return lines
+}
+
+func chatopsEvidenceHandoffLines(items []runtimeapi.EvidenceRecord) []string {
+	if len(items) == 0 {
+		return []string{"Evidence handoff: no evidence records captured yet."}
+	}
+	lines := make([]string, 0, len(items))
+	for _, item := range items {
+		parts := []string{
+			runtimeclient.NormalizeStringOrDefault(strings.TrimSpace(item.Kind), "-"),
+			runtimeclient.NormalizeStringOrDefault(strings.TrimSpace(item.EvidenceID), "-"),
+			runtimeclient.NormalizeStringOrDefault(strings.TrimSpace(item.URI), "-"),
+		}
+		if checkpointID := strings.TrimSpace(item.CheckpointID); checkpointID != "" {
+			parts = append(parts, "checkpoint="+checkpointID)
+		}
+		if toolActionID := strings.TrimSpace(item.ToolActionID); toolActionID != "" {
+			parts = append(parts, "toolAction="+toolActionID)
+		}
+		lines = append(lines, fmt.Sprintf("Evidence handoff: %s", strings.Join(parts, " | ")))
+	}
+	return lines
+}
+
 func renderChatopsApprovalDecisionUpdate(response *runtimeapi.ApprovalCheckpointDecisionResponse, report *chatopsStatusReport) string {
 	summary := fmt.Sprintf("Approval %s is now %s.", runtimeclient.NormalizeStringOrDefault(response.CheckpointID, "checkpoint"), runtimeclient.NormalizeStringOrDefault(string(response.Status), "-"))
 	details := []string{
@@ -1088,6 +1158,63 @@ func renderChatopsApprovalDecisionUpdate(response *runtimeapi.ApprovalCheckpoint
 		details = append(details, fmt.Sprintf("Reviewed at: %s", response.ReviewedAt))
 	}
 	return renderChatopsThreadEnvelope("approval_decision", summary, report, details, renderChatopsRecentEventLines(report, 3), renderChatopsActionHints(report))
+}
+
+func chatopsReviewHandoffSpec(report *chatopsStatusReport) runtimeclient.ReviewHandoffSpec {
+	spec := runtimeclient.ReviewHandoffSpec{
+		SessionID:           runtimeclient.NormalizeStringOrDefault(reportSessionID(report), ""),
+		SessionStatus:       runtimeclient.NormalizeStringOrDefault(report.SessionStatus, ""),
+		LatestActivity:      runtimeclient.NormalizeStringOrDefault(report.LatestWorkerSummary, ""),
+		ApprovalCheckpoints: chatopsApprovalRecords(report),
+		ToolProposals:       append([]runtimeclient.ToolProposalReview(nil), report.PendingProposals...),
+		SessionEvents:       append([]runtimeapi.SessionEventRecord(nil), report.SessionEvents...),
+		EvidenceRecords:     append([]runtimeapi.EvidenceRecord(nil), report.EvidenceRecords...),
+		ContextHint:         buildChatopsContextHint(report),
+		ApprovalCommand:     "approvals decide",
+		ProposalCommand:     "proposals decide",
+		SubjectLabel:        "conversation",
+		SubjectValue:        runtimeclient.NormalizeStringOrDefault(report.ThreadID, report.TaskID),
+	}
+	if len(report.EvidenceRecords) > 0 {
+		latest := report.EvidenceRecords[len(report.EvidenceRecords)-1]
+		spec.LatestEvidenceID = runtimeclient.NormalizeStringOrDefault(latest.EvidenceID, "")
+		spec.LatestEvidenceKind = runtimeclient.NormalizeStringOrDefault(latest.Kind, "")
+	}
+	threadID := runtimeclient.NormalizeStringOrDefault(report.ThreadID, report.TaskID)
+	if threadID != "" {
+		spec.PackageTarget = fmt.Sprintf("conversation handoff package for thread %s", threadID)
+		targetParts := []string{}
+		if source := strings.TrimSpace(report.SourceSystem); source != "" {
+			targetParts = append(targetParts, source)
+		}
+		targetParts = append(targetParts, "thread "+threadID)
+		if channelID := strings.TrimSpace(report.ChannelID); channelID != "" {
+			targetParts = append(targetParts, "in channel "+channelID)
+		}
+		spec.EscalationTarget = strings.Join(targetParts, " ")
+	}
+	return spec
+}
+
+func chatopsApprovalRecords(report *chatopsStatusReport) []runtimeapi.ApprovalCheckpointRecord {
+	items := append([]runtimeapi.ApprovalCheckpointRecord(nil), report.ApprovalCheckpoints...)
+	seen := map[string]struct{}{}
+	for _, item := range items {
+		if id := strings.TrimSpace(item.CheckpointID); id != "" {
+			seen[id] = struct{}{}
+		}
+	}
+	for _, item := range report.PendingApprovals {
+		id := strings.TrimSpace(item.CheckpointID)
+		if id != "" {
+			if _, ok := seen[id]; ok {
+				continue
+			}
+			seen[id] = struct{}{}
+		}
+		items = append(items, item)
+	}
+	return items
 }
 
 func renderChatopsProposalDecisionUpdate(response *runtimeapi.ToolProposalDecisionResponse, report *chatopsStatusReport) string {
@@ -1160,6 +1287,30 @@ func printChatopsEventStream(items []runtimeapi.SessionEventRecord) {
 	for _, item := range items {
 		fmt.Printf("#%d %s %s | %s\n", item.Sequence, item.Timestamp.UTC().Format(time.RFC3339), runtimeclient.SummarizeEventLabel(string(item.EventType)), runtimeclient.SummarizeEventDetail(item))
 	}
+}
+
+func renderConnectionStatus(status *runtimeclient.ConnectionStatus) string {
+	if status == nil {
+		return ""
+	}
+	scopeSummary := runtimeclient.NormalizeStringOrDefault(status.ScopeLabel, "not configured")
+	authSummary := "bearer token missing"
+	if status.AuthReady {
+		authSummary = "bearer token configured"
+	}
+	if !strings.EqualFold(strings.TrimSpace(status.AuthMode), "bearer_token") && strings.TrimSpace(status.AuthMode) != "" {
+		authSummary = runtimeclient.NormalizeStringOrDefault(status.AuthMode, authSummary)
+	}
+	lines := []string{
+		fmt.Sprintf("State: %s", runtimeclient.NormalizeStringOrDefault(status.State, "unknown")),
+		fmt.Sprintf("Runtime API: %s", runtimeclient.NormalizeStringOrDefault(status.RuntimeAPIBaseURL, "-")),
+		fmt.Sprintf("Scope: %s", scopeSummary),
+		fmt.Sprintf("Auth: %s", authSummary),
+	}
+	if message := strings.TrimSpace(status.Message); message != "" {
+		lines = append(lines, fmt.Sprintf("Message: %s", message))
+	}
+	return strings.Join(lines, "\n") + "\n"
 }
 
 func printChatopsTurnResult(invoke *runtimeapi.AgentInvokeResponse, report *chatopsStatusReport) error {

@@ -36,7 +36,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "Commands:")
 		fmt.Fprintln(os.Stderr, "  status check")
 		fmt.Fprintln(os.Stderr, "  threads list")
-		fmt.Fprintln(os.Stderr, "  threads show (--task-id <taskId> | --session-id <sessionId>) [--render text|update|report]")
+		fmt.Fprintln(os.Stderr, "  threads show (--task-id <taskId> | --session-id <sessionId>) [--render text|update|handoff|report]")
 		fmt.Fprintln(os.Stderr, "  sessions follow (--session-id <sessionId> | --task-id <taskId>) [--after-sequence N] [--wait-seconds N] [--once] [--render text|update|delta-update|report|delta-report]")
 		fmt.Fprintln(os.Stderr, "  approvals decide [--session-id <sessionId>] [--checkpoint-id <checkpointId>] [--task-id <taskId>] --decision APPROVE|DENY [--reason text]")
 		fmt.Fprintln(os.Stderr, "  proposals decide [--session-id <sessionId>] [--proposal-id <proposalId>] [--task-id <taskId>] --decision APPROVE|DENY [--reason text]")
@@ -123,7 +123,7 @@ func runThreadsCommand(ctx context.Context, client *runtimeclient.Client, cfg ru
 		fs.SetOutput(os.Stderr)
 		taskID := fs.String("task-id", "", "task id")
 		sessionID := fs.String("session-id", "", "specific session id")
-		render := fs.String("render", "text", "render mode: text, update, or report")
+		render := fs.String("render", "text", "render mode: text, update, handoff, or report")
 		reportSelection := runtimeclient.BindEnterpriseReportSelectionFlags(fs)
 		if err := fs.Parse(args[1:]); err != nil {
 			return err
@@ -172,6 +172,9 @@ func runThreadsCommand(ctx context.Context, client *runtimeclient.Client, cfg ru
 		switch strings.ToLower(strings.TrimSpace(*render)) {
 		case "update":
 			fmt.Print(renderCLIThreadEnvelope(view))
+			return nil
+		case "handoff":
+			fmt.Print(renderCLIHandoffEnvelope(view))
 			return nil
 		case "report":
 			rendered, err := renderCLIReport(ctx, client, view, *reportSelection)
@@ -679,22 +682,7 @@ func renderCLIThreadEnvelope(view *runtimeclient.ThreadReview) string {
 			Summary:    "Governed thread state refreshed.",
 		})
 	}
-	details := make([]string, 0, 4)
-	if view != nil && view.SelectedSession != nil {
-		details = append(details, fmt.Sprintf("Selected session: %s", runtimeclient.NormalizeStringOrDefault(view.SelectedSession.SessionID, "-")))
-	}
-	if view != nil && view.Timeline != nil && view.Timeline.SelectedWorker != nil {
-		details = append(details, fmt.Sprintf("Worker adapter: %s (%s)", runtimeclient.NormalizeStringOrDefault(view.Timeline.SelectedWorker.AdapterID, "-"), runtimeclient.NormalizeStringOrDefault(view.Timeline.SelectedWorker.WorkerType, "-")))
-	}
-	if view != nil && view.Transcript != nil && strings.TrimSpace(view.Transcript.ToolActionID) != "" {
-		details = append(details, fmt.Sprintf("Managed transcript: %s", view.Transcript.ToolActionID))
-	}
-	if len(runtimeclient.PendingApprovalIDsFromThreadReview(view)) > 0 {
-		details = append(details, fmt.Sprintf("Pending approvals: %d", len(runtimeclient.PendingApprovalIDsFromThreadReview(view))))
-	}
-	if len(runtimeclient.PendingProposalIDsFromThreadReview(view)) > 0 {
-		details = append(details, fmt.Sprintf("Pending proposals: %d", len(runtimeclient.PendingProposalIDsFromThreadReview(view))))
-	}
+	details := runtimeclient.BuildReviewHandoffDetailLines(cliReviewHandoffSpec(view))
 	summary := "Governed thread state refreshed."
 	if view != nil && len(view.RecentEvents) > 0 {
 		summary = runtimeclient.NormalizeStringOrDefault(view.RecentEvents[len(view.RecentEvents)-1].Detail, summary)
@@ -708,9 +696,79 @@ func renderCLIThreadEnvelope(view *runtimeclient.ThreadReview) string {
 		SubjectValue: runtimeclient.NormalizeStringOrDefault(view.Task.Title, view.Task.TaskID),
 		Summary:      summary,
 		Details:      details,
-		ActionHints:  renderCLIActionHints(view),
 	})
 	return runtimeclient.RenderGovernedUpdateEnvelope(envelope)
+}
+
+func renderCLIHandoffEnvelope(view *runtimeclient.ThreadReview) string {
+	if view == nil {
+		return runtimeclient.RenderGovernedUpdateEnvelope(runtimeclient.GovernedUpdateEnvelope{
+			Header:     "AgentOps thread update",
+			UpdateType: "handoff",
+			Summary:    "Governed thread handoff is not ready yet.",
+		})
+	}
+	summary := "Governed thread handoff package refreshed."
+	if view.Timeline != nil && len(runtimeclient.PendingApprovalIDsFromThreadReview(view)) == 0 && len(runtimeclient.PendingProposalIDsFromThreadReview(view)) == 0 && len(view.Timeline.EvidenceRecords) > 0 {
+		summary = "Governed thread handoff package is ready for review or escalation."
+	}
+	envelope := runtimeclient.BuildThreadGovernedUpdateEnvelope(view, runtimeclient.ThreadEnvelopeOptions{
+		Header:       "AgentOps thread update",
+		UpdateType:   "handoff",
+		ContextLabel: "Thread",
+		ContextValue: runtimeclient.NormalizeStringOrDefault(view.Task.TaskID, "-"),
+		SubjectLabel: "Task",
+		SubjectValue: runtimeclient.NormalizeStringOrDefault(view.Task.Title, view.Task.TaskID),
+		Summary:      summary,
+		Details:      runtimeclient.BuildReviewHandoffDetailLines(cliReviewHandoffSpec(view)),
+	})
+	return runtimeclient.RenderGovernedUpdateEnvelope(envelope)
+}
+
+func cliReviewHandoffSpec(view *runtimeclient.ThreadReview) runtimeclient.ReviewHandoffSpec {
+	spec := runtimeclient.ReviewHandoffSpec{
+		ContextHint:     runtimeclient.BuildThreadContextHint(view, "", runtimeclient.ContextHintPart{Flag: "task-id", Value: runtimeclient.NormalizeStringOrDefault(view.Task.TaskID, "")}),
+		ApprovalCommand: "approvals decide",
+		ProposalCommand: "proposals decide",
+	}
+	if view == nil {
+		return spec
+	}
+	taskID := runtimeclient.NormalizeStringOrDefault(view.Task.TaskID, "")
+	spec.SubjectLabel = "task"
+	spec.SubjectValue = taskID
+	if view.Timeline != nil {
+		spec.SessionID = runtimeclient.NormalizeStringOrDefault(view.Timeline.Session.SessionID, "")
+		spec.SessionStatus = runtimeclient.NormalizeStringOrDefault(string(view.Timeline.Session.Status), "")
+		spec.ApprovalCheckpoints = append([]runtimeapi.ApprovalCheckpointRecord(nil), view.Timeline.ApprovalCheckpoints...)
+		spec.ToolProposals = append([]runtimeclient.ToolProposalReview(nil), view.ToolProposals...)
+		spec.SessionEvents = append([]runtimeapi.SessionEventRecord(nil), view.Timeline.Events...)
+		spec.EvidenceRecords = append([]runtimeapi.EvidenceRecord(nil), view.Timeline.EvidenceRecords...)
+		if len(view.Timeline.EvidenceRecords) > 0 {
+			latest := view.Timeline.EvidenceRecords[len(view.Timeline.EvidenceRecords)-1]
+			spec.LatestEvidenceID = runtimeclient.NormalizeStringOrDefault(latest.EvidenceID, "")
+			spec.LatestEvidenceKind = runtimeclient.NormalizeStringOrDefault(latest.Kind, "")
+		}
+	}
+	if view.SelectedSession != nil {
+		spec.SessionID = runtimeclient.NormalizeStringOrDefault(spec.SessionID, view.SelectedSession.SessionID)
+		spec.SessionStatus = runtimeclient.NormalizeStringOrDefault(spec.SessionStatus, string(view.SelectedSession.Status))
+	}
+	if view.Transcript != nil {
+		spec.LatestToolActionID = runtimeclient.NormalizeStringOrDefault(view.Transcript.ToolActionID, "")
+	}
+	if len(view.RecentEvents) > 0 {
+		spec.LatestActivity = runtimeclient.NormalizeStringOrDefault(view.RecentEvents[len(view.RecentEvents)-1].Detail, "")
+	}
+	if taskID != "" {
+		spec.PackageTarget = fmt.Sprintf("CLI handoff summary for task %s", taskID)
+		if spec.SessionID != "" {
+			spec.EscalationTarget = fmt.Sprintf("CLI thread review for task %s in session %s", taskID, spec.SessionID)
+		} else {
+			spec.EscalationTarget = fmt.Sprintf("CLI thread review for task %s", taskID)
+		}
+	}
+	return spec
 }
 
 func renderCLIReport(ctx context.Context, client *runtimeclient.Client, view *runtimeclient.ThreadReview, selection runtimeclient.EnterpriseReportSelection) (string, error) {

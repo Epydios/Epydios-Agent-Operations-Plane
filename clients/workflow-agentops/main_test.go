@@ -140,13 +140,15 @@ func TestRenderWorkflowUpdateUsesGovernedEnvelope(t *testing.T) {
 		"Workflow: jira | incident-response",
 		"Ticket: OPS-101",
 		"Task: task-1 (IN_PROGRESS)",
-		"Pending approval: approval-1 (runtime.apply)",
-		"Pending proposal: proposal-1 (Run pwd)",
+		"Current decision: Pending approval checkpoint approval-1 (runtime.apply).",
+		"Current decision: Pending tool proposal proposal-1 (Run pwd).",
+		"Run/session continuity: Session anchor: sess-1 (AWAITING_APPROVAL).",
+		"Approval/proposal linkage: Pending approval checkpoints: approval-1",
+		"Approval/proposal linkage: Pending tool proposals: proposal-1",
+		"Next actions: Current approval is focused automatically: approvals decide --ticket-id OPS-101 --source-system jira --workflow-id incident-response --decision APPROVE|DENY",
+		"Next actions: Current proposal is focused automatically: proposals decide --ticket-id OPS-101 --source-system jira --workflow-id incident-response --decision APPROVE|DENY",
 		"Recent activity:",
 		"Worker Progress: Worker collected deployment context.",
-		"Action hints:",
-		"approvals decide --ticket-id OPS-101 --source-system jira --workflow-id incident-response --decision APPROVE|DENY",
-		"proposals decide --ticket-id OPS-101 --source-system jira --workflow-id incident-response --decision APPROVE|DENY",
 	) {
 		t.Fatalf("unexpected workflow update: %s", update)
 	}
@@ -362,9 +364,16 @@ func TestRenderWorkflowHandoff(t *testing.T) {
 		"Workflow: jira | incident-response",
 		"Ticket: OPS-101",
 		"Summary: Workflow handoff package is ready for review or escalation.",
-		"Audit continuity: 2 session event(s) captured for sess-1.",
-		"Approval linkage: approval-1 | runtime.apply | APPROVED",
-		"Evidence handoff: audit_bundle | evidence-1 | memory://evidence-1 | checkpoint=approval-1 | toolAction=tool-1",
+		"Current decision: No pending approval checkpoints or tool proposals remain.",
+		"Run/session continuity: Session anchor: sess-1 (RUNNING).",
+		"Approval/proposal linkage: Primary decision detail: approval checkpoint approval-1 (APPROVED) is the latest resolved record for ticket OPS-101.",
+		"Approval/proposal linkage: Resolved approvals: approval-1 (APPROVED)",
+		"Audit/evidence handoff: Primary evidence destination: latest audit bundle evidence is ready for workflow handoff package for ticket OPS-101.",
+		"Audit/evidence handoff: Suggested escalation target: ticket OPS-101 in jira / incident-response.",
+		"Audit/evidence handoff: Suggested package target: workflow handoff package for ticket OPS-101.",
+		"Audit/evidence handoff: Audit continuity: 2 session event(s) captured for sess-1.",
+		"Audit/evidence handoff: Evidence package: audit_bundle | evidence-1 | memory://evidence-1 | checkpoint=approval-1 | toolAction=tool-1",
+		"Next actions: Share this handoff summary or the governed report when downstream review needs the current proof package.",
 	) {
 		t.Fatalf("unexpected workflow handoff: %s", rendered)
 	}
@@ -535,7 +544,11 @@ func TestRenderWorkflowParityFixtureIncludesSharedGuidance(t *testing.T) {
 		},
 	}
 	rendered := renderWorkflowUpdate(report)
-	for _, part := range append(fixture.Expected.EventLines, "Action hints:", "--checkpoint-id <id>", fixture.Expected.Summary) {
+	for _, part := range append(fixture.Expected.EventLines,
+		"Current decision: Pending approval checkpoint approval-1",
+		"Next actions: Current approval is not unambiguous: approvals decide --ticket-id OPS-101 --source-system jira --workflow-id incident-response --checkpoint-id <id> --decision APPROVE|DENY",
+		fixture.Expected.Summary,
+	) {
 		if !strings.Contains(rendered, part) {
 			t.Fatalf("missing %q in %s", part, rendered)
 		}

@@ -39,8 +39,14 @@ test("buildAuditEvidenceHandoff packages evidence and recent audit continuity", 
   assert.equal(handoff.runId, "run-9");
   assert.match(handoff.renderedText, /AgentOps Audit and Evidence Handoff/);
   assert.match(handoff.renderedText, /Run: run-9/);
-  assert.match(handoff.renderedText, /Governed run anchor: run-9/);
+  assert.match(handoff.renderedText, /Current decision:/);
+  assert.match(handoff.renderedText, /Run\/session continuity:/);
+  assert.match(handoff.renderedText, /Primary decision detail: approval checkpoint appr-1 \(APPROVED\) is the latest resolved record for task task-1\./);
   assert.match(handoff.renderedText, /Resolved approvals: appr-1 \(APPROVED\)/);
-  assert.match(handoff.renderedText, /Governed request bundle ready/);
+  assert.match(handoff.renderedText, /Audit\/evidence handoff:/);
+  assert.match(handoff.renderedText, /Primary evidence destination: latest audit bundle evidence is ready for the VS Code handoff summary for task task-1\./);
+  assert.match(handoff.renderedText, /Suggested escalation target: the VS Code governed thread for task task-1\./);
+  assert.match(handoff.renderedText, /Suggested package target: the VS Code handoff summary for task task-1\./);
+  assert.match(handoff.renderedText, /Evidence package: audit_bundle \| evidence-1/);
   assert.match(handoff.renderedText, /Approval Decision: Approved by operator\./);
 });

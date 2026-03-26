@@ -228,8 +228,11 @@ func TestRenderCLIThreadEnvelopeIncludesGovernedSections(t *testing.T) {
 	if !strings.Contains(rendered, "Type: review") {
 		t.Fatalf("expected review type, got %q", rendered)
 	}
-	if !strings.Contains(rendered, "Action hints:") {
-		t.Fatalf("expected action hints section, got %q", rendered)
+	if !strings.Contains(rendered, "Current decision: Focused approval checkpoint appr-1") {
+		t.Fatalf("expected current decision summary, got %q", rendered)
+	}
+	if !strings.Contains(rendered, "Next actions: Current approval is focused automatically: approvals decide --session-id sess-1 --task-id task-1 --decision APPROVE|DENY") {
+		t.Fatalf("expected next-actions guidance, got %q", rendered)
 	}
 }
 
@@ -237,7 +240,31 @@ func TestRenderCLIThreadEnvelopeMatchesParityFixture(t *testing.T) {
 	fixture := loadCLIParityFixture(t)
 	view := buildCLIParityThreadReview(t)
 	rendered := renderCLIThreadEnvelope(view)
-	for _, part := range append(fixture.Expected.EventLines, "Action hints:", "--checkpoint-id <id>", fixture.Expected.Summary) {
+	for _, part := range append(fixture.Expected.EventLines,
+		"Current decision: Pending approval checkpoint approval-1",
+		"Next actions: Current approval is not unambiguous: approvals decide --session-id sess-parity-1 --task-id task-parity-1 --checkpoint-id <id> --decision APPROVE|DENY",
+		fixture.Expected.Summary,
+	) {
+		if !strings.Contains(rendered, part) {
+			t.Fatalf("missing %q in %s", part, rendered)
+		}
+	}
+}
+
+func TestRenderCLIHandoffEnvelope(t *testing.T) {
+	view := buildCLIParityThreadReview(t)
+	rendered := renderCLIHandoffEnvelope(view)
+	for _, part := range []string{
+		"AgentOps thread update",
+		"Type: handoff",
+		"Current decision: Pending approval checkpoint approval-1",
+		"Approval/proposal linkage: Primary decision detail is not unambiguous yet for task task-parity-1.",
+		"Approval/proposal linkage: Pending approval checkpoints: approval-1, approval-2",
+		"Audit/evidence handoff: Primary evidence destination: latest worker output evidence is ready for CLI handoff summary for task task-parity-1.",
+		"Audit/evidence handoff: Suggested escalation target: CLI thread review for task task-parity-1 in session sess-parity-1.",
+		"Audit/evidence handoff: Suggested package target: CLI handoff summary for task task-parity-1.",
+		"Audit/evidence handoff: Evidence package: worker_output | evidence-1 | memory://evidence-1",
+	} {
 		if !strings.Contains(rendered, part) {
 			t.Fatalf("missing %q in %s", part, rendered)
 		}

@@ -211,9 +211,9 @@ func main() {
 		"--render", "handoff",
 	)
 	assert(strings.Contains(handoffOutput, "Type: handoff"), "expected workflow handoff render")
-	assert(strings.Contains(handoffOutput, "Approval linkage: approval-workflow-proof-1"), "expected approval linkage in workflow handoff")
-	assert(strings.Contains(handoffOutput, "Evidence handoff: audit_bundle | evidence-workflow-proof-1 | memory://evidence-workflow-proof-1"), "expected evidence handoff in workflow output")
-	assert(strings.Contains(handoffOutput, "Audit continuity: "), "expected audit continuity line in workflow handoff")
+	assert(strings.Contains(handoffOutput, "Approval/proposal linkage: Resolved approvals: approval-workflow-proof-1 (APPROVED)"), "expected approval linkage in workflow handoff")
+	assert(strings.Contains(handoffOutput, "Audit/evidence handoff: Evidence package: audit_bundle | evidence-workflow-proof-1 | memory://evidence-workflow-proof-1"), "expected evidence package in workflow output")
+	assert(strings.Contains(handoffOutput, "Audit/evidence handoff: Audit continuity: "), "expected audit continuity line in workflow handoff")
 	logger.log("proved audit and evidence continuity through explicit workflow handoff output")
 
 	checklist := map[string]any{

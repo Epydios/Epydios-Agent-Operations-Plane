@@ -112,7 +112,7 @@ func ResolvePendingTarget(lookup PendingTargetLookup) (string, string, error) {
 				labels = append(labels, label)
 			}
 		}
-		return "", "", fmt.Errorf("multiple pending %s matched the %s; rerun with --%s (%s)", targetPlural, contextLabel, explicitFlag, strings.Join(labels, ", "))
+		return "", "", fmt.Errorf("multiple pending %s matched the %s; the current %s is not unambiguous, so rerun with --%s (%s)", targetPlural, contextLabel, targetSingular, explicitFlag, strings.Join(labels, ", "))
 	}
 }
 
@@ -145,20 +145,22 @@ func RenderDecisionActionHints(spec DecisionActionHints) []string {
 	lines := make([]string, 0, 4)
 	switch len(spec.ApprovalIDs) {
 	case 1:
-		lines = append(lines, fmt.Sprintf("- Approve or deny the pending approval: %s %s --decision APPROVE|DENY", approvalCommand, contextHint))
+		lines = append(lines, fmt.Sprintf("- Current approval is focused automatically: %s %s --decision APPROVE|DENY", approvalCommand, contextHint))
+		lines = append(lines, fmt.Sprintf("- Secondary path: %s %s --checkpoint-id %s --decision APPROVE|DENY", approvalCommand, contextHint, spec.ApprovalIDs[0]))
 	default:
 		if len(spec.ApprovalIDs) > 1 {
-			lines = append(lines, fmt.Sprintf("- Choose an approval explicitly: %s %s --checkpoint-id <id> --decision APPROVE|DENY", approvalCommand, contextHint))
-			lines = append(lines, fmt.Sprintf("- Available approval IDs: %s", strings.Join(spec.ApprovalIDs, ", ")))
+			lines = append(lines, fmt.Sprintf("- Current approval is not unambiguous: %s %s --checkpoint-id <id> --decision APPROVE|DENY", approvalCommand, contextHint))
+			lines = append(lines, fmt.Sprintf("- Secondary approval IDs: %s", strings.Join(spec.ApprovalIDs, ", ")))
 		}
 	}
 	switch len(spec.ProposalIDs) {
 	case 1:
-		lines = append(lines, fmt.Sprintf("- Approve or deny the pending proposal: %s %s --decision APPROVE|DENY", proposalCommand, contextHint))
+		lines = append(lines, fmt.Sprintf("- Current proposal is focused automatically: %s %s --decision APPROVE|DENY", proposalCommand, contextHint))
+		lines = append(lines, fmt.Sprintf("- Secondary path: %s %s --proposal-id %s --decision APPROVE|DENY", proposalCommand, contextHint, spec.ProposalIDs[0]))
 	default:
 		if len(spec.ProposalIDs) > 1 {
-			lines = append(lines, fmt.Sprintf("- Choose a proposal explicitly: %s %s --proposal-id <id> --decision APPROVE|DENY", proposalCommand, contextHint))
-			lines = append(lines, fmt.Sprintf("- Available proposal IDs: %s", strings.Join(spec.ProposalIDs, ", ")))
+			lines = append(lines, fmt.Sprintf("- Current proposal is not unambiguous: %s %s --proposal-id <id> --decision APPROVE|DENY", proposalCommand, contextHint))
+			lines = append(lines, fmt.Sprintf("- Secondary proposal IDs: %s", strings.Join(spec.ProposalIDs, ", ")))
 		}
 	}
 	return lines

@@ -786,16 +786,7 @@ func renderWorkflowUpdate(report *workflowStatusReport) string {
 		return ""
 	}
 	summary := runtimeclient.NormalizeStringOrDefault(report.LatestWorkerSummary, "Governed workflow state refreshed.")
-	details := make([]string, 0, 1+len(report.PendingApprovals)+len(report.PendingProposals))
-	if report.Title != "" {
-		details = append(details, fmt.Sprintf("Title: %s", report.Title))
-	}
-	for _, item := range report.PendingApprovals {
-		details = append(details, fmt.Sprintf("Pending approval: %s (%s)", item.CheckpointID, runtimeclient.NormalizeStringOrDefault(item.Scope, "scope-unspecified")))
-	}
-	for _, item := range report.PendingProposals {
-		details = append(details, fmt.Sprintf("Pending proposal: %s (%s)", item.ProposalID, runtimeclient.NormalizeStringOrDefault(item.Summary, item.Command)))
-	}
+	details := runtimeclient.BuildReviewHandoffDetailLines(workflowReviewHandoffSpec(report))
 	return renderWorkflowEnvelope("status", summary, report, details, runtimeclient.RenderEventSummaryLines(report.RecentEvents, 3))
 }
 
@@ -862,16 +853,7 @@ func renderWorkflowHandoff(report *workflowStatusReport) string {
 	if len(report.PendingApprovals) == 0 && len(report.PendingProposals) == 0 && len(report.EvidenceRecords) > 0 {
 		summary = "Workflow handoff package is ready for review or escalation."
 	}
-	details := make([]string, 0, 4+len(report.ApprovalCheckpoints)+len(report.EvidenceRecords))
-	if title := strings.TrimSpace(report.Title); title != "" {
-		details = append(details, fmt.Sprintf("Title: %s", title))
-	}
-	if latest := strings.TrimSpace(report.LatestWorkerSummary); latest != "" {
-		details = append(details, fmt.Sprintf("Latest activity: %s", latest))
-	}
-	details = append(details, fmt.Sprintf("Audit continuity: %d session event(s) captured for %s.", len(report.SessionEvents), runtimeclient.NormalizeStringOrDefault(report.LatestSessionID, "-")))
-	details = append(details, workflowApprovalLinkageLines(report.ApprovalCheckpoints)...)
-	details = append(details, workflowEvidenceHandoffLines(report.EvidenceRecords)...)
+	details := runtimeclient.BuildReviewHandoffDetailLines(workflowReviewHandoffSpec(report))
 	return renderWorkflowEnvelope("handoff", summary, report, details, workflowRecentEventLines(report, 4))
 }
 
@@ -1023,7 +1005,7 @@ func renderWorkflowEnvelope(updateType, summary string, report *workflowStatusRe
 		orgAdminArtifacts = runtimeclient.BuildOrgAdminArtifactProjection(report.SessionEvents, report.EvidenceRecords)
 		details = runtimeclient.MergeEnvelopeLines(details, orgAdminReview.Details, orgAdminArtifacts.Details)
 	}
-	actionHints := renderWorkflowActionHints(report)
+	actionHints := []string{}
 	if report != nil {
 		actionHints = runtimeclient.MergeEnvelopeLines(actionHints, orgAdminReview.ActionHints)
 	}
@@ -1155,6 +1137,65 @@ func workflowEvidenceHandoffLines(items []runtimeapi.EvidenceRecord) []string {
 		lines = append(lines, fmt.Sprintf("Evidence handoff: %s", strings.Join(parts, " | ")))
 	}
 	return lines
+}
+
+func workflowReviewHandoffSpec(report *workflowStatusReport) runtimeclient.ReviewHandoffSpec {
+	spec := runtimeclient.ReviewHandoffSpec{
+		SessionID:           runtimeclient.NormalizeStringOrDefault(reportSessionID(report), ""),
+		SessionStatus:       runtimeclient.NormalizeStringOrDefault(report.SessionStatus, ""),
+		LatestActivity:      runtimeclient.NormalizeStringOrDefault(report.LatestWorkerSummary, ""),
+		ApprovalCheckpoints: workflowApprovalRecords(report),
+		ToolProposals:       append([]runtimeclient.ToolProposalReview(nil), report.PendingProposals...),
+		SessionEvents:       append([]runtimeapi.SessionEventRecord(nil), report.SessionEvents...),
+		EvidenceRecords:     append([]runtimeapi.EvidenceRecord(nil), report.EvidenceRecords...),
+		ContextHint:         buildWorkflowContextHint(report),
+		ApprovalCommand:     "approvals decide",
+		ProposalCommand:     "proposals decide",
+		SubjectLabel:        "ticket",
+		SubjectValue:        runtimeclient.NormalizeStringOrDefault(report.TicketID, report.TaskID),
+	}
+	if len(report.EvidenceRecords) > 0 {
+		latest := report.EvidenceRecords[len(report.EvidenceRecords)-1]
+		spec.LatestEvidenceID = runtimeclient.NormalizeStringOrDefault(latest.EvidenceID, "")
+		spec.LatestEvidenceKind = runtimeclient.NormalizeStringOrDefault(latest.Kind, "")
+	}
+	if ticketID := runtimeclient.NormalizeStringOrDefault(report.TicketID, report.TaskID); ticketID != "" {
+		spec.PackageTarget = fmt.Sprintf("workflow handoff package for ticket %s", ticketID)
+		if report.SourceSystem != "" || report.WorkflowID != "" {
+			target := fmt.Sprintf("ticket %s", ticketID)
+			if source := strings.TrimSpace(report.SourceSystem); source != "" {
+				target += " in " + source
+			}
+			if workflowID := strings.TrimSpace(report.WorkflowID); workflowID != "" {
+				target += " / " + workflowID
+			}
+			spec.EscalationTarget = target
+		} else {
+			spec.EscalationTarget = fmt.Sprintf("ticket %s", ticketID)
+		}
+	}
+	return spec
+}
+
+func workflowApprovalRecords(report *workflowStatusReport) []runtimeapi.ApprovalCheckpointRecord {
+	items := append([]runtimeapi.ApprovalCheckpointRecord(nil), report.ApprovalCheckpoints...)
+	seen := map[string]struct{}{}
+	for _, item := range items {
+		if id := strings.TrimSpace(item.CheckpointID); id != "" {
+			seen[id] = struct{}{}
+		}
+	}
+	for _, item := range report.PendingApprovals {
+		id := strings.TrimSpace(item.CheckpointID)
+		if id != "" {
+			if _, ok := seen[id]; ok {
+				continue
+			}
+			seen[id] = struct{}{}
+		}
+		items = append(items, item)
+	}
+	return items
 }
 
 func buildWorkflowContextHint(report *workflowStatusReport) string {

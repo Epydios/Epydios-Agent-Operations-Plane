@@ -99,9 +99,10 @@ func TestRenderDecisionActionHints(t *testing.T) {
 		ProposalIDs: []string{"proposal-1"},
 	}), "\n")
 	for _, part := range []string{
-		"Choose an approval explicitly: approvals decide --ticket-id OPS-101 --source-system jira --checkpoint-id <id> --decision APPROVE|DENY",
-		"Available approval IDs: approval-1, approval-2",
-		"Approve or deny the pending proposal: proposals decide --ticket-id OPS-101 --source-system jira --decision APPROVE|DENY",
+		"Current approval is not unambiguous: approvals decide --ticket-id OPS-101 --source-system jira --checkpoint-id <id> --decision APPROVE|DENY",
+		"Secondary approval IDs: approval-1, approval-2",
+		"Current proposal is focused automatically: proposals decide --ticket-id OPS-101 --source-system jira --decision APPROVE|DENY",
+		"Secondary path: proposals decide --ticket-id OPS-101 --source-system jira --proposal-id proposal-1 --decision APPROVE|DENY",
 	} {
 		if !strings.Contains(value, part) {
 			t.Fatalf("missing %q in %s", part, value)

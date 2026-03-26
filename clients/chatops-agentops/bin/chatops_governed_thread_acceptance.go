@@ -20,82 +20,134 @@ import (
 
 type proofRuntime struct {
 	server            *httptest.Server
-	state             *cliProofState
+	state             *chatopsProofState
 	token             string
 	runtimeAPIBaseURL string
 }
 
-type cliProofState struct {
-	task      runtimeapi.TaskRecord
+type chatopsProofState struct {
+	task      *runtimeapi.TaskRecord
 	sessions  []runtimeapi.SessionRecord
 	timelines map[string]*runtimeapi.SessionTimelineResponse
+}
+
+type chatopsIntakeResult struct {
+	Task   *runtimeapi.TaskRecord          `json:"task,omitempty"`
+	Invoke *runtimeapi.AgentInvokeResponse `json:"invoke,omitempty"`
+	Status *chatopsStatusSnapshot          `json:"status,omitempty"`
+}
+
+type chatopsStatusSnapshot struct {
+	SourceSystem        string                                `json:"sourceSystem,omitempty"`
+	ChannelID           string                                `json:"channelId,omitempty"`
+	ChannelName         string                                `json:"channelName,omitempty"`
+	ThreadID            string                                `json:"threadId,omitempty"`
+	TaskID              string                                `json:"taskId,omitempty"`
+	LatestSessionID     string                                `json:"latestSessionId,omitempty"`
+	OpenApprovals       int                                   `json:"openApprovals,omitempty"`
+	PendingProposals    []runtimeclient.ToolProposalReview    `json:"pendingProposals,omitempty"`
+	ApprovalCheckpoints []runtimeapi.ApprovalCheckpointRecord `json:"approvalCheckpoints,omitempty"`
+	EvidenceRecords     []runtimeapi.EvidenceRecord           `json:"evidenceRecords,omitempty"`
+	EvidenceCount       int                                   `json:"evidenceCount,omitempty"`
+}
+
+type chatopsApprovalDecisionEnvelope struct {
+	Decision *runtimeapi.ApprovalCheckpointDecisionResponse `json:"decision,omitempty"`
+}
+
+type chatopsProposalDecisionEnvelope struct {
+	Decision *runtimeapi.ToolProposalDecisionResponse `json:"decision,omitempty"`
 }
 
 func main() {
 	repoRoot := mustRepoRoot()
 	stamp := stampUTC()
-	phaseRoot := filepath.Join(repoRoot, ".epydios", "internal-readiness", "cli-governed-thread-proof")
+	phaseRoot := filepath.Join(repoRoot, ".epydios", "internal-readiness", "chatops-governed-thread-proof")
 	runRoot := filepath.Join(phaseRoot, stamp)
 	must(os.MkdirAll(runRoot, 0o755))
 	must(os.MkdirAll(phaseRoot, 0o755))
 
-	logPath := filepath.Join(runRoot, "verify-cli-governed-thread.log")
-	summaryPath := filepath.Join(runRoot, "verify-cli-governed-thread.summary.json")
-	checklistPath := filepath.Join(runRoot, "operator-cli-governed-thread-checklist.json")
-	latestLogPath := filepath.Join(phaseRoot, "verify-cli-governed-thread-latest.log")
-	latestSummaryPath := filepath.Join(phaseRoot, "verify-cli-governed-thread-latest.summary.json")
+	logPath := filepath.Join(runRoot, "verify-chatops-governed-thread.log")
+	summaryPath := filepath.Join(runRoot, "verify-chatops-governed-thread.summary.json")
+	checklistPath := filepath.Join(runRoot, "operator-chatops-governed-thread-checklist.json")
+	latestLogPath := filepath.Join(phaseRoot, "verify-chatops-governed-thread-latest.log")
+	latestSummaryPath := filepath.Join(phaseRoot, "verify-chatops-governed-thread-latest.summary.json")
 
 	logger := newProofLogger(logPath)
 	proof := startMockRuntime(logger.log)
 	defer proof.server.Close()
 
-	binaryPath := filepath.Join(runRoot, "agentops-cli-proof")
-	buildCLIBinary(repoRoot, binaryPath, logger.log)
+	binaryPath := filepath.Join(runRoot, "chatops-agentops-proof")
+	buildChatopsBinary(repoRoot, binaryPath, logger.log)
 
 	baseEnv := []string{
 		"AGENTOPS_RUNTIME_API_BASE_URL=" + proof.runtimeAPIBaseURL,
-		"AGENTOPS_TENANT_ID=" + proof.state.task.TenantID,
-		"AGENTOPS_PROJECT_ID=" + proof.state.task.ProjectID,
+		"AGENTOPS_TENANT_ID=tenant-demo",
+		"AGENTOPS_PROJECT_ID=project-chatops",
 	}
 
-	var status runtimeclient.ConnectionStatus
-	mustJSONCommand(repoRoot, binaryPath, append(baseEnv, "AGENTOPS_AUTH_TOKEN="), &status, logger.log, "--output", "json", "status", "check")
-	assert(status.State == "auth_required", "expected auth_required state, got %q", status.State)
-	logger.log("proved auth-required CLI status check")
+	var connection runtimeclient.ConnectionStatus
+	mustJSONCommand(repoRoot, binaryPath, append(baseEnv, "AGENTOPS_AUTH_TOKEN="), &connection, logger.log, "--output", "json", "status", "check")
+	assert(connection.State == "auth_required", "expected auth_required chatops status, got %q", connection.State)
+	logger.log("proved auth-required chatops status check")
 
-	mustJSONCommand(repoRoot, binaryPath, append(baseEnv, "AGENTOPS_AUTH_TOKEN="+proof.token), &status, logger.log, "--output", "json", "status", "check")
-	assert(status.State == "connected", "expected connected state, got %q", status.State)
-	logger.log("proved connected CLI status check")
+	mustJSONCommand(repoRoot, binaryPath, append(baseEnv, "AGENTOPS_AUTH_TOKEN="+proof.token), &connection, logger.log, "--output", "json", "status", "check")
+	assert(connection.State == "connected", "expected connected chatops status, got %q", connection.State)
+	logger.log("proved connected chatops status check")
 
-	var baseline runtimeclient.ThreadReview
-	mustJSONCommand(repoRoot, binaryPath, append(baseEnv, "AGENTOPS_AUTH_TOKEN="+proof.token), &baseline, logger.log, "--output", "json", "threads", "show", "--task-id", proof.state.task.TaskID)
-	assert(strings.TrimSpace(baseline.Task.TaskID) == proof.state.task.TaskID, "expected baseline task %q, got %q", proof.state.task.TaskID, baseline.Task.TaskID)
-	logger.log("loaded baseline governed thread through cli-agentops")
+	payloadPath := filepath.Join(runRoot, "chatops-intake.json")
+	writeJSON(payloadPath, map[string]any{
+		"sourceSystem":    "slack",
+		"channelId":       "C123",
+		"channelName":     "ops-alerts",
+		"threadId":        "1730.55",
+		"messageId":       "m-1",
+		"messageUrl":      "https://chat.example/messages/m-1",
+		"conversationUrl": "https://chat.example/thread/1730.55",
+		"title":           "Investigate deployment failure",
+		"intent":          "Create a governed conversation that triages the failing deployment and proposes the next safe action.",
+		"requestedBy":     map[string]any{"displayName": "On-call Engineer"},
+		"labels":          []string{"incident", "sev1"},
+		"initialPrompt":   "Review the chat context and propose the next governed verification step.",
+		"executionMode":   runtimeapi.AgentInvokeExecutionModeManagedCodexWorker,
+		"agentProfileId":  "codex",
+		"systemPrompt":    "Prefer safe triage and explicit approval points before proposing changes.",
+		"maxOutputTokens": 256,
+	})
 
-	var invoke runtimeapi.AgentInvokeResponse
+	var intake chatopsIntakeResult
 	mustJSONCommand(
 		repoRoot,
 		binaryPath,
 		append(baseEnv, "AGENTOPS_AUTH_TOKEN="+proof.token),
-		&invoke,
+		&intake,
 		logger.log,
 		"--output", "json",
-		"turns", "send",
-		"--task-id", proof.state.task.TaskID,
-		"--prompt", "Summarize the governed workspace change and stage the next safe command.",
-		"--execution-mode", runtimeapi.AgentInvokeExecutionModeManagedCodexWorker,
+		"conversations", "intake",
+		"--file", payloadPath,
 	)
-	assert(strings.TrimSpace(invoke.SessionID) == "sess-cli-proof", "expected governed session sess-cli-proof, got %q", invoke.SessionID)
-	logger.log("submitted governed CLI turn")
+	assert(intake.Task != nil && strings.TrimSpace(intake.Task.TaskID) == "task-chatops-proof-1", "expected created chatops task")
+	assert(intake.Invoke != nil && strings.TrimSpace(intake.Invoke.SessionID) == "sess-chatops-proof-1", "expected chatops proof session")
+	logger.log("created chatops task and initial governed turn through chatops-agentops")
 
-	var review runtimeclient.ThreadReview
-	mustJSONCommand(repoRoot, binaryPath, append(baseEnv, "AGENTOPS_AUTH_TOKEN="+proof.token), &review, logger.log, "--output", "json", "threads", "show", "--task-id", proof.state.task.TaskID)
-	assert(review.Timeline != nil, "expected review timeline after invoke")
-	assert(review.Timeline.OpenApprovalCount == 1, "expected 1 pending approval, got %d", review.Timeline.OpenApprovalCount)
-	assert(len(review.ToolProposals) == 1, "expected 1 pending proposal, got %d", len(review.ToolProposals))
-	logger.log("loaded governed review state with approval and proposal checkpoints")
+	var status chatopsStatusSnapshot
+	mustJSONCommand(
+		repoRoot,
+		binaryPath,
+		append(baseEnv, "AGENTOPS_AUTH_TOKEN="+proof.token),
+		&status,
+		logger.log,
+		"--output", "json",
+		"conversations", "status",
+		"--thread-id", "1730.55",
+		"--source-system", "slack",
+		"--channel-id", "C123",
+	)
+	assert(status.OpenApprovals == 1, "expected 1 pending approval, got %d", status.OpenApprovals)
+	assert(len(status.PendingProposals) == 1, "expected 1 pending proposal, got %d", len(status.PendingProposals))
+	logger.log("loaded governed chat thread review state with approval and proposal checkpoints")
 
-	var approval runtimeapi.ApprovalCheckpointDecisionResponse
+	var approval chatopsApprovalDecisionEnvelope
 	mustJSONCommand(
 		repoRoot,
 		binaryPath,
@@ -104,14 +156,17 @@ func main() {
 		logger.log,
 		"--output", "json",
 		"approvals", "decide",
-		"--session-id", "sess-cli-proof",
+		"--thread-id", "1730.55",
+		"--source-system", "slack",
+		"--channel-id", "C123",
 		"--decision", "APPROVE",
-		"--reason", "CLI bounded proof approval accepted.",
+		"--reason", "Chatops bounded proof approval accepted.",
 	)
-	assert(strings.EqualFold(string(approval.Status), string(runtimeapi.ApprovalStatusApproved)), "expected approval status APPROVED, got %q", approval.Status)
-	logger.log("resolved approval checkpoint")
+	assert(approval.Decision != nil, "expected chatops approval decision payload")
+	assert(strings.EqualFold(string(approval.Decision.Status), string(runtimeapi.ApprovalStatusApproved)), "expected approval approved, got %q", approval.Decision.Status)
+	logger.log("resolved chatops approval checkpoint")
 
-	var proposal runtimeapi.ToolProposalDecisionResponse
+	var proposal chatopsProposalDecisionEnvelope
 	mustJSONCommand(
 		repoRoot,
 		binaryPath,
@@ -120,54 +175,62 @@ func main() {
 		logger.log,
 		"--output", "json",
 		"proposals", "decide",
-		"--session-id", "sess-cli-proof",
+		"--thread-id", "1730.55",
+		"--source-system", "slack",
+		"--channel-id", "C123",
 		"--decision", "APPROVE",
-		"--reason", "CLI bounded proof proposal accepted.",
+		"--reason", "Chatops bounded proof proposal accepted.",
 	)
-	assert(strings.EqualFold(proposal.Status, "APPROVED"), "expected proposal status APPROVED, got %q", proposal.Status)
-	logger.log("resolved tool proposal")
+	assert(proposal.Decision != nil, "expected chatops proposal decision payload")
+	assert(strings.EqualFold(proposal.Decision.Status, "APPROVED"), "expected proposal approved, got %q", proposal.Decision.Status)
+	logger.log("resolved chatops proposal")
 
 	followOutput := mustTextCommand(
 		repoRoot,
 		binaryPath,
 		append(baseEnv, "AGENTOPS_AUTH_TOKEN="+proof.token),
 		logger.log,
-		"sessions", "follow",
-		"--session-id", "sess-cli-proof",
+		"conversations", "follow",
+		"--thread-id", "1730.55",
+		"--source-system", "slack",
+		"--channel-id", "C123",
 		"--once",
 		"--render", "delta-update",
 	)
-	assert(strings.Contains(followOutput, "AgentOps thread update"), "expected follow envelope header")
-	assert(strings.Contains(followOutput, "Proposal Decision: CLI bounded proof proposal accepted."), "expected proposal decision follow line")
-	assert(strings.Contains(followOutput, "Evidence Recorded: audit_bundle"), "expected evidence follow line")
-	logger.log("followed governed session event stream through cli-agentops")
+	assert(strings.Contains(followOutput, "AgentOps thread update"), "expected chatops follow envelope")
+	assert(strings.Contains(followOutput, "Proposal Decision: Chatops bounded proof proposal accepted."), "expected proposal decision in chatops follow")
+	assert(strings.Contains(followOutput, "Evidence Recorded: audit_bundle"), "expected evidence event in chatops follow")
+	logger.log("followed governed chat thread event stream through chatops-agentops")
 
 	handoffOutput := mustTextCommand(
 		repoRoot,
 		binaryPath,
 		append(baseEnv, "AGENTOPS_AUTH_TOKEN="+proof.token),
 		logger.log,
-		"threads", "show",
-		"--task-id", proof.state.task.TaskID,
+		"conversations", "status",
+		"--thread-id", "1730.55",
+		"--source-system", "slack",
+		"--channel-id", "C123",
 		"--render", "handoff",
 	)
-	assert(strings.Contains(handoffOutput, "Type: handoff"), "expected CLI handoff render")
-	assert(strings.Contains(handoffOutput, "Current decision: No pending approval checkpoints or tool proposals remain."), "expected resolved current decision summary in CLI handoff")
-	assert(strings.Contains(handoffOutput, "Audit/evidence handoff: Evidence package: audit_bundle | evidence-cli-proof-1 | memory://evidence-cli-proof-1"), "expected evidence package in CLI handoff")
-	logger.log("proved audit and evidence handoff through explicit cli-agentops handoff output")
+	assert(strings.Contains(handoffOutput, "Type: handoff"), "expected chatops handoff render")
+	assert(strings.Contains(handoffOutput, "Approval/proposal linkage: Resolved approvals: approval-chatops-proof-1 (APPROVED)"), "expected approval linkage in chatops handoff")
+	assert(strings.Contains(handoffOutput, "Audit/evidence handoff: Evidence package: audit_bundle | evidence-chatops-proof-1 | memory://evidence-chatops-proof-1"), "expected evidence package in chatops output")
+	assert(strings.Contains(handoffOutput, "Audit/evidence handoff: Audit continuity: "), "expected audit continuity line in chatops handoff")
+	logger.log("proved audit and evidence continuity through explicit chatops handoff output")
 
 	checklist := map[string]any{
 		"generated_at_utc": stamp,
-		"supported_path_cli_governed_thread": map[string]any{
+		"chatops_governed_thread_beta_proof": map[string]any{
 			"status": "pass",
 			"steps": []string{
 				"connection and auth truth reported auth-required and connected states",
-				"baseline governed thread loaded through cli-agentops",
-				"one governed turn submitted through cli-agentops",
-				"approval checkpoint resolved through cli-agentops",
-				"tool proposal resolved through cli-agentops",
-				"live follow consumed governed session event updates",
-				"audit and evidence handoff rendered explicitly through cli-agentops handoff output",
+				"chatops intake created a governed task and initial governed turn",
+				"chatops review surfaced pending approval and proposal state",
+				"approval checkpoint resolved through chatops-agentops",
+				"tool proposal resolved through chatops-agentops",
+				"live follow consumed governed chat thread event updates",
+				"audit and evidence continuity rendered explicitly through chatops handoff output",
 			},
 			"runtime_api_base_url": proof.runtimeAPIBaseURL,
 			"log_path":             logPath,
@@ -176,8 +239,8 @@ func main() {
 	}
 	summary := map[string]any{
 		"generated_at_utc":     stamp,
-		"status":               "cli_governed_thread_proof_ready",
-		"reason":               "CLI bounded proof accepted connection and auth truth, one governed turn, approval and proposal resolution, live follow, and audit and evidence handoff on the shared M16 contract.",
+		"status":               "chatops_governed_thread_proof_ready",
+		"reason":               "Chatops bounded proof accepted connection and auth truth, one governed intake and turn, approval and proposal resolution, live follow, and explicit audit and evidence continuity on the shared M16 contract.",
 		"runtime_api_base_url": proof.runtimeAPIBaseURL,
 		"log_path":             logPath,
 		"checklist_path":       checklistPath,
@@ -186,13 +249,13 @@ func main() {
 	writeJSON(summaryPath, summary)
 	copyFile(logPath, latestLogPath)
 	copyFile(summaryPath, latestSummaryPath)
-	fmt.Println("CLI governed thread verifier passed.")
+	fmt.Println("Chatops governed thread verifier passed.")
 }
 
 func mustRepoRoot() string {
 	_, filePath, _, ok := runtime.Caller(0)
 	if !ok {
-		panic("unable to resolve cli proof harness path")
+		panic("unable to resolve chatops proof harness path")
 	}
 	return filepath.Clean(filepath.Join(filepath.Dir(filePath), "../../.."))
 }
@@ -205,12 +268,12 @@ func isoNow() time.Time {
 	return time.Now().UTC()
 }
 
-func newProofLogger(logPath string) *proofLogger {
-	return &proofLogger{logPath: logPath}
-}
-
 type proofLogger struct {
 	logPath string
+}
+
+func newProofLogger(logPath string) *proofLogger {
+	return &proofLogger{logPath: logPath}
 }
 
 func (p *proofLogger) log(line string) {
@@ -222,8 +285,8 @@ func (p *proofLogger) log(line string) {
 	}
 }
 
-func buildCLIBinary(repoRoot, binaryPath string, logf func(string)) {
-	cmd := exec.Command("go", "build", "-o", binaryPath, "./clients/cli-agentops")
+func buildChatopsBinary(repoRoot, binaryPath string, logf func(string)) {
+	cmd := exec.Command("go", "build", "-o", binaryPath, "./clients/chatops-agentops")
 	cmd.Dir = repoRoot
 	cmd.Env = append(os.Environ(), "GOCACHE="+filepath.Join(repoRoot, ".tmp", "go-build"))
 	logf("$ " + strings.Join(cmd.Args, " "))
@@ -232,7 +295,7 @@ func buildCLIBinary(repoRoot, binaryPath string, logf func(string)) {
 		logf(strings.TrimSpace(string(output)))
 	}
 	if err != nil {
-		panic(fmt.Sprintf("build cli binary: %v", err))
+		panic(fmt.Sprintf("build chatops binary: %v", err))
 	}
 }
 
@@ -270,28 +333,49 @@ func mustCommand(repoRoot, binaryPath string, env []string, logf func(string), a
 }
 
 func startMockRuntime(logf func(string)) *proofRuntime {
-	state := newCLIProofState()
-	token := "cli-proof-token"
+	state := &chatopsProofState{timelines: map[string]*runtimeapi.SessionTimelineResponse{}}
+	token := "chatops-proof-token"
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.TrimSpace(r.Header.Get("Authorization")) != "Bearer "+token {
-			if r.URL.Path == "/v1alpha2/runtime/tasks" && r.Method == http.MethodGet {
-				writeJSONResponse(w, http.StatusUnauthorized, map[string]any{"error": "missing or invalid bearer token"})
-				return
-			}
 			writeJSONResponse(w, http.StatusUnauthorized, map[string]any{"error": "missing or invalid bearer token"})
 			return
 		}
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/v1alpha2/runtime/tasks":
+			items := make([]runtimeapi.TaskRecord, 0, 1)
+			if state.task != nil {
+				items = append(items, *state.task)
+			}
 			writeJSONResponse(w, http.StatusOK, runtimeclient.TaskListResponse{
-				Count:  1,
-				Limit:  1,
+				Count:  len(items),
+				Limit:  maxInt(1, len(items)),
 				Offset: 0,
-				Items:  []runtimeapi.TaskRecord{state.task},
+				Items:  items,
 			})
+		case r.Method == http.MethodPost && r.URL.Path == "/v1alpha2/runtime/tasks":
+			var req runtimeapi.TaskCreateRequest
+			mustDecodeJSON(r, &req)
+			now := isoNow()
+			task := &runtimeapi.TaskRecord{
+				TaskID:      "task-chatops-proof-1",
+				RequestID:   req.Meta.RequestID,
+				TenantID:    req.Meta.TenantID,
+				ProjectID:   req.Meta.ProjectID,
+				Source:      req.Source,
+				Title:       req.Title,
+				Intent:      req.Intent,
+				RequestedBy: mustJSON(req.RequestedBy),
+				Status:      runtimeapi.TaskStatusInProgress,
+				Annotations: mustJSON(req.Annotations),
+				CreatedAt:   now,
+				UpdatedAt:   now,
+			}
+			state.task = task
+			logf(fmt.Sprintf("created chatops task %s", task.TaskID))
+			writeJSONResponse(w, http.StatusOK, task)
 		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/v1alpha2/runtime/tasks/"):
 			taskID := strings.TrimPrefix(r.URL.Path, "/v1alpha2/runtime/tasks/")
-			if strings.TrimSpace(taskID) != state.task.TaskID {
+			if state.task == nil || strings.TrimSpace(taskID) != state.task.TaskID {
 				writeJSONResponse(w, http.StatusNotFound, map[string]any{"error": "task not found"})
 				return
 			}
@@ -306,7 +390,7 @@ func startMockRuntime(logf func(string)) *proofRuntime {
 			}
 			writeJSONResponse(w, http.StatusOK, runtimeclient.SessionListResponse{
 				Count:         len(items),
-				Limit:         len(items),
+				Limit:         maxInt(1, len(items)),
 				Offset:        0,
 				IncludeLegacy: false,
 				Items:         items,
@@ -337,8 +421,8 @@ func startMockRuntime(logf func(string)) *proofRuntime {
 		case r.Method == http.MethodPost && r.URL.Path == "/v1alpha1/runtime/integrations/invoke":
 			var req runtimeapi.AgentInvokeRequest
 			mustDecodeJSON(r, &req)
-			timeline := ensureCLIProofSession(state)
-			logf(fmt.Sprintf("invoke accepted for task %s", strings.TrimSpace(req.TaskID)))
+			timeline := ensureChatopsProofSession(state)
+			logf(fmt.Sprintf("chatops invoke accepted for task %s", strings.TrimSpace(req.TaskID)))
 			writeJSONResponse(w, http.StatusOK, runtimeapi.AgentInvokeResponse{
 				Applied:          true,
 				RequestID:        req.Meta.RequestID,
@@ -352,10 +436,10 @@ func startMockRuntime(logf func(string)) *proofRuntime {
 				WorkerType:       "managed_agent",
 				WorkerAdapterID:  "codex",
 				Provider:         "agentops_gateway",
-				Transport:        "gateway",
+				Transport:        "chatops_gateway",
 				Model:            "gpt-5.4",
 				Route:            "managed_worker_gateway_process",
-				EndpointRef:      "cli-proof-endpoint",
+				EndpointRef:      "chatops-proof-endpoint",
 				FinishReason:     "approval_required",
 			})
 		case r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/approval-checkpoints/") && strings.HasSuffix(r.URL.Path, "/decision"):
@@ -367,29 +451,29 @@ func startMockRuntime(logf func(string)) *proofRuntime {
 			}
 			var req runtimeapi.ApprovalCheckpointDecisionRequest
 			mustDecodeJSON(r, &req)
+			now := isoNow()
 			for idx := range timeline.ApprovalCheckpoints {
 				if timeline.ApprovalCheckpoints[idx].CheckpointID == checkpointID {
-					reviewedAt := isoNow()
 					timeline.ApprovalCheckpoints[idx].Status = runtimeapi.ApprovalStatusApproved
 					timeline.ApprovalCheckpoints[idx].Reason = req.Reason
-					timeline.ApprovalCheckpoints[idx].ReviewedAt = &reviewedAt
-					timeline.ApprovalCheckpoints[idx].UpdatedAt = reviewedAt
-					timeline.OpenApprovalCount = 0
+					timeline.ApprovalCheckpoints[idx].ReviewedAt = &now
+					timeline.ApprovalCheckpoints[idx].UpdatedAt = now
 				}
 			}
+			timeline.OpenApprovalCount = 0
 			timeline.Session.Status = runtimeapi.SessionStatusRunning
-			timeline.Session.UpdatedAt = isoNow()
+			timeline.Session.UpdatedAt = now
 			if timeline.SelectedWorker != nil {
 				timeline.SelectedWorker.Status = runtimeapi.WorkerStatusRunning
-				timeline.SelectedWorker.UpdatedAt = timeline.Session.UpdatedAt
+				timeline.SelectedWorker.UpdatedAt = now
 			}
 			pushEvent(timeline, "approval.status.changed", map[string]any{
 				"checkpointId": checkpointID,
 				"decision":     strings.ToUpper(strings.TrimSpace(req.Decision)),
 				"status":       runtimeapi.ApprovalStatusApproved,
-				"reason":       runtimeclient.NormalizeStringOrDefault(req.Reason, "CLI bounded proof approval accepted."),
+				"reason":       runtimeclient.NormalizeStringOrDefault(req.Reason, "Chatops bounded proof approval accepted."),
 			})
-			syncState(state, timeline)
+			syncChatopsState(state, timeline)
 			writeJSONResponse(w, http.StatusOK, runtimeapi.ApprovalCheckpointDecisionResponse{
 				Applied:      true,
 				SessionID:    sessionID,
@@ -397,7 +481,7 @@ func startMockRuntime(logf func(string)) *proofRuntime {
 				Decision:     strings.ToUpper(strings.TrimSpace(req.Decision)),
 				Status:       runtimeapi.ApprovalStatusApproved,
 				Reason:       req.Reason,
-				ReviewedAt:   isoNow().Format(time.RFC3339),
+				ReviewedAt:   now.Format(time.RFC3339),
 			})
 		case r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/tool-proposals/") && strings.HasSuffix(r.URL.Path, "/decision"):
 			sessionID, proposalID := proposalDecisionIDs(r.URL.Path)
@@ -408,51 +492,51 @@ func startMockRuntime(logf func(string)) *proofRuntime {
 			}
 			var req runtimeapi.ToolProposalDecisionRequest
 			mustDecodeJSON(r, &req)
+			now := isoNow()
 			if len(timeline.ToolActions) > 0 {
 				timeline.ToolActions[0].Status = runtimeapi.ToolActionStatusCompleted
-				timeline.ToolActions[0].UpdatedAt = isoNow()
+				timeline.ToolActions[0].UpdatedAt = now
 			}
 			evidence := runtimeapi.EvidenceRecord{
-				EvidenceID:     "evidence-cli-proof-1",
+				EvidenceID:     "evidence-chatops-proof-1",
 				SessionID:      sessionID,
-				ToolActionID:   "tool-cli-proof-1",
-				CheckpointID:   "approval-cli-proof-1",
+				ToolActionID:   "tool-chatops-proof-1",
+				CheckpointID:   "approval-chatops-proof-1",
 				TenantID:       state.task.TenantID,
 				ProjectID:      state.task.ProjectID,
 				Kind:           "audit_bundle",
-				URI:            "memory://evidence-cli-proof-1",
+				URI:            "memory://evidence-chatops-proof-1",
 				RetentionClass: "standard",
-				CreatedAt:      isoNow(),
-				UpdatedAt:      isoNow(),
+				CreatedAt:      now,
+				UpdatedAt:      now,
 			}
 			timeline.EvidenceRecords = append(timeline.EvidenceRecords, evidence)
 			timeline.Session.Status = runtimeapi.SessionStatusCompleted
-			completedAt := isoNow()
-			timeline.Session.CompletedAt = &completedAt
-			timeline.Session.UpdatedAt = completedAt
+			timeline.Session.UpdatedAt = now
+			timeline.Session.CompletedAt = &now
 			if timeline.SelectedWorker != nil {
 				timeline.SelectedWorker.Status = runtimeapi.WorkerStatusCompleted
-				timeline.SelectedWorker.UpdatedAt = completedAt
+				timeline.SelectedWorker.UpdatedAt = now
 			}
 			state.task.Status = runtimeapi.TaskStatusCompleted
 			pushEvent(timeline, "tool_proposal.decided", map[string]any{
 				"proposalId":   proposalID,
 				"decision":     strings.ToUpper(strings.TrimSpace(req.Decision)),
 				"status":       "APPROVED",
-				"reason":       runtimeclient.NormalizeStringOrDefault(req.Reason, "CLI bounded proof proposal accepted."),
-				"toolActionId": "tool-cli-proof-1",
-				"summary":      "Run a safe workspace summary command.",
+				"reason":       runtimeclient.NormalizeStringOrDefault(req.Reason, "Chatops bounded proof proposal accepted."),
+				"toolActionId": "tool-chatops-proof-1",
+				"summary":      "Post a safe governed status update into the thread.",
 			})
 			pushEvent(timeline, "evidence.recorded", map[string]any{
 				"kind":       "audit_bundle",
 				"evidenceId": evidence.EvidenceID,
-				"summary":    "Governed CLI request bundle ready for downstream review.",
+				"summary":    "Governed chat thread review bundle ready for downstream review.",
 			})
 			pushEvent(timeline, "session.status.changed", map[string]any{
 				"status":  runtimeapi.SessionStatusCompleted,
-				"summary": "Governed CLI review completed.",
+				"summary": "Governed chat thread review completed.",
 			})
-			syncState(state, timeline)
+			syncChatopsState(state, timeline)
 			writeJSONResponse(w, http.StatusOK, runtimeapi.ToolProposalDecisionResponse{
 				Applied:      true,
 				SessionID:    sessionID,
@@ -460,68 +544,11 @@ func startMockRuntime(logf func(string)) *proofRuntime {
 				Decision:     strings.ToUpper(strings.TrimSpace(req.Decision)),
 				Status:       "APPROVED",
 				Reason:       req.Reason,
-				ToolActionID: "tool-cli-proof-1",
+				ToolActionID: "tool-chatops-proof-1",
 				ToolType:     "managed_agent_turn",
 				ActionStatus: runtimeapi.ToolActionStatusCompleted,
-				RunID:        "run-cli-proof-1",
-				ReviewedAt:   isoNow().Format(time.RFC3339),
-			})
-		case r.Method == http.MethodGet && r.URL.Path == "/v1alpha2/runtime/worker-capabilities":
-			writeJSONResponse(w, http.StatusOK, runtimeapi.WorkerCapabilityCatalogResponse{
-				Count: 1,
-				Items: []runtimeapi.WorkerCapabilityCatalogEntry{{
-					Label:                "Managed Codex Worker",
-					ExecutionMode:        runtimeapi.AgentInvokeExecutionModeManagedCodexWorker,
-					WorkerType:           "managed_agent",
-					AdapterID:            "codex",
-					Provider:             "agentops_gateway",
-					BoundaryRequirements: []string{"governed_tool_execution"},
-				}},
-			})
-		case r.Method == http.MethodGet && r.URL.Path == "/v1alpha2/runtime/policy-packs":
-			writeJSONResponse(w, http.StatusOK, runtimeapi.PolicyPackCatalogResponse{
-				Count: 1,
-				Items: []runtimeapi.PolicyPackCatalogEntry{{
-					PackID:                   "managed_codex_worker_operator",
-					Label:                    "Managed Codex Worker Operator",
-					RoleBundles:              []string{"enterprise.operator", "enterprise.worker_controller"},
-					DecisionSurfaces:         []string{"approval_checkpoint", "tool_proposal"},
-					ApplicableExecutionModes: []string{runtimeapi.AgentInvokeExecutionModeManagedCodexWorker},
-					ApplicableWorkerTypes:    []string{"managed_agent"},
-					ApplicableAdapterIDs:     []string{"codex"},
-					ClientSurfaces:           []string{"cli"},
-					ReportingSurfaces:        []string{"report", "delta-report"},
-					BoundaryRequirements:     []string{"agentops_gateway_boundary"},
-				}},
-			})
-		case r.Method == http.MethodGet && r.URL.Path == "/v1alpha2/runtime/export-profiles":
-			reportType := r.URL.Query().Get("reportType")
-			writeJSONResponse(w, http.StatusOK, runtimeapi.ExportProfileCatalogResponse{
-				Count: 1,
-				Items: []runtimeapi.ExportProfileCatalogEntry{{
-					ExportProfile:           map[bool]string{true: "operator_follow", false: "operator_review"}[strings.Contains(reportType, "delta")],
-					Label:                   map[bool]string{true: "Operator Follow", false: "Operator Review"}[strings.Contains(reportType, "delta")],
-					DefaultAudience:         "operator",
-					AllowedAudiences:        []string{"operator", "security_review"},
-					DefaultRetentionClass:   map[bool]string{true: "short", false: "standard"}[strings.Contains(reportType, "delta")],
-					AllowedRetentionClasses: []string{"short", "standard", "archive"},
-					ClientSurfaces:          []string{"cli"},
-					ReportTypes:             []string{"report", "delta-report"},
-					DeliveryChannels:        []string{"report", "stream"},
-					RedactionMode:           "structured_and_text",
-				}},
-			})
-		case r.Method == http.MethodGet && r.URL.Path == "/v1alpha2/runtime/org-admin-profiles":
-			writeJSONResponse(w, http.StatusOK, runtimeapi.OrgAdminCatalogResponse{
-				Count: 1,
-				Items: []runtimeapi.OrgAdminCatalogEntry{{
-					ProfileID:            "centralized_enterprise_admin",
-					Label:                "Centralized Enterprise Admin",
-					OrganizationModel:    "centralized_enterprise",
-					BoundaryRequirements: []string{"runtime_authz"},
-					ReportingSurfaces:    []string{"admin_report"},
-					ClientSurfaces:       []string{"cli"},
-				}},
+				RunID:        "run-chatops-proof-1",
+				ReviewedAt:   now.Format(time.RFC3339),
 			})
 		default:
 			writeJSONResponse(w, http.StatusNotFound, map[string]any{"error": "not found"})
@@ -536,140 +563,28 @@ func startMockRuntime(logf func(string)) *proofRuntime {
 	}
 }
 
-func newCLIProofState() *cliProofState {
-	now := isoNow()
-	task := runtimeapi.TaskRecord{
-		TaskID:          "task-cli-proof-1",
-		TenantID:        "tenant-demo",
-		ProjectID:       "project-payments",
-		Source:          "cli",
-		Title:           "Review governed CLI request",
-		Intent:          "Validate the first bounded CLI governed thread path.",
-		Status:          runtimeapi.TaskStatusInProgress,
-		CreatedAt:       now,
-		UpdatedAt:       now,
-		LatestSessionID: "sess-cli-baseline",
-	}
-	baselineTimeline := &runtimeapi.SessionTimelineResponse{
-		Session: runtimeapi.SessionRecord{
-			SessionID:        "sess-cli-baseline",
-			TaskID:           task.TaskID,
-			TenantID:         task.TenantID,
-			ProjectID:        task.ProjectID,
-			SessionType:      "interactive",
-			Status:           runtimeapi.SessionStatusCompleted,
-			SelectedWorkerID: "worker-cli-baseline",
-			CreatedAt:        now,
-			StartedAt:        now,
-			UpdatedAt:        now,
-		},
-		Task: &task,
-		SelectedWorker: &runtimeapi.SessionWorkerRecord{
-			WorkerID:   "worker-cli-baseline",
-			SessionID:  "sess-cli-baseline",
-			TaskID:     task.TaskID,
-			TenantID:   task.TenantID,
-			ProjectID:  task.ProjectID,
-			WorkerType: "managed_agent",
-			AdapterID:  "codex",
-			Status:     runtimeapi.WorkerStatusCompleted,
-			CreatedAt:  now,
-			UpdatedAt:  now,
-		},
-		ToolActions: []runtimeapi.ToolActionRecord{{
-			ToolActionID: "tool-cli-baseline-1",
-			SessionID:    "sess-cli-baseline",
-			WorkerID:     "worker-cli-baseline",
-			TenantID:     task.TenantID,
-			ProjectID:    task.ProjectID,
-			ToolType:     "managed_agent_turn",
-			Status:       runtimeapi.ToolActionStatusCompleted,
-			ResultPayload: mustJSON(map[string]any{
-				"runId":              "run-cli-baseline",
-				"route":              "managed_worker_gateway_process",
-				"boundaryProviderId": "agentops_gateway",
-				"endpointRef":        "cli-proof-endpoint",
-				"rawResponse": []map[string]any{{
-					"type": "message",
-					"text": "Baseline governed CLI review ready.",
-				}},
-			}),
-			CreatedAt: now,
-			UpdatedAt: now,
-		}},
-		EvidenceRecords: []runtimeapi.EvidenceRecord{{
-			EvidenceID:     "evidence-cli-baseline-1",
-			SessionID:      "sess-cli-baseline",
-			ToolActionID:   "tool-cli-baseline-1",
-			TenantID:       task.TenantID,
-			ProjectID:      task.ProjectID,
-			Kind:           "audit_bundle",
-			URI:            "memory://evidence-cli-baseline-1",
-			RetentionClass: "standard",
-			CreatedAt:      now,
-			UpdatedAt:      now,
-		}},
-		Events: []runtimeapi.SessionEventRecord{
-			{
-				EventID:   "evt-cli-baseline-1",
-				SessionID: "sess-cli-baseline",
-				Sequence:  1,
-				EventType: "session.status.changed",
-				Payload: mustJSON(map[string]any{
-					"status":  runtimeapi.SessionStatusCompleted,
-					"summary": "Baseline governed CLI review completed.",
-				}),
-				Timestamp: now,
-			},
-			{
-				EventID:   "evt-cli-baseline-2",
-				SessionID: "sess-cli-baseline",
-				Sequence:  2,
-				EventType: "evidence.recorded",
-				Payload: mustJSON(map[string]any{
-					"kind":       "audit_bundle",
-					"evidenceId": "evidence-cli-baseline-1",
-					"summary":    "Initial governed CLI bundle is available.",
-				}),
-				Timestamp: now,
-			},
-		},
-		OpenApprovalCount:   0,
-		LatestEventSequence: 2,
-	}
-	return &cliProofState{
-		task: task,
-		sessions: []runtimeapi.SessionRecord{
-			baselineTimeline.Session,
-		},
-		timelines: map[string]*runtimeapi.SessionTimelineResponse{
-			baselineTimeline.Session.SessionID: baselineTimeline,
-		},
-	}
-}
-
-func ensureCLIProofSession(state *cliProofState) *runtimeapi.SessionTimelineResponse {
-	if timeline := state.timelines["sess-cli-proof"]; timeline != nil {
+func ensureChatopsProofSession(state *chatopsProofState) *runtimeapi.SessionTimelineResponse {
+	if timeline := state.timelines["sess-chatops-proof-1"]; timeline != nil {
 		return timeline
 	}
 	now := isoNow()
 	timeline := &runtimeapi.SessionTimelineResponse{
 		Session: runtimeapi.SessionRecord{
-			SessionID:        "sess-cli-proof",
+			SessionID:        "sess-chatops-proof-1",
 			TaskID:           state.task.TaskID,
 			TenantID:         state.task.TenantID,
 			ProjectID:        state.task.ProjectID,
-			SessionType:      "interactive",
+			SessionType:      "chatops",
 			Status:           runtimeapi.SessionStatusAwaitingApproval,
-			SelectedWorkerID: "worker-cli-proof",
+			SelectedWorkerID: "worker-chatops-proof-1",
 			CreatedAt:        now,
 			StartedAt:        now,
 			UpdatedAt:        now,
 		},
-		Task: &state.task,
+		Task: state.task,
 		SelectedWorker: &runtimeapi.SessionWorkerRecord{
-			WorkerID:   "worker-cli-proof",
-			SessionID:  "sess-cli-proof",
+			WorkerID:   "worker-chatops-proof-1",
+			SessionID:  "sess-chatops-proof-1",
 			TaskID:     state.task.TaskID,
 			TenantID:   state.task.TenantID,
 			ProjectID:  state.task.ProjectID,
@@ -680,33 +595,33 @@ func ensureCLIProofSession(state *cliProofState) *runtimeapi.SessionTimelineResp
 			UpdatedAt:  now,
 		},
 		ApprovalCheckpoints: []runtimeapi.ApprovalCheckpointRecord{{
-			CheckpointID: "approval-cli-proof-1",
-			SessionID:    "sess-cli-proof",
+			CheckpointID: "approval-chatops-proof-1",
+			SessionID:    "sess-chatops-proof-1",
 			TenantID:     state.task.TenantID,
 			ProjectID:    state.task.ProjectID,
-			Scope:        "worker_action",
+			Scope:        "chatops.apply",
 			Status:       runtimeapi.ApprovalStatusPending,
-			Reason:       "Review the first governed CLI turn before execution continues.",
+			Reason:       "Review the first governed conversation turn before execution continues.",
 			CreatedAt:    now,
 			UpdatedAt:    now,
 		}},
 		ToolActions: []runtimeapi.ToolActionRecord{{
-			ToolActionID:         "tool-cli-proof-1",
-			SessionID:            "sess-cli-proof",
-			WorkerID:             "worker-cli-proof",
+			ToolActionID:         "tool-chatops-proof-1",
+			SessionID:            "sess-chatops-proof-1",
+			WorkerID:             "worker-chatops-proof-1",
 			TenantID:             state.task.TenantID,
 			ProjectID:            state.task.ProjectID,
 			ToolType:             "managed_agent_turn",
 			Status:               runtimeapi.ToolActionStatusAuthorized,
-			ApprovalCheckpointID: "approval-cli-proof-1",
+			ApprovalCheckpointID: "approval-chatops-proof-1",
 			ResultPayload: mustJSON(map[string]any{
-				"runId":              "run-cli-proof-1",
+				"runId":              "run-chatops-proof-1",
 				"route":              "managed_worker_gateway_process",
 				"boundaryProviderId": "agentops_gateway",
-				"endpointRef":        "cli-proof-endpoint",
+				"endpointRef":        "chatops-proof-endpoint",
 				"rawResponse": []map[string]any{{
 					"type": "message",
-					"text": "Governed CLI turn is awaiting review.",
+					"text": "Governed chat thread turn is awaiting review.",
 				}},
 			}),
 			CreatedAt: now,
@@ -717,17 +632,17 @@ func ensureCLIProofSession(state *cliProofState) *runtimeapi.SessionTimelineResp
 		LatestEventSequence: 0,
 	}
 	pushEvent(timeline, "worker.progress", map[string]any{
-		"summary": "Governed CLI turn submitted for review.",
+		"summary": "Governed chat thread turn submitted for review.",
 	})
 	pushEvent(timeline, "approval.requested", map[string]any{
 		"status": "PENDING",
-		"reason": "Review the first governed CLI turn before execution continues.",
-		"scope":  "worker_action",
+		"reason": "Review the first governed conversation turn before execution continues.",
+		"scope":  "chatops.apply",
 	})
 	pushEvent(timeline, "tool_proposal.generated", map[string]any{
-		"proposalId":   "proposal-cli-proof-1",
+		"proposalId":   "proposal-chatops-proof-1",
 		"proposalType": "terminal_command",
-		"summary":      "Run a safe workspace summary command.",
+		"summary":      "Post a safe governed status update into the thread.",
 		"payload": map[string]any{
 			"command": "pwd",
 			"cwd":     "/workspace",
@@ -736,11 +651,11 @@ func ensureCLIProofSession(state *cliProofState) *runtimeapi.SessionTimelineResp
 	state.timelines[timeline.Session.SessionID] = timeline
 	state.sessions = append([]runtimeapi.SessionRecord{timeline.Session}, state.sessions...)
 	state.task.LatestSessionID = timeline.Session.SessionID
-	state.task.UpdatedAt = isoNow()
+	state.task.UpdatedAt = now
 	return timeline
 }
 
-func syncState(state *cliProofState, timeline *runtimeapi.SessionTimelineResponse) {
+func syncChatopsState(state *chatopsProofState, timeline *runtimeapi.SessionTimelineResponse) {
 	if timeline == nil {
 		return
 	}
@@ -843,6 +758,13 @@ func mustJSON(value any) json.RawMessage {
 	payload, err := json.Marshal(value)
 	must(err)
 	return payload
+}
+
+func maxInt(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 func must(err error) {
