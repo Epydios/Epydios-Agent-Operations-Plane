@@ -81,6 +81,21 @@ class AgentOpsRuntimeClient {
     return this.config().includeLegacySessions;
   }
 
+  connectionDescriptor() {
+    const config = this.config();
+    const tenantId = normalizedString(config.tenantId);
+    const projectId = normalizedString(config.projectId);
+    return {
+      runtimeApiBaseUrl: normalizedString(config.runtimeApiBaseUrl),
+      authMode: normalizedString(config.authToken) ? "bearer" : "none",
+      authReady: Boolean(normalizedString(config.authToken)),
+      tenantId,
+      projectId,
+      scopeState: tenantId && projectId ? "scoped" : "broad",
+      scopeLabel: tenantId && projectId ? `${tenantId} / ${projectId}` : "broad runtime scope"
+    };
+  }
+
   async request(path, options = {}) {
     const config = this.config();
     const url = new URL(path, config.runtimeApiBaseUrl);
@@ -109,6 +124,50 @@ class AgentOpsRuntimeClient {
       return response.text();
     }
     return response.json();
+  }
+
+  async checkConnection() {
+    const descriptor = this.connectionDescriptor();
+    if (!descriptor.runtimeApiBaseUrl) {
+      return {
+        state: "not_configured",
+        ...descriptor,
+        message: "Set the runtime API base URL before opening AgentOps thread review."
+      };
+    }
+    try {
+      const response = await this.listTasks({
+        tenantId: descriptor.tenantId,
+        projectId: descriptor.projectId,
+        limit: 1,
+        offset: 0
+      });
+      const itemCount = Array.isArray(response?.items) ? response.items.length : 0;
+      return {
+        state: "connected",
+        ...descriptor,
+        itemCount,
+        message: descriptor.scopeState === "scoped"
+          ? "Connected to the AgentOps runtime and ready for governed thread review."
+          : "Connected to the AgentOps runtime. Set tenant and project if you want a narrower thread scope."
+      };
+    } catch (error) {
+      const status = Number(error?.status || 0) || 0;
+      if (status === 401 || status === 403) {
+        return {
+          state: "auth_required",
+          ...descriptor,
+          status,
+          message: "The runtime is reachable, but the current token is missing or not accepted."
+        };
+      }
+      return {
+        state: "unreachable",
+        ...descriptor,
+        status,
+        message: normalizedString(error?.message, "The runtime could not be reached from this VS Code client.")
+      };
+    }
   }
 
   async listTasks(query = {}) {

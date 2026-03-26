@@ -13,6 +13,7 @@ const {
 } = require("./lib/threadContext");
 const { buildGovernedUpdateEnvelope } = require("./lib/updateEnvelope");
 const { buildGovernedReportEnvelope, buildGovernedReportSelectionState } = require("./lib/reportEnvelope");
+const { buildAuditEvidenceHandoff } = require("./lib/handoffSummary");
 
 function normalizedString(value, fallback = "") {
   const text = String(value || "").trim();
@@ -90,6 +91,19 @@ class AgentOpsThreadProvider {
       return [];
     }
     try {
+      const connection = await this.client.checkConnection();
+      if (normalizedString(connection?.state) !== "connected") {
+        const item = new vscode.TreeItem("AgentOps connection not ready", vscode.TreeItemCollapsibleState.None);
+        item.description = clipText(normalizedString(connection?.message, "Check runtime connection settings."), 90);
+        item.tooltip = new vscode.MarkdownString([
+          `**Status**: ${normalizedString(connection?.state, "-")}`,
+          `**Runtime**: ${normalizedString(connection?.runtimeApiBaseUrl, "-")}`,
+          `**Auth**: ${normalizedString(connection?.authMode, "-")}`,
+          `**Scope**: ${normalizedString(connection?.scopeLabel, "-")}`
+        ].join("  \n"));
+        item.iconPath = new vscode.ThemeIcon("warning");
+        return [item];
+      }
       const query = {
         tenantId: this.client.getTenantId(),
         projectId: this.client.getProjectId(),
@@ -112,7 +126,9 @@ class AgentOpsThreadProvider {
       }
       if (!items.length) {
         const empty = new vscode.TreeItem("No native threads found", vscode.TreeItemCollapsibleState.None);
-        empty.description = "Check tenant/project settings or runtime scope";
+        empty.description = connection.scopeState === "scoped"
+          ? "Connected, but no governed threads are in the current scope"
+          : "Connected without a narrow scope; no governed threads were returned";
         empty.iconPath = new vscode.ThemeIcon("info");
         return [empty];
       }
@@ -172,6 +188,7 @@ class ThreadPanel {
     this.followGeneration = 0;
     this.catalogs = { workerCapabilities: null, policyPacks: null, exportProfiles: null, orgAdminProfiles: null };
     this.governedReportSelection = {};
+    this.connectionStatus = null;
 
     this.panel.onDidDispose(() => {
       this.stopFollow();
@@ -210,6 +227,10 @@ class ThreadPanel {
       await this.copyGovernanceReport();
       return;
     }
+    if (message?.type === "copyAuditEvidenceHandoff") {
+      await this.copyAuditEvidenceHandoff();
+      return;
+    }
     if (message?.type === "selectGovernanceReportProfile") {
       await this.selectGovernanceReportProfile();
     }
@@ -221,7 +242,8 @@ class ThreadPanel {
 
   async load(taskHint, sessionHints) {
     const taskId = this.taskId;
-    const [threadResult, workerCapabilitiesResult, policyPacksResult, exportProfilesResult, orgAdminProfilesResult] = await Promise.allSettled([
+    const [connectionResult, threadResult, workerCapabilitiesResult, policyPacksResult, exportProfilesResult, orgAdminProfilesResult] = await Promise.allSettled([
+      this.client.checkConnection(),
       this.client.loadThread(taskId, {
         tenantId: this.client.getTenantId(),
         projectId: this.client.getProjectId(),
@@ -234,6 +256,15 @@ class ThreadPanel {
       this.client.listExportProfiles({ clientSurface: "vscode" }),
       this.client.listOrgAdminProfiles({ clientSurface: "vscode" })
     ]);
+    this.connectionStatus = connectionResult.status === "fulfilled"
+      ? connectionResult.value
+      : {
+          state: "unknown",
+          runtimeApiBaseUrl: "",
+          authMode: "unknown",
+          scopeLabel: "",
+          message: normalizedString(connectionResult?.reason?.message, "Connection state could not be determined.")
+        };
     if (threadResult.status !== "fulfilled") {
       throw threadResult.reason;
     }
@@ -392,7 +423,7 @@ class ThreadPanel {
   render() {
     const model = buildThreadReviewModel(this.thread, this.selectedSessionId);
     model.catalogs = this.catalogs || {};
-    this.panel.webview.html = renderHtml(model, this.governedReportSelection);
+    this.panel.webview.html = renderHtml(model, this.governedReportSelection, this.connectionStatus);
   }
 
   async copyGovernanceReport() {
@@ -401,6 +432,13 @@ class ThreadPanel {
     const report = buildThreadGovernanceReport(model, this.governedReportSelection);
     await vscode.env.clipboard.writeText(normalizedString(report?.renderedText));
     vscode.window.showInformationMessage("AgentOps enterprise governance report copied to clipboard.");
+  }
+
+  async copyAuditEvidenceHandoff() {
+    const model = buildThreadReviewModel(this.thread, this.selectedSessionId);
+    const handoff = buildAuditEvidenceHandoff(model);
+    await vscode.env.clipboard.writeText(normalizedString(handoff?.renderedText));
+    vscode.window.showInformationMessage("AgentOps audit and evidence handoff copied to clipboard.");
   }
 
   async selectGovernanceReportProfile() {
@@ -521,7 +559,28 @@ function buildThreadGovernanceReport(model = {}, selection = {}) {
   });
 }
 
-function renderHtml(model, selection = {}) {
+function renderConnectionStatus(connection = {}) {
+  const state = normalizedString(connection?.state, "unknown");
+  const stateLabel = state === "connected"
+    ? "Connected"
+    : state === "auth_required"
+      ? "Auth Required"
+      : state === "not_configured"
+        ? "Not Configured"
+        : state === "unreachable"
+          ? "Unreachable"
+          : "Unknown";
+  return {
+    state,
+    stateLabel,
+    runtimeApiBaseUrl: normalizedString(connection?.runtimeApiBaseUrl, "-"),
+    authMode: normalizedString(connection?.authMode, "none"),
+    scopeLabel: normalizedString(connection?.scopeLabel, "broad runtime scope"),
+    message: normalizedString(connection?.message, "Connection state is not available yet.")
+  };
+}
+
+function renderHtml(model, selection = {}, connection = {}) {
   const selectedSessionId = normalizedString(model?.selectedSession?.sessionId);
   const sessions = Array.isArray(model?.sessions) ? model.sessions : [];
   const selectedActivity = model?.selectedActivity || {};
@@ -529,6 +588,8 @@ function renderHtml(model, selection = {}) {
   const transcript = model?.selectedTranscript || null;
   const decisionHints = buildDecisionActionHints(selectedSummary, selectedSessionId);
   const governedReport = buildThreadGovernanceReport(model, selection);
+  const handoff = buildAuditEvidenceHandoff(model);
+  const connectionStatus = renderConnectionStatus(connection);
   const governedUpdate = buildGovernedUpdateEnvelope(model, {
     header: "AgentOps thread update",
     updateType: "review",
@@ -678,6 +739,35 @@ function renderHtml(model, selection = {}) {
     ${renderEnvelopeSection("DLP findings", governedReport.dlpFindings)}
     <details><summary>Rendered governed report</summary><pre>${escapeHtml(normalizedString(governedReport.renderedText))}</pre></details>
   </section>`;
+  const connectionBlock = `<section class="panel">
+    <h3>Connection</h3>
+    <div class="meta">${escapeHtml(connectionStatus.message)}</div>
+    <div class="chips">
+      <span class="chip">status=${escapeHtml(connectionStatus.stateLabel)}</span>
+      <span class="chip">auth=${escapeHtml(connectionStatus.authMode)}</span>
+      <span class="chip">scope=${escapeHtml(connectionStatus.scopeLabel)}</span>
+      <span class="chip">runtime=${escapeHtml(connectionStatus.runtimeApiBaseUrl)}</span>
+    </div>
+  </section>`;
+  const handoffBlock = `<section class="panel">
+    <h3>${escapeHtml(handoff.header)}</h3>
+    <div class="meta">${escapeHtml(normalizedString(handoff.summary, "Audit and evidence handoff is not ready yet."))}</div>
+    <div class="chips">
+      <span class="chip">session=${escapeHtml(normalizedString(handoff.sessionId, "-"))}</span>
+      <span class="chip">evidence=${escapeHtml(String(handoff.evidenceCount || 0))}</span>
+      <span class="chip">audit=${escapeHtml(String(handoff.auditEventCount || 0))}</span>
+      <span class="chip">openApprovals=${escapeHtml(String(handoff.openApprovals || 0))}</span>
+      <span class="chip">pendingProposals=${escapeHtml(String(handoff.pendingProposals || 0))}</span>
+    </div>
+    <div class="toolbar">
+      <button type="button" data-action="copy-audit-evidence-handoff">Copy Handoff Summary</button>
+      <button type="button" data-action="copy-governance-report">Copy Governed Report</button>
+    </div>
+    ${renderEnvelopeSection("Evidence", handoff.evidenceLines)}
+    ${renderEnvelopeSection("Recent audit and review", handoff.auditLines)}
+    ${renderEnvelopeSection("Next truthful actions", handoff.actionHints)}
+    <details><summary>Rendered handoff summary</summary><pre>${escapeHtml(normalizedString(handoff.renderedText))}</pre></details>
+  </section>`;
   const nonce = String(Date.now());
   return `<!DOCTYPE html>
 <html>
@@ -721,8 +811,10 @@ ul { margin: 8px 0 0; padding-left: 18px; }
   </div>
 </header>
 <div class="panel-grid">
+  ${connectionBlock}
   ${governedUpdateBlock}
   ${governedReportBlock}
+  ${handoffBlock}
   <section class="panel">
     <h3>Governed Turn</h3>
     <div class="meta">Submit the next governed turn against this task on the existing M16 or M18 contract.</div>
@@ -828,6 +920,10 @@ ul { margin: 8px 0 0; padding-left: 18px; }
     }
     if (action === 'copy-governance-report') {
       vscode.postMessage({ type: 'copyGovernanceReport' });
+      return;
+    }
+    if (action === 'copy-audit-evidence-handoff') {
+      vscode.postMessage({ type: 'copyAuditEvidenceHandoff' });
       return;
     }
     const reason = window.prompt('Decision reason (optional):', '') || '';

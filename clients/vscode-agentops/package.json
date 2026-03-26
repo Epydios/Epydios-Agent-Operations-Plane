@@ -88,7 +88,8 @@
     }
   },
   "scripts": {
-    "check": "node --check extension.js && node --check lib/runtimeClient.js && node --check lib/sessionReview.js && node --check lib/threadContext.js && node --check lib/updateEnvelope.js && node --check lib/reportEnvelope.js",
-    "test": "node --test ./test/*.test.js"
+    "check": "node --check extension.js && node --check lib/runtimeClient.js && node --check lib/sessionReview.js && node --check lib/threadContext.js && node --check lib/updateEnvelope.js && node --check lib/reportEnvelope.js && node --check lib/handoffSummary.js && node --check bin/vscode_governed_thread_acceptance.js",
+    "test": "node --test ./test/*.test.js",
+    "proof": "node ./bin/vscode_governed_thread_acceptance.js"
   }
 }
