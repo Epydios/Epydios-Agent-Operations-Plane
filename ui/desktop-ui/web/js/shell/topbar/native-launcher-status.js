@@ -9,6 +9,8 @@ function describeLauncherState(state) {
   switch (String(state || "").trim().toLowerCase()) {
     case "ready":
       return "Launcher ready";
+    case "recovering":
+      return "Launcher recovering";
     case "degraded":
       return "Launcher degraded";
     case "stopped":
@@ -92,6 +94,17 @@ function describeGatewayServiceHealth(state) {
       return "gateway=unreachable";
     default:
       return "gateway=unknown";
+  }
+}
+
+function describeBridgeHealth(state) {
+  switch (String(state || "").trim().toLowerCase()) {
+    case "healthy":
+      return "bridge=healthy";
+    case "degraded":
+      return "bridge=degraded";
+    default:
+      return "bridge=unknown";
   }
 }
 
@@ -193,7 +206,13 @@ export function renderNativeLauncherStatus(shell = null) {
     interposition.upstreamAuthMode,
     interpositionTokenConfigured ? "saved_token" : "client_passthrough"
   ).toLowerCase();
+  const bridgeHealth = normalizeValue(shell.bridgeHealth, "unknown").toLowerCase();
+  const bridgeMissingBindings = Array.isArray(shell.bridgeMissingBindings)
+    ? shell.bridgeMissingBindings.filter((value) => String(value || "").trim())
+    : [];
   const interpositionBusy = ["starting", "stopping"].includes(interpositionStatus);
+  const bridgeDegraded = bridgeHealth === "degraded";
+  const interpositionControlsDisabled = interpositionBusy || bridgeDegraded;
   const startupError = String(shell.startupError || "").trim();
   const copy = startupError
     ? "The native launcher opened in a degraded state. Review the diagnostics below before retrying the live path."
@@ -223,13 +242,14 @@ export function renderNativeLauncherStatus(shell = null) {
         <span class="chip chip-neutral chip-compact">bootstrap=${escapeHTML(bootstrapState)}</span>
         <span class="chip chip-neutral chip-compact">${escapeHTML(describeRuntimeServiceHealth(serviceHealth))}</span>
         <span class="chip chip-neutral chip-compact">${escapeHTML(describeGatewayServiceHealth(gatewayHealth))}</span>
+        <span class="chip chip-neutral chip-compact">${escapeHTML(describeBridgeHealth(bridgeHealth))}</span>
         <span class="chip chip-neutral chip-compact">${escapeHTML(describeInterpositionAuthMode(interpositionAuthMode))}</span>
       </div>
     </details>
     <div class="native-launcher-status-controls">
       <div class="native-launcher-status-switch">
-        <div class="title">Interposition ON/OFF</div>
-        <div class="meta">Put Epydios directly in the request path only when you intentionally turn it on.</div>
+        <div class="title">Interposition OFF / ON</div>
+        <div class="meta">OFF keeps Epydios available without sitting in path. ON routes supported requests through live governance.</div>
         <div class="native-launcher-status-switch-callout ${escapeHTML(interpositionCalloutClass(interpositionEnabled, interpositionStatus))}">
           <div class="native-launcher-status-switch-row">
             <span class="chip chip-compact ${interpositionEnabled ? "chip-success" : "chip-neutral"}">${escapeHTML(
@@ -245,7 +265,7 @@ export function renderNativeLauncherStatus(shell = null) {
             type="button"
             data-native-shell-action="toggle-interposition"
             data-native-shell-next-enabled="${interpositionEnabled ? "false" : "true"}"
-            ${interpositionBusy ? "disabled" : ""}
+            ${interpositionControlsDisabled ? "disabled" : ""}
           >${escapeHTML(
             interpositionStatus === "starting"
               ? "Turning Interposition ON..."
@@ -271,6 +291,7 @@ export function renderNativeLauncherStatus(shell = null) {
             value="${escapeHTML(interpositionBaseURL)}"
             placeholder="https://api.openai.com/v1"
             data-native-shell-field="interposition-upstream-base-url"
+            ${interpositionControlsDisabled ? "disabled" : ""}
             spellcheck="false"
             autocomplete="off"
           />
@@ -284,6 +305,7 @@ export function renderNativeLauncherStatus(shell = null) {
               value="client_passthrough"
               data-native-shell-field="interposition-auth-mode"
               ${interpositionAuthMode === "client_passthrough" ? "checked" : ""}
+              ${interpositionControlsDisabled ? "disabled" : ""}
             />
             <span>Use credentials already present in the client request</span>
           </label>
@@ -294,6 +316,7 @@ export function renderNativeLauncherStatus(shell = null) {
               value="saved_token"
               data-native-shell-field="interposition-auth-mode"
               ${interpositionAuthMode === "saved_token" ? "checked" : ""}
+              ${interpositionControlsDisabled ? "disabled" : ""}
             />
             <span>Use a saved upstream bearer token override</span>
           </label>
@@ -312,7 +335,7 @@ export function renderNativeLauncherStatus(shell = null) {
                 : "Client passthrough mode uses the Authorization already present in compatible client requests."
             )}"
             data-native-shell-field="interposition-upstream-bearer-token"
-            ${interpositionAuthMode === "saved_token" ? "" : "disabled"}
+            ${interpositionControlsDisabled || interpositionAuthMode !== "saved_token" ? "disabled" : ""}
             spellcheck="false"
             autocomplete="off"
           />
@@ -320,12 +343,14 @@ export function renderNativeLauncherStatus(shell = null) {
         <div class="native-launcher-status-actions">
           <div class="meta native-launcher-status-hint" data-native-shell-field="interposition-auth-hint">${
             escapeHTML(
-              interpositionAuthMode === "saved_token"
+              bridgeDegraded
+                ? `Native launcher bindings are degraded${bridgeMissingBindings.length ? `: ${bridgeMissingBindings.join(", ")}` : ""}. Relaunch the installed shell before changing interposition controls.`
+                : interpositionAuthMode === "saved_token"
                 ? "Save a dedicated upstream token here when you want Epydios to override the upstream credentials."
                 : "Leave saved-token mode off to forward the Authorization already present in compatible client requests."
             )
           }</div>
-          <button class="btn btn-secondary btn-small" type="submit" data-native-shell-action="save-interposition-config">Save Upstream Config</button>
+          <button class="btn btn-secondary btn-small" type="submit" data-native-shell-action="save-interposition-config" ${interpositionControlsDisabled ? "disabled" : ""}>Save Upstream Config</button>
         </div>
       </form>
     </div>

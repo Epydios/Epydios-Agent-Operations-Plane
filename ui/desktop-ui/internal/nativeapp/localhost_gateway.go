@@ -275,7 +275,8 @@ func SyncGatewayServiceStatus(opts LaunchOptions, session *Session) (GatewayServ
 	if pid > 0 {
 		record.PID = pid
 	}
-	if gatewayHealthy(record.BaseURL) {
+	reachable, ready, detail := gatewayHealthStatus(opts, record.BaseURL)
+	if ready {
 		record.State = gatewayStateRunning
 		record.Health = gatewayHealthHealthy
 		record.LastError = ""
@@ -288,13 +289,11 @@ func SyncGatewayServiceStatus(opts LaunchOptions, session *Session) (GatewayServ
 		}
 		return record, session.UpdateGatewayService(record)
 	}
-	if record.PID > 0 && processIsRunning(record.PID) {
+	if reachable || (record.PID > 0 && processIsRunning(record.PID)) {
 		record.State = gatewayStateDegraded
 		record.Health = gatewayHealthUnreachable
 		record.UpdatedAtUTC = time.Now().UTC().Format(time.RFC3339)
-		if strings.TrimSpace(record.LastError) == "" {
-			record.LastError = fmt.Sprintf("gateway health endpoint did not become ready: %s/healthz", strings.TrimRight(record.BaseURL, "/"))
-		}
+		record.LastError = gatewayHealthStatusDetail(record.BaseURL, detail)
 		if err := writeGatewayServiceRecord(record); err != nil {
 			return record, err
 		}
@@ -380,7 +379,7 @@ func StartGatewayService(opts LaunchOptions, session *Session) (GatewayServiceRe
 	if err := session.UpdateGatewayService(record); err != nil {
 		return record, err
 	}
-	if err := waitForGatewayHealth(record.BaseURL + "/healthz"); err != nil {
+	if err := waitForGatewayService(opts, record.BaseURL); err != nil {
 		_ = stopRuntimeServiceByPID(pid)
 		_ = os.Remove(record.PIDPath)
 		record.State = gatewayStateFailed
@@ -1995,18 +1994,80 @@ func waitForGatewayHealth(url string) error {
 	return fmt.Errorf("gateway health endpoint did not become ready: %s", url)
 }
 
-func gatewayHealthy(baseURL string) bool {
+func waitForGatewayService(opts LaunchOptions, baseURL string) error {
+	probePath := "/healthz"
+	failureLabel := "gateway health endpoint did not become ready"
+	if strings.TrimSpace(opts.Mode) == modeLive {
+		probePath = "/readyz"
+		failureLabel = "gateway ready endpoint did not become ready"
+	}
+	url := strings.TrimRight(strings.TrimSpace(baseURL), "/") + probePath
+	deadline := time.Now().Add(20 * time.Second)
+	client := &http.Client{Timeout: 2 * time.Second}
+	for time.Now().Before(deadline) {
+		resp, err := client.Get(url)
+		if err == nil {
+			_ = resp.Body.Close()
+			if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+				return nil
+			}
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	return fmt.Errorf("%s: %s", failureLabel, url)
+}
+
+func gatewayHealthStatus(opts LaunchOptions, baseURL string) (bool, bool, string) {
 	base := strings.TrimSpace(baseURL)
 	if base == "" {
-		return false
+		return false, false, ""
 	}
+	if _, detail, ok := probeGatewayEndpoint(strings.TrimRight(base, "/") + "/healthz"); !ok {
+		return false, false, detail
+	}
+	if strings.TrimSpace(opts.Mode) != modeLive {
+		return true, true, ""
+	}
+	_, detail, ok := probeGatewayEndpoint(strings.TrimRight(base, "/") + "/readyz")
+	return true, ok, detail
+}
+
+func probeGatewayEndpoint(url string) (int, string, bool) {
 	client := &http.Client{Timeout: 1500 * time.Millisecond}
-	resp, err := client.Get(strings.TrimRight(base, "/") + "/healthz")
+	resp, err := client.Get(url)
 	if err != nil {
-		return false
+		return 0, err.Error(), false
 	}
-	_ = resp.Body.Close()
-	return resp.StatusCode >= 200 && resp.StatusCode < 300
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		return resp.StatusCode, "", true
+	}
+	return resp.StatusCode, extractGatewayProbeReason(body), false
+}
+
+func extractGatewayProbeReason(body []byte) string {
+	trimmed := strings.TrimSpace(string(body))
+	if trimmed == "" {
+		return ""
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(body, &payload); err == nil {
+		if reason := strings.TrimSpace(fmt.Sprint(payload["reason"])); reason != "" && reason != "<nil>" {
+			return reason
+		}
+		if status := strings.TrimSpace(fmt.Sprint(payload["status"])); status != "" && status != "<nil>" {
+			return status
+		}
+	}
+	return trimmed
+}
+
+func gatewayHealthStatusDetail(baseURL string, detail string) string {
+	if strings.TrimSpace(detail) != "" {
+		return detail
+	}
+	return fmt.Sprintf("gateway ready endpoint did not become ready: %s/readyz", strings.TrimRight(baseURL, "/"))
 }
 
 func writeGatewayServiceRecord(record GatewayServiceRecord) error {

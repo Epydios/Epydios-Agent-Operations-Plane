@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { renderHomeOpsEmptyState, renderHomeOpsPage } from "../domains/homeops/routes.js";
 
-test("companionops page renders companion status, attention, recent governed actions, and exact workbench handoffs", () => {
+test("companionops page renders companion as the daily governance lane with workbench depth handoffs", () => {
   const ui = { homeOpsContent: { innerHTML: "" } };
   renderHomeOpsPage(ui, {
     nativeShell: {
@@ -171,12 +171,19 @@ test("companionops page renders companion status, attention, recent governed act
           ts: "2026-03-15T16:21:00Z",
           event: "runtime.policy.decision",
           decision: "DENY"
+        },
+        {
+          ts: "2026-03-15T16:17:00Z",
+          event: "approval.reviewed",
+          approvalId: "approval-20260315-003",
+          runId: "run-20260315-003"
         }
       ]
     },
     incidentHistory: {
       items: [
         {
+          id: "incident-entry-20260315-003",
           packageId: "incident-20260315T161900Z-run-20260315-003",
           generatedAt: "2026-03-15T16:19:30Z",
           filingStatus: "filed",
@@ -188,21 +195,24 @@ test("companionops page renders companion status, attention, recent governed act
   });
 
   assert.match(ui.homeOpsContent.innerHTML, /data-domain-root="companionops"/);
-  assert.match(ui.homeOpsContent.innerHTML, /System Status/);
+  assert.match(ui.homeOpsContent.innerHTML, /Operator Status/);
   assert.match(ui.homeOpsContent.innerHTML, /Attention Queue/);
   assert.match(ui.homeOpsContent.innerHTML, /Live Approvals/);
   assert.match(ui.homeOpsContent.innerHTML, /Recent Governed Actions/);
+  assert.match(ui.homeOpsContent.innerHTML, /Audit And Event Stream/);
+  assert.match(ui.homeOpsContent.innerHTML, /Current Incidents And Escalations/);
+  assert.match(ui.homeOpsContent.innerHTML, /Runtime And Diagnostics/);
   assert.match(ui.homeOpsContent.innerHTML, /Quick Actions/);
   assert.match(ui.homeOpsContent.innerHTML, /Connected Client Context/);
   assert.match(ui.homeOpsContent.innerHTML, /Companion/);
   assert.match(ui.homeOpsContent.innerHTML, /Launcher/);
   assert.match(ui.homeOpsContent.innerHTML, /Runtime Service/);
   assert.match(ui.homeOpsContent.innerHTML, /Gateway/);
-  assert.match(ui.homeOpsContent.innerHTML, /Workbench ready: AgentOps/);
+  assert.match(ui.homeOpsContent.innerHTML, /Default daily lane\. Deep console: AgentOps\./);
   assert.match(ui.homeOpsContent.innerHTML, /Shell: Live desktop path\./);
   assert.match(ui.homeOpsContent.innerHTML, /homeops-feedback ok/);
-  assert.match(ui.homeOpsContent.innerHTML, /Interposition is ON\. Epydios is governing supported requests\./);
-  assert.match(ui.homeOpsContent.innerHTML, /Open Workbench/);
+  assert.match(ui.homeOpsContent.innerHTML, /Interposition is ON\. Companion is the live governance lane for supported requests\./);
+  assert.match(ui.homeOpsContent.innerHTML, /Open Workbench Depth/);
   assert.match(ui.homeOpsContent.innerHTML, /Restart Services/);
   assert.match(ui.homeOpsContent.innerHTML, /Show Diagnostics/);
   assert.match(ui.homeOpsContent.innerHTML, /Held request review/);
@@ -210,6 +220,13 @@ test("companionops page renders companion status, attention, recent governed act
   assert.match(ui.homeOpsContent.innerHTML, /Runs requiring attention/);
   assert.match(ui.homeOpsContent.innerHTML, /Incident escalation pending/);
   assert.match(ui.homeOpsContent.innerHTML, /Resolve the normal live approval loop here without leaving Companion/);
+  assert.match(ui.homeOpsContent.innerHTML, /Companion is the default daily governance lane\./);
+  assert.match(ui.homeOpsContent.innerHTML, /Runtime Policy Decision/);
+  assert.match(ui.homeOpsContent.innerHTML, /approval reviewed/i);
+  assert.match(ui.homeOpsContent.innerHTML, /Open AuditOps Depth/);
+  assert.match(ui.homeOpsContent.innerHTML, /incident-20260315T161900Z-run-20260315-003/);
+  assert.match(ui.homeOpsContent.innerHTML, /Open Incident Depth/);
+  assert.match(ui.homeOpsContent.innerHTML, /Runtime depth/);
   assert.match(ui.homeOpsContent.innerHTML, /Current Thread Approval/);
   assert.match(ui.homeOpsContent.innerHTML, /Held Request/);
   assert.match(ui.homeOpsContent.innerHTML, /Decision Reason \(Optional\)/);
@@ -218,13 +235,14 @@ test("companionops page renders companion status, attention, recent governed act
   assert.match(ui.homeOpsContent.innerHTML, /data-homeops-native-selection-id="native:hold:ixr-20260315-003"/);
   assert.match(ui.homeOpsContent.innerHTML, /data-homeops-native-selection-id="native:checkpoint:session-1:approval-org-admin-1"/);
   assert.match(ui.homeOpsContent.innerHTML, /Review Live Approvals/);
-  assert.match(ui.homeOpsContent.innerHTML, /Open Approval/);
-  assert.match(ui.homeOpsContent.innerHTML, /Open Run/);
+  assert.match(ui.homeOpsContent.innerHTML, /Open Workbench Review/);
+  assert.match(ui.homeOpsContent.innerHTML, /Open RuntimeOps Depth/);
   assert.match(ui.homeOpsContent.innerHTML, /operator@example\.com/);
   assert.match(ui.homeOpsContent.innerHTML, /epydios-runtime-prod-client/);
   assert.match(ui.homeOpsContent.innerHTML, /codex/);
   assert.match(ui.homeOpsContent.innerHTML, /tenant-demo\/project-core/);
   assert.match(ui.homeOpsContent.innerHTML, /Open Recent Runs/);
+  assert.match(ui.homeOpsContent.innerHTML, /data-homeops-action="open-audit-depth"/);
   assert.match(ui.homeOpsContent.innerHTML, /data-homeops-action="open-workbench"/);
   assert.match(ui.homeOpsContent.innerHTML, /data-homeops-action="focus-live-approvals"/);
   assert.match(ui.homeOpsContent.innerHTML, /data-homeops-action="open-approval-item"/);

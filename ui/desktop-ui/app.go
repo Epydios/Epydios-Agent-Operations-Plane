@@ -50,6 +50,44 @@ func (a *App) NativeSessionSummary() nativeapp.SessionManifest {
 	return a.session.Manifest
 }
 
+func (a *App) NativeShellStatusRefresh() (nativeapp.SessionManifest, error) {
+	opts := a.session.LaunchOptions()
+	if _, err := nativeapp.SyncRuntimeServiceStatus(opts, a.session); err != nil {
+		_ = a.session.RecordEvent("native_shell_runtime_status_refresh_failed", map[string]any{"error": err.Error()})
+		return a.session.Manifest, err
+	}
+	if _, err := nativeapp.SyncGatewayServiceStatus(opts, a.session); err != nil {
+		_ = a.session.RecordEvent("native_shell_gateway_status_refresh_failed", map[string]any{"error": err.Error()})
+		return a.session.Manifest, err
+	}
+	nextLauncherState := nativeapp.RecommendedLauncherState(a.session.Manifest)
+	if nextLauncherState != a.session.Manifest.LauncherState {
+		if err := a.session.UpdateLauncherState(nextLauncherState); err != nil {
+			_ = a.session.RecordEvent("native_shell_launcher_state_refresh_failed", map[string]any{
+				"error":         err.Error(),
+				"launcherState": nextLauncherState,
+			})
+			return a.session.Manifest, err
+		}
+	}
+	return a.session.Manifest, nil
+}
+
+func (a *App) NativeBridgeHealthReport(missingBindings []string, reason string) (nativeapp.SessionManifest, error) {
+	if err := a.session.UpdateBridgeHealth(missingBindings, reason); err != nil {
+		_ = a.session.RecordEvent("native_bridge_health_report_failed", map[string]any{
+			"error":           err.Error(),
+			"missingBindings": missingBindings,
+		})
+		return a.session.Manifest, err
+	}
+	_ = a.session.RecordEvent("native_bridge_health_reported", map[string]any{
+		"missingBindings": missingBindings,
+		"bridgeHealth":    a.session.Manifest.BridgeHealth,
+	})
+	return a.session.Manifest, nil
+}
+
 func (a *App) NativeOpenPath(path string) error {
 	return nativeapp.OpenPath(a.session.Manifest, path)
 }
@@ -64,6 +102,7 @@ func (a *App) NativeRuntimeServiceSummary() nativeapp.RuntimeServiceRecord {
 }
 
 func (a *App) NativeRuntimeServiceStart() nativeapp.RuntimeServiceRecord {
+	_ = a.session.UpdateLauncherState("recovering")
 	record, err := nativeapp.StartRuntimeService(a.session.LaunchOptions(), a.session)
 	if err != nil {
 		_ = a.session.RecordEvent("runtime_service_start_failed", map[string]any{"error": err.Error()})
@@ -111,6 +150,7 @@ func (a *App) NativeRuntimeServiceStop() nativeapp.RuntimeServiceRecord {
 }
 
 func (a *App) NativeRuntimeServiceRestart() nativeapp.RuntimeServiceRecord {
+	_ = a.session.UpdateLauncherState("recovering")
 	record, err := nativeapp.RestartRuntimeService(a.session.LaunchOptions(), a.session)
 	if err != nil {
 		_ = a.session.RecordEvent("runtime_service_restart_failed", map[string]any{"error": err.Error()})
@@ -146,6 +186,7 @@ func (a *App) NativeGatewayServiceSummary() nativeapp.GatewayServiceRecord {
 }
 
 func (a *App) NativeGatewayServiceStart() nativeapp.GatewayServiceRecord {
+	_ = a.session.UpdateLauncherState("recovering")
 	if a.session.LaunchOptions().Mode == "live" {
 		if _, err := nativeapp.EnsureRuntimeService(a.session.LaunchOptions(), a.session); err != nil {
 			_ = a.session.RecordEvent("gateway_service_runtime_dependency_failed", map[string]any{"error": err.Error()})
@@ -181,6 +222,7 @@ func (a *App) NativeGatewayServiceStop() nativeapp.GatewayServiceRecord {
 }
 
 func (a *App) NativeGatewayServiceRestart() nativeapp.GatewayServiceRecord {
+	_ = a.session.UpdateLauncherState("recovering")
 	if a.session.LaunchOptions().Mode == "live" {
 		if _, err := nativeapp.EnsureRuntimeService(a.session.LaunchOptions(), a.session); err != nil {
 			_ = a.session.RecordEvent("gateway_service_runtime_dependency_failed", map[string]any{"error": err.Error()})
@@ -204,12 +246,41 @@ func (a *App) NativeGatewayServiceRestart() nativeapp.GatewayServiceRecord {
 
 func (a *App) NativeInterpositionConfigure(enabled bool, upstreamBaseURL string, upstreamBearerToken string) (nativeapp.SessionManifest, error) {
 	previousOpts := a.session.LaunchOptions()
+	currentEnabled := previousOpts.InterpositionEnabled
+	transitioning := currentEnabled != enabled
+	transitionStatus := ""
+	transitionReason := ""
+	if transitioning {
+		if enabled {
+			transitionStatus = "starting"
+			transitionReason = "Turning interposition on. Epydios is getting ready to govern supported requests."
+		} else {
+			transitionStatus = "stopping"
+			transitionReason = "Turning interposition off. Supported requests are returning to their normal client flow."
+		}
+		if err := a.session.BeginInterpositionTransition(currentEnabled, enabled, transitionStatus, transitionReason); err != nil {
+			_ = a.session.RecordEvent("interposition_transition_failed", map[string]any{
+				"error":   err.Error(),
+				"enabled": enabled,
+				"status":  transitionStatus,
+			})
+			return a.session.Manifest, err
+		}
+	}
+	resetTransition := func() {
+		if !transitioning {
+			return
+		}
+		_ = a.session.ClearInterpositionTransition()
+	}
 	_ = a.session.RecordEvent("interposition_config_apply_started", map[string]any{
 		"enabled":                       enabled,
 		"upstreamBaseUrl":               strings.TrimSpace(upstreamBaseURL),
 		"upstreamBearerTokenConfigured": strings.TrimSpace(upstreamBearerToken) != "" && strings.TrimSpace(upstreamBearerToken) != "__EPYDIOS_CLEAR_INTERPOSITION_BEARER__",
+		"transitionStatus":              transitionStatus,
 	})
 	if err := a.session.UpdateInterpositionConfig(enabled, upstreamBaseURL, upstreamBearerToken); err != nil {
+		resetTransition()
 		_ = a.session.RecordEvent("interposition_config_update_failed", map[string]any{
 			"error":   err.Error(),
 			"enabled": enabled,
@@ -222,6 +293,7 @@ func (a *App) NativeInterpositionConfigure(enabled bool, upstreamBaseURL string,
 		previousOpts.InterpositionUpstreamBearerToken != opts.InterpositionUpstreamBearerToken
 	if opts.Mode == "live" {
 		if _, err := nativeapp.EnsureRuntimeService(opts, a.session); err != nil {
+			resetTransition()
 			_ = a.session.RecordEvent("interposition_runtime_dependency_failed", map[string]any{
 				"error":   err.Error(),
 				"enabled": enabled,
@@ -231,6 +303,7 @@ func (a *App) NativeInterpositionConfigure(enabled bool, upstreamBaseURL string,
 		}
 		if configChanged {
 			if _, err := nativeapp.RestartGatewayService(opts, a.session); err != nil {
+				resetTransition()
 				_ = a.session.RecordEvent("interposition_gateway_restart_failed", map[string]any{
 					"error":   err.Error(),
 					"enabled": enabled,
@@ -239,6 +312,7 @@ func (a *App) NativeInterpositionConfigure(enabled bool, upstreamBaseURL string,
 				return a.session.Manifest, err
 			}
 		} else if _, err := nativeapp.SyncGatewayServiceStatus(opts, a.session); err != nil {
+			resetTransition()
 			_ = a.session.RecordEvent("interposition_gateway_status_failed", map[string]any{
 				"error":   err.Error(),
 				"enabled": enabled,
@@ -247,11 +321,22 @@ func (a *App) NativeInterpositionConfigure(enabled bool, upstreamBaseURL string,
 		}
 	}
 	if _, err := nativeapp.SyncGatewayServiceStatus(opts, a.session); err != nil {
+		resetTransition()
 		_ = a.session.RecordEvent("interposition_gateway_status_failed", map[string]any{
 			"error":   err.Error(),
 			"enabled": enabled,
 		})
 		return a.session.Manifest, err
+	}
+	if transitioning {
+		if err := a.session.ClearInterpositionTransition(); err != nil {
+			_ = a.session.RecordEvent("interposition_transition_clear_failed", map[string]any{
+				"error":   err.Error(),
+				"enabled": enabled,
+			})
+			return a.session.Manifest, err
+		}
+		transitioning = false
 	}
 	_ = a.session.UpdateLauncherState("ready")
 	_ = a.session.RecordEvent("interposition_config_updated", map[string]any{

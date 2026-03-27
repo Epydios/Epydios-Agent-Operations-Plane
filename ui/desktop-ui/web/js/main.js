@@ -448,6 +448,10 @@ const INCIDENT_STATUS_SORT_RANK = {
   closed: 2
 };
 const workspaceTabNodes = Array.from(document.querySelectorAll("[data-workspace-tab]"));
+const workspaceModeNodes = Array.from(document.querySelectorAll("[data-workspace-mode]"));
+const workspaceModeActionNodes = workspaceModeNodes.filter(
+  (node) => !(node instanceof HTMLElement) || !String(node.dataset.workspaceTab || "").trim()
+);
 const workspaceShell = createWorkspaceLayoutController({
   layout: ui.workspaceLayout,
   viewIds: WORKSPACE_VIEW_ID_LIST
@@ -1481,6 +1485,37 @@ function normalizeWorkspaceView(value, fallback = "companionops") {
   return normalizeShellWorkspaceView(value, fallback, WORKSPACE_VIEW_ID_LIST);
 }
 
+function normalizeWorkspaceMode(value, fallback = "companion") {
+  const requested = String(value || "").trim().toLowerCase();
+  if (requested === "workbench") {
+    return "workbench";
+  }
+  const fallbackMode = String(fallback || "").trim().toLowerCase();
+  if (fallbackMode === "workbench") {
+    return "workbench";
+  }
+  return "companion";
+}
+
+function deriveWorkspaceMode(view) {
+  return normalizeWorkspaceView(view, "companionops") === "companionops" ? "companion" : "workbench";
+}
+
+function syncWorkspaceModeControls(view) {
+  const activeMode = deriveWorkspaceMode(view);
+  for (const modeNode of workspaceModeNodes) {
+    if (!(modeNode instanceof HTMLElement)) {
+      continue;
+    }
+    const mode = normalizeWorkspaceMode(modeNode?.dataset?.workspaceMode, "");
+    const isActive = mode === activeMode;
+    modeNode.classList.toggle("is-active", isActive);
+    modeNode.setAttribute("aria-pressed", isActive ? "true" : "false");
+    modeNode.setAttribute("aria-selected", isActive ? "true" : "false");
+    modeNode.setAttribute("tabindex", isActive ? "0" : "-1");
+  }
+}
+
 function setWorkspaceView(view, persist = false) {
   const selectedView = workspaceShell.applyView(view, { tabs: workspaceTabNodes });
   if (selectedView !== "companionops") {
@@ -1489,12 +1524,21 @@ function setWorkspaceView(view, persist = false) {
       lastWorkbenchDomain: selectedView
     };
   }
+  syncWorkspaceModeControls(selectedView);
   if (persist) {
     saveValue(WORKSPACE_VIEW_PREF_KEY, selectedView);
   }
   renderCompanionHandoffBanner();
   reconcileOperatorChatFollowLoop();
   return selectedView;
+}
+
+function setWorkspaceMode(mode, persist = false) {
+  const selectedMode = normalizeWorkspaceMode(mode, "companion");
+  if (selectedMode === "workbench") {
+    return setWorkspaceView(companionOpsViewState.lastWorkbenchDomain || "agentops", persist);
+  }
+  return setWorkspaceView("companionops", persist);
 }
 
 function normalizeIncidentSubview(value, fallback = "queue") {
@@ -4090,8 +4134,11 @@ async function main() {
   applyAdvancedState();
   createWorkspaceNavController({
     tabs: workspaceTabNodes,
+    modes: workspaceModeActionNodes,
     normalizeView: normalizeWorkspaceView,
+    normalizeMode: normalizeWorkspaceMode,
     activateView: (requested) => setWorkspaceView(requested, true),
+    activateMode: (requested) => setWorkspaceMode(requested, true),
     onKeydown: handleHorizontalTabKeydown
   }).bind();
   for (const tab of ui.incidentSubtabs || []) {
@@ -4957,15 +5004,15 @@ async function main() {
       .join("");
     ui.companionHandoffBanner.innerHTML = `
       <div class="companion-handoff-summary">
-        <span class="native-launcher-status-badge">Opened From Companion</span>
+        <span class="native-launcher-status-badge">Workbench Depth Opened</span>
         <span class="chip chip-neutral chip-compact">${escapeHTML(
           String(handoff.kind || "handoff").trim() || "handoff"
         )}</span>
         ${chips}
       </div>
-      <div class="companion-handoff-copy">Workbench depth is open for the selected handoff. Use the explicit return action when you are done reviewing or approving.</div>
+      <div class="companion-handoff-copy">Companion remains the default daily governance lane. Use this Workbench handoff only for deeper review, investigation, or admin depth, then return when you are done.</div>
       <div class="companion-handoff-actions">
-        <button class="btn btn-secondary btn-small" type="button" data-companion-return-action="return">Return To Companion</button>
+        <button class="btn btn-secondary btn-small" type="button" data-companion-return-action="return">Return To Companion Lane</button>
       </div>
     `;
     ui.companionHandoffBanner.hidden = false;
@@ -4981,6 +5028,37 @@ async function main() {
         : null
     };
     renderHomePanel();
+  };
+  const normalizeCompanionInterpositionStatusMessage = (status, reason = "") => {
+    const normalizedStatus = String(status || "").trim().toLowerCase();
+    const rawReason = String(reason || "").trim();
+    if (
+      rawReason &&
+      ![
+        "Interposition is ON. Epydios is governing supported requests.",
+        "Interposition is OFF. Epydios is not governing supported requests.",
+        "Interposition is turning on. Epydios is getting ready.",
+        "Interposition is ON, but Epydios is still getting ready.",
+        "Interposition cannot turn on until setup is complete."
+      ].includes(rawReason)
+    ) {
+      return rawReason;
+    }
+    switch (normalizedStatus) {
+      case "on":
+        return "Interposition is ON. Companion is the live governance lane for supported requests.";
+      case "off":
+        return "Interposition is OFF. Companion is monitoring only; supported requests are not being governed in path.";
+      case "warming":
+        return "Interposition is turning ON. Companion will become the live governance lane when the launcher finishes reconciling.";
+      case "gateway_unavailable":
+        return "Interposition is ON, but the live governance path is still getting ready.";
+      case "blocked_mock_mode":
+      case "blocked_upstream_config":
+        return "Interposition cannot turn ON until setup is complete. Companion stays in monitor mode.";
+      default:
+        return rawReason;
+    }
   };
   const buildCompanionRenderContext = (snapshot = triageSnapshot) => ({
     ...(snapshot && typeof snapshot === "object" ? snapshot : triageSnapshot),
@@ -7610,6 +7688,7 @@ async function main() {
 
     session = getSession();
     setAuthDisplay(ui, session);
+    await syncNativeShellStateFromBindings().catch(() => {});
     let projectID = activeProjectScope(session);
     await Promise.all([
       syncProjectIntegrationSettings(projectID, session),
@@ -8007,6 +8086,7 @@ async function main() {
     if (refreshInFlight) {
       return;
     }
+    await syncNativeShellStateFromBindings().catch(() => {});
     const currentSession = getSession();
     if (config.auth?.enabled && !currentSession.authenticated && !config.mockMode) {
       setRefreshStatus("warn", "sign-in required");
@@ -15177,8 +15257,10 @@ function getCurrentIncidentOpsEntry(entryId = "") {
       focusRenderedRegion(ui.evidenceOpsContent, { scroll: false });
     }
   });
-  const REQUIRED_NATIVE_BRIDGE_METHODS = Object.freeze([
+  const DEFAULT_REQUIRED_NATIVE_BRIDGE_METHODS = Object.freeze([
     "NativeSessionSummary",
+    "NativeShellStatusRefresh",
+    "NativeBridgeHealthReport",
     "NativeGatewayHoldList",
     "NativeInterpositionConfigure",
     "NativeRuntimeServiceRestart",
@@ -15186,22 +15268,33 @@ function getCurrentIncidentOpsEntry(entryId = "") {
   ]);
   const nativeBindings = () => globalThis?.go?.main?.App || null;
   let nativeBridgeFailureKey = "";
+  const readNativeBridgeRequiredMethods = () => {
+    const configured = Array.isArray(config?.nativeShell?.bridgeRequiredBindings)
+      ? config.nativeShell.bridgeRequiredBindings
+          .map((value) => String(value || "").trim())
+          .filter(Boolean)
+      : [];
+    return configured.length ? configured : [...DEFAULT_REQUIRED_NATIVE_BRIDGE_METHODS];
+  };
   const readNativeBridgeContract = () => {
+    const required = readNativeBridgeRequiredMethods();
     const bindings = nativeBindings();
     if (!bindings || typeof bindings !== "object") {
       return {
         available: false,
         healthy: false,
-        missing: [...REQUIRED_NATIVE_BRIDGE_METHODS],
+        required,
+        missing: [...required],
         bindings: null
       };
     }
-    const missing = REQUIRED_NATIVE_BRIDGE_METHODS.filter(
+    const missing = required.filter(
       (name) => typeof bindings?.[name] !== "function"
     );
     return {
       available: true,
       healthy: missing.length === 0,
+      required,
       missing,
       bindings
     };
@@ -15236,8 +15329,22 @@ function getCurrentIncidentOpsEntry(entryId = "") {
     updateNativeLauncherPresentation({
       ...shell,
       launcherState: "degraded",
+      bridgeHealth: "degraded",
+      bridgeRequiredBindings: Array.isArray(bridgeContract.required) ? bridgeContract.required : shell.bridgeRequiredBindings,
+      bridgeMissingBindings: bridgeContract.missing,
       startupError
     });
+    if (bridgeContract.bindings && typeof bridgeContract.bindings.NativeBridgeHealthReport === "function") {
+      bridgeContract.bindings.NativeBridgeHealthReport(bridgeContract.missing, startupError)
+        .then((sessionSummary) => {
+          applyNativeSessionSummary(sessionSummary, {
+            syncHolds: false,
+            renderHome: false,
+            renderLog: false
+          }).catch(() => {});
+        })
+        .catch(() => {});
+    }
     setCompanionOpsFeedback("error", startupError);
     return true;
   };
@@ -15279,7 +15386,18 @@ function getCurrentIncidentOpsEntry(entryId = "") {
       reportNativeBridgeContractFailure(bridgeContract);
       return false;
     }
-    const sessionSummary = await bridgeContract.bindings.NativeSessionSummary();
+    if (typeof bridgeContract.bindings.NativeBridgeHealthReport === "function") {
+      const bridgeSummary = await bridgeContract.bindings.NativeBridgeHealthReport([], "");
+      await applyNativeSessionSummary(bridgeSummary, {
+        syncHolds: false,
+        renderHome: false,
+        renderLog: false
+      });
+    }
+    const sessionSummary =
+      typeof bridgeContract.bindings.NativeShellStatusRefresh === "function"
+        ? await bridgeContract.bindings.NativeShellStatusRefresh()
+        : await bridgeContract.bindings.NativeSessionSummary();
     return applyNativeSessionSummary(sessionSummary);
   };
   const initialNativeBridgeContract = readNativeBridgeContract();
@@ -15295,6 +15413,11 @@ function getCurrentIncidentOpsEntry(entryId = "") {
     const interposition = shell?.interposition && typeof shell.interposition === "object"
       ? shell.interposition
       : {};
+    const bridgeDegraded = String(shell?.bridgeHealth || "").trim().toLowerCase() === "degraded";
+    const interpositionBusy = ["starting", "stopping"].includes(
+      String(interposition?.status || "").trim().toLowerCase()
+    );
+    const controlsLocked = bridgeDegraded || interpositionBusy;
     const authModeNodes = Array.from(
       root.querySelectorAll("[data-native-shell-field='interposition-auth-mode']")
     ).filter((node) => node instanceof HTMLInputElement);
@@ -15310,7 +15433,7 @@ function getCurrentIncidentOpsEntry(entryId = "") {
     const usingSavedToken = authMode === "saved_token";
     const bearerTokenInput = root.querySelector("[data-native-shell-field='interposition-upstream-bearer-token']");
     if (bearerTokenInput instanceof HTMLInputElement) {
-      bearerTokenInput.disabled = !usingSavedToken;
+      bearerTokenInput.disabled = controlsLocked || !usingSavedToken;
       if (usingSavedToken) {
         bearerTokenInput.placeholder = interposition.upstreamBearerTokenConfigured
           ? "Saved token is configured. Enter a new token to replace it."
@@ -15322,9 +15445,11 @@ function getCurrentIncidentOpsEntry(entryId = "") {
     }
     const authHintNode = root.querySelector("[data-native-shell-field='interposition-auth-hint']");
     if (authHintNode instanceof HTMLElement) {
-      authHintNode.textContent = usingSavedToken
-        ? "Save a dedicated upstream token here when you want Epydios to override the upstream credentials."
-        : "Leave saved-token mode off to forward the Authorization already present in compatible client requests.";
+      authHintNode.textContent = bridgeDegraded
+        ? "Native launcher bindings are degraded. Relaunch the installed shell before changing interposition controls."
+        : usingSavedToken
+          ? "Save a dedicated upstream token here when you want Epydios to override the upstream credentials."
+          : "Leave saved-token mode off to forward the Authorization already present in compatible client requests.";
     }
   }
   const readNativeInterpositionDraft = () => {
@@ -15384,8 +15509,8 @@ function getCurrentIncidentOpsEntry(entryId = "") {
       mode === "save"
         ? "Saving upstream interposition config. Epydios will keep the current request-path state while the launcher applies the change."
         : enabled
-          ? "Turning interposition on. Epydios is getting ready to govern supported requests."
-          : "Turning interposition off. Supported requests are returning to their normal client flow.";
+          ? "Turning interposition ON. Companion is getting ready to become the live governance lane for supported requests."
+          : "Turning interposition OFF. Supported requests are returning to their normal client flow while Companion stays in monitor mode.";
     setNativeLauncherControlsDisabled(true);
     setCompanionOpsFeedback("info", transitionMessage);
     if (mode === "toggle" && currentEnabled !== Boolean(enabled)) {
@@ -15406,11 +15531,13 @@ function getCurrentIncidentOpsEntry(entryId = "") {
         ? shell.interposition
         : {};
       const interpositionStatus = String(interposition.status || "").trim().toLowerCase();
-      const statusMessage = String(interposition.reason || "").trim() || (
-        enabled
-          ? "Interposition is ON. Epydios is governing supported requests."
-          : "Interposition is OFF. Epydios is not governing supported requests."
-      );
+      const statusMessage =
+        normalizeCompanionInterpositionStatusMessage(interpositionStatus || (enabled ? "on" : "off"), interposition.reason) ||
+        (
+          enabled
+            ? "Interposition is ON. Companion is the live governance lane for supported requests."
+            : "Interposition is OFF. Companion is monitoring only; supported requests are not being governed in path."
+        );
       const feedbackTone =
         !Boolean(interposition.enabled) || interpositionStatus === "off"
           ? "danger"
@@ -15475,8 +15602,16 @@ function getCurrentIncidentOpsEntry(entryId = "") {
   const setNativeServicesPendingPresentation = (message) => {
     const shell = config?.nativeShell && typeof config.nativeShell === "object" ? config.nativeShell : {};
     const liveMode = String(shell?.mode || "").trim().toLowerCase() === "live";
+    const gatewayService =
+      shell?.gatewayService && typeof shell.gatewayService === "object"
+        ? shell.gatewayService
+        : {};
+    const nextGatewayState = liveMode
+      ? (String(gatewayService.state || "").trim().toLowerCase() === "stopped" ? "starting" : gatewayService.state)
+      : gatewayService.state;
     updateNativeLauncherPresentation({
       ...shell,
+      launcherState: "recovering",
       startupError: "",
       runtimeState: "service_starting",
       runtimeService: {
@@ -15485,9 +15620,9 @@ function getCurrentIncidentOpsEntry(entryId = "") {
         health: "starting"
       },
       gatewayService: {
-        ...(shell?.gatewayService && typeof shell.gatewayService === "object" ? shell.gatewayService : {}),
-        state: liveMode ? "starting" : shell?.gatewayService?.state,
-        health: liveMode ? "starting" : shell?.gatewayService?.health
+        ...gatewayService,
+        state: nextGatewayState,
+        health: liveMode ? "starting" : gatewayService.health
       }
     });
     setNativeLauncherControlsDisabled(true);
@@ -15503,19 +15638,13 @@ function getCurrentIncidentOpsEntry(entryId = "") {
       return false;
     }
     setNativeServicesPendingPresentation(
-      "Restarting the local runtime and gateway services. Companion will refresh health after the launcher settles."
+      "Restarting the local runtime and reconciling gateway health. Companion will refresh service truth after the launcher settles."
     );
     try {
       await bindings.NativeRuntimeServiceRestart();
-      if (
-        String(config?.nativeShell?.mode || "").trim().toLowerCase() === "live" &&
-        typeof bindings.NativeGatewayServiceRestart === "function"
-      ) {
-        await bindings.NativeGatewayServiceRestart();
-      }
       await syncNativeShellStateFromBindings();
       await refresh();
-      setCompanionOpsFeedback("ok", "Local runtime and gateway services restarted from Companion.");
+      setCompanionOpsFeedback("ok", "Local runtime restarted and gateway health reconciled from Companion.");
       return true;
     } catch (error) {
       await syncNativeShellStateFromBindings().catch(() => {});
@@ -15544,6 +15673,7 @@ function getCurrentIncidentOpsEntry(entryId = "") {
       });
     };
     if (nextKind === "workbench") {
+      openContext(companionOpsViewState.lastWorkbenchDomain || "agentops");
       setWorkspaceView(companionOpsViewState.lastWorkbenchDomain || "agentops", true);
       return true;
     }
@@ -15570,6 +15700,13 @@ function getCurrentIncidentOpsEntry(entryId = "") {
         setWorkspaceView("runtimeops", true);
         focusRenderedRegion(ui.runsContent, { scroll: false });
       }
+      return true;
+    }
+    if (nextKind === "audit") {
+      await refresh();
+      openContext("auditops");
+      setWorkspaceView("auditops", true);
+      focusRenderedRegion(ui.auditOpsContent, { scroll: false });
       return true;
     }
     if (nextKind === "incident") {
@@ -15607,7 +15744,7 @@ function getCurrentIncidentOpsEntry(entryId = "") {
         const continuityMessage = result.applied
           ? result.isGatewayHold
             ? `${result.message} RuntimeOps keeps the linked connector continuity and evidence handoff on the related run.`
-            : `${result.message} Workbench remains available for deeper approval history if you need it.`
+            : `${result.message} Companion remains the daily approval lane; Workbench is still available if you need deeper approval history.`
           : result.message;
         setCompanionOpsFeedback(String(result.tone || "info").trim().toLowerCase(), continuityMessage);
       }
@@ -15647,6 +15784,11 @@ function getCurrentIncidentOpsEntry(entryId = "") {
 
     if (action === "show-diagnostics") {
       await openCompanionWorkbenchTarget("diagnostics");
+      return;
+    }
+
+    if (action === "open-audit-depth") {
+      await openCompanionWorkbenchTarget("audit");
       return;
     }
 

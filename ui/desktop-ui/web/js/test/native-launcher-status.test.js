@@ -50,9 +50,11 @@ test("native launcher status renders ready mock launcher details", () => {
   assert.match(html, /runtime=mock_active/);
   assert.match(html, /process=mock_only/);
   assert.match(html, /bootstrap=loaded/);
+  assert.match(html, /bridge=unknown/);
   assert.match(html, /Bootstrap config loaded/);
   assert.match(html, /Background service not required/);
   assert.match(html, /Gateway stopped/);
+  assert.match(html, /Interposition OFF \/ ON/);
   assert.match(html, /Interposition off/);
   assert.match(html, /Client credential passthrough/);
   assert.match(html, /Turn Interposition ON/);
@@ -116,6 +118,7 @@ test("native launcher status renders degraded launcher failure details", () => {
   assert.match(html, /health=unreachable/);
   assert.match(html, /Gateway degraded/);
   assert.match(html, /gateway=unreachable/);
+  assert.match(html, /bridge=unknown/);
   assert.match(html, /Gateway not ready/);
   assert.match(html, /Saved token override/);
   assert.match(html, /Turn Interposition OFF/);
@@ -125,7 +128,8 @@ test("native launcher status renders degraded launcher failure details", () => {
 
 test("native launcher status renders interposition transition feedback", () => {
   const html = renderNativeLauncherStatus({
-    launcherState: "ready",
+    launcherState: "recovering",
+    bridgeHealth: "healthy",
     mode: "live",
     runtimeState: "service_running",
     runtimeProcessMode: "background_supervisor",
@@ -149,10 +153,50 @@ test("native launcher status renders interposition transition feedback", () => {
     bootstrapConfigState: "loaded"
   });
 
+  assert.match(html, /Launcher recovering/);
   assert.match(html, /Background service starting/);
   assert.match(html, /Gateway starting/);
   assert.match(html, /Interposition starting/);
+  assert.match(html, /bridge=healthy/);
   assert.match(html, /Turning Interposition ON\.\.\./);
   assert.match(html, /native-launcher-status-switch-callout is-pending/);
+  assert.match(html, /disabled/);
+});
+
+test("native launcher status locks interposition controls when the bridge is degraded", () => {
+  const html = renderNativeLauncherStatus({
+    launcherState: "degraded",
+    bridgeHealth: "degraded",
+    bridgeMissingBindings: ["NativeInterpositionConfigure", "NativeRuntimeServiceRestart"],
+    mode: "live",
+    runtimeState: "service_running",
+    runtimeProcessMode: "background_supervisor",
+    runtimeService: {
+      state: "running",
+      health: "healthy"
+    },
+    gatewayService: {
+      state: "running",
+      health: "healthy"
+    },
+    interposition: {
+      enabled: true,
+      effective: true,
+      status: "on",
+      reason: "Interposition is ON. Epydios is governing supported requests.",
+      upstreamBaseUrl: "https://api.openai.com/v1",
+      upstreamBearerTokenConfigured: false,
+      upstreamAuthMode: "client_passthrough"
+    },
+    startupError: "Native bridge missing required bindings: NativeInterpositionConfigure, NativeRuntimeServiceRestart",
+    bootstrapConfigState: "loaded"
+  });
+
+  assert.match(html, /Launcher degraded/);
+  assert.match(html, /Native bridge missing required bindings/);
+  assert.match(html, /bridge=degraded/);
+  assert.match(html, /Native launcher bindings are degraded: NativeInterpositionConfigure, NativeRuntimeServiceRestart/);
+  assert.match(html, /data-native-shell-action="toggle-interposition"/);
+  assert.match(html, /data-native-shell-action="save-interposition-config"/);
   assert.match(html, /disabled/);
 });

@@ -17,13 +17,18 @@ const (
 	modeMock = "mock"
 	modeLive = "live"
 
-	launcherStatePrepared = "prepared"
-	launcherStateReady    = "ready"
-	launcherStateDegraded = "degraded"
-	launcherStateStopped  = "stopped"
+	launcherStatePrepared   = "prepared"
+	launcherStateRecovering = "recovering"
+	launcherStateReady      = "ready"
+	launcherStateDegraded   = "degraded"
+	launcherStateStopped    = "stopped"
 
 	bootstrapStateLoaded  = "loaded"
 	bootstrapStateMissing = "missing"
+
+	bridgeHealthUnknown  = "unknown"
+	bridgeHealthHealthy  = "healthy"
+	bridgeHealthDegraded = "degraded"
 )
 
 type LaunchOptions struct {
@@ -100,6 +105,9 @@ type InterpositionRecord struct {
 	Effective                     bool   `json:"effective"`
 	Status                        string `json:"status"`
 	Reason                        string `json:"reason,omitempty"`
+	Transitioning                 bool   `json:"transitioning,omitempty"`
+	DesiredEnabled                bool   `json:"desiredEnabled,omitempty"`
+	TransitionStartedAtUTC        string `json:"transitionStartedAtUtc,omitempty"`
 	UpstreamBaseURL               string `json:"upstreamBaseUrl,omitempty"`
 	UpstreamBearerTokenConfigured bool   `json:"upstreamBearerTokenConfigured"`
 	UpstreamAuthMode              string `json:"upstreamAuthMode,omitempty"`
@@ -110,6 +118,11 @@ type SessionManifest struct {
 	StartedAtUTC           string               `json:"startedAtUtc"`
 	Mode                   string               `json:"mode"`
 	LauncherState          string               `json:"launcherState"`
+	BridgeHealth           string               `json:"bridgeHealth"`
+	BridgeRequiredBindings []string             `json:"bridgeRequiredBindings,omitempty"`
+	BridgeMissingBindings  []string             `json:"bridgeMissingBindings,omitempty"`
+	BridgeCheckedAtUTC     string               `json:"bridgeCheckedAtUtc,omitempty"`
+	BridgeReason           string               `json:"bridgeReason,omitempty"`
 	RuntimeProcessMode     string               `json:"runtimeProcessMode"`
 	RuntimeState           string               `json:"runtimeState"`
 	RuntimeAPIBaseURL      string               `json:"runtimeApiBaseUrl"`
@@ -275,6 +288,8 @@ func PrepareSession(assets fs.FS, opts LaunchOptions) (*Session, error) {
 		StartedAtUTC:           time.Now().UTC().Format(time.RFC3339),
 		Mode:                   opts.Mode,
 		LauncherState:          launcherStatePrepared,
+		BridgeHealth:           bridgeHealthUnknown,
+		BridgeRequiredBindings: nativeBridgeRequiredBindings(),
 		RuntimeProcessMode:     runtimeProcessMode(opts),
 		RuntimeState:           runtimeState(opts),
 		RuntimeAPIBaseURL:      runtimeBase,
@@ -287,7 +302,7 @@ func PrepareSession(assets fs.FS, opts LaunchOptions) (*Session, error) {
 		GatewayService:         defaultGatewayServiceRecord(opts, paths),
 		Paths:                  paths,
 	}
-	manifest.Interposition = buildInterpositionRecord(opts, manifest.GatewayService)
+	manifest.Interposition = buildInterpositionRecord(opts, manifest.GatewayService, InterpositionRecord{})
 	if err := patchRuntimeConfig(paths.WebDir, opts, manifest); err != nil {
 		return nil, err
 	}
@@ -392,11 +407,58 @@ func (s *Session) UpdateInterpositionConfig(enabled bool, upstreamBaseURL string
 	})
 }
 
+func (s *Session) UpdateBridgeHealth(missingBindings []string, reason string) error {
+	normalizedMissing := normalizeStringSlice(missingBindings)
+	return s.update(func(manifest *SessionManifest) {
+		manifest.BridgeRequiredBindings = nativeBridgeRequiredBindings()
+		manifest.BridgeMissingBindings = normalizedMissing
+		manifest.BridgeCheckedAtUTC = time.Now().UTC().Format(time.RFC3339)
+		manifest.BridgeReason = strings.TrimSpace(reason)
+		if len(normalizedMissing) == 0 {
+			manifest.BridgeHealth = bridgeHealthHealthy
+			if strings.HasPrefix(strings.TrimSpace(manifest.StartupError), "Native bridge missing required bindings:") {
+				manifest.StartupError = ""
+			}
+		} else {
+			manifest.BridgeHealth = bridgeHealthDegraded
+			if strings.TrimSpace(manifest.BridgeReason) == "" {
+				manifest.BridgeReason = "Native bridge missing required bindings."
+			}
+			manifest.StartupError = manifest.BridgeReason
+		}
+		manifest.LauncherState = recommendedLauncherState(*manifest)
+	})
+}
+
+func (s *Session) BeginInterpositionTransition(currentEnabled bool, desiredEnabled bool, status string, reason string) error {
+	normalizedStatus := strings.TrimSpace(strings.ToLower(status))
+	if !isInterpositionTransitionStatus(normalizedStatus) {
+		return fmt.Errorf("unsupported interposition transition status %q", status)
+	}
+	return s.update(func(manifest *SessionManifest) {
+		manifest.Interposition.Enabled = currentEnabled || desiredEnabled
+		manifest.Interposition.Effective = false
+		manifest.Interposition.Status = normalizedStatus
+		manifest.Interposition.Reason = strings.TrimSpace(reason)
+		manifest.Interposition.Transitioning = true
+		manifest.Interposition.DesiredEnabled = desiredEnabled
+		manifest.Interposition.TransitionStartedAtUTC = time.Now().UTC().Format(time.RFC3339)
+	})
+}
+
+func (s *Session) ClearInterpositionTransition() error {
+	return s.update(func(manifest *SessionManifest) {
+		manifest.Interposition.Transitioning = false
+		manifest.Interposition.DesiredEnabled = false
+		manifest.Interposition.TransitionStartedAtUTC = ""
+	})
+}
+
 func (s *Session) update(mutate func(*SessionManifest)) error {
 	if mutate != nil {
 		mutate(&s.Manifest)
 	}
-	s.Manifest.Interposition = buildInterpositionRecord(s.launchOptions, s.Manifest.GatewayService)
+	s.Manifest.Interposition = buildInterpositionRecord(s.launchOptions, s.Manifest.GatewayService, s.Manifest.Interposition)
 	if err := patchRuntimeConfig(s.Manifest.Paths.WebDir, s.launchOptions, s.Manifest); err != nil {
 		return err
 	}
@@ -467,6 +529,11 @@ func patchRuntimeConfig(webDir string, opts LaunchOptions, manifest SessionManif
 	}
 	payload["nativeShell"] = map[string]any{
 		"launcherState":          manifest.LauncherState,
+		"bridgeHealth":           manifest.BridgeHealth,
+		"bridgeRequiredBindings": manifest.BridgeRequiredBindings,
+		"bridgeMissingBindings":  manifest.BridgeMissingBindings,
+		"bridgeCheckedAtUtc":     manifest.BridgeCheckedAtUTC,
+		"bridgeReason":           manifest.BridgeReason,
 		"mode":                   opts.Mode,
 		"runtimeProcessMode":     manifest.RuntimeProcessMode,
 		"runtimeState":           manifest.RuntimeState,
@@ -581,7 +648,7 @@ func runtimeState(opts LaunchOptions) string {
 	return "mock_active"
 }
 
-func buildInterpositionRecord(opts LaunchOptions, gateway GatewayServiceRecord) InterpositionRecord {
+func buildInterpositionRecord(opts LaunchOptions, gateway GatewayServiceRecord, previous InterpositionRecord) InterpositionRecord {
 	upstreamBaseURL := strings.TrimSpace(opts.InterpositionUpstreamBaseURL)
 	upstreamBearerTokenConfigured := strings.TrimSpace(opts.InterpositionUpstreamBearerToken) != ""
 	upstreamAuthMode := "client_passthrough"
@@ -595,6 +662,16 @@ func buildInterpositionRecord(opts LaunchOptions, gateway GatewayServiceRecord) 
 		UpstreamBaseURL:               upstreamBaseURL,
 		UpstreamBearerTokenConfigured: upstreamBearerTokenConfigured,
 		UpstreamAuthMode:              upstreamAuthMode,
+	}
+	if previous.Transitioning && isInterpositionTransitionStatus(previous.Status) {
+		record.Enabled = previous.Enabled
+		record.Effective = false
+		record.Status = strings.TrimSpace(strings.ToLower(previous.Status))
+		record.Reason = strings.TrimSpace(previous.Reason)
+		record.Transitioning = true
+		record.DesiredEnabled = previous.DesiredEnabled
+		record.TransitionStartedAtUTC = strings.TrimSpace(previous.TransitionStartedAtUTC)
+		return record
 	}
 	switch {
 	case !record.Enabled:
@@ -618,6 +695,99 @@ func buildInterpositionRecord(opts LaunchOptions, gateway GatewayServiceRecord) 
 		record.Reason = "Interposition is ON, but Epydios is still getting ready."
 	}
 	return record
+}
+
+func nativeBridgeRequiredBindings() []string {
+	return []string{
+		"NativeSessionSummary",
+		"NativeShellStatusRefresh",
+		"NativeBridgeHealthReport",
+		"NativeGatewayHoldList",
+		"NativeInterpositionConfigure",
+		"NativeRuntimeServiceRestart",
+		"NativeOpenPath",
+	}
+}
+
+func normalizeStringSlice(items []string) []string {
+	if len(items) == 0 {
+		return nil
+	}
+	seen := make(map[string]struct{}, len(items))
+	normalized := make([]string, 0, len(items))
+	for _, item := range items {
+		value := strings.TrimSpace(item)
+		if value == "" {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		normalized = append(normalized, value)
+	}
+	if len(normalized) == 0 {
+		return nil
+	}
+	return normalized
+}
+
+func recommendedLauncherState(manifest SessionManifest) string {
+	current := strings.TrimSpace(strings.ToLower(manifest.LauncherState))
+	if current == launcherStateStopped {
+		return launcherStateStopped
+	}
+	if strings.TrimSpace(strings.ToLower(manifest.BridgeHealth)) == bridgeHealthDegraded {
+		return launcherStateDegraded
+	}
+	if strings.TrimSpace(manifest.Mode) != modeLive {
+		if current == launcherStatePrepared {
+			return launcherStatePrepared
+		}
+		return launcherStateReady
+	}
+	runtimeState := strings.TrimSpace(strings.ToLower(manifest.RuntimeService.State))
+	runtimeHealth := strings.TrimSpace(strings.ToLower(manifest.RuntimeService.Health))
+	gatewayState := strings.TrimSpace(strings.ToLower(manifest.GatewayService.State))
+	gatewayHealth := strings.TrimSpace(strings.ToLower(manifest.GatewayService.Health))
+	switch {
+	case runtimeState == runtimeServiceStateStarting || runtimeHealth == runtimeServiceHealthStarting:
+		return launcherStateRecovering
+	case gatewayState == gatewayStateStarting || gatewayHealth == gatewayHealthStarting:
+		return launcherStateRecovering
+	case runtimeState == runtimeServiceStateFailed || runtimeState == runtimeServiceStateDegraded:
+		return launcherStateDegraded
+	case runtimeHealth == runtimeServiceHealthUnreachable:
+		return launcherStateDegraded
+	case gatewayState == gatewayStateFailed || gatewayState == gatewayStateDegraded:
+		return launcherStateDegraded
+	case gatewayHealth == gatewayHealthUnreachable:
+		return launcherStateDegraded
+	case runtimeState == runtimeServiceStateRunning &&
+		runtimeHealth == runtimeServiceHealthHealthy &&
+		gatewayState == gatewayStateRunning &&
+		gatewayHealth == gatewayHealthHealthy:
+		return launcherStateReady
+	case runtimeState == runtimeServiceStateStopped && gatewayState == gatewayStateStopped:
+		return launcherStatePrepared
+	case current == launcherStateRecovering || current == launcherStateReady || current == launcherStateDegraded || current == launcherStatePrepared:
+		return current
+	default:
+		return launcherStatePrepared
+	}
+}
+
+func RecommendedLauncherState(manifest SessionManifest) string {
+	return recommendedLauncherState(manifest)
+}
+
+func isInterpositionTransitionStatus(status string) bool {
+	switch strings.TrimSpace(strings.ToLower(status)) {
+	case "starting", "stopping":
+		return true
+	default:
+		return false
+	}
 }
 
 func runtimeStateFromService(mode string, record RuntimeServiceRecord) string {

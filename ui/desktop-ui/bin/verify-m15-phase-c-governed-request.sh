@@ -136,17 +136,30 @@ assert manifest["runtimeProcessMode"] == "background_supervisor", manifest["runt
 assert manifest["runtimeState"] == "service_running", manifest["runtimeState"]
 assert manifest["bootstrapConfigState"] == "loaded", manifest["bootstrapConfigState"]
 assert manifest["bootstrapConfigPath"] == bootstrap_path, manifest["bootstrapConfigPath"]
+assert manifest.get("startupError", "") in ("", None), manifest.get("startupError")
 assert manifest["runtimeService"]["state"] == "running", manifest["runtimeService"]["state"]
 assert manifest["runtimeService"]["health"] == "healthy", manifest["runtimeService"]["health"]
+assert manifest["runtimeService"]["statusPath"] == manifest["paths"]["serviceStatusPath"], manifest["runtimeService"]["statusPath"]
+assert manifest["runtimeService"]["runtimeApiBaseUrl"] == manifest["runtimeApiBaseUrl"], manifest["runtimeService"]["runtimeApiBaseUrl"]
 assert manifest["gatewayService"]["state"] == "running", manifest["gatewayService"]["state"]
 assert manifest["gatewayService"]["health"] == "healthy", manifest["gatewayService"]["health"]
+assert manifest["gatewayService"]["statusPath"] == manifest["paths"]["gatewayStatusPath"], manifest["gatewayService"]["statusPath"]
 assert manifest["interposition"]["enabled"] is expected_enabled, manifest["interposition"]
 assert manifest["interposition"]["status"] == expected_status, manifest["interposition"]
+assert manifest["interposition"].get("transitioning") in (False, None), manifest["interposition"]
 
 runtime_config = json.loads(pathlib.Path(manifest["paths"]["webDir"]).joinpath("config", "runtime-config.json").read_text())
 auth = runtime_config.get("auth") or {}
 assert auth.get("enabled") is True, auth
 assert auth.get("mockLogin") is True, auth
+native_shell = runtime_config.get("nativeShell") or {}
+assert native_shell.get("launcherState") == "ready", native_shell
+assert native_shell.get("runtimeState") == "service_running", native_shell
+assert native_shell.get("serviceStatusPath") == manifest["paths"]["serviceStatusPath"], native_shell.get("serviceStatusPath")
+assert native_shell.get("gatewayStatusPath") == manifest["paths"]["gatewayStatusPath"], native_shell.get("gatewayStatusPath")
+assert (native_shell.get("interposition") or {}).get("status") == expected_status, native_shell.get("interposition")
+assert (native_shell.get("interposition") or {}).get("transitioning") in (False, None), native_shell.get("interposition")
+assert native_shell.get("startupError", "") in ("", None), native_shell.get("startupError")
 PY
 }
 

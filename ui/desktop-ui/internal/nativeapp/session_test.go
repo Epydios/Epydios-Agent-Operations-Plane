@@ -629,6 +629,100 @@ func TestUpdateInterpositionConfigCanClearSavedBearerToken(t *testing.T) {
 	}
 }
 
+func TestInterpositionTransitionPersistsUntilExplicitlyCleared(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(tempHome, ".cache"))
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tempHome, ".config"))
+
+	assets := fstest.MapFS{
+		"web/config/runtime-config.json": {
+			Data: []byte(`{
+  "environment": "local",
+  "mockMode": false,
+  "runtimeApiBaseUrl": "http://127.0.0.1:8080",
+  "registryApiBaseUrl": "http://127.0.0.1:8080",
+  "auth": {
+    "enabled": true
+  }
+}`),
+		},
+		"web/index.html": {Data: []byte("<html></html>")},
+	}
+
+	opts := DefaultLaunchOptions()
+	opts.Mode = modeLive
+	session, err := PrepareSession(assets, opts)
+	if err != nil {
+		t.Fatalf("prepare session: %v", err)
+	}
+	if err := session.UpdateInterpositionConfig(true, "https://api.openai.com", ""); err != nil {
+		t.Fatalf("update interposition config: %v", err)
+	}
+	if err := session.BeginInterpositionTransition(false, true, "starting", "Turning interposition on. Epydios is getting ready to govern supported requests."); err != nil {
+		t.Fatalf("begin interposition transition: %v", err)
+	}
+
+	record := session.Manifest.GatewayService
+	record.State = gatewayStateRunning
+	record.Health = gatewayHealthHealthy
+	record.PID = 5252
+	record.UpdatedAtUTC = "2026-03-26T00:00:00Z"
+	record.StartedAtUTC = "2026-03-26T00:00:00Z"
+	if err := session.UpdateGatewayService(record); err != nil {
+		t.Fatalf("update gateway service: %v", err)
+	}
+
+	if session.Manifest.Interposition.Status != "starting" {
+		t.Fatalf("expected interposition status starting during transition, got %q", session.Manifest.Interposition.Status)
+	}
+	if !session.Manifest.Interposition.Transitioning {
+		t.Fatal("expected interposition transition to remain marked while pending")
+	}
+	if !session.Manifest.Interposition.Enabled {
+		t.Fatal("expected interposition enabled chip to stay on during transition")
+	}
+	if !session.Manifest.Interposition.DesiredEnabled {
+		t.Fatal("expected desired enabled state to remain true during transition")
+	}
+
+	content, err := os.ReadFile(filepath.Join(session.Manifest.Paths.WebDir, "config", "runtime-config.json"))
+	if err != nil {
+		t.Fatalf("read patched config: %v", err)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(content, &payload); err != nil {
+		t.Fatalf("decode patched config: %v", err)
+	}
+	nativeShell, ok := payload["nativeShell"].(map[string]any)
+	if !ok {
+		t.Fatal("expected nativeShell block")
+	}
+	interposition, ok := nativeShell["interposition"].(map[string]any)
+	if !ok {
+		t.Fatal("expected interposition block in runtime config")
+	}
+	if got := interposition["status"]; got != "starting" {
+		t.Fatalf("expected runtime config interposition.status=starting, got %#v", got)
+	}
+	if got := interposition["transitioning"]; got != true {
+		t.Fatalf("expected runtime config interposition.transitioning=true, got %#v", got)
+	}
+
+	if err := session.ClearInterpositionTransition(); err != nil {
+		t.Fatalf("clear interposition transition: %v", err)
+	}
+	if session.Manifest.Interposition.Status != "on" {
+		t.Fatalf("expected interposition status on after clearing transition, got %q", session.Manifest.Interposition.Status)
+	}
+	if !session.Manifest.Interposition.Effective {
+		t.Fatal("expected interposition to become effective after clearing transition")
+	}
+	if session.Manifest.Interposition.Transitioning {
+		t.Fatal("expected interposition transition to clear")
+	}
+}
+
 func TestSessionStateUpdatesRefreshRuntimeConfig(t *testing.T) {
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
@@ -829,5 +923,107 @@ func TestUpdateGatewayServiceRefreshesRuntimeConfig(t *testing.T) {
 	}
 	if got := gateway["health"]; got != gatewayHealthHealthy {
 		t.Fatalf("expected gatewayService.health=%q, got %#v", gatewayHealthHealthy, got)
+	}
+}
+
+func TestUpdateBridgeHealthRefreshesRuntimeConfigAndLauncherState(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(tempHome, ".cache"))
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tempHome, ".config"))
+
+	assets := fstest.MapFS{
+		"web/config/runtime-config.json": {
+			Data: []byte(`{
+  "environment": "local",
+  "mockMode": false,
+  "runtimeApiBaseUrl": "http://127.0.0.1:8080",
+  "registryApiBaseUrl": "http://127.0.0.1:8080",
+  "auth": {
+    "enabled": true
+  }
+}`),
+		},
+		"web/index.html": {Data: []byte("<html></html>")},
+	}
+
+	opts := DefaultLaunchOptions()
+	opts.Mode = modeLive
+	session, err := PrepareSession(assets, opts)
+	if err != nil {
+		t.Fatalf("prepare session: %v", err)
+	}
+
+	runtimeRecord := session.Manifest.RuntimeService
+	runtimeRecord.State = runtimeServiceStateRunning
+	runtimeRecord.Health = runtimeServiceHealthHealthy
+	runtimeRecord.PID = 4242
+	runtimeRecord.UpdatedAtUTC = "2026-03-26T00:00:00Z"
+	runtimeRecord.StartedAtUTC = "2026-03-26T00:00:00Z"
+	if err := session.UpdateRuntimeService(runtimeRecord); err != nil {
+		t.Fatalf("update runtime service: %v", err)
+	}
+
+	gatewayRecord := session.Manifest.GatewayService
+	gatewayRecord.State = gatewayStateRunning
+	gatewayRecord.Health = gatewayHealthHealthy
+	gatewayRecord.PID = 5252
+	gatewayRecord.UpdatedAtUTC = "2026-03-26T00:00:00Z"
+	gatewayRecord.StartedAtUTC = "2026-03-26T00:00:00Z"
+	if err := session.UpdateGatewayService(gatewayRecord); err != nil {
+		t.Fatalf("update gateway service: %v", err)
+	}
+	if err := session.UpdateLauncherState(launcherStateReady); err != nil {
+		t.Fatalf("update launcher state: %v", err)
+	}
+
+	reason := "Native bridge missing required bindings: NativeShellStatusRefresh"
+	if err := session.UpdateBridgeHealth([]string{"NativeShellStatusRefresh"}, reason); err != nil {
+		t.Fatalf("update bridge health degraded: %v", err)
+	}
+	if session.Manifest.BridgeHealth != bridgeHealthDegraded {
+		t.Fatalf("expected bridgeHealth=%q, got %q", bridgeHealthDegraded, session.Manifest.BridgeHealth)
+	}
+	if session.Manifest.LauncherState != launcherStateDegraded {
+		t.Fatalf("expected launcherState=%q, got %q", launcherStateDegraded, session.Manifest.LauncherState)
+	}
+	if session.Manifest.StartupError != reason {
+		t.Fatalf("expected startupError=%q, got %q", reason, session.Manifest.StartupError)
+	}
+
+	content, err := os.ReadFile(filepath.Join(session.Manifest.Paths.WebDir, "config", "runtime-config.json"))
+	if err != nil {
+		t.Fatalf("read patched config: %v", err)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(content, &payload); err != nil {
+		t.Fatalf("decode patched config: %v", err)
+	}
+	nativeShell, ok := payload["nativeShell"].(map[string]any)
+	if !ok {
+		t.Fatal("expected nativeShell block")
+	}
+	if got := nativeShell["bridgeHealth"]; got != bridgeHealthDegraded {
+		t.Fatalf("expected bridgeHealth=%q, got %#v", bridgeHealthDegraded, got)
+	}
+	missing, ok := nativeShell["bridgeMissingBindings"].([]any)
+	if !ok || len(missing) != 1 || missing[0] != "NativeShellStatusRefresh" {
+		t.Fatalf("expected bridgeMissingBindings to contain NativeShellStatusRefresh, got %#v", nativeShell["bridgeMissingBindings"])
+	}
+	if got := nativeShell["launcherState"]; got != launcherStateDegraded {
+		t.Fatalf("expected launcherState=%q, got %#v", launcherStateDegraded, got)
+	}
+
+	if err := session.UpdateBridgeHealth(nil, ""); err != nil {
+		t.Fatalf("update bridge health healthy: %v", err)
+	}
+	if session.Manifest.BridgeHealth != bridgeHealthHealthy {
+		t.Fatalf("expected bridgeHealth=%q, got %q", bridgeHealthHealthy, session.Manifest.BridgeHealth)
+	}
+	if session.Manifest.LauncherState != launcherStateReady {
+		t.Fatalf("expected launcherState=%q after recovery, got %q", launcherStateReady, session.Manifest.LauncherState)
+	}
+	if session.Manifest.StartupError != "" {
+		t.Fatalf("expected startupError to clear after bridge recovery, got %q", session.Manifest.StartupError)
 	}
 }

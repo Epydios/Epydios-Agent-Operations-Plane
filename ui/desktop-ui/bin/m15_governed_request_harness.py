@@ -1080,7 +1080,10 @@ return text.includes('runtime.approval.decision') && text.includes('ALLOW');
             session_id,
             """
 const text = String(document.getElementById('evidenceops-content')?.textContent || '');
-return text.includes(arguments[0]) && text.includes('Evidence Access');
+return (
+    text.includes(arguments[0]) &&
+    (text.includes('Package Handoff Locations') || text.includes('Evidence Package'))
+);
 """,
             [f"bundle-{run_id}"],
             timeout=30,

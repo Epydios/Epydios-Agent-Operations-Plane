@@ -428,6 +428,38 @@ function latestGatewayHold(context = {}) {
   return pickLatest(pendingGatewayHolds(context), ["updatedAtUtc", "createdAtUtc", "holdStartedAtUtc", "holdDeadlineAtUtc"]);
 }
 
+function canonicalCompanionInterpositionMessage(status, reason = "") {
+  const normalizedStatus = normalizeStatus(status, "");
+  const rawReason = String(reason || "").trim();
+  if (
+    rawReason &&
+    ![
+      "Interposition is ON. Epydios is governing supported requests.",
+      "Interposition is OFF. Epydios is not governing supported requests.",
+      "Interposition is turning on. Epydios is getting ready.",
+      "Interposition is ON, but Epydios is still getting ready.",
+      "Interposition cannot turn on until setup is complete."
+    ].includes(rawReason)
+  ) {
+    return rawReason;
+  }
+  switch (normalizedStatus) {
+    case "on":
+      return "Interposition is ON. Companion is the live governance lane for supported requests.";
+    case "off":
+      return "Interposition is OFF. Companion is monitoring only; supported requests are not being governed in path.";
+    case "warming":
+      return "Interposition is turning ON. Companion will become the live governance lane when the launcher finishes reconciling.";
+    case "gateway_unavailable":
+      return "Interposition is ON, but the live governance path is still getting ready.";
+    case "blocked_mock_mode":
+    case "blocked_upstream_config":
+      return "Interposition cannot turn ON until setup is complete. Companion stays in monitor mode.";
+    default:
+      return rawReason;
+  }
+}
+
 function createCompanionInterpositionFeedback(shell = {}) {
   const interposition = readObject(shell.interposition);
   const status = normalizeStatus(
@@ -439,28 +471,28 @@ function createCompanionInterpositionFeedback(shell = {}) {
     case "on":
       return {
         tone: "ok",
-        message: reason || "Interposition is ON. Epydios is governing supported requests."
+        message: canonicalCompanionInterpositionMessage(status, reason)
       };
     case "off":
       return {
         tone: "danger",
-        message: reason || "Interposition is OFF. Epydios is not governing supported requests."
+        message: canonicalCompanionInterpositionMessage(status, reason)
       };
     case "warming":
       return {
         tone: "warn",
-        message: reason || "Interposition is turning on. Epydios is getting ready."
+        message: canonicalCompanionInterpositionMessage(status, reason)
       };
     case "gateway_unavailable":
       return {
         tone: "warn",
-        message: reason || "Interposition is ON, but Epydios is still getting ready."
+        message: canonicalCompanionInterpositionMessage(status, reason)
       };
     case "blocked_mock_mode":
     case "blocked_upstream_config":
       return {
         tone: "danger",
-        message: reason || "Interposition cannot turn on until setup is complete."
+        message: canonicalCompanionInterpositionMessage(status, reason)
       };
     default:
       return null;
@@ -542,8 +574,8 @@ function createLiveApprovalItems(context = {}) {
             : "open-approval-queue",
         detailActionLabel:
           decisionType === "gateway_hold" && runId
-            ? "Open RuntimeOps"
-            : "Open Workbench Detail"
+            ? "Open RuntimeOps Depth"
+            : "Open Workbench Review"
       };
     })
     .sort((left, right) => parseTimeMs(right?.createdAt || right?.expiresAt) - parseTimeMs(left?.createdAt || left?.expiresAt))
@@ -554,6 +586,7 @@ function createSystemStatusRegion(context = {}) {
   const shell = readObject(context.nativeShell);
   const runtimeService = readObject(shell.runtimeService);
   const gatewayService = readObject(shell.gatewayService);
+  const interposition = readObject(shell.interposition);
   const runtime = summarizeRuntime(context.health, context.runs, context.approvals);
   const platform = summarizePlatform(context.health, context.pipeline, context.providers);
   const policy = summarizePolicy(context.runs, context.settings);
@@ -572,11 +605,11 @@ function createSystemStatusRegion(context = {}) {
     cards: [
       {
         id: "companion-posture",
-        title: "Product Posture",
+        title: "Daily Governance Lane",
         tone: "ok",
         value: "Companion",
-        summary: `Workbench ready: ${lastWorkbenchDomain}`,
-        meta: `Decision layer: ${aimxsPath.modeLabel}. Shell: ${describeShellMode(shell.mode)}.`
+        summary: `Default daily lane. Deep console: ${lastWorkbenchDomain}.`,
+        meta: `Interposition: ${titleCaseToken(interposition.status || (interposition.enabled ? "warming" : "off"), "Unknown")}. Decision layer: ${aimxsPath.modeLabel}. Shell: ${describeShellMode(shell.mode)}.`
       },
       {
         id: "launcher",
@@ -606,8 +639,8 @@ function createSystemStatusRegion(context = {}) {
     actions: [
       {
         id: "open-workbench",
-        label: "Open Workbench",
-        summary: `Return to ${lastWorkbenchDomain}`,
+        label: "Open Workbench Depth",
+        summary: `Deep review in ${lastWorkbenchDomain}`,
         action: "open-workbench"
       },
       {
@@ -660,7 +693,7 @@ function createAttentionItems(context = {}) {
       value: String(pendingHolds.length),
       detail: `Latest approval ${formatIdentityLabel(latestHold?.approvalId, "-")} from ${deriveGatewayClientLabel(latestHold, context)} should be reviewed before ${formatIdentityLabel(latestHold?.holdDeadlineAtUtc, "-")}.`,
       action: liveApprovals.length > 0 ? "focus-live-approvals" : "open-approval-item",
-      actionLabel: liveApprovals.length > 0 ? "Review In Companion" : "Open Approval",
+      actionLabel: liveApprovals.length > 0 ? "Review In Companion" : "Open Workbench Review",
       runId: String(latestHold?.runId || "").trim(),
       approvalId: String(latestHold?.approvalId || "").trim()
     });
@@ -671,7 +704,7 @@ function createAttentionItems(context = {}) {
       value: String(pendingApprovals.length),
       detail: `Latest approval ${formatIdentityLabel(latestPendingApproval?.approvalId, "-")}. ${countExpiringApprovals(approvals)} expiring soon.`,
       action: liveApprovals.length > 0 ? "focus-live-approvals" : "open-approval-item",
-      actionLabel: liveApprovals.length > 0 ? "Review In Companion" : "Open Approval",
+      actionLabel: liveApprovals.length > 0 ? "Review In Companion" : "Open Workbench Review",
       runId: String(latestPendingApproval?.runId || "").trim(),
       approvalId: String(latestPendingApproval?.approvalId || "").trim()
     });
@@ -704,7 +737,7 @@ function createAttentionItems(context = {}) {
       detail: `Latest affected run: ${String(latestAttentionRun?.runId || "-").trim() || "-"}.`,
       action: "open-run-item",
       runId: String(latestAttentionRun?.runId || "").trim(),
-      actionLabel: "Open Run"
+      actionLabel: "Open RuntimeOps Depth"
     });
   }
   if (incidents.total > 0) {
@@ -714,7 +747,7 @@ function createAttentionItems(context = {}) {
       value: String(incidents.total),
       detail: `Latest incident package: ${String(incidents.latest?.packageId || "-").trim() || "-"}.`,
       action: "open-incident-item",
-      actionLabel: "Open Incident",
+      actionLabel: "Open Incident Depth",
       incidentId: String(incidents.latest?.id || "").trim(),
       runId: String(incidents.latest?.runId || "").trim()
     });
@@ -750,7 +783,7 @@ function createRecentGovernedActions(context = {}) {
       approvalId: String(hold?.approvalId || "").trim(),
       gatewayRequestId: formatIdentityLabel(hold?.gatewayRequestId, ""),
       action: "open-approval-item",
-      actionLabel: "Open Approval"
+      actionLabel: "Open Workbench Review"
     });
   });
   readItems(context.runs)
@@ -787,7 +820,7 @@ function createRecentGovernedActions(context = {}) {
         approvalId: String(linkedApproval?.approvalId || "").trim(),
         gatewayRequestId: formatIdentityLabel(run?.requestId, ""),
         action: approvalRequired ? "open-approval-item" : "open-run-item",
-        actionLabel: approvalRequired ? "Open Approval" : "Open Run"
+        actionLabel: approvalRequired ? "Open Workbench Review" : "Open RuntimeOps Depth"
         }
       ];
     })
@@ -800,6 +833,173 @@ function createRecentGovernedActions(context = {}) {
     .slice(0, 5);
 }
 
+function formatEventLabel(value, fallback = "Audit Event") {
+  const normalized = String(value || "").trim();
+  if (!normalized) {
+    return fallback;
+  }
+  return normalized
+    .split(/[._\s-]+/)
+    .filter(Boolean)
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+    .join(" ");
+}
+
+function auditEventTone(item = {}) {
+  const decision = String(item?.decision || "").trim().toUpperCase();
+  const eventName = String(item?.event || "").trim().toLowerCase();
+  if (decision === "DENY" || decision === "DEFER" || /deny|defer|fail|error|blocked/.test(eventName)) {
+    return "danger";
+  }
+  if (decision === "ALLOW" || /allow|approved|success|completed/.test(eventName)) {
+    return "ok";
+  }
+  return "warn";
+}
+
+function createLiveAuditEventItems(context = {}) {
+  return readItems(context.audit)
+    .slice()
+    .sort((left, right) => parseTimeMs(right?.ts) - parseTimeMs(left?.ts))
+    .map((item) => {
+      const runId = String(item?.runId || "").trim();
+      const approvalId = String(item?.approvalId || "").trim();
+      return {
+        id: `${String(item?.event || "audit.event").trim()}@${String(item?.ts || "").trim()}`,
+        title: formatEventLabel(item?.event, "Audit Event"),
+        tone: auditEventTone(item),
+        summary:
+          String(item?.message || item?.reason || "").trim() ||
+          `Latest live event from ${formatIdentityLabel(context?.audit?.source, "audit")}.`,
+        primaryMeta: `decision=${formatIdentityLabel(item?.decision, "-")}`,
+        secondaryMeta: `runId=${runId || "-"}; approvalId=${approvalId || "-"}`,
+        occurredAt: formatIdentityLabel(item?.ts, "-"),
+        action: approvalId ? "open-approval-item" : runId ? "open-run-item" : "open-audit-depth",
+        actionLabel: approvalId
+          ? "Open Workbench Review"
+          : runId
+            ? "Open RuntimeOps Depth"
+            : "Open AuditOps Depth",
+        runId,
+        approvalId
+      };
+    })
+    .slice(0, 5);
+}
+
+function createIncidentEscalationItems(context = {}) {
+  const items = readItems(context.incidentHistory)
+    .slice()
+    .sort((left, right) => {
+      const leftTs = parseTimeMs(left?.filingUpdatedAt || left?.generatedAt);
+      const rightTs = parseTimeMs(right?.filingUpdatedAt || right?.generatedAt);
+      return rightTs - leftTs;
+    })
+    .map((item) => {
+      const severity = deriveIncidentSeverity(item, readItems(context.runs), readItems(context.approvals));
+      return {
+        id: String(item?.id || item?.packageId || "").trim(),
+        title: formatIdentityLabel(item?.packageId, "Incident package"),
+        tone: severity === "high" ? "danger" : severity === "medium" ? "warn" : "ok",
+        summary:
+          severity === "high"
+            ? "Active escalation is shaping the live governance path right now."
+            : severity === "medium"
+              ? "Current incident context still needs operator attention."
+              : "Recent incident context is available in Companion before deeper packaging work.",
+        primaryMeta: `status=${formatIdentityLabel(item?.filingStatus, "-")}; runId=${formatIdentityLabel(item?.runId, "-")}`,
+        secondaryMeta: `approval=${formatIdentityLabel(item?.approvalStatus, "-")}; severity=${severity}`,
+        occurredAt: formatIdentityLabel(item?.filingUpdatedAt || item?.generatedAt, "-"),
+        action: "open-incident-item",
+        actionLabel: "Open Incident Depth",
+        incidentId: String(item?.id || "").trim(),
+        runId: String(item?.runId || "").trim()
+      };
+    });
+  if (items.length > 0) {
+    return items.slice(0, 3);
+  }
+  const latestAttentionRun = pickLatest(
+    readItems(context.runs).filter((item) => {
+      const status = String(item?.status || "").trim().toUpperCase();
+      const decision = String(item?.policyDecision || "").trim().toUpperCase();
+      return status === "FAILED" || status === "POLICY_BLOCKED" || decision === "DENY" || decision === "DEFER";
+    }),
+    ["updatedAt", "createdAt"]
+  );
+  if (latestAttentionRun) {
+    return [
+      {
+        id: "escalation-candidate",
+        title: "Escalation candidate",
+        tone: "danger",
+        summary: "A failed or blocked governed run is still shaping live operator posture even before full incident packaging.",
+        primaryMeta: `runId=${formatIdentityLabel(latestAttentionRun?.runId, "-")}; status=${formatIdentityLabel(latestAttentionRun?.status, "-")}`,
+        secondaryMeta: `policy=${formatIdentityLabel(latestAttentionRun?.policyDecision, "-")}`,
+        occurredAt: formatIdentityLabel(latestAttentionRun?.updatedAt || latestAttentionRun?.createdAt, "-"),
+        action: "open-run-item",
+        actionLabel: "Open RuntimeOps Depth",
+        runId: String(latestAttentionRun?.runId || "").trim()
+      }
+    ];
+  }
+  const shell = readObject(context.nativeShell);
+  const runtimeService = readObject(shell.runtimeService);
+  const gatewayService = readObject(shell.gatewayService);
+  if (
+    ["degraded", "failed", "stopped"].includes(normalizeStatus(runtimeService.state, "")) ||
+    ["degraded", "failed", "stopped"].includes(normalizeStatus(gatewayService.state, ""))
+  ) {
+    return [
+      {
+        id: "service-escalation",
+        title: "Service escalation",
+        tone: "danger",
+        summary: "Runtime or gateway degradation is part of the current live incident posture.",
+        primaryMeta: `runtime=${formatIdentityLabel(runtimeService.state, "-")}; gateway=${formatIdentityLabel(gatewayService.state, "-")}`,
+        secondaryMeta: "Open Diagnostics for the deeper service path and recovery detail.",
+        occurredAt: "-",
+        action: "show-diagnostics",
+        actionLabel: "Show Diagnostics"
+      }
+    ];
+  }
+  return [];
+}
+
+function createRuntimeDiagnosticsItems(context = {}) {
+  const shell = readObject(context.nativeShell);
+  const runtimeService = readObject(shell.runtimeService);
+  const gatewayService = readObject(shell.gatewayService);
+  const runtime = summarizeRuntime(context.health, context.runs, context.approvals);
+  return [
+    {
+      id: "runtime-depth",
+      title: "Runtime depth",
+      tone: toneFromRuntimeStatus(runtimeService.state || runtime.status, "warn"),
+      value: titleCaseToken(runtimeService.state || runtime.status, "Unknown"),
+      summary: runtime.detail,
+      meta: `attention=${runtime.attentionRuns}; runs=${runtime.runCount}; pendingApprovals=${runtime.pendingApprovals}`,
+      action: "open-recent-runs",
+      actionLabel: "Open RuntimeOps Depth"
+    },
+    {
+      id: "diagnostics-depth",
+      title: "Diagnostics",
+      tone:
+        ["degraded", "failed", "stopped"].includes(normalizeStatus(shell.launcherState, "")) ||
+        ["degraded", "failed", "stopped"].includes(normalizeStatus(gatewayService.state, ""))
+          ? "danger"
+          : "warn",
+      value: titleCaseToken(shell.launcherState, "Unknown"),
+      summary: `gateway=${titleCaseToken(gatewayService.state, "Unknown").toLowerCase()}; runtime=${titleCaseToken(runtimeService.state || runtime.status, "Unknown").toLowerCase()}.`,
+      meta: "Use Companion for practical restart and status truth; open diagnostics for deeper launcher and bridge detail.",
+      action: "show-diagnostics",
+      actionLabel: "Show Diagnostics"
+    }
+  ];
+}
+
 function createQuickActions(context = {}) {
   const lastWorkbenchDomain = String(context.lastWorkbenchDomain || "agentops").trim().toLowerCase() || "agentops";
   const approvals = readItems(context.approvals);
@@ -808,21 +1008,15 @@ function createQuickActions(context = {}) {
   const shell = readObject(context.nativeShell);
   return [
     {
-      id: "open-workbench",
-      label: "Open Workbench",
-      summary: `Return to ${formatOpsLabel(lastWorkbenchDomain)}`,
-      action: "open-workbench"
-    },
-    {
       id: liveApprovals.length > 0 ? "review-live-approvals" : "open-approval-queue",
       label: liveApprovals.length > 0 ? "Review Live Approvals" : "Open Approval Queue",
-      summary: `${countPendingApprovals(approvals)} waiting for review`,
+      summary: `${countPendingApprovals(approvals)} waiting in the daily Companion lane`,
       action: liveApprovals.length > 0 ? "focus-live-approvals" : "open-approval-queue"
     },
     {
       id: "open-recent-runs",
       label: "Open Recent Runs",
-      summary: `${runs.length} recent runs`,
+      summary: `${runs.length} recent governed runs`,
       action: "open-recent-runs"
     },
     {
@@ -836,6 +1030,12 @@ function createQuickActions(context = {}) {
       label: "Show Diagnostics",
       summary: "Open deeper tools for launcher, gateway, and settings detail",
       action: "show-diagnostics"
+    },
+    {
+      id: "open-workbench",
+      label: "Open Workbench Depth",
+      summary: `Investigate in ${formatOpsLabel(lastWorkbenchDomain)}`,
+      action: "open-workbench"
     }
   ];
 }
@@ -1054,6 +1254,15 @@ export function createHomeWorkspaceSnapshot(context = {}) {
     },
     recentGovernedActions: {
       items: createRecentGovernedActions(snapshot)
+    },
+    liveAuditEvents: {
+      items: createLiveAuditEventItems(snapshot)
+    },
+    incidentEscalations: {
+      items: createIncidentEscalationItems(snapshot)
+    },
+    runtimeDiagnostics: {
+      items: createRuntimeDiagnosticsItems(snapshot)
     },
     quickActions: {
       items: createQuickActions(snapshot)
