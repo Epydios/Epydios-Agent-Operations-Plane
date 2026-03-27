@@ -1,3 +1,4 @@
+import { isAimxsPremiumVisible } from "../../../aimxs/state.js";
 import { displayAimxsModeLabel, escapeHTML } from "../../../views/common.js";
 import {
   createPolicySettingsSnapshot,
@@ -13,10 +14,12 @@ function tableCell(label, content, attrs = "") {
 
 export function renderCurrentPolicyContractPanel(settings = {}) {
   const { runtimeIdentity, policyCatalog, policyCatalogItems, activePolicyPack } = createPolicySettingsSnapshot(settings);
+  const aimxsPremiumVisible = isAimxsPremiumVisible(settings);
+  const modeLabel = displayAimxsModeLabel(settings?.aimxs?.mode || "-");
   return `
     <div class="metric settings-metric settings-metric-policy-contract" data-domain-root="policyops" data-policyops-panel="current-contract">
       <div class="title">Current Policy Contract</div>
-      <div class="meta">mode=${escapeHTML(displayAimxsModeLabel(settings?.aimxs?.mode || "-"))}; provider=${escapeHTML(policyProviderLabel(settings))}</div>
+      <div class="meta">${escapeHTML(aimxsPremiumVisible ? "mode" : "policyMode")}=${escapeHTML(modeLabel)}; provider=${escapeHTML(policyProviderLabel(settings))}</div>
       <div class="meta">policyCatalogSource=${escapeHTML(summarizePolicyDataSource(policyCatalog?.source || "unknown"))}; packCount=${escapeHTML(String(policyCatalog?.count || policyCatalogItems.length || 0))}</div>
       <div class="meta">policyMatrixRequired=${escapeHTML(String(Boolean(runtimeIdentity?.policyMatrixRequired)))}; policyRuleCount=${escapeHTML(String(runtimeIdentity?.policyRuleCount || 0))}</div>
       <div class="meta">activePack=<code>${escapeHTML(activePolicyPack?.packId || "-")}</code>@<code>${escapeHTML(activePolicyPack?.version || "unversioned")}</code>; activationTarget=${escapeHTML(activePolicyPack?.activationTarget || "workspace")}; activationPosture=${escapeHTML(activePolicyPack?.activationPosture || "available")}</div>

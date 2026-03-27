@@ -1,3 +1,4 @@
+import { isAimxsPremiumVisible } from "../../../aimxs/state.js";
 import { renderAimxsSettingsMetric } from "../../../aimxs/settings-view.js";
 import { escapeHTML } from "../../../views/common.js";
 import {
@@ -252,6 +253,8 @@ function renderSecureRefBoard(snapshot) {
 
 function renderLocalEnvironmentBoard(snapshot) {
   const board = snapshot.localEnvironment;
+  const aimxsPremiumVisible = isAimxsPremiumVisible(snapshot.settings);
+  const postureChipLabel = aimxsPremiumVisible ? "aimxs" : "policy";
   return `
     <article class="metric settingsops-card settingsops-card-environment" data-domain-root="settingsops" data-settingsops-panel="local-environment">
       <div class="metric-title-row">
@@ -261,7 +264,7 @@ function renderLocalEnvironmentBoard(snapshot) {
       <div class="settingsops-chip-row">
         <span class="chip chip-neutral chip-compact">tenant=${escapeHTML(board.tenantId)}</span>
         <span class="chip chip-neutral chip-compact">project=${escapeHTML(board.projectId)}</span>
-        <span class="chip chip-neutral chip-compact">aimxs=${escapeHTML(board.aimxsMode)}</span>
+        <span class="chip chip-neutral chip-compact">${escapeHTML(postureChipLabel)}=${escapeHTML(board.aimxsMode)}</span>
       </div>
       <div class="settingsops-environment-grid">
         <div class="settingsops-kv-list">
@@ -318,12 +321,18 @@ function renderLocalEnvironmentBoard(snapshot) {
             }
           ])}
         </div>
-        <div class="settingsops-aimxs-shell">
-          ${renderAimxsSettingsMetric(snapshot.settings, snapshot.viewState || {}, {
-            chipClassForEditorStatus,
-            selectedAttr
-          })}
-        </div>
+        ${
+          aimxsPremiumVisible
+            ? `
+              <div class="settingsops-aimxs-shell">
+                ${renderAimxsSettingsMetric(snapshot.settings, snapshot.viewState || {}, {
+                  chipClassForEditorStatus,
+                  selectedAttr
+                })}
+              </div>
+            `
+            : ""
+        }
       </div>
     </article>
   `;

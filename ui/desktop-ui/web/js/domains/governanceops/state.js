@@ -83,6 +83,20 @@ function approvalTierLabel(value) {
   return tier > 0 ? `Tier ${tier}` : "Unassigned";
 }
 
+function isAimxsRoutingLive(settings = {}) {
+  const aimxs = readObject(settings?.aimxs);
+  const activation = readObject(aimxs?.activation);
+  const activationState = normalizeString(activation?.state).toLowerCase();
+  const activeMode = normalizeString(activation?.activeMode || aimxs?.mode).toLowerCase();
+  return (
+    Boolean(activation?.available) &&
+    activationState === "active" &&
+    activeMode !== "" &&
+    activeMode !== "oss-only" &&
+    Boolean(activation?.selectedProviderReady)
+  );
+}
+
 function summarizeApprovalQueue(approvals = {}, nowValue = new Date()) {
   const items = Array.isArray(approvals?.items) ? approvals.items : [];
   const normalized = items.map((item) => {
@@ -296,7 +310,7 @@ function normalizeAdminProposalItems(items = []) {
     .filter(Boolean);
 }
 
-function summarizeAdminProposalReview(adminQueueItems = [], viewState = {}) {
+function summarizeAdminProposalReview(adminQueueItems = [], viewState = {}, aimxsRoutingLive = false) {
   const items = normalizeAdminProposalItems(adminQueueItems);
   const selectedChangeId = normalizeString(viewState?.selectedAdminChangeId);
   const selectedItem =
@@ -355,13 +369,20 @@ function summarizeAdminProposalReview(adminQueueItems = [], viewState = {}) {
       summary: selectedItem.summary
     }),
     canApproveDeny: actionable,
-    canRoute: actionable,
+    canRoute: actionable && aimxsRoutingLive,
+    aimxsRoutingLive,
     canCopyReceipt: selectedItem.decision.approvalReceiptId !== "-",
     canOpenIdentity: true
   };
 }
 
-function summarizeActionReview(approvals = {}, runs = {}, nowValue = new Date(), viewState = {}) {
+function summarizeActionReview(
+  approvals = {},
+  runs = {},
+  nowValue = new Date(),
+  viewState = {},
+  aimxsRoutingLive = false
+) {
   const approvalItems = Array.isArray(approvals?.items) ? approvals.items : [];
   const selectedRunId = normalizeString(viewState?.selectedRunId);
   const selectedApproval =
@@ -393,7 +414,8 @@ function summarizeActionReview(approvals = {}, runs = {}, nowValue = new Date(),
     approvalStatus: status,
     actionable,
     canApproveDeny: actionable,
-    canRoute: actionable,
+    canRoute: actionable && aimxsRoutingLive,
+    aimxsRoutingLive,
     routeOnlyActions: ["DEFER", "ESCALATE"],
     runId: normalizeString(linkedRun?.runId || selectedApproval?.runId, "-"),
     requestId: normalizeString(linkedRun?.requestId || selectedApproval?.requestId, "-"),
@@ -537,7 +559,14 @@ function summarizeDecisionReceipt(approvals = {}, runs = {}, nowValue = new Date
   };
 }
 
-function summarizeDelegationAndEscalation(settings = {}, approvals = {}, runs = {}, session = {}, nowValue = new Date()) {
+function summarizeDelegationAndEscalation(
+  settings = {},
+  approvals = {},
+  runs = {},
+  session = {},
+  nowValue = new Date(),
+  aimxsRoutingLive = false
+) {
   const runtimeIdentity = readObject(settings?.identity);
   const identity = readObject(runtimeIdentity?.identity);
   const claims = readObject(session?.claims);
@@ -598,11 +627,13 @@ function summarizeDelegationAndEscalation(settings = {}, approvals = {}, runs = 
     tier > 0 ? `${approvalTierLabel(tier)} reviewer` : approvalState === "PENDING" ? "approval queue" : "not assigned";
 
   return {
-    available: Boolean(
-      normalizeString(referenceApproval?.approvalId) ||
-        normalizeString(linkedRun?.runId) ||
-        normalizeString(identity?.subject || claims?.sub || claims?.email)
-    ),
+    available:
+      aimxsRoutingLive &&
+      Boolean(
+        normalizeString(referenceApproval?.approvalId) ||
+          normalizeString(linkedRun?.runId) ||
+          normalizeString(identity?.subject || claims?.sub || claims?.email)
+      ),
     source: normalizeString(runtimeIdentity?.source || approvals?.source || runs?.source, "unknown"),
     routeState,
     routeTone,
@@ -865,6 +896,7 @@ export function createGovernanceWorkspaceSnapshot(context = {}) {
   const orgAdminProfiles = readObject(context?.orgAdminProfiles);
   const viewState = readObject(context?.viewState);
   const nowValue = context?.now || new Date();
+  const aimxsRoutingLive = isAimxsRoutingLive(settings);
 
   return {
     aimxsDecisionBindingSpine:
@@ -872,8 +904,8 @@ export function createGovernanceWorkspaceSnapshot(context = {}) {
         ? context.aimxsDecisionBindingSpine
         : { available: false },
     operationalFeedback: summarizeOperationalFeedback(viewState),
-    adminProposalReview: summarizeAdminProposalReview(context?.adminQueueItems, viewState),
-    actionReview: summarizeActionReview(approvals, runs, nowValue, viewState),
+    adminProposalReview: summarizeAdminProposalReview(context?.adminQueueItems, viewState, aimxsRoutingLive),
+    actionReview: summarizeActionReview(approvals, runs, nowValue, viewState, aimxsRoutingLive),
     connectorApprovalQueue: summarizeConnectorApprovalQueue(
       context?.nativeGatewayHolds,
       settings,
@@ -882,7 +914,14 @@ export function createGovernanceWorkspaceSnapshot(context = {}) {
     approvalQueue: summarizeApprovalQueue(approvals, nowValue),
     authorityLadder: summarizeAuthorityLadder(settings, approvals, runs, session),
     decisionReceipt: summarizeDecisionReceipt(approvals, runs, nowValue),
-    delegationEscalation: summarizeDelegationAndEscalation(settings, approvals, runs, session, nowValue),
+    delegationEscalation: summarizeDelegationAndEscalation(
+      settings,
+      approvals,
+      runs,
+      session,
+      nowValue,
+      aimxsRoutingLive
+    ),
     overrideExceptionPosture: summarizeOverrideAndExceptionPosture(approvals, runs, orgAdminProfiles, nowValue)
   };
 }

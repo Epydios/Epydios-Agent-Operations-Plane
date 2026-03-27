@@ -646,13 +646,14 @@ function renderWorkerFleetBoard(snapshot) {
 
 function renderProviderRoutingBoard(snapshot) {
   const routing = snapshot.providerRouting;
+  const aimxsPremiumVisible = Boolean(snapshot?.aimxsPremiumVisible);
   const rows = [
     {
       label: "Loaded Route Set",
       value: renderValuePills([
         { label: "source", value: routing.source, code: true },
         { label: "runs", value: String(routing.totalRuns) },
-        { label: "aimxs policy", value: String(routing.aimxsPolicyCount) }
+        { label: aimxsPremiumVisible ? "aimxs policy" : "premium policy", value: String(routing.aimxsPolicyCount) }
       ])
     },
     {
@@ -740,10 +741,11 @@ function renderIdentityApplicationBoard(snapshot) {
 }
 
 function renderAimxsIdentityPostureEchoBoard(snapshot) {
+  const aimxsPremiumVisible = Boolean(snapshot?.aimxsPremiumVisible);
   return `
     <article class="metric runtimeops-card runtimeops-card-wide" data-domain-root="runtimeops" data-runtimeops-panel="aimxs-identity-posture-echo">
       <div class="metric-title-row">
-        <div class="title">AIMXS Identity And Posture Echo</div>
+        <div class="title">${escapeHTML(aimxsPremiumVisible ? "AIMXS Identity And Posture Echo" : "Identity And Posture Echo")}</div>
         <span class="chip chip-neutral chip-compact">read-only</span>
       </div>
       ${renderAimxsIdentityPostureBlock(snapshot.aimxsIdentityPosture)}
@@ -752,10 +754,11 @@ function renderAimxsIdentityPostureEchoBoard(snapshot) {
 }
 
 function renderAimxsRouteBoundaryEchoBoard(snapshot) {
+  const aimxsPremiumVisible = Boolean(snapshot?.aimxsPremiumVisible);
   return `
     <article class="metric runtimeops-card runtimeops-card-wide" data-domain-root="runtimeops" data-runtimeops-panel="aimxs-route-boundary-echo">
       <div class="metric-title-row">
-        <div class="title">AIMXS Route And Boundary Echo</div>
+        <div class="title">${escapeHTML(aimxsPremiumVisible ? "AIMXS Route And Boundary Echo" : "Route And Boundary Echo")}</div>
         <span class="chip chip-neutral chip-compact">read-only</span>
       </div>
       ${renderAimxsRouteBoundaryBlock(snapshot.aimxsRouteBoundary)}

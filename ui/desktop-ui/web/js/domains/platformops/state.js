@@ -2,6 +2,7 @@ import {
   createAimxsRouteBoundaryField,
   createAimxsRouteBoundaryModel
 } from "../../shared/aimxs/route-boundary.js";
+import { isAimxsPremiumVisible } from "../../aimxs/state.js";
 
 function normalizeString(value, fallback = "") {
   const normalized = String(value || "").trim();
@@ -255,7 +256,15 @@ export function createPlatformWorkspaceSnapshot(context = {}) {
   const providers = context?.providers && typeof context.providers === "object" ? context.providers : {};
   const aimxsActivation =
     context?.aimxsActivation && typeof context.aimxsActivation === "object" ? context.aimxsActivation : {};
+  const aimxsSettings =
+    context?.settings?.aimxs && typeof context.settings.aimxs === "object" ? context.settings.aimxs : {};
   const viewState = context?.viewState && typeof context.viewState === "object" ? context.viewState : {};
+  const aimxsPremiumVisible = isAimxsPremiumVisible({
+    paymentEntitled: aimxsSettings.paymentEntitled,
+    mode: aimxsSettings.mode,
+    state: aimxsSettings.state,
+    activation: aimxsActivation
+  });
   const providerCounts = countProviderReadiness(providers.items || []);
   const providerItems = Array.isArray(providers.items) ? providers.items : [];
   const probedProviderCount = countProbedProviders(providerItems);
@@ -290,6 +299,7 @@ export function createPlatformWorkspaceSnapshot(context = {}) {
     adminQueueItems.find((item) => item.id === selectedAdminChangeId) || adminQueueItems[0] || null;
 
   const snapshot = {
+    aimxsPremiumVisible,
     environmentOverview: {
       surface: "desktop-local",
       namespace: normalizeString(aimxsActivation.namespace, "epydios-system"),
@@ -447,6 +457,7 @@ function buildPlatformAimxsRouteBoundary(snapshot = {}) {
   const release = snapshot?.releaseReadiness || {};
   const support = snapshot?.supportPosture || {};
   const scope = snapshot?.admin?.currentScope || {};
+  const aimxsPremiumVisible = Boolean(snapshot?.aimxsPremiumVisible);
   const bounded =
     Number(release?.deploymentIssueCount || 0) === 0 &&
     Number(support?.supportSignalCount || 0) === 0 &&
@@ -455,7 +466,9 @@ function buildPlatformAimxsRouteBoundary(snapshot = {}) {
 
   return createAimxsRouteBoundaryModel({
     summary:
-      "This primary AIMXS view shows which deployment route is currently live on the platform surface and why the release boundary is still allowed or constrained.",
+      aimxsPremiumVisible
+        ? "This primary AIMXS view shows which deployment route is currently live on the platform surface and why the release boundary is still allowed or constrained."
+        : "This primary provider-route view shows which deployment route is currently live on the platform surface and why the release boundary is still allowed or constrained.",
     surfaceLabel: "primary platform surface",
     routeFields: [
       createAimxsRouteBoundaryField("surface", environment?.surface, true),
@@ -469,7 +482,9 @@ function buildPlatformAimxsRouteBoundary(snapshot = {}) {
       title: "Current Route",
       badge: bounded ? "current" : "watch",
       tone: bounded ? "ok" : "warn",
-      note: "Current route is derived from AIMXS bridge readiness and the active platform deployment surface.",
+      note: aimxsPremiumVisible
+        ? "Current route is derived from AIMXS bridge readiness and the active platform deployment surface."
+        : "Current route is derived from bridge readiness and the active platform deployment surface.",
       fields: [
         createAimxsRouteBoundaryField("bridge state", bridge?.state),
         createAimxsRouteBoundaryField("route posture", bridge?.available ? "bridge available" : "bridge unavailable"),
@@ -483,8 +498,9 @@ function buildPlatformAimxsRouteBoundary(snapshot = {}) {
       title: "Boundary Posture",
       badge: bounded ? "bounded" : "constrained",
       tone: bounded ? "ok" : "warn",
-      note:
-        "Platform boundaries stay bounded by pipeline status, provider readiness, and AIMXS secret posture before any deployment change can proceed.",
+      note: aimxsPremiumVisible
+        ? "Platform boundaries stay bounded by pipeline status, provider readiness, and AIMXS secret posture before any deployment change can proceed."
+        : "Platform boundaries stay bounded by pipeline status, provider readiness, and bridge secret posture before any deployment change can proceed.",
       fields: [
         createAimxsRouteBoundaryField("pipeline", release?.pipelineStatus),
         createAimxsRouteBoundaryField("deployment issues", String(release?.deploymentIssueCount || 0)),

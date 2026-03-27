@@ -247,10 +247,11 @@ function renderDelegationOverrideBoard(snapshot) {
 }
 
 function renderAimxsIdentityPostureBoard(snapshot) {
+  const aimxsPremiumVisible = Boolean(snapshot?.aimxsPremiumVisible);
   return `
     <article class="metric identityops-card identityops-card-wide" data-domain-root="identityops" data-identityops-panel="aimxs-identity-posture">
       <div class="metric-title-row">
-        <div class="title">AIMXS Identity And Posture</div>
+        <div class="title">${escapeHTML(aimxsPremiumVisible ? "AIMXS Identity And Posture" : "Identity And Posture")}</div>
         <span class="chip chip-ok chip-compact">primary</span>
       </div>
       ${renderAimxsIdentityPostureBlock(snapshot.aimxsIdentityPosture)}

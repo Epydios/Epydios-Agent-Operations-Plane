@@ -1035,10 +1035,11 @@ function renderPolicySimulationBoard(snapshot) {
 }
 
 function renderAimxsIdentityPostureEchoBoard(snapshot) {
+  const aimxsPremiumVisible = Boolean(snapshot?.aimxsPremiumVisible);
   return `
     <article class="metric policyops-card policyops-card-wide" data-domain-root="policyops" data-policyops-panel="aimxs-identity-posture-echo">
       <div class="metric-title-row">
-        <div class="title">AIMXS Identity And Posture Echo</div>
+        <div class="title">${escapeHTML(aimxsPremiumVisible ? "AIMXS Identity And Posture Echo" : "Identity And Posture Echo")}</div>
         <span class="chip chip-neutral chip-compact">read-only</span>
       </div>
       ${renderAimxsIdentityPostureBlock(snapshot.aimxsIdentityPosture)}

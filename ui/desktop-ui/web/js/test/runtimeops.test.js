@@ -287,9 +287,9 @@ test("runtimeops page renders the first inspect-only runtime boards", () => {
   assert.match(ui.runtimeOpsContent.innerHTML, /Live Sessions/);
   assert.match(ui.runtimeOpsContent.innerHTML, /Worker Fleet/);
   assert.match(ui.runtimeOpsContent.innerHTML, /Provider Routing/);
-  assert.match(ui.runtimeOpsContent.innerHTML, /AIMXS Route And Boundary Echo/);
+  assert.match(ui.runtimeOpsContent.innerHTML, /Route And Boundary Echo/);
   assert.match(ui.runtimeOpsContent.innerHTML, /Identity Application/);
-  assert.match(ui.runtimeOpsContent.innerHTML, /AIMXS Identity And Posture Echo/);
+  assert.match(ui.runtimeOpsContent.innerHTML, /Identity And Posture Echo/);
   assert.match(ui.runtimeOpsContent.innerHTML, /runtime session identity/);
   assert.match(ui.runtimeOpsContent.innerHTML, /Route And Provider Chain/);
   assert.match(ui.runtimeOpsContent.innerHTML, /Current Boundary/);
@@ -310,7 +310,7 @@ test("runtimeops page renders the first inspect-only runtime boards", () => {
   assert.match(ui.runtimeOpsContent.innerHTML, /worker-capability-endpoint/);
   assert.match(ui.runtimeOpsContent.innerHTML, /capabilities=3/);
   assert.match(ui.runtimeOpsContent.innerHTML, /gpt-5-codex/);
-  assert.match(ui.runtimeOpsContent.innerHTML, /aimxs policy/i);
+  assert.match(ui.runtimeOpsContent.innerHTML, /premium policy/i);
   assert.match(ui.runtimeOpsContent.innerHTML, /aimxs-policy-primary/);
   assert.match(ui.runtimeOpsContent.innerHTML, /bearer_token_jwt/);
   assert.match(ui.runtimeOpsContent.innerHTML, /epydiosops-desktop-local/);

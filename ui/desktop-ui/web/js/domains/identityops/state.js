@@ -3,6 +3,7 @@ import {
   createAimxsIdentityPostureModel,
   inferAimxsAuthorityTierFromRoles
 } from "../../shared/aimxs/identity-posture.js";
+import { isAimxsPremiumVisible } from "../../aimxs/state.js";
 
 export function resolveAuthSummaryState(session = {}) {
   if (session.authenticated) {
@@ -298,6 +299,7 @@ export function createIdentityWorkspaceSnapshot(settings = {}, session = {}) {
     adminQueueItems.find((item) => item.id === adminSelectedChangeId) || adminQueueItems[0] || null;
 
   const snapshot = {
+    aimxsPremiumVisible: isAimxsPremiumVisible(settings),
     runtimeIdentity,
     identitySummary,
     authenticated,
@@ -447,7 +449,9 @@ function buildIdentityAimxsIdentityPosture(snapshot = {}) {
 
   return createAimxsIdentityPostureModel({
     summary:
-      "Bounded AIMXS identity posture links the current runtime-bound subject to the next authority or delegation posture without opening new write controls.",
+      snapshot?.aimxsPremiumVisible
+        ? "Bounded AIMXS identity posture links the current runtime-bound subject to the next authority or delegation posture without opening new write controls."
+        : "Bounded identity posture links the current runtime-bound subject to the next authority or delegation posture without opening new write controls.",
     surfaceLabel: "primary owner surface",
     identityFields: [
       createAimxsField("identity class", snapshot?.authenticated ? "runtime-bound subject" : "identity unresolved"),

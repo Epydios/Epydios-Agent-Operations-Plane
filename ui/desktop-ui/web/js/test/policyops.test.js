@@ -258,7 +258,7 @@ test("policyops page renders the first inspect-only policy boards", () => {
   assert.match(ui.policyOpsContent.innerHTML, /schema=declared; compile=ready/);
   assert.match(ui.policyOpsContent.innerHTML, /activationTarget=workspace; activationPosture=current/);
   assert.match(ui.policyOpsContent.innerHTML, /Decision Explanation/);
-  assert.match(ui.policyOpsContent.innerHTML, /AIMXS Identity And Posture Echo/);
+  assert.match(ui.policyOpsContent.innerHTML, /Identity And Posture Echo/);
   assert.match(ui.policyOpsContent.innerHTML, /governed action authority/);
   assert.match(ui.policyOpsContent.innerHTML, /governance handshake/);
   assert.match(ui.policyOpsContent.innerHTML, /Current Posture/);

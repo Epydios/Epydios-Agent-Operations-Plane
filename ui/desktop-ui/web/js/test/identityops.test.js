@@ -186,7 +186,7 @@ test("identityops page renders inspect-first boards plus bounded admin recovery 
   assert.match(ui.identityContent.innerHTML, /demo\.operator/);
   assert.match(ui.identityContent.innerHTML, /runtime\.run\.create/);
   assert.match(ui.identityContent.innerHTML, /staging/);
-  assert.match(ui.identityContent.innerHTML, /AIMXS Identity And Posture/);
+  assert.match(ui.identityContent.innerHTML, /Identity And Posture/);
   assert.match(ui.identityContent.innerHTML, /runtime-bound subject/);
   assert.match(ui.identityContent.innerHTML, /authority tier|current authority/);
   assert.match(ui.identityContent.innerHTML, /governance-backed claims/);

@@ -7,6 +7,18 @@ test("governanceops page renders runtime approvals plus identity admin proposal 
   const ui = { governanceOpsContent: { innerHTML: "" } };
   renderGovernanceOpsPage(ui, {
     settings: {
+      aimxs: {
+        mode: "aimxs-full",
+        state: "ready",
+        activation: {
+          available: true,
+          state: "active",
+          activeMode: "aimxs-full",
+          selectedProviderId: "aimxs-full",
+          selectedProviderName: "aimxs-full",
+          selectedProviderReady: true
+        }
+      },
       connectors: {
         source: "runtime-endpoint",
         selectedConnectorId: "browser-proof",
@@ -338,6 +350,10 @@ test("governanceops page tolerates approvals without org-admin decision bindings
 
   assert.match(ui.governanceOpsContent.innerHTML, /Override And Exception Posture/);
   assert.match(ui.governanceOpsContent.innerHTML, /approval-no-binding-001/);
+  assert.doesNotMatch(ui.governanceOpsContent.innerHTML, /data-governanceops-routing-action="DEFER"/);
+  assert.doesNotMatch(ui.governanceOpsContent.innerHTML, /data-governanceops-routing-action="ESCALATE"/);
+  assert.doesNotMatch(ui.governanceOpsContent.innerHTML, /route=defer\/escalate/);
+  assert.doesNotMatch(ui.governanceOpsContent.innerHTML, /Delegation And Escalation/);
 });
 
 test("governanceops admin review renders a routed platform proposal without identity-specific leakage", () => {
@@ -379,6 +395,7 @@ test("governanceops admin review renders a routed platform proposal without iden
   assert.match(ui.governanceOpsContent.innerHTML, /staging \/ aimxs-full/);
   assert.match(ui.governanceOpsContent.innerHTML, /Open PlatformOps/);
   assert.match(ui.governanceOpsContent.innerHTML, /data-governanceops-open-admin-owner-domain="platformops"/);
+  assert.doesNotMatch(ui.governanceOpsContent.innerHTML, /data-governanceops-routing-admin-change-id="platform-change-queue-001"/);
 });
 
 test("governanceops admin review renders a routed guardrail proposal without platform leakage", () => {
@@ -420,6 +437,7 @@ test("governanceops admin review renders a routed guardrail proposal without pla
   assert.match(ui.governanceOpsContent.innerHTML, /tenant-demo \/ project-core/);
   assert.match(ui.governanceOpsContent.innerHTML, /Open GuardrailOps/);
   assert.match(ui.governanceOpsContent.innerHTML, /data-governanceops-open-admin-owner-domain="guardrailops"/);
+  assert.doesNotMatch(ui.governanceOpsContent.innerHTML, /data-governanceops-routing-admin-change-id="guardrail-change-queue-001"/);
 });
 
 test("governanceops admin review renders a routed policy proposal without identity fallback leakage", () => {
@@ -461,6 +479,7 @@ test("governanceops admin review renders a routed policy proposal without identi
   assert.match(ui.governanceOpsContent.innerHTML, /tenant-demo \/ project-finance/);
   assert.match(ui.governanceOpsContent.innerHTML, /Open PolicyOps/);
   assert.match(ui.governanceOpsContent.innerHTML, /data-governanceops-open-admin-owner-domain="policyops"/);
+  assert.doesNotMatch(ui.governanceOpsContent.innerHTML, /data-governanceops-routing-admin-change-id="policy-change-queue-001"/);
 });
 
 test("governanceops admin review renders a routed compliance proposal without policy fallback leakage", () => {
@@ -502,6 +521,7 @@ test("governanceops admin review renders a routed compliance proposal without po
   assert.match(ui.governanceOpsContent.innerHTML, /tenant-demo \/ project-payments/);
   assert.match(ui.governanceOpsContent.innerHTML, /Open ComplianceOps/);
   assert.match(ui.governanceOpsContent.innerHTML, /data-governanceops-open-admin-owner-domain="complianceops"/);
+  assert.doesNotMatch(ui.governanceOpsContent.innerHTML, /data-governanceops-routing-admin-change-id="compliance-change-queue-001"/);
 });
 
 test("governanceops admin review renders a routed network proposal without identity fallback leakage", () => {
@@ -543,6 +563,7 @@ test("governanceops admin review renders a routed network proposal without ident
   assert.match(ui.governanceOpsContent.innerHTML, /tenant-demo \/ project-payments/);
   assert.match(ui.governanceOpsContent.innerHTML, /Open NetworkOps/);
   assert.match(ui.governanceOpsContent.innerHTML, /data-governanceops-open-admin-owner-domain="networkops"/);
+  assert.doesNotMatch(ui.governanceOpsContent.innerHTML, /data-governanceops-routing-admin-change-id="network-change-queue-001"/);
 });
 
 test("governanceops page renders selected recorded review state and operational feedback", () => {
@@ -595,5 +616,6 @@ test("governanceops page renders selected recorded review state and operational 
   assert.match(ui.governanceOpsContent.innerHTML, /run-reviewed-ops-001/);
   assert.match(ui.governanceOpsContent.innerHTML, /data-governanceops-decision="APPROVE"/);
   assert.match(ui.governanceOpsContent.innerHTML, /data-governanceops-decision="APPROVE"[\s\S]*disabled/);
-  assert.match(ui.governanceOpsContent.innerHTML, /data-governanceops-routing-action="ESCALATE"[\s\S]*disabled/);
+  assert.doesNotMatch(ui.governanceOpsContent.innerHTML, /data-governanceops-routing-action="ESCALATE"/);
+  assert.doesNotMatch(ui.governanceOpsContent.innerHTML, /route=defer\/escalate/);
 });

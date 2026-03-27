@@ -8,6 +8,7 @@ import {
   createAimxsIdentityPostureModel,
   inferAimxsAuthorityTierFromRoles
 } from "../../shared/aimxs/identity-posture.js";
+import { isAimxsPremiumVisible } from "../../aimxs/state.js";
 
 export function presentPolicyCopy(value) {
   return String(value || "")
@@ -725,6 +726,7 @@ export function createPolicyWorkspaceSnapshot(context = {}) {
   };
 
   const snapshot = {
+    aimxsPremiumVisible: isAimxsPremiumVisible(settings),
     feedback: feedbackMessage
       ? {
           tone: String(viewState?.feedback?.tone || "info").trim().toLowerCase(),
@@ -973,7 +975,9 @@ function buildPolicyAimxsIdentityPosture(snapshot = {}) {
     currentPosture: {
       badge: currentBadge,
       tone: policyAimxsTone(currentBadge),
-      note: "Current posture is derived from the latest governed-run replay and the active AIMXS policy explanation.",
+      note: snapshot?.aimxsPremiumVisible
+        ? "Current posture is derived from the latest governed-run replay and the active AIMXS policy explanation."
+        : "Current posture is derived from the latest governed-run replay and the active policy explanation.",
       fields: [
         createAimxsField("current posture", richness?.decision || "unset"),
         createAimxsField("scope", currentScope, true),

@@ -11391,6 +11391,26 @@ function getCurrentIncidentOpsEntry(entryId = "") {
     return reasonInput instanceof HTMLInputElement ? String(reasonInput.value || "").trim() : "";
   }
 
+  function governanceAimxsRoutingLive() {
+    const aimxs =
+      latestSettingsSnapshot?.aimxs && typeof latestSettingsSnapshot.aimxs === "object"
+        ? latestSettingsSnapshot.aimxs
+        : {};
+    const activation =
+      aimxs?.activation && typeof aimxs.activation === "object"
+        ? aimxs.activation
+        : {};
+    const activationState = String(activation?.state || "").trim().toLowerCase();
+    const activeMode = String(activation?.activeMode || aimxs?.mode || "").trim().toLowerCase();
+    return (
+      Boolean(activation?.available) &&
+      activationState === "active" &&
+      activeMode !== "" &&
+      activeMode !== "oss-only" &&
+      Boolean(activation?.selectedProviderReady)
+    );
+  }
+
   function buildGovernanceAdminDecision(changeId, status, reason) {
     const queueItem = governanceAdminQueueItemById(changeId);
     if (!queueItem) {
@@ -11495,6 +11515,10 @@ function getCurrentIncidentOpsEntry(entryId = "") {
         : "";
     if (!changeId || !routeAction) {
       return false;
+    }
+    if (!governanceAimxsRoutingLive()) {
+      setGovernanceOpsFeedback("warn", "Defer and escalate stay hidden until AIMXS routing is live. Approve and deny remain available.");
+      return true;
     }
     const queueItem = governanceAdminQueueItemById(changeId);
     if (!queueItem) {
@@ -11653,6 +11677,10 @@ function getCurrentIncidentOpsEntry(entryId = "") {
         : "";
     if (!runID || !routeAction) {
       return false;
+    }
+    if (!governanceAimxsRoutingLive()) {
+      setGovernanceOpsFeedback("warn", "Defer and escalate stay hidden until AIMXS routing is live. Approve and deny remain available.");
+      return true;
     }
     const reasonInput =
       container instanceof HTMLElement ? container.querySelector("[data-governanceops-decision-reason]") : null;

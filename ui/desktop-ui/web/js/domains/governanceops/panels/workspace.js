@@ -256,20 +256,22 @@ function renderAdminProposalReviewBoard(snapshot) {
             data-governanceops-decision="DENY"
             ${board.canApproveDeny ? "" : "disabled"}
           >Deny</button>
-          <button
+          ${
+            board.canRoute
+              ? `<button
             class="btn btn-secondary"
             type="button"
             data-governanceops-routing-admin-change-id="${escapeHTML(board.changeId)}"
             data-governanceops-routing-action="DEFER"
-            ${board.canRoute ? "" : "disabled"}
           >Defer</button>
           <button
             class="btn btn-secondary"
             type="button"
             data-governanceops-routing-admin-change-id="${escapeHTML(board.changeId)}"
             data-governanceops-routing-action="ESCALATE"
-            ${board.canRoute ? "" : "disabled"}
-          >Escalate</button>
+          >Escalate</button>`
+              : ""
+          }
           ${openOwnerButton}
           <button
             class="btn btn-secondary btn-small"
@@ -361,7 +363,7 @@ function renderActionReviewBoard(snapshot) {
       </div>
       <div class="governanceops-chip-row">
         <span class="chip chip-neutral chip-compact">live=approve/deny</span>
-        <span class="chip chip-neutral chip-compact">route=defer/escalate</span>
+        ${board.canRoute ? '<span class="chip chip-neutral chip-compact">route=defer/escalate</span>' : ""}
         <span class="chip chip-neutral chip-compact">source=${escapeHTML(board.source)}</span>
       </div>
       <div class="governanceops-kv-list">${renderKeyValueRows(rows)}</div>
@@ -390,20 +392,22 @@ function renderActionReviewBoard(snapshot) {
             data-governanceops-decision="DENY"
             ${board.canApproveDeny ? "" : "disabled"}
           >Deny</button>
-          <button
+          ${
+            board.canRoute
+              ? `<button
             class="btn btn-secondary"
             type="button"
             data-governanceops-routing-run-id="${escapeHTML(board.runId)}"
             data-governanceops-routing-action="DEFER"
-            ${board.canRoute ? "" : "disabled"}
           >Defer</button>
           <button
             class="btn btn-secondary"
             type="button"
             data-governanceops-routing-run-id="${escapeHTML(board.runId)}"
             data-governanceops-routing-action="ESCALATE"
-            ${board.canRoute ? "" : "disabled"}
-          >Escalate</button>
+          >Escalate</button>`
+              : ""
+          }
           <button
             class="btn btn-secondary btn-small"
             type="button"
@@ -805,20 +809,7 @@ function renderDecisionReceiptBoard(snapshot) {
 function renderDelegationAndEscalationBoard(snapshot) {
   const board = snapshot.delegationEscalation;
   if (!board.available) {
-    return `
-      <article class="metric governanceops-card" data-domain-root="governanceops" data-governanceops-panel="delegation-escalation">
-        <div class="metric-title-row">
-          <div class="title">Delegation And Escalation</div>
-          <span class="chip chip-neutral chip-compact">idle</span>
-        </div>
-        <div class="governanceops-kv-list">
-          <div class="governanceops-row">
-            <div class="governanceops-row-label">Status</div>
-            <div class="governanceops-row-value"><span class="governanceops-empty">No delegation or escalation anchors are currently loaded.</span></div>
-          </div>
-        </div>
-      </article>
-    `;
+    return "";
   }
 
   const rows = [

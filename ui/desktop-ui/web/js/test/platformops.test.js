@@ -143,6 +143,42 @@ test("platformops page renders the first inspect-only platform boards", () => {
   assert.match(ui.platformOpsContent.innerHTML, /One or more provider registrations remain degraded\./);
 });
 
+test("platformops neutralizes AIMXS labels in baseline posture", () => {
+  const ui = { platformOpsContent: { innerHTML: "" } };
+  renderPlatformOpsPage(ui, {
+    health: {
+      runtime: { status: "ok", detail: "Runtime API reachable." },
+      providers: { status: "ok", detail: "Providers are healthy." },
+      policy: { status: "ok", detail: "Policy evaluation reachable." }
+    },
+    pipeline: {
+      status: "pass",
+      latestStagingGate: "staging-gate.log",
+      latestProdGate: "prod-gate.log"
+    },
+    providers: {
+      items: [{ providerId: "oss-profile-static", ready: true, probed: true }]
+    },
+    aimxsActivation: {
+      available: false,
+      state: "unavailable",
+      activeMode: "unknown",
+      warnings: [],
+      enabledProviders: [],
+      secrets: {}
+    }
+  });
+
+  assert.match(ui.platformOpsContent.innerHTML, /Provider Selection/);
+  assert.match(ui.platformOpsContent.innerHTML, /Provider Route Dependencies/);
+  assert.match(ui.platformOpsContent.innerHTML, /Provider Bridge Readiness/);
+  assert.match(ui.platformOpsContent.innerHTML, /Route And Boundary/);
+  assert.doesNotMatch(ui.platformOpsContent.innerHTML, /AIMXS Selection/);
+  assert.doesNotMatch(ui.platformOpsContent.innerHTML, /AIMXS Dependencies/);
+  assert.doesNotMatch(ui.platformOpsContent.innerHTML, /AIMXS Bridge Readiness/);
+  assert.doesNotMatch(ui.platformOpsContent.innerHTML, /AIMXS Route And Boundary/);
+});
+
 test("platformops page renders apply and receipt actions for approved platform admin proposals", () => {
   const ui = { platformOpsContent: { innerHTML: "" } };
   renderPlatformOpsPage(ui, {

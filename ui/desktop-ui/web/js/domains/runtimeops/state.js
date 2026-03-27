@@ -12,6 +12,7 @@ import {
   createAimxsRouteBoundaryField,
   createAimxsRouteBoundaryModel
 } from "../../shared/aimxs/route-boundary.js";
+import { isAimxsPremiumVisible } from "../../aimxs/state.js";
 
 function normalizeStatus(value) {
   return String(value || "").trim().toLowerCase();
@@ -611,6 +612,7 @@ export function createRuntimeWorkspaceSnapshot(context = {}, session = {}, optio
   const scopeProject = normalizeString(session?.claims?.project_id, projectIds[0] || "-");
 
   const snapshot = {
+    aimxsPremiumVisible: isAimxsPremiumVisible(context?.settings || {}),
     runtimeHealth: healthSnapshot,
     queueAndThroughput: {
       source: normalizeString(context?.runs?.source, "unknown"),
@@ -699,7 +701,9 @@ function buildRuntimeAimxsIdentityPosture(snapshot = {}) {
 
   return createAimxsIdentityPostureModel({
     summary:
-      "This read-only echo shows the current runtime identity posture and the next bounded session posture without opening any new runtime mutation controls.",
+      snapshot?.aimxsPremiumVisible
+        ? "This read-only AIMXS echo shows the current runtime identity posture and the next bounded session posture without opening any new runtime mutation controls."
+        : "This read-only echo shows the current runtime identity posture and the next bounded session posture without opening any new runtime mutation controls.",
     surfaceLabel: "read-only echo",
     identityFields: [
       createAimxsField("identity class", "runtime session identity"),

@@ -67,6 +67,7 @@ test("settingsops renders bounded preferences, secure refs, environment, support
         ]
       },
       aimxs: {
+        paymentEntitled: true,
         mode: "aimxs-full",
         state: "active",
         endpointRef: "ref://projects/{projectId}/providers/aimxs/https-endpoint",
@@ -81,6 +82,8 @@ test("settingsops renders bounded preferences, secure refs, environment, support
           namespace: "epydios-system",
           selectedProviderId: "aimxs-full",
           selectedProviderName: "aimxs-full",
+          selectedProviderReady: true,
+          selectedProviderProbed: true,
           capabilities: ["policy.evaluate"],
           enabledProviders: [],
           secrets: {
@@ -213,4 +216,81 @@ test("settings empty state uses product-language recovery guidance", () => {
   assert.match(ui.settingsContent.innerHTML, /Epydios loads the current workspace configuration/i);
   assert.match(ui.settingsContent.innerHTML, /check launcher status and try again/i);
   assert.doesNotMatch(ui.settingsContent.innerHTML, /runtime endpoint availability/i);
+});
+
+test("settingsops hides AIMXS deployment controls in baseline posture", () => {
+  const ui = { settingsContent: { innerHTML: "" } };
+
+  renderSettingsOpsPage(ui, {
+    session: {
+      claims: {
+        tenant_id: "tenant-local",
+        project_id: "project-local"
+      }
+    },
+    settings: {
+      summary: {
+        tenantId: "tenant-local",
+        projectId: "project-local",
+        environmentId: "local"
+      },
+      integrations: {
+        modelRouting: "gateway_first",
+        gatewayProviderId: "litellm",
+        selectedAgentProfileId: "openai"
+      },
+      theme: {
+        mode: "system"
+      },
+      realtime: {
+        mode: "polling",
+        pollIntervalMs: 5000
+      },
+      terminal: {
+        mode: "governed_exec",
+        restrictedHostMode: "enforced"
+      },
+      localSecureRefs: {
+        available: true,
+        service: "epydios.agentops.desktop.local-ref.v1",
+        storedCount: 1
+      },
+      aimxs: {
+        mode: "oss-only",
+        state: "inactive",
+        activation: {
+          available: false,
+          state: "unavailable",
+          activeMode: "unknown"
+        }
+      },
+      connectors: {
+        source: "runtime-endpoint",
+        tenantId: "tenant-local",
+        projectId: "project-local",
+        hasSettings: false,
+        profiles: []
+      }
+    },
+    viewState: {
+      aimxsEditor: {
+        status: "clean",
+        message: "Draft ready."
+      }
+    },
+    editorState: {
+      projectId: "project-local",
+      scopeTenantId: "tenant-local",
+      scopeProjectId: "project-local",
+      status: "saved",
+      syncState: "loaded",
+      source: "runtime-endpoint"
+    }
+  });
+
+  const html = ui.settingsContent.innerHTML;
+  assert.match(html, /policy=oss-only/);
+  assert.doesNotMatch(html, /AIMXS Deployment Contract/);
+  assert.doesNotMatch(html, /Activate AIMXS Mode/);
+  assert.doesNotMatch(html, /Apply AIMXS Settings/);
 });

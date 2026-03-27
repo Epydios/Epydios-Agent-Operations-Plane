@@ -1,4 +1,4 @@
-import { resolveAimxsContractProfile } from "../../aimxs/state.js";
+import { isAimxsPremiumVisible, resolveAimxsContractProfile } from "../../aimxs/state.js";
 import {
   createAimxsRouteBoundaryField,
   createAimxsRouteBoundaryModel
@@ -556,6 +556,7 @@ export function createNetworkWorkspaceSnapshot(context = {}) {
     adminQueueItems.find((item) => item.id === selectedAdminChangeId) || adminQueueItems[0] || null;
   const currentBoundaryPathOption = boundaryPathOptions[0] || null;
   const snapshot = {
+    aimxsPremiumVisible: isAimxsPremiumVisible(settings),
     networkBoundary,
     endpointReachability,
     trustAndCertificate,
@@ -617,7 +618,9 @@ function buildNetworkAimxsRouteBoundary(snapshot = {}) {
 
   return createAimxsRouteBoundaryModel({
     summary:
-      "This primary AIMXS view correlates the active network route chain, trust boundary, and bounded probe surface. Later bounded network control remains closed.",
+      snapshot?.aimxsPremiumVisible
+        ? "This primary AIMXS view correlates the active network route chain, trust boundary, and bounded probe surface. Later bounded network control remains closed."
+        : "This primary provider-route view correlates the active network route chain, trust boundary, and bounded probe surface. Later bounded network control remains closed.",
     surfaceLabel: "primary network surface",
     routeFields: [
       createAimxsRouteBoundaryField("environment", boundary?.environment, true),
