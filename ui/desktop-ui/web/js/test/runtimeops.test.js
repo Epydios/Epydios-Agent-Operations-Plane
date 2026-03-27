@@ -275,9 +275,11 @@ test("runtimeops page renders the first inspect-only runtime boards", () => {
   );
 
   assert.match(ui.runtimeOpsContent.innerHTML, /data-domain-root="runtimeops"/);
+  assert.match(ui.runtimeOpsContent.innerHTML, /RuntimeOps/);
   assert.match(ui.runtimeOpsContent.innerHTML, /Operate/);
   assert.match(ui.runtimeOpsContent.innerHTML, /Fleet/);
   assert.match(ui.runtimeOpsContent.innerHTML, /Routing And Inventory/);
+  assert.match(ui.runtimeOpsContent.innerHTML, /Operate the current runtime, inspect fleet posture, and keep routing and governed run inventory legible/);
   assert.match(ui.runtimeOpsContent.innerHTML, /Runtime Actions/);
   assert.match(ui.runtimeOpsContent.innerHTML, /Selected Session Review/);
   assert.match(ui.runtimeOpsContent.innerHTML, /Worker Posture/);
@@ -339,6 +341,8 @@ test("runtimeops page renders the first inspect-only runtime boards", () => {
   assert.match(ui.runtimeOpsContent.innerHTML, /data-runtimeops-review-session-id="session-20260314-003"/);
   assert.match(ui.runtimeOpsContent.innerHTML, /data-runtimeops-close-session-id="session-20260314-003"/);
   assert.match(ui.runtimeOpsContent.innerHTML, /data-runtimeops-worker-event-type="heartbeat"/);
+  assert.ok(ui.runtimeOpsContent.innerHTML.indexOf("Operate") < ui.runtimeOpsContent.innerHTML.indexOf("Fleet"));
+  assert.ok(ui.runtimeOpsContent.innerHTML.indexOf("Fleet") < ui.runtimeOpsContent.innerHTML.indexOf("Routing And Inventory"));
 });
 
 test("runtimeops empty state renders without loaded runtime context", () => {

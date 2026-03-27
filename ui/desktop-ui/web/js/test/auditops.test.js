@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { renderAuditOpsEmptyState, renderAuditOpsPage } from "../domains/auditops/routes.js";
 import { createAimxsDecisionBindingSpine } from "../shared/aimxs/decision-binding.js";
 
-test("auditops page renders bounded audit event, actor activity, and decision trace boards", () => {
+test("auditops page restores visible event, trace, and investigation clusters", () => {
   const ui = { auditOpsContent: { innerHTML: "" } };
   renderAuditOpsPage(ui, {
     now: "2026-03-15T01:20:00Z",
@@ -184,6 +184,11 @@ test("auditops page renders bounded audit event, actor activity, and decision tr
   });
 
   assert.match(ui.auditOpsContent.innerHTML, /data-domain-root="auditops"/);
+  assert.match(ui.auditOpsContent.innerHTML, /AuditOps/);
+  assert.match(ui.auditOpsContent.innerHTML, /Events/);
+  assert.match(ui.auditOpsContent.innerHTML, /Decision And Actor Trace/);
+  assert.match(ui.auditOpsContent.innerHTML, /Investigation And Export/);
+  assert.match(ui.auditOpsContent.innerHTML, /data-workbench-cluster-layout="split"/);
   assert.match(ui.auditOpsContent.innerHTML, /Audit Activity/);
   assert.match(ui.auditOpsContent.innerHTML, /Actor Activity Board/);
   assert.match(ui.auditOpsContent.innerHTML, /Decision Trace Board/);
@@ -243,4 +248,5 @@ test("auditops empty state renders without loaded audit posture", () => {
 
   assert.match(ui.auditOpsContent.innerHTML, /AuditOps/);
   assert.match(ui.auditOpsContent.innerHTML, /Audit activity becomes available/);
+  assert.match(ui.auditOpsContent.innerHTML, /data-domain-root="auditops"/);
 });

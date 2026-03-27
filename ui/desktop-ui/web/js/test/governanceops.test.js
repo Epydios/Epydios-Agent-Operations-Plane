@@ -231,6 +231,9 @@ test("governanceops page renders runtime approvals plus identity admin proposal 
   });
 
   assert.match(ui.governanceOpsContent.innerHTML, /data-domain-root="governanceops"/);
+  assert.match(ui.governanceOpsContent.innerHTML, /GovernanceOps/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Live Review And Approvals/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Governance Structure And Receipts/);
   assert.match(ui.governanceOpsContent.innerHTML, /Admin Proposal Review/);
   assert.match(ui.governanceOpsContent.innerHTML, /AIMXS Lifecycle Ribbon/);
   assert.match(ui.governanceOpsContent.innerHTML, /AIMXS Decision-Binding Spine/);
@@ -299,6 +302,7 @@ test("governanceops page renders runtime approvals plus identity admin proposal 
   assert.match(ui.governanceOpsContent.innerHTML, /Centralized Enterprise Admin Residency Exception/);
   assert.match(ui.governanceOpsContent.innerHTML, /Centralized Enterprise Admin Quota Overlay/);
   assert.match(ui.governanceOpsContent.innerHTML, /enterprise\.break_glass_admin/);
+  assert.ok(ui.governanceOpsContent.innerHTML.indexOf("Live Review And Approvals") < ui.governanceOpsContent.innerHTML.indexOf("Governance Structure And Receipts"));
 });
 
 test("governanceops empty state renders without loaded governance context", () => {

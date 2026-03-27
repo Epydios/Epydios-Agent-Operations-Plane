@@ -1,4 +1,5 @@
 import { renderPanelStateMetric } from "../../views/common.js";
+import { renderWorkbenchDomainEmptyState } from "../../shell/layout/workbench-domain.js";
 import { renderIncidentWorkspace } from "./panels/workspace.js";
 
 export function renderIncidentOpsPage(ui, context = {}) {
@@ -12,11 +13,17 @@ export function renderIncidentOpsEmptyState(ui, options = {}) {
   if (!ui?.incidentOpsContent) {
     return;
   }
-  ui.incidentOpsContent.innerHTML = renderPanelStateMetric(
-    options.tone || "info",
-    options.title || "IncidentOps",
-    options.message || "Incident packages appear here after a governed run, review decision, and audit trail are ready.",
-    options.detail ||
-      "Refresh the workspace. If an incident package should already be here, check the linked run, audit activity, and evidence handoff."
-  );
+  ui.incidentOpsContent.innerHTML = renderWorkbenchDomainEmptyState({
+    domainRoot: "incidentops",
+    shellClass: "incidentops-workspace",
+    title: options.title || "IncidentOps",
+    lead: "Incident ownership appears here once a governed run, review decision, and audit trail are ready.",
+    content: renderPanelStateMetric(
+      options.tone || "info",
+      options.title || "IncidentOps",
+      options.message || "Incident packages appear here after a governed run, review decision, and audit trail are ready.",
+      options.detail ||
+        "Refresh the workspace. If an incident package should already be here, check the linked run, audit activity, and evidence handoff."
+    )
+  });
 }

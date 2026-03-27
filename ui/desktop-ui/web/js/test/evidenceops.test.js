@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { renderEvidenceOpsEmptyState, renderEvidenceOpsPage } from "../domains/evidenceops/routes.js";
 import { createAimxsDecisionBindingSpine } from "../shared/aimxs/decision-binding.js";
 
-test("evidenceops page renders bounded bundle, provenance, and artifact access boards", () => {
+test("evidenceops page restores visible proof-management clusters", () => {
   const ui = { evidenceOpsContent: { innerHTML: "" } };
   renderEvidenceOpsPage(ui, {
     settings: {
@@ -260,6 +260,11 @@ test("evidenceops page renders bounded bundle, provenance, and artifact access b
   });
 
   assert.match(ui.evidenceOpsContent.innerHTML, /data-domain-root="evidenceops"/);
+  assert.match(ui.evidenceOpsContent.innerHTML, /EvidenceOps/);
+  assert.match(ui.evidenceOpsContent.innerHTML, /Bundle And Provenance/);
+  assert.match(ui.evidenceOpsContent.innerHTML, /Access And Retention/);
+  assert.match(ui.evidenceOpsContent.innerHTML, /Control Mapping/);
+  assert.match(ui.evidenceOpsContent.innerHTML, /data-workbench-cluster-layout="split"/);
   assert.match(ui.evidenceOpsContent.innerHTML, /EvidenceOps Action Complete/);
   assert.match(ui.evidenceOpsContent.innerHTML, /Evidence bundle review JSON downloaded/);
   assert.match(ui.evidenceOpsContent.innerHTML, /Evidence Package/);
@@ -323,4 +328,5 @@ test("evidenceops empty state renders without loaded proof material", () => {
 
   assert.match(ui.evidenceOpsContent.innerHTML, /EvidenceOps/);
   assert.match(ui.evidenceOpsContent.innerHTML, /Evidence becomes available/);
+  assert.match(ui.evidenceOpsContent.innerHTML, /data-domain-root="evidenceops"/);
 });

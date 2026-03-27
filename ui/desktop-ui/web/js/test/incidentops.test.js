@@ -6,7 +6,7 @@ import {
 } from "../domains/incidentops/routes.js";
 import { createAimxsDecisionBindingSpine } from "../shared/aimxs/decision-binding.js";
 
-test("incidentops page renders bounded queue, active incident, severity, timeline, and closure boards", () => {
+test("incidentops page restores visible triage and closure clusters", () => {
   const ui = { incidentOpsContent: { innerHTML: "" } };
   renderIncidentOpsPage(ui, {
     incidentHistory: {
@@ -116,6 +116,10 @@ test("incidentops page renders bounded queue, active incident, severity, timelin
   });
 
   assert.match(ui.incidentOpsContent.innerHTML, /data-domain-root="incidentops"/);
+  assert.match(ui.incidentOpsContent.innerHTML, /IncidentOps/);
+  assert.match(ui.incidentOpsContent.innerHTML, /Queue And Active Incident/);
+  assert.match(ui.incidentOpsContent.innerHTML, /Timeline And Closure/);
+  assert.match(ui.incidentOpsContent.innerHTML, /data-workbench-cluster-layout="split"/);
   assert.match(ui.incidentOpsContent.innerHTML, /IncidentOps action feedback is visible\./);
   assert.match(ui.incidentOpsContent.innerHTML, /Incident Packages/);
   assert.match(ui.incidentOpsContent.innerHTML, /Current Incident Package/);
@@ -165,4 +169,5 @@ test("incidentops empty state renders without loaded incident posture", () => {
 
   assert.match(ui.incidentOpsContent.innerHTML, /IncidentOps/);
   assert.match(ui.incidentOpsContent.innerHTML, /incident packages appear here after a governed run, review decision, and audit trail are ready/i);
+  assert.match(ui.incidentOpsContent.innerHTML, /data-domain-root="incidentops"/);
 });

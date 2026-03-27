@@ -914,10 +914,11 @@ function renderTopologyBoard(snapshot) {
 }
 
 function renderAimxsRouteBoundaryBoard(snapshot) {
+  const aimxsPremiumVisible = Boolean(snapshot?.aimxsPremiumVisible);
   return `
     <article class="metric networkops-card networkops-card-wide" data-domain-root="networkops" data-networkops-panel="aimxs-route-boundary">
       <div class="metric-title-row">
-        <div class="title">AIMXS Route And Boundary</div>
+        <div class="title">${aimxsPremiumVisible ? "AIMXS Route And Boundary" : "Route And Boundary"}</div>
         <span class="chip chip-neutral chip-compact">primary</span>
       </div>
       ${renderAimxsRouteBoundaryBlock(snapshot.aimxsRouteBoundary)}

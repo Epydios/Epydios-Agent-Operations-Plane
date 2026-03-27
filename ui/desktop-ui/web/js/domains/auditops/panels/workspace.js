@@ -4,6 +4,10 @@ import {
   formatTime,
   renderPanelStateMetric
 } from "../../../views/common.js";
+import {
+  renderWorkbenchDomainCluster,
+  renderWorkbenchDomainShell
+} from "../../../shell/layout/workbench-domain.js";
 import { renderAimxsLegibilityBlock } from "../../../shared/components/aimxs-legibility.js";
 import { renderAimxsDecisionBindingSpine } from "../../../shared/components/aimxs-decision-binding-spine.js";
 import { createAuditWorkspaceSnapshot } from "../state.js";
@@ -557,16 +561,46 @@ function renderInvestigationWorkspace(snapshot) {
 
 export function renderAuditWorkspace(context = {}) {
   const snapshot = createAuditWorkspaceSnapshot(context);
-  return `
-    <div class="stack auditops-workspace" data-domain-root="auditops">
+  return renderWorkbenchDomainShell({
+    domainRoot: "auditops",
+    shellClass: "auditops-workspace",
+    title: "AuditOps",
+    lead:
+      "Use the deeper audit console for event review, actor and decision traceability, and investigation export work once the daily Companion lane is not enough.",
+    layout: "split",
+    prelude: `
       ${renderFeedbackPanel(snapshot)}
       ${renderAimxsDecisionBindingSpineBoard(snapshot)}
-      ${renderAuditEventBoard(snapshot)}
-      ${renderActorActivityBoard(snapshot)}
-      ${renderDecisionTraceBoard(snapshot)}
-      ${renderAdminLifecycleBoard(snapshot)}
-      ${renderExportBoard(snapshot)}
-      ${renderInvestigationWorkspace(snapshot)}
-    </div>
-  `;
+    `,
+    clusters: [
+      renderWorkbenchDomainCluster({
+        title: "Events",
+        lead:
+          "Keep recent audit activity visible as its own ownership area instead of collapsing it into the rest of the investigation workspace.",
+        bodyClass: "stack",
+        body: `${renderAuditEventBoard(snapshot)}`
+      }),
+      renderWorkbenchDomainCluster({
+        title: "Decision And Actor Trace",
+        lead:
+          "Review actor activity, decision paths, and admin lifecycle continuity together so audit depth stays legible when investigation work starts.",
+        bodyClass: "stack",
+        body: `
+          ${renderActorActivityBoard(snapshot)}
+          ${renderDecisionTraceBoard(snapshot)}
+          ${renderAdminLifecycleBoard(snapshot)}
+        `
+      }),
+      renderWorkbenchDomainCluster({
+        title: "Investigation And Export",
+        lead:
+          "Keep export packaging and the full investigation workspace visible as the deeper audit lane rather than flattening them into event review.",
+        bodyClass: "stack",
+        body: `
+          ${renderExportBoard(snapshot)}
+          ${renderInvestigationWorkspace(snapshot)}
+        `
+      })
+    ]
+  });
 }

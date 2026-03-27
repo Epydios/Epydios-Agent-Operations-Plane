@@ -1,4 +1,8 @@
 import { escapeHTML, formatTime, renderPanelStateMetric } from "../../../views/common.js";
+import {
+  renderWorkbenchDomainCluster,
+  renderWorkbenchDomainShell
+} from "../../../shell/layout/workbench-domain.js";
 import { renderAimxsDecisionBindingSpine } from "../../../shared/components/aimxs-decision-binding-spine.js";
 import { createIncidentOpsWorkspaceSnapshot } from "../state.js";
 
@@ -452,15 +456,39 @@ function renderClosureBoard(snapshot) {
 
 export function renderIncidentWorkspace(context = {}) {
   const snapshot = createIncidentOpsWorkspaceSnapshot(context);
-  return `
-    <section class="incidentops-workspace stack" data-domain-root="incidentops">
+  return renderWorkbenchDomainShell({
+    domainRoot: "incidentops",
+    shellClass: "incidentops-workspace",
+    title: "IncidentOps",
+    lead:
+      "Use the deeper incident console for triage, active response context, and closure follow-through once the daily Companion lane is not enough.",
+    layout: "split",
+    prelude: `
       ${renderFeedbackPanel(snapshot)}
       ${renderAimxsDecisionBindingSpineBoard(snapshot)}
-      ${renderIncidentQueueBoard(snapshot)}
-      ${renderActiveIncidentBoard(snapshot)}
-      ${renderSeverityBoard(snapshot)}
-      ${renderResponseTimelineBoard(snapshot)}
-      ${renderClosureBoard(snapshot)}
-    </section>
-  `;
+    `,
+    clusters: [
+      renderWorkbenchDomainCluster({
+        title: "Queue And Active Incident",
+        lead:
+          "Keep incident intake, the currently focused package, and severity posture visible as the active triage plane instead of compressing them into one card strip.",
+        bodyClass: "stack",
+        body: `
+          ${renderIncidentQueueBoard(snapshot)}
+          ${renderActiveIncidentBoard(snapshot)}
+          ${renderSeverityBoard(snapshot)}
+        `
+      }),
+      renderWorkbenchDomainCluster({
+        title: "Timeline And Closure",
+        lead:
+          "Keep response timeline and closure readiness together so follow-through remains visible after the queue and active incident move forward.",
+        bodyClass: "stack",
+        body: `
+          ${renderResponseTimelineBoard(snapshot)}
+          ${renderClosureBoard(snapshot)}
+        `
+      })
+    ]
+  });
 }

@@ -6,6 +6,10 @@ import {
   renderIntegrationSyncStatus,
   renderLocalSecureRefPanel
 } from "../../../views/settings.js";
+import {
+  renderWorkbenchDomainCluster,
+  renderWorkbenchDomainShell
+} from "../../../shell/layout/workbench-domain.js";
 import { createSettingsWorkspaceSnapshot } from "../state.js";
 
 function chipClassForTone(value) {
@@ -572,32 +576,36 @@ function renderSettingsWorkflowRecoveryBoard(snapshot) {
 
 export function renderSettingsWorkspace(context = {}) {
   const snapshot = createSettingsWorkspaceSnapshot(context);
-  return `
-    <div class="workbench-domain-shell settingsops-workspace" data-domain-root="settingsops">
-      <div class="workbench-domain-cluster-grid" data-workbench-cluster-layout="split">
-        <section class="workbench-domain-cluster">
-          <div class="workbench-domain-cluster-header">
-            <h3 class="workbench-domain-cluster-title">Preferences And Local Environment</h3>
-            <p class="workbench-domain-cluster-lead">Keep everyday preferences, secure refs, and the active workspace together so setup stays readable without hiding local ownership.</p>
-          </div>
-          <div class="workbench-domain-cluster-body settingsops-board-grid settingsops-cluster-grid">
-            ${renderAppPreferencesBoard(snapshot)}
-            ${renderSecureRefBoard(snapshot)}
-            ${renderLocalEnvironmentBoard(snapshot)}
-          </div>
-        </section>
-        <section class="workbench-domain-cluster">
-          <div class="workbench-domain-cluster-header">
-            <h3 class="workbench-domain-cluster-title">Supported Setup And Recovery</h3>
-            <p class="workbench-domain-cluster-lead">Edit the supported workspace setup, keep recovery steps visible, and leave deeper diagnostics for the dedicated advanced lane.</p>
-          </div>
-          <div class="workbench-domain-cluster-body settingsops-board-grid settingsops-cluster-grid">
+  return renderWorkbenchDomainShell({
+    domainRoot: "settingsops",
+    shellClass: "settingsops-workspace",
+    title: "SettingsOps",
+    lead:
+      "Keep local preferences, secure refs, supported integrations, and recovery posture visible as one coherent settings surface without collapsing everything into one board.",
+    layout: "split",
+    clusters: [
+      renderWorkbenchDomainCluster({
+        title: "App And Local Environment",
+        lead:
+          "Keep everyday preferences, secure refs, and the active workspace together so local ownership stays legible without burying supported setup.",
+        bodyClass: "settingsops-board-grid settingsops-cluster-grid",
+        body: `
+          ${renderAppPreferencesBoard(snapshot)}
+          ${renderSecureRefBoard(snapshot)}
+          ${renderLocalEnvironmentBoard(snapshot)}
+        `
+      }),
+      renderWorkbenchDomainCluster({
+        title: "Integrations And Recovery",
+        lead:
+          "Edit the supported workspace setup, review the current connector lane, and keep recovery steps visible without turning SettingsOps into a control-plane catchall.",
+        bodyClass: "settingsops-board-grid settingsops-cluster-grid",
+        body: `
           ${renderIntegrationSettingsBoard(snapshot)}
           ${renderConnectorGovernanceBoard(snapshot)}
           ${renderSettingsWorkflowRecoveryBoard(snapshot)}
-        </div>
-      </section>
-      </div>
-    </div>
-  `;
+        `
+      })
+    ]
+  });
 }

@@ -4,6 +4,10 @@ import {
   formatTime,
   renderPanelStateMetric
 } from "../../../views/common.js";
+import {
+  renderWorkbenchDomainCluster,
+  renderWorkbenchDomainShell
+} from "../../../shell/layout/workbench-domain.js";
 import { renderAimxsLegibilityBlock } from "../../../shared/components/aimxs-legibility.js";
 import { renderAimxsDecisionBindingSpine } from "../../../shared/components/aimxs-decision-binding-spine.js";
 import { createEvidenceWorkspaceSnapshot } from "../state.js";
@@ -549,16 +553,46 @@ function renderControlMappingBoard(snapshot) {
 
 export function renderEvidenceWorkspace(context = {}) {
   const snapshot = createEvidenceWorkspaceSnapshot(context);
-  return `
-    <div class="stack evidenceops-workspace" data-domain-root="evidenceops">
+  return renderWorkbenchDomainShell({
+    domainRoot: "evidenceops",
+    shellClass: "evidenceops-workspace",
+    title: "EvidenceOps",
+    lead:
+      "Use the deeper proof console for governed bundles, provenance continuity, artifact access, and control mapping without flattening evidence ownership into one long board.",
+    layout: "split",
+    prelude: `
       ${renderFeedbackPanel(snapshot)}
       ${renderAimxsDecisionBindingSpineBoard(snapshot)}
-      ${renderEvidenceBundleBoard(snapshot)}
-      ${renderProvenanceBoard(snapshot)}
-      ${renderAdminChangeProvenanceBoard(snapshot)}
-      ${renderArtifactAccessBoard(snapshot)}
-      ${renderRetentionBoard(snapshot)}
-      ${renderControlMappingBoard(snapshot)}
-    </div>
-  `;
+    `,
+    clusters: [
+      renderWorkbenchDomainCluster({
+        title: "Bundle And Provenance",
+        lead:
+          "Keep the active evidence package, provenance trace, and admin change provenance together so proof continuity stays visible at a glance.",
+        bodyClass: "stack",
+        body: `
+          ${renderEvidenceBundleBoard(snapshot)}
+          ${renderProvenanceBoard(snapshot)}
+          ${renderAdminChangeProvenanceBoard(snapshot)}
+        `
+      }),
+      renderWorkbenchDomainCluster({
+        title: "Access And Retention",
+        lead:
+          "Show artifact handoff paths and retention posture together as the operational evidence access lane rather than scattering them across proof views.",
+        bodyClass: "stack",
+        body: `
+          ${renderArtifactAccessBoard(snapshot)}
+          ${renderRetentionBoard(snapshot)}
+        `
+      }),
+      renderWorkbenchDomainCluster({
+        title: "Control Mapping",
+        lead:
+          "Keep control coverage and evidence-to-control traceability visible as the deeper proof-management layer, not just another metrics card.",
+        bodyClass: "stack",
+        body: `${renderControlMappingBoard(snapshot)}`
+      })
+    ]
+  });
 }

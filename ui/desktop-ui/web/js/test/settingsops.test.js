@@ -168,8 +168,9 @@ test("settingsops renders bounded preferences, secure refs, environment, support
   });
 
   const html = ui.settingsContent.innerHTML;
-  assert.match(html, /Preferences And Local Environment/);
-  assert.match(html, /Supported Setup And Recovery/);
+  assert.match(html, /SettingsOps/);
+  assert.match(html, /App And Local Environment/);
+  assert.match(html, /Integrations And Recovery/);
   assert.match(html, /App Preferences/);
   assert.match(html, /Secure Refs/);
   assert.match(html, /Local Environment/);
@@ -192,6 +193,7 @@ test("settingsops renders bounded preferences, secure refs, environment, support
   assert.match(html, /Show endpoints and local paths/);
   assert.match(html, /Show advanced provider and credential details/);
   assert.match(html, /data-domain-root="settingsops"/);
+  assert.match(html, /data-workbench-cluster-layout="split"/);
   assert.match(html, /data-settings-local-ref-action="save"/);
   assert.match(html, /Activate AIMXS Mode/);
   assert.doesNotMatch(html, /Open Diagnostics/);
@@ -215,6 +217,7 @@ test("settings empty state uses product-language recovery guidance", () => {
   assert.match(ui.settingsContent.innerHTML, /Settings/);
   assert.match(ui.settingsContent.innerHTML, /Epydios loads the current workspace configuration/i);
   assert.match(ui.settingsContent.innerHTML, /check launcher status and try again/i);
+  assert.match(ui.settingsContent.innerHTML, /data-domain-root="settingsops"/);
   assert.doesNotMatch(ui.settingsContent.innerHTML, /runtime endpoint availability/i);
 });
 

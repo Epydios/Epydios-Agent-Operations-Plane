@@ -1,3 +1,4 @@
+import { isAimxsPremiumVisible } from "../../aimxs/state.js";
 import {
   createAimxsField,
   createAimxsIdentityPostureModel
@@ -513,6 +514,7 @@ export function createGuardrailWorkspaceSnapshot(context = {}) {
     adminQueueItems.find((item) => item.id === selectedAdminChangeId) || adminQueueItems[0] || null;
 
   const snapshot = {
+    aimxsPremiumVisible: isAimxsPremiumVisible(settings),
     guardrailPosture: {
       available: Boolean(latestRun?.runId || latestApproval?.approvalId || terminalMode),
       terminalMode,

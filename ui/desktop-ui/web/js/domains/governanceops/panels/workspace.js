@@ -2,6 +2,10 @@ import { escapeHTML, renderPanelStateMetric } from "../../../views/common.js";
 import { renderAimxsLegibilityBlock } from "../../../shared/components/aimxs-legibility.js";
 import { renderAimxsDecisionBindingSpine } from "../../../shared/components/aimxs-decision-binding-spine.js";
 import {
+  renderWorkbenchDomainCluster,
+  renderWorkbenchDomainShell
+} from "../../../shell/layout/workbench-domain.js";
+import {
   createGovernanceWorkspaceSnapshot,
   governanceStatusChipClass,
   governanceToneChipClass
@@ -973,20 +977,42 @@ function renderOverrideAndExceptionPostureBoard(snapshot) {
 
 export function renderGovernanceWorkspace(context = {}) {
   const snapshot = createGovernanceWorkspaceSnapshot(context);
-  return `
-    <section class="governanceops-workspace" data-domain-root="governanceops">
-      ${renderOperationalFeedback(snapshot)}
-      ${renderAimxsDecisionBindingSpineBoard(snapshot)}
-      ${renderAdminProposalReviewBoard(snapshot)}
-      ${renderActionReviewBoard(snapshot)}
-      <div class="governanceops-primary-grid">
-        ${renderConnectorApprovalsBoard(snapshot)}
-        ${renderApprovalQueueBoard(snapshot)}
-        ${renderAuthorityLadderBoard(snapshot)}
-        ${renderDecisionReceiptBoard(snapshot)}
-        ${renderDelegationAndEscalationBoard(snapshot)}
-        ${renderOverrideAndExceptionPostureBoard(snapshot)}
-      </div>
-    </section>
-  `;
+  return renderWorkbenchDomainShell({
+    domainRoot: "governanceops",
+    shellClass: "governanceops-workspace",
+    title: "GovernanceOps",
+    lead:
+      "Use the deeper governance console for live review, approval structure, and durable decision receipts once the daily Companion lane is not enough.",
+    layout: "split",
+    clusters: [
+      renderWorkbenchDomainCluster({
+        title: "Live Review And Approvals",
+        lead:
+          "Handle the active review loop, queued approvals, connector holds, and routed admin proposals from one governance review plane.",
+        body: `
+          ${renderOperationalFeedback(snapshot)}
+          <div class="governanceops-primary-grid">
+            ${renderAdminProposalReviewBoard(snapshot)}
+            ${renderActionReviewBoard(snapshot)}
+            ${renderConnectorApprovalsBoard(snapshot)}
+            ${renderApprovalQueueBoard(snapshot)}
+          </div>
+        `
+      }),
+      renderWorkbenchDomainCluster({
+        title: "Governance Structure And Receipts",
+        lead:
+          "Keep authority ladders, decision-binding depth, escalation posture, and receipt continuity visible as the deeper governance ownership layer.",
+        body: `
+          ${renderAimxsDecisionBindingSpineBoard(snapshot)}
+          <div class="governanceops-primary-grid">
+            ${renderAuthorityLadderBoard(snapshot)}
+            ${renderDecisionReceiptBoard(snapshot)}
+            ${renderDelegationAndEscalationBoard(snapshot)}
+            ${renderOverrideAndExceptionPostureBoard(snapshot)}
+          </div>
+        `
+      })
+    ]
+  });
 }

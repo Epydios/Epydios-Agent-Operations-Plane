@@ -48,9 +48,12 @@ test("networkops page renders bounded boundary, endpoint, trust, posture, and to
         clientTlsKeyRef: "ref://projects/demo/providers/aimxs/client-tls-key",
         caCertRef: "ref://projects/demo/providers/aimxs/provider-ca",
         activation: {
+          available: true,
           state: "active",
           activeMode: "aimxs-https",
           selectedProviderId: "aimxs-policy-primary",
+          selectedProviderReady: true,
+          selectedProviderProbed: true,
           warnings: ["Provider CA rotation due soon."],
           secrets: {
             bearerTokenSecret: { name: "aimxs-policy-token", present: true },
@@ -136,6 +139,74 @@ test("networkops page renders bounded boundary, endpoint, trust, posture, and to
   assert.match(ui.networkOpsContent.innerHTML, /Later bounded network control remains closed\./);
   assert.match(ui.networkOpsContent.innerHTML, /Current Boundary/);
   assert.match(ui.networkOpsContent.innerHTML, /policy route/);
+});
+
+test("networkops neutralizes AIMXS route boundary labeling in baseline posture", () => {
+  const ui = { networkOpsContent: { innerHTML: "" } };
+  renderNetworkOpsPage(ui, {
+    settings: {
+      environment: "local",
+      runtimeApiBaseUrl: "http://127.0.0.1:8787",
+      registryApiBaseUrl: "http://127.0.0.1:8787/registry",
+      endpoints: [
+        { id: "tasks", label: "Runtime Tasks", path: "/v1/tasks", state: "ok" }
+      ],
+      integrations: {
+        modelRouting: "gateway_first",
+        gatewayProviderId: "litellm",
+        allowDirectProviderFallback: false,
+        providerContracts: [
+          {
+            profileId: "managed-codex",
+            label: "Managed Codex",
+            provider: "openai",
+            transport: "responses_api",
+            endpointRef: "ref://gateways/litellm/openai-compatible",
+            selected: true
+          }
+        ]
+      },
+      aimxs: {
+        mode: "oss-only",
+        activation: {
+          state: "inactive",
+          activeMode: "oss-only",
+          selectedProviderId: "aimxs-policy-primary"
+        }
+      }
+    },
+    health: {
+      providers: { status: "ok", detail: "All providers are ready." }
+    },
+    providers: {
+      items: [
+        { providerId: "aimxs-policy-primary", ready: false, probed: false }
+      ]
+    },
+    runs: {
+      items: [
+        {
+          runId: "run-20260315-004",
+          selectedPolicyProvider: "oss-policy-opa",
+          updatedAt: "2026-03-15T06:25:00Z"
+        }
+      ]
+    },
+    runtimeWorkerCapabilities: {
+      items: [
+        {
+          provider: "openai",
+          transport: "wss",
+          boundaryRequirements: ["tenant_project_scope"]
+        }
+      ]
+    }
+  });
+
+  assert.match(ui.networkOpsContent.innerHTML, /Route And Boundary/);
+  assert.doesNotMatch(ui.networkOpsContent.innerHTML, /AIMXS Route And Boundary/);
+  assert.match(ui.networkOpsContent.innerHTML, /primary provider-route view/);
+  assert.doesNotMatch(ui.networkOpsContent.innerHTML, /primary AIMXS view/);
 });
 
 test("networkops empty state renders without loaded network posture", () => {
