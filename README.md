@@ -118,7 +118,7 @@ Interposition is ready for:
 - Visual Studio Code
 - CODEX
 
-Coming Soon: 
+In the works: 
 
 - CLI
 - Model Context Protocol (MCP)
@@ -127,6 +127,7 @@ Coming Soon:
 - Cloud Control Plane
 - Kubernetes Admission
 - LangGraph/Vercel/Orchestration Middleware
+- Desktop Local, Desktop Connected, Desktop Cluster-Admin
 
 ## Future Directions
 
