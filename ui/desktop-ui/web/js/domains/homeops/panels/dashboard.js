@@ -1,5 +1,55 @@
 import { chipClassForStatus, escapeHTML, formatTime } from "../../../views/common.js";
 
+function renderActionAttributes(options = {}) {
+  return [
+    options.view ? `data-homeops-view="${escapeHTML(options.view)}"` : "",
+    options.runId ? `data-homeops-run-id="${escapeHTML(options.runId)}"` : "",
+    options.approvalId ? `data-homeops-approval-id="${escapeHTML(options.approvalId)}"` : "",
+    options.incidentId ? `data-homeops-incident-id="${escapeHTML(options.incidentId)}"` : "",
+    options.checkpointId ? `data-homeops-checkpoint-id="${escapeHTML(options.checkpointId)}"` : "",
+    options.gatewayRequestId ? `data-homeops-gateway-request-id="${escapeHTML(options.gatewayRequestId)}"` : "",
+    options.sourceClient ? `data-homeops-source-client="${escapeHTML(options.sourceClient)}"` : ""
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function renderActionButton(action, label, options = {}) {
+  const attrs = renderActionAttributes(options);
+  return `
+    <button
+      class="btn btn-secondary btn-small"
+      type="button"
+      data-homeops-action="${escapeHTML(action || "open-workbench")}"
+      ${attrs}
+    >${escapeHTML(label || "Open")}</button>
+  `;
+}
+
+function shouldRenderDistinctProofAction(item = {}, proof = {}) {
+  const itemAction = String(item.action || "").trim();
+  const proofAction = String(proof.action || "").trim();
+  if (!proofAction) {
+    return false;
+  }
+  if (itemAction !== proofAction) {
+    return true;
+  }
+  return (
+    String(item.runId || "").trim() !== String(proof.runId || "").trim() ||
+    String(item.approvalId || "").trim() !== String(proof.approvalId || "").trim() ||
+    String(item.incidentId || "").trim() !== String(proof.incidentId || "").trim()
+  );
+}
+
+function renderProofBadge(proof = {}) {
+  return `
+    <span class="${chipClassForStatus(proof.tone || "warn")} chip-compact">${escapeHTML(
+      proof.label || "Proof pending"
+    )}</span>
+  `;
+}
+
 function renderStatusCard(card = {}) {
   return `
     <article class="metric homeops-status-card" data-homeops-card="${escapeHTML(card.id || "companion-status")}">
@@ -16,33 +66,107 @@ function renderStatusCard(card = {}) {
   `;
 }
 
-function renderAttentionItem(item = {}) {
+function renderQueueItem(item = {}, index = 0) {
+  const proof = item?.proof && typeof item.proof === "object" ? item.proof : {};
+  const defaultOpen = index === 0 ? " open" : "";
+  const detailAction = renderActionButton(item.action, item.actionLabel || "Open Workbench Depth", item);
+  const proofAction = shouldRenderDistinctProofAction(item, proof)
+    ? renderActionButton(proof.action, proof.actionLabel || "Open Evidence Depth", proof)
+    : "";
   return `
-    <article class="metric homeops-attention-card">
-      <div class="title">${escapeHTML(item.title || "Attention")}</div>
-      <div class="meta">
-        <span class="${chipClassForStatus(item.tone || "unknown")} chip-compact">${escapeHTML(
-          String(item.tone || "unknown")
-        )}</span>
+    <details
+      class="metric homeops-queue-item"
+      data-homeops-queue-item
+      data-homeops-queue-kind="${escapeHTML(item.queueKind || "attention")}"
+      ${item.selectionId ? "data-homeops-live-approval-card" : ""}
+      ${defaultOpen}
+    >
+      <summary class="homeops-queue-summary">
+        <div class="homeops-queue-summary-main">
+          <div class="homeops-recent-action-header">
+            <div class="title">${escapeHTML(item.title || "Needs attention")}</div>
+            <div class="meta">
+              <span class="${chipClassForStatus(item.tone || "warn")} chip-compact">${escapeHTML(
+                String(item.tone || "warn")
+              )}</span>
+              <span class="chip chip-neutral chip-compact">${escapeHTML(item.kindLabel || "Attention")}</span>
+              ${renderProofBadge(proof)}
+            </div>
+          </div>
+          <div class="meta">${escapeHTML(item.summary || "-")}</div>
+          <div class="homeops-queue-meta-grid">
+            <div class="meta">${escapeHTML(item.primaryMeta || "-")}</div>
+            <div class="meta">${escapeHTML(item.secondaryMeta || "-")}</div>
+            <div class="meta">time=${escapeHTML(formatTime(item.occurredAt || "-"))}</div>
+          </div>
+        </div>
+      </summary>
+      <div class="homeops-queue-detail">
+        <div class="homeops-queue-detail-grid">
+          <article class="metric homeops-queue-detail-card">
+            <div class="title">${escapeHTML(item.selectionId ? "Decision Context" : "Current Context")}</div>
+            <div class="meta">${escapeHTML(item.summary || "-")}</div>
+            <div class="meta">${escapeHTML(item.primaryMeta || "-")}</div>
+            <div class="meta">${escapeHTML(item.secondaryMeta || "-")}</div>
+          </article>
+          <article class="metric homeops-queue-detail-card">
+            <div class="title">Attached Proof</div>
+            <div class="meta">
+              ${renderProofBadge(proof)}
+              <span class="chip chip-neutral chip-compact">${escapeHTML(item.kindLabel || "Attention")}</span>
+            </div>
+            <div class="meta">${escapeHTML(proof.summary || "Open the owner surface for deeper proof context.")}</div>
+            <div class="meta">run=${escapeHTML(proof.runId || item.runId || "-")}; approval=${escapeHTML(proof.approvalId || item.approvalId || "-")}</div>
+          </article>
+        </div>
+        ${
+          item.selectionId
+            ? `
+              <div class="field">
+                <span class="label">Decision Reason (Optional)</span>
+                <input
+                  class="filter-input"
+                  type="text"
+                  placeholder="optional; add operator context or leave blank to use the default review note"
+                  data-homeops-native-decision-reason
+                />
+              </div>
+            `
+            : ""
+        }
+        <div class="homeops-actions">
+          ${
+            item.selectionId
+              ? `
+                <button
+                  class="btn btn-ok btn-small"
+                  type="button"
+                  data-homeops-native-decision-action="APPROVE"
+                  data-homeops-native-selection-id="${escapeHTML(item.selectionId || "")}"
+                >Approve</button>
+                <button
+                  class="btn btn-danger btn-small"
+                  type="button"
+                  data-homeops-native-decision-action="DENY"
+                  data-homeops-native-selection-id="${escapeHTML(item.selectionId || "")}"
+                >Deny</button>
+              `
+              : ""
+          }
+          ${detailAction}
+          ${proofAction}
+        </div>
       </div>
-      <div class="homeops-attention-value">${escapeHTML(item.value || "0")}</div>
-      <div class="meta">${escapeHTML(item.detail || "-")}</div>
-      <div class="homeops-actions">
-        <button
-          class="btn btn-secondary btn-small"
-          type="button"
-          data-homeops-action="${escapeHTML(item.action || "open-workbench")}"
-          ${item.view ? `data-homeops-view="${escapeHTML(item.view)}"` : ""}
-          ${item.runId ? `data-homeops-run-id="${escapeHTML(item.runId)}"` : ""}
-          ${item.approvalId ? `data-homeops-approval-id="${escapeHTML(item.approvalId)}"` : ""}
-          ${item.incidentId ? `data-homeops-incident-id="${escapeHTML(item.incidentId)}"` : ""}
-        >${escapeHTML(item.actionLabel || "Open Workbench Depth")}</button>
-      </div>
-    </article>
+    </details>
   `;
 }
 
 function renderRecentActionRow(item = {}) {
+  const proof = item?.proof && typeof item.proof === "object" ? item.proof : {};
+  const detailAction = renderActionButton(item.action, item.actionLabel || "Open", item);
+  const proofAction = shouldRenderDistinctProofAction(item, proof)
+    ? renderActionButton(proof.action, proof.actionLabel || "Open Evidence Depth", proof)
+    : "";
   return `
     <article class="metric homeops-recent-action-card" data-homeops-run="${escapeHTML(item.runId || item.id || "")}">
       <div class="homeops-recent-action-header">
@@ -52,6 +176,7 @@ function renderRecentActionRow(item = {}) {
             item.state || "-"
           )}</span>
           <span class="chip chip-neutral chip-compact">policy=${escapeHTML(item.policyDecision || "-")}</span>
+          ${renderProofBadge(proof)}
         </div>
       </div>
       <div class="homeops-recent-action-grid">
@@ -60,14 +185,10 @@ function renderRecentActionRow(item = {}) {
         <div class="meta">Run: ${escapeHTML(item.runId || "-")}</div>
         <div class="meta">Time: ${escapeHTML(formatTime(item.occurredAt || "-"))}</div>
       </div>
+      <div class="meta">Attached proof: ${escapeHTML(proof.summary || "Open the owner surface for deeper proof context.")}</div>
       <div class="homeops-actions">
-        <button
-          class="btn btn-secondary btn-small"
-          type="button"
-          data-homeops-action="${escapeHTML(item.action || "open-run-item")}"
-          ${item.runId ? `data-homeops-run-id="${escapeHTML(item.runId)}"` : ""}
-          ${item.approvalId ? `data-homeops-approval-id="${escapeHTML(item.approvalId)}"` : ""}
-        >${escapeHTML(item.actionLabel || "Open")}</button>
+        ${detailAction}
+        ${proofAction}
       </div>
     </article>
   `;
@@ -91,13 +212,7 @@ function renderAuditEventRow(item = {}) {
         <div class="meta">time=${escapeHTML(formatTime(item.occurredAt || "-"))}</div>
       </div>
       <div class="homeops-actions">
-        <button
-          class="btn btn-secondary btn-small"
-          type="button"
-          data-homeops-action="${escapeHTML(item.action || "open-audit-depth")}"
-          ${item.runId ? `data-homeops-run-id="${escapeHTML(item.runId)}"` : ""}
-          ${item.approvalId ? `data-homeops-approval-id="${escapeHTML(item.approvalId)}"` : ""}
-        >${escapeHTML(item.actionLabel || "Open AuditOps Depth")}</button>
+        ${renderActionButton(item.action, item.actionLabel || "Open AuditOps Depth", item)}
       </div>
     </article>
   `;
@@ -121,13 +236,7 @@ function renderIncidentEscalationRow(item = {}) {
         <div class="meta">time=${escapeHTML(formatTime(item.occurredAt || "-"))}</div>
       </div>
       <div class="homeops-actions">
-        <button
-          class="btn btn-secondary btn-small"
-          type="button"
-          data-homeops-action="${escapeHTML(item.action || "show-diagnostics")}"
-          ${item.runId ? `data-homeops-run-id="${escapeHTML(item.runId)}"` : ""}
-          ${item.incidentId ? `data-homeops-incident-id="${escapeHTML(item.incidentId)}"` : ""}
-        >${escapeHTML(item.actionLabel || "Open Incident Depth")}</button>
+        ${renderActionButton(item.action, item.actionLabel || "Open Incident Depth", item)}
       </div>
     </article>
   `;
@@ -160,11 +269,7 @@ function renderRuntimeDiagnosticsCard(item = {}) {
       <div class="meta">${escapeHTML(item.summary || "-")}</div>
       <div class="meta">${escapeHTML(item.meta || "-")}</div>
       <div class="homeops-actions">
-        <button
-          class="btn btn-secondary btn-small"
-          type="button"
-          data-homeops-action="${escapeHTML(item.action || "show-diagnostics")}"
-        >${escapeHTML(item.actionLabel || "Show Diagnostics")}</button>
+        ${renderActionButton(item.action, item.actionLabel || "Show Diagnostics", item)}
       </div>
     </article>
   `;
@@ -186,62 +291,6 @@ function renderConnectedClientCard(item = {}) {
   `;
 }
 
-function renderLiveApprovalCard(item = {}) {
-  return `
-    <article
-      class="metric homeops-live-approval-card"
-      data-homeops-live-approval-card
-      data-homeops-selection-id="${escapeHTML(item.selectionId || "")}"
-    >
-      <div class="homeops-recent-action-header">
-        <div class="title">${escapeHTML(item.title || "Pending review")}</div>
-        <div class="meta">
-          <span class="${chipClassForStatus(item.tone || "warn")} chip-compact">${escapeHTML(
-            String(item.tone || "warn")
-          )}</span>
-          <span class="chip chip-neutral chip-compact">${escapeHTML(item.kindLabel || "Review")}</span>
-        </div>
-      </div>
-      <div class="meta">${escapeHTML(item.summary || "-")}</div>
-      <div class="homeops-recent-action-grid">
-        <div class="meta">${escapeHTML(item.primaryMeta || "-")}</div>
-        <div class="meta">${escapeHTML(item.secondaryMeta || "-")}</div>
-        <div class="meta">created=${escapeHTML(item.createdAt || "-")}</div>
-        <div class="meta">expires=${escapeHTML(item.expiresAt || "-")}</div>
-      </div>
-      <div class="field">
-        <span class="label">Decision Reason (Optional)</span>
-        <input
-          class="filter-input"
-          type="text"
-          placeholder="optional; add operator context or leave blank to use the default review note"
-          data-homeops-native-decision-reason
-        />
-      </div>
-      <div class="homeops-actions">
-        <button
-          class="btn btn-ok btn-small"
-          type="button"
-          data-homeops-native-decision-action="APPROVE"
-          data-homeops-native-selection-id="${escapeHTML(item.selectionId || "")}"
-        >Approve</button>
-        <button
-          class="btn btn-danger btn-small"
-          type="button"
-          data-homeops-native-decision-action="DENY"
-          data-homeops-native-selection-id="${escapeHTML(item.selectionId || "")}"
-        >Deny</button>
-        <button
-          class="btn btn-secondary btn-small"
-          type="button"
-          data-homeops-action="${escapeHTML(item.detailAction || "open-approval-queue")}"
-          ${item.runId ? `data-homeops-run-id="${escapeHTML(item.runId)}"` : ""}
-        >${escapeHTML(item.detailActionLabel || "Open Workbench Review")}</button>
-      </div>
-    </article>
-  `;
-}
-
 function renderEmptyMessage(message) {
   return `<div class="homeops-empty">${escapeHTML(message)}</div>`;
 }
@@ -249,8 +298,9 @@ function renderEmptyMessage(message) {
 export function renderHomeWorkspace(snapshot = {}) {
   const systemCards = Array.isArray(snapshot?.systemStatus?.cards) ? snapshot.systemStatus.cards : [];
   const systemActions = Array.isArray(snapshot?.systemStatus?.actions) ? snapshot.systemStatus.actions : [];
-  const attentionItems = Array.isArray(snapshot?.attentionQueue?.items) ? snapshot.attentionQueue.items : [];
-  const liveApprovals = Array.isArray(snapshot?.liveApprovals?.items) ? snapshot.liveApprovals.items : [];
+  const governedRequestQueue = Array.isArray(snapshot?.governedRequestQueue?.items)
+    ? snapshot.governedRequestQueue.items
+    : [];
   const recentActions = Array.isArray(snapshot?.recentGovernedActions?.items)
     ? snapshot.recentGovernedActions.items
     : [];
@@ -274,7 +324,7 @@ export function renderHomeWorkspace(snapshot = {}) {
       <section class="homeops-board">
         <div class="homeops-board-header">
           <h3>Operator Status</h3>
-          <p class="homeops-board-lead">Companion is the default daily governance lane. Workbench stays available for deeper investigation, admin depth, and historical review.</p>
+          <p class="homeops-board-lead">Companion stays the daily governed-work lane. Workbench stays available for deeper investigation, evidence depth, and admin review.</p>
         </div>
         ${
           feedback?.message
@@ -288,28 +338,23 @@ export function renderHomeWorkspace(snapshot = {}) {
           ${systemActions.map((action) => renderQuickAction(action)).join("")}
         </div>
       </section>
-      <section class="homeops-board">
+      <section class="homeops-board homeops-priority-board" data-homeops-section="needs-attention">
         <div class="homeops-board-header">
-          <h3>Attention Queue</h3>
-          <p class="homeops-board-lead">Only the items that need operator attention now in the live Companion lane.</p>
+          <h3>Needs Attention Now</h3>
+          <p class="homeops-board-lead">This is the primary governed-request queue. Review the active item here, decide it here when possible, and open Workbench only for deeper evidence, audit, runtime, or incident depth.</p>
         </div>
-        <div class="homeops-attention-grid">
-          ${attentionItems.length ? attentionItems.map((item) => renderAttentionItem(item)).join("") : renderEmptyMessage("No immediate approvals, degraded services, failed runs, or incident escalations are waiting for action.")}
-        </div>
-      </section>
-      <section class="homeops-board" data-homeops-section="live-approvals">
-        <div class="homeops-board-header">
-          <h3>Live Approvals</h3>
-          <p class="homeops-board-lead">Resolve the normal live approval loop here without leaving Companion. Use Workbench only when you need deeper history or investigation.</p>
-        </div>
-        <div class="homeops-recent-action-list">
-          ${liveApprovals.length ? liveApprovals.map((item) => renderLiveApprovalCard(item)).join("") : renderEmptyMessage("No current-thread approvals or held gateway requests are waiting for direct Companion review.")}
+        <div class="homeops-queue-list">
+          ${
+            governedRequestQueue.length
+              ? governedRequestQueue.map((item, index) => renderQueueItem(item, index)).join("")
+              : renderEmptyMessage("No governed requests, escalations, or blocked items currently need operator action.")
+          }
         </div>
       </section>
       <section class="homeops-board">
         <div class="homeops-board-header">
           <h3>Recent Governed Actions</h3>
-          <p class="homeops-board-lead">Recent governed traffic and live handoff targets. Stay here for the daily lane; open Workbench only when you need deeper run, evidence, or incident review.</p>
+          <p class="homeops-board-lead">Recent governed traffic stays visible in Companion with attached proof summaries. Open depth only when you need fuller runtime, evidence, or governance inspection.</p>
         </div>
         <div class="homeops-recent-action-list">
           ${recentActions.length ? recentActions.map((item) => renderRecentActionRow(item)).join("") : renderEmptyMessage("No recent governed actions are available yet. Submit work through the local gateway to populate this surface.")}
@@ -317,17 +362,8 @@ export function renderHomeWorkspace(snapshot = {}) {
       </section>
       <section class="homeops-board">
         <div class="homeops-board-header">
-          <h3>Audit And Event Stream</h3>
-          <p class="homeops-board-lead">Recent live events stay visible in Companion. Use AuditOps depth only for export, long-range history, and deeper investigative review.</p>
-        </div>
-        <div class="homeops-recent-action-list">
-          ${liveAuditEvents.length ? liveAuditEvents.map((item) => renderAuditEventRow(item)).join("") : renderEmptyMessage("No recent live audit events are available yet. The next governed decision, approval event, or launcher transition will appear here.")}
-        </div>
-      </section>
-      <section class="homeops-board">
-        <div class="homeops-board-header">
-          <h3>Current Incidents And Escalations</h3>
-          <p class="homeops-board-lead">Current escalations stay visible in Companion so the live lane does not lose incident posture. Use IncidentOps depth only for packaging and deeper response work.</p>
+          <h3>Live Exceptions And Incidents</h3>
+          <p class="homeops-board-lead">Active failures stay visible in Companion, but deeper incident packaging and long-form response remain in IncidentOps.</p>
         </div>
         <div class="homeops-recent-action-list">
           ${incidentEscalations.length ? incidentEscalations.map((item) => renderIncidentEscalationRow(item)).join("") : renderEmptyMessage("No active incidents or escalation candidates are shaping the live governance lane right now.")}
@@ -335,7 +371,16 @@ export function renderHomeWorkspace(snapshot = {}) {
       </section>
       <section class="homeops-board">
         <div class="homeops-board-header">
-          <h3>Runtime And Diagnostics</h3>
+          <h3>Recent Audit And Event Stream</h3>
+          <p class="homeops-board-lead">Recent live events stay visible in Companion. Use AuditOps depth for export, long-range history, and deeper investigative review.</p>
+        </div>
+        <div class="homeops-recent-action-list">
+          ${liveAuditEvents.length ? liveAuditEvents.map((item) => renderAuditEventRow(item)).join("") : renderEmptyMessage("No recent live audit events are available yet. The next governed decision, approval event, or launcher transition will appear here.")}
+        </div>
+      </section>
+      <section class="homeops-board">
+        <div class="homeops-board-header">
+          <h3>Health And Diagnostics</h3>
           <p class="homeops-board-lead">Practical runtime and launcher truth stays in Companion. Use diagnostics depth only when the daily lane is not enough.</p>
         </div>
         <div class="homeops-command-grid">
@@ -344,8 +389,8 @@ export function renderHomeWorkspace(snapshot = {}) {
       </section>
       <section class="homeops-board">
         <div class="homeops-board-header">
-          <h3>Quick Actions</h3>
-          <p class="homeops-board-lead">Fast pivots for the daily governance lane. Workbench remains the deep console, not the default path.</p>
+          <h3>Operator Pivots</h3>
+          <p class="homeops-board-lead">Fast pivots for the live lane. These stay secondary to the active governed-request queue.</p>
         </div>
         <div class="homeops-pivot-grid">
           ${quickActions.map((action) => renderQuickAction(action)).join("")}
@@ -354,7 +399,7 @@ export function renderHomeWorkspace(snapshot = {}) {
       <section class="homeops-board">
         <div class="homeops-board-header">
           <h3>Connected Client Context</h3>
-          <p class="homeops-board-lead">Signed-in context, active scope, and recent request activity.</p>
+          <p class="homeops-board-lead">Signed-in context, active scope, and current traffic posture.</p>
         </div>
         <div class="homeops-summary-grid">
           ${connectedClientCards.map((item) => renderConnectedClientCard(item)).join("")}

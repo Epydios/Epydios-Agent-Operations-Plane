@@ -3,6 +3,7 @@ import { renderAimxsIdentityPostureBlock } from "../../../shared/components/aimx
 import { renderAimxsRouteBoundaryBlock } from "../../../shared/components/aimxs-route-boundary.js";
 import {
   renderWorkbenchDomainCluster,
+  renderWorkbenchArrivalContext,
   renderWorkbenchDomainShell
 } from "../../../shell/layout/workbench-domain.js";
 import { createRuntimeWorkspaceSnapshot } from "../state.js";
@@ -167,7 +168,7 @@ function renderRuntimeActionsBoard(snapshot) {
   return `
     <article class="metric runtimeops-card runtimeops-action-board" data-domain-root="runtimeops" data-runtimeops-panel="workspace-actions">
       <div class="metric-title-row">
-        <div class="title">Runtime Actions</div>
+        <div class="title">Run And Session Follow-Through</div>
         <span class="chip chip-ok chip-compact">operational</span>
       </div>
       <div class="runtimeops-chip-row">
@@ -445,7 +446,7 @@ function renderQueueBoard(snapshot) {
   return `
     <article class="metric runtimeops-card" data-domain-root="runtimeops" data-runtimeops-panel="workspace-queue">
       <div class="metric-title-row">
-        <div class="title">Queue And Throughput</div>
+        <div class="title">Run Backlog Signals</div>
         <span class="${chipClassForTone(queue.queueTone)}">${escapeHTML(queue.queueTone)}</span>
       </div>
       <div class="runtimeops-chip-row">
@@ -587,7 +588,7 @@ function renderLiveSessionsBoard(snapshot) {
   return `
     <article class="metric runtimeops-card" data-domain-root="runtimeops" data-runtimeops-panel="workspace-sessions">
       <div class="metric-title-row">
-        <div class="title">Live Sessions</div>
+        <div class="title">Session Activity</div>
         <span class="${chipClassForTone(sessions.awaitingApprovalCount > 0 ? "warn" : sessions.activeCount > 0 ? "ok" : "neutral")}">
           ${escapeHTML(sessions.awaitingApprovalCount > 0 ? "watch" : sessions.activeCount > 0 ? "active" : "quiet")}
         </span>
@@ -777,13 +778,17 @@ export function renderRuntimeWorkspace(context = {}, session = {}, options = {})
     shellClass: "runtimeops-workspace",
     title: "RuntimeOps",
     lead:
-      "Operate the current runtime, inspect fleet posture, and keep routing and governed run inventory legible without leaving the runtime console.",
+      "Use the deeper runtime console to inspect governed runs, follow session continuity, and confirm runtime posture once Companion needs more than the daily lane.",
     layout: "split",
+    prelude: renderWorkbenchArrivalContext({
+      domainRoot: "runtimeops",
+      handoffContext: context.companionHandoffContext
+    }),
     clusters: [
       renderWorkbenchDomainCluster({
-        title: "Operate",
+        title: "Current Run And Session",
         lead:
-          "Act on the current governed run, review the selected session, and confirm runtime health before changing fleet posture.",
+          "Inspect the selected governed run, review the current session, and confirm runtime posture before taking bounded runtime actions.",
         span: "full",
         bodyClass: "runtimeops-primary-grid runtimeops-cluster-grid",
         body: `
@@ -794,9 +799,9 @@ export function renderRuntimeWorkspace(context = {}, session = {}, options = {})
         `
       }),
       renderWorkbenchDomainCluster({
-        title: "Fleet",
+        title: "Investigation And Follow-Through",
         lead:
-          "Track queue pressure, capacity, live sessions, and worker availability without leaving the runtime surface.",
+          "Inspect backlog signals, capacity, session activity, and worker availability without turning RuntimeOps into a second daily queue.",
         bodyClass: "runtimeops-primary-grid runtimeops-cluster-grid",
         body: `
           ${renderQueueBoard(snapshot)}

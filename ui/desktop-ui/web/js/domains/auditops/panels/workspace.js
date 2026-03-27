@@ -6,6 +6,7 @@ import {
 } from "../../../views/common.js";
 import {
   renderWorkbenchDomainCluster,
+  renderWorkbenchArrivalContext,
   renderWorkbenchDomainShell
 } from "../../../shell/layout/workbench-domain.js";
 import { renderAimxsLegibilityBlock } from "../../../shared/components/aimxs-legibility.js";
@@ -569,6 +570,10 @@ export function renderAuditWorkspace(context = {}) {
       "Use the deeper audit console for event review, actor and decision traceability, and investigation export work once the daily Companion lane is not enough.",
     layout: "split",
     prelude: `
+      ${renderWorkbenchArrivalContext({
+        domainRoot: "auditops",
+        handoffContext: context.companionHandoffContext
+      })}
       ${renderFeedbackPanel(snapshot)}
       ${renderAimxsDecisionBindingSpineBoard(snapshot)}
     `,

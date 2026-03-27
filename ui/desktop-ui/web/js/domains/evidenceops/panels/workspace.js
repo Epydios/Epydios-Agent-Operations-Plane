@@ -6,6 +6,7 @@ import {
 } from "../../../views/common.js";
 import {
   renderWorkbenchDomainCluster,
+  renderWorkbenchArrivalContext,
   renderWorkbenchDomainShell
 } from "../../../shell/layout/workbench-domain.js";
 import { renderAimxsLegibilityBlock } from "../../../shared/components/aimxs-legibility.js";
@@ -561,6 +562,10 @@ export function renderEvidenceWorkspace(context = {}) {
       "Use the deeper proof console for governed bundles, provenance continuity, artifact access, and control mapping without flattening evidence ownership into one long board.",
     layout: "split",
     prelude: `
+      ${renderWorkbenchArrivalContext({
+        domainRoot: "evidenceops",
+        handoffContext: context.companionHandoffContext
+      })}
       ${renderFeedbackPanel(snapshot)}
       ${renderAimxsDecisionBindingSpineBoard(snapshot)}
     `,

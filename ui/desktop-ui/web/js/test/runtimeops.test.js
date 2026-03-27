@@ -276,17 +276,17 @@ test("runtimeops page renders the first inspect-only runtime boards", () => {
 
   assert.match(ui.runtimeOpsContent.innerHTML, /data-domain-root="runtimeops"/);
   assert.match(ui.runtimeOpsContent.innerHTML, /RuntimeOps/);
-  assert.match(ui.runtimeOpsContent.innerHTML, /Operate/);
-  assert.match(ui.runtimeOpsContent.innerHTML, /Fleet/);
+  assert.match(ui.runtimeOpsContent.innerHTML, /Current Run And Session/);
+  assert.match(ui.runtimeOpsContent.innerHTML, /Investigation And Follow-Through/);
   assert.match(ui.runtimeOpsContent.innerHTML, /Routing And Inventory/);
-  assert.match(ui.runtimeOpsContent.innerHTML, /Operate the current runtime, inspect fleet posture, and keep routing and governed run inventory legible/);
-  assert.match(ui.runtimeOpsContent.innerHTML, /Runtime Actions/);
+  assert.match(ui.runtimeOpsContent.innerHTML, /Use the deeper runtime console to inspect governed runs, follow session continuity, and confirm runtime posture/);
+  assert.match(ui.runtimeOpsContent.innerHTML, /Run And Session Follow-Through/);
   assert.match(ui.runtimeOpsContent.innerHTML, /Selected Session Review/);
   assert.match(ui.runtimeOpsContent.innerHTML, /Worker Posture/);
   assert.match(ui.runtimeOpsContent.innerHTML, /Runtime Health/);
-  assert.match(ui.runtimeOpsContent.innerHTML, /Queue And Throughput/);
+  assert.match(ui.runtimeOpsContent.innerHTML, /Run Backlog Signals/);
   assert.match(ui.runtimeOpsContent.innerHTML, /Latency And Capacity/);
-  assert.match(ui.runtimeOpsContent.innerHTML, /Live Sessions/);
+  assert.match(ui.runtimeOpsContent.innerHTML, /Session Activity/);
   assert.match(ui.runtimeOpsContent.innerHTML, /Worker Fleet/);
   assert.match(ui.runtimeOpsContent.innerHTML, /Provider Routing/);
   assert.match(ui.runtimeOpsContent.innerHTML, /Route And Boundary Echo/);
@@ -341,8 +341,49 @@ test("runtimeops page renders the first inspect-only runtime boards", () => {
   assert.match(ui.runtimeOpsContent.innerHTML, /data-runtimeops-review-session-id="session-20260314-003"/);
   assert.match(ui.runtimeOpsContent.innerHTML, /data-runtimeops-close-session-id="session-20260314-003"/);
   assert.match(ui.runtimeOpsContent.innerHTML, /data-runtimeops-worker-event-type="heartbeat"/);
-  assert.ok(ui.runtimeOpsContent.innerHTML.indexOf("Operate") < ui.runtimeOpsContent.innerHTML.indexOf("Fleet"));
-  assert.ok(ui.runtimeOpsContent.innerHTML.indexOf("Fleet") < ui.runtimeOpsContent.innerHTML.indexOf("Routing And Inventory"));
+  assert.match(ui.runtimeOpsContent.innerHTML, /Companion needs more than the daily lane/);
+  assert.match(ui.runtimeOpsContent.innerHTML, /without turning RuntimeOps into a second daily queue/);
+  assert.ok(
+    ui.runtimeOpsContent.innerHTML.indexOf("Current Run And Session") <
+      ui.runtimeOpsContent.innerHTML.indexOf("Investigation And Follow-Through")
+  );
+  assert.ok(
+    ui.runtimeOpsContent.innerHTML.indexOf("Investigation And Follow-Through") <
+      ui.runtimeOpsContent.innerHTML.indexOf("Routing And Inventory")
+  );
+});
+
+test("runtimeops page preserves companion handoff context in the receiving prelude", () => {
+  const ui = { runtimeOpsContent: { innerHTML: "" } };
+  renderRuntimeOpsPage(
+    ui,
+    {
+      companionHandoffContext: {
+        view: "runtimeops",
+        arrivalRationale:
+          "Companion opened runtime depth because the governed run needs deeper runtime investigation and proof follow-through.",
+        proof: {
+          tone: "warn",
+          label: "Proof attached",
+          summary: "bundle=pending; record=queued; audit=1"
+        },
+        receipt: {
+          tone: "warn",
+          label: "Approval receipt pending",
+          summary: "Approval approval-20260327-002 is still pending review."
+        },
+        runId: "run-20260327-002",
+        approvalId: "approval-20260327-002"
+      }
+    },
+    {},
+    {}
+  );
+
+  assert.match(ui.runtimeOpsContent.innerHTML, /Companion handoff context/);
+  assert.match(ui.runtimeOpsContent.innerHTML, /Proof attached/);
+  assert.match(ui.runtimeOpsContent.innerHTML, /Approval receipt pending/);
+  assert.match(ui.runtimeOpsContent.innerHTML, /run=run-20260327-002/);
 });
 
 test("runtimeops empty state renders without loaded runtime context", () => {

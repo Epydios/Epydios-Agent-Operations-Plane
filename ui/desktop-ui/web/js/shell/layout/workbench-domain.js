@@ -1,4 +1,4 @@
-import { escapeHTML } from "../../views/common.js";
+import { chipClassForStatus, escapeHTML } from "../../views/common.js";
 
 function normalizeClassName(value = "") {
   return String(value || "")
@@ -12,6 +12,106 @@ function joinClasses(...values) {
   return values
     .flatMap((value) => normalizeClassName(value).split(/\s+/).filter(Boolean))
     .join(" ");
+}
+
+function renderArrivalChip(label = "", tone = "neutral") {
+  const normalizedLabel = String(label || "").trim();
+  if (!normalizedLabel) {
+    return "";
+  }
+  return `<span class="${chipClassForStatus(tone)} chip-compact">${escapeHTML(normalizedLabel)}</span>`;
+}
+
+function renderArrivalNeutralChip(label = "", value = "") {
+  const normalizedLabel = String(label || "").trim();
+  const normalizedValue = String(value || "").trim();
+  if (!normalizedValue) {
+    return "";
+  }
+  return `<span class="chip chip-neutral chip-compact">${escapeHTML(
+    normalizedLabel ? `${normalizedLabel}=${normalizedValue}` : normalizedValue
+  )}</span>`;
+}
+
+export function renderWorkbenchArrivalContext({ domainRoot = "", handoffContext = null } = {}) {
+  const handoff =
+    handoffContext && typeof handoffContext === "object"
+      ? handoffContext
+      : null;
+  const normalizedDomainRoot = String(domainRoot || "").trim().toLowerCase();
+  if (!handoff || !normalizedDomainRoot) {
+    return "";
+  }
+  const targetView = String(handoff.view || "").trim().toLowerCase();
+  if (targetView && targetView !== normalizedDomainRoot) {
+    return "";
+  }
+  const proof = handoff.proof && typeof handoff.proof === "object" ? handoff.proof : {};
+  const receipt = handoff.receipt && typeof handoff.receipt === "object" ? handoff.receipt : {};
+  const continuityChips = [
+    renderArrivalChip(proof.label || "Proof continuity", proof.tone || "neutral"),
+    renderArrivalChip(receipt.label || "Receipt continuity", receipt.tone || "neutral"),
+    renderArrivalNeutralChip("run", handoff.runId),
+    renderArrivalNeutralChip("approval", handoff.approvalId),
+    renderArrivalNeutralChip("checkpoint", handoff.checkpointId),
+    renderArrivalNeutralChip("incident", handoff.incidentPackageId || handoff.incidentId),
+    renderArrivalNeutralChip("client", handoff.sourceClient)
+  ]
+    .filter(Boolean)
+    .join("");
+  const continuitySummary = [
+    handoff.bundleStatus ? `bundle=${handoff.bundleStatus}` : "",
+    handoff.recordStatus ? `record=${handoff.recordStatus}` : "",
+    handoff.incidentPackageId ? `incident=${handoff.incidentPackageId}` : "",
+    Number.isFinite(handoff.auditCount) && handoff.auditCount > 0 ? `audit=${handoff.auditCount}` : "",
+    Number.isFinite(handoff.evidenceRefCount) && handoff.evidenceRefCount > 0
+      ? `refs=${handoff.evidenceRefCount}`
+      : ""
+  ]
+    .filter(Boolean)
+    .join("; ");
+  return `
+    <section class="workbench-arrival-context" data-workbench-arrival-context data-workbench-arrival-domain="${escapeHTML(normalizedDomainRoot)}">
+      <article class="metric workbench-arrival-context-card">
+        <div class="workbench-arrival-context-header">
+          <div class="workbench-arrival-context-copy">
+            <div class="title">Companion handoff context</div>
+            <div class="meta">${escapeHTML(
+              String(handoff.arrivalRationale || "Companion opened this Workbench depth because the governed request needs deeper review.")
+            )}</div>
+          </div>
+          <div class="workbench-arrival-context-chip-row">
+            <span class="native-launcher-status-badge">Companion handoff</span>
+            ${continuityChips}
+          </div>
+        </div>
+        <div class="workbench-arrival-context-grid">
+          <div class="workbench-arrival-context-detail">
+            <div class="title">Proof continuity</div>
+            <div class="meta">${escapeHTML(
+              String(proof.summary || "Proof continuity stays attached from Companion into this deeper workspace.")
+            )}</div>
+            <div class="meta">${escapeHTML(
+              continuitySummary || "Bundle, record, incident, and audit continuity will appear here as they become ready."
+            )}</div>
+          </div>
+          <div class="workbench-arrival-context-detail">
+            <div class="title">Receipt continuity</div>
+            <div class="meta">${escapeHTML(
+              String(receipt.summary || "Receipt continuity stays attached from the live governed path.")
+            )}</div>
+            <div class="meta">${escapeHTML(
+              handoff.gatewayRequestId
+                ? `gatewayRequest=${handoff.gatewayRequestId}`
+                : handoff.openedFrom
+                  ? `openedFrom=${handoff.openedFrom}`
+                  : "Return to Companion when the deeper review is complete."
+            )}</div>
+          </div>
+        </div>
+      </article>
+    </section>
+  `;
 }
 
 export function renderWorkbenchDomainCluster({

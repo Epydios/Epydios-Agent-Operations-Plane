@@ -3,6 +3,7 @@ import { renderAimxsLegibilityBlock } from "../../../shared/components/aimxs-leg
 import { renderAimxsDecisionBindingSpine } from "../../../shared/components/aimxs-decision-binding-spine.js";
 import {
   renderWorkbenchDomainCluster,
+  renderWorkbenchArrivalContext,
   renderWorkbenchDomainShell
 } from "../../../shell/layout/workbench-domain.js";
 import {
@@ -295,13 +296,13 @@ function renderActionReviewBoard(snapshot) {
     return `
       <article class="metric governanceops-card governanceops-card-wide" data-domain-root="governanceops" data-governanceops-panel="action-review">
         <div class="metric-title-row">
-          <div class="title">Active Review</div>
+          <div class="title">Selected Approval Review</div>
           <span class="chip chip-neutral chip-compact">idle</span>
         </div>
         <div class="governanceops-kv-list">
           <div class="governanceops-row">
             <div class="governanceops-row-label">Status</div>
-            <div class="governanceops-row-value"><span class="governanceops-empty">No approval is currently selected for live governance review.</span></div>
+            <div class="governanceops-row-value"><span class="governanceops-empty">No approval is currently selected for deeper governance review.</span></div>
           </div>
         </div>
       </article>
@@ -362,11 +363,11 @@ function renderActionReviewBoard(snapshot) {
   return `
     <article class="metric governanceops-card governanceops-card-wide" data-domain-root="governanceops" data-governanceops-panel="action-review">
       <div class="metric-title-row">
-        <div class="title">Active Review</div>
+        <div class="title">Selected Approval Review</div>
         <span class="${governanceStatusChipClass(board.approvalStatus)}">${escapeHTML(board.approvalStatus)}</span>
       </div>
       <div class="governanceops-chip-row">
-        <span class="chip chip-neutral chip-compact">live=approve/deny</span>
+        <span class="chip chip-neutral chip-compact">deep-review=approve/deny</span>
         ${board.canRoute ? '<span class="chip chip-neutral chip-compact">route=defer/escalate</span>' : ""}
         <span class="chip chip-neutral chip-compact">source=${escapeHTML(board.source)}</span>
       </div>
@@ -434,7 +435,7 @@ function renderConnectorApprovalsBoard(snapshot) {
     return `
       <article class="metric governanceops-card" data-domain-root="governanceops" data-governanceops-panel="connector-approval-queue">
         <div class="metric-title-row">
-          <div class="title">Connector Approvals</div>
+          <div class="title">Connector Hold Review</div>
           <span class="chip chip-neutral chip-compact">idle</span>
         </div>
         <div class="governanceops-kv-list">
@@ -461,7 +462,7 @@ function renderConnectorApprovalsBoard(snapshot) {
   return `
     <article class="metric governanceops-card governanceops-card-wide" data-domain-root="governanceops" data-governanceops-panel="connector-approval-queue">
       <div class="metric-title-row">
-        <div class="title">Connector Approvals</div>
+        <div class="title">Connector Hold Review</div>
         <span class="chip chip-warn chip-compact">pending</span>
       </div>
       <div class="governanceops-chip-row">
@@ -564,13 +565,13 @@ function renderApprovalQueueBoard(snapshot) {
     return `
       <article class="metric governanceops-card governanceops-card-wide" data-domain-root="governanceops" data-governanceops-panel="approval-queue">
         <div class="metric-title-row">
-          <div class="title">Approval Queue</div>
+          <div class="title">Review Backlog</div>
           <span class="chip chip-neutral chip-compact">idle</span>
         </div>
         <div class="governanceops-kv-list">
           <div class="governanceops-row">
             <div class="governanceops-row-label">Status</div>
-            <div class="governanceops-row-value"><span class="governanceops-empty">No governance approvals are currently loaded.</span></div>
+            <div class="governanceops-row-value"><span class="governanceops-empty">No deeper governance review backlog is currently loaded.</span></div>
           </div>
         </div>
       </article>
@@ -634,7 +635,7 @@ function renderApprovalQueueBoard(snapshot) {
   return `
     <article class="metric governanceops-card governanceops-card-wide" data-domain-root="governanceops" data-governanceops-panel="approval-queue">
       <div class="metric-title-row">
-        <div class="title">Approval Queue</div>
+        <div class="title">Review Backlog</div>
         <span class="chip chip-neutral chip-compact">total=${escapeHTML(String(board.counts.total || 0))}</span>
       </div>
       <div class="governanceops-chip-row">
@@ -644,6 +645,7 @@ function renderApprovalQueueBoard(snapshot) {
         <span class="chip chip-warn chip-compact">expired=${escapeHTML(String(board.counts.expired || 0))}</span>
         <span class="chip chip-neutral chip-compact">source=${escapeHTML(board.source)}</span>
       </div>
+      <div class="meta">Companion owns the default daily approval lane. Use this backlog for deeper governance follow-through, receipt continuity, and exception context.</div>
       ${board.warning ? `<div class="meta">${escapeHTML(board.warning)}</div>` : ""}
       <div class="governanceops-queue-list">${queueCards}</div>
     </article>
@@ -982,34 +984,38 @@ export function renderGovernanceWorkspace(context = {}) {
     shellClass: "governanceops-workspace",
     title: "GovernanceOps",
     lead:
-      "Use the deeper governance console for live review, approval structure, and durable decision receipts once the daily Companion lane is not enough.",
+      "Use the deeper governance console for approval structure, exception handling, and durable decision receipts once the daily Companion lane is not enough.",
     layout: "split",
+    prelude: renderWorkbenchArrivalContext({
+      domainRoot: "governanceops",
+      handoffContext: context.companionHandoffContext
+    }),
     clusters: [
       renderWorkbenchDomainCluster({
-        title: "Live Review And Approvals",
+        title: "Governance Structure, Exceptions, And Receipts",
         lead:
-          "Handle the active review loop, queued approvals, connector holds, and routed admin proposals from one governance review plane.",
+          "Keep authority ladders, decision-binding depth, exception posture, and receipt continuity visible before stepping into any deeper review action.",
         body: `
           ${renderOperationalFeedback(snapshot)}
-          <div class="governanceops-primary-grid">
-            ${renderAdminProposalReviewBoard(snapshot)}
-            ${renderActionReviewBoard(snapshot)}
-            ${renderConnectorApprovalsBoard(snapshot)}
-            ${renderApprovalQueueBoard(snapshot)}
-          </div>
-        `
-      }),
-      renderWorkbenchDomainCluster({
-        title: "Governance Structure And Receipts",
-        lead:
-          "Keep authority ladders, decision-binding depth, escalation posture, and receipt continuity visible as the deeper governance ownership layer.",
-        body: `
           ${renderAimxsDecisionBindingSpineBoard(snapshot)}
           <div class="governanceops-primary-grid">
             ${renderAuthorityLadderBoard(snapshot)}
             ${renderDecisionReceiptBoard(snapshot)}
             ${renderDelegationAndEscalationBoard(snapshot)}
             ${renderOverrideAndExceptionPostureBoard(snapshot)}
+          </div>
+        `
+      }),
+      renderWorkbenchDomainCluster({
+        title: "Focused Review And Routed Holds",
+        lead:
+          "Companion stays the default daily approval lane. Use this deeper governance plane for selected approvals, routed admin proposals, connector holds, and backlog follow-through when receipt or exception context matters.",
+        body: `
+          <div class="governanceops-primary-grid">
+            ${renderAdminProposalReviewBoard(snapshot)}
+            ${renderActionReviewBoard(snapshot)}
+            ${renderConnectorApprovalsBoard(snapshot)}
+            ${renderApprovalQueueBoard(snapshot)}
           </div>
         `
       })

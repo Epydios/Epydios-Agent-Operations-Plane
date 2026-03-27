@@ -1,6 +1,7 @@
 import { escapeHTML, formatTime, renderPanelStateMetric } from "../../../views/common.js";
 import {
   renderWorkbenchDomainCluster,
+  renderWorkbenchArrivalContext,
   renderWorkbenchDomainShell
 } from "../../../shell/layout/workbench-domain.js";
 import { renderAimxsDecisionBindingSpine } from "../../../shared/components/aimxs-decision-binding-spine.js";
@@ -464,6 +465,10 @@ export function renderIncidentWorkspace(context = {}) {
       "Use the deeper incident console for triage, active response context, and closure follow-through once the daily Companion lane is not enough.",
     layout: "split",
     prelude: `
+      ${renderWorkbenchArrivalContext({
+        domainRoot: "incidentops",
+        handoffContext: context.companionHandoffContext
+      })}
       ${renderFeedbackPanel(snapshot)}
       ${renderAimxsDecisionBindingSpineBoard(snapshot)}
     `,

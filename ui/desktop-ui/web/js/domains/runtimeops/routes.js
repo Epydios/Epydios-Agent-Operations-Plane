@@ -41,7 +41,7 @@ export function renderRuntimeOpsEmptyState(ui, options = {}) {
     shellClass: "runtimeops-workspace",
     title: options.title || "RuntimeOps",
     lead:
-      "Operate the current runtime, watch fleet posture, and inspect routing or inventory depth here when the daily lane is not enough.",
+      "Inspect governed runs, follow session continuity, and review runtime posture here when the daily lane is not enough.",
     content: renderPanelStateMetric(
       options.tone || "info",
       options.title || "RuntimeOps",

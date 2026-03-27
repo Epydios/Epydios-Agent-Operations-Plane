@@ -3,6 +3,17 @@
   gap: var(--space-4);
 }
 
+.homeops-priority-board {
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--brand) 28%, var(--line));
+  border-radius: var(--radius-3);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-soft) 80%, var(--brand) 20%),
+    color-mix(in srgb, var(--surface) 96%, var(--brand) 4%)
+  );
+}
+
 .homeops-board {
   display: grid;
   gap: var(--space-3);
@@ -33,6 +44,11 @@
   gap: var(--space-3);
 }
 
+.homeops-queue-list {
+  display: grid;
+  gap: var(--space-3);
+}
+
 .homeops-recent-action-list {
   display: grid;
   gap: var(--space-3);
@@ -44,6 +60,52 @@
 .homeops-summary-card,
 .homeops-status-card,
 .homeops-recent-action-card {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.homeops-queue-item {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.homeops-queue-item summary {
+  list-style: none;
+}
+
+.homeops-queue-item summary::-webkit-details-marker {
+  display: none;
+}
+
+.homeops-queue-summary {
+  display: grid;
+  gap: var(--space-3);
+  cursor: pointer;
+}
+
+.homeops-queue-summary-main {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.homeops-queue-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-2);
+}
+
+.homeops-queue-detail {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.homeops-queue-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-3);
+}
+
+.homeops-queue-detail-card {
   display: grid;
   gap: var(--space-2);
 }

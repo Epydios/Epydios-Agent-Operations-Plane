@@ -18,7 +18,7 @@ export function renderGovernanceOpsEmptyState(ui, options = {}) {
     shellClass: "governanceops-workspace",
     title: options.title || "GovernanceOps",
     lead:
-      "Handle deeper governance review, approval structure, and decision receipts here when Companion awareness is not enough.",
+      "Handle deeper governance review, exception posture, and decision receipts here when Companion awareness is not enough.",
     content: renderPanelStateMetric(
       options.tone || "info",
       options.title || "GovernanceOps",

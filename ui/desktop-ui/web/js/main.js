@@ -45,7 +45,10 @@ import {
   renderHomeOpsEmptyState,
   renderHomeOpsPage
 } from "./domains/homeops/routes.js";
-import { createEmptyHomeSnapshot } from "./domains/homeops/state.js";
+import {
+  createCompanionProofHandoffContext,
+  createEmptyHomeSnapshot
+} from "./domains/homeops/state.js";
 import {
   mountAgentOpsEmbeddedPanels,
   renderAgentOpsEmptyState,
@@ -195,6 +198,7 @@ import {
   describeGovernedExportRedactions as describeGovernedExportRedactionsInternal
 } from "./runtime/desktop-export-governance.js";
 import {
+  chipClassForStatus,
   escapeHTML,
   formatTime,
   normalizeTimeRange,
@@ -4988,10 +4992,21 @@ async function main() {
       ui.companionHandoffBanner.hidden = true;
       return;
     }
+    const proof = handoff.proof && typeof handoff.proof === "object" ? handoff.proof : {};
+    const receipt = handoff.receipt && typeof handoff.receipt === "object" ? handoff.receipt : {};
     const chips = [
+      proof.label
+        ? `<span class="${chipClassForStatus(proof.tone || "neutral")} chip-compact">${escapeHTML(proof.label)}</span>`
+        : "",
+      receipt.label
+        ? `<span class="${chipClassForStatus(receipt.tone || "neutral")} chip-compact">${escapeHTML(receipt.label)}</span>`
+        : "",
       handoff.runId ? `<span class="chip chip-neutral chip-compact">run=${escapeHTML(handoff.runId)}</span>` : "",
       handoff.approvalId
         ? `<span class="chip chip-neutral chip-compact">approval=${escapeHTML(handoff.approvalId)}</span>`
+        : "",
+      handoff.checkpointId
+        ? `<span class="chip chip-neutral chip-compact">checkpoint=${escapeHTML(handoff.checkpointId)}</span>`
         : "",
       handoff.incidentId
         ? `<span class="chip chip-neutral chip-compact">incident=${escapeHTML(handoff.incidentId)}</span>`
@@ -5010,7 +5025,15 @@ async function main() {
         )}</span>
         ${chips}
       </div>
-      <div class="companion-handoff-copy">Companion remains the default daily governance lane. Use this Workbench handoff only for deeper review, investigation, or admin depth, then return when you are done.</div>
+      <div class="companion-handoff-copy">${escapeHTML(
+        String(
+          handoff.arrivalRationale ||
+            "Companion remains the default daily governance lane. Use this Workbench handoff only for deeper review, investigation, or admin depth, then return when you are done."
+        )
+      )}</div>
+      <div class="companion-handoff-copy">${escapeHTML(
+        [String(proof.summary || "").trim(), String(receipt.summary || "").trim()].filter(Boolean).join(" ")
+      )}</div>
       <div class="companion-handoff-actions">
         <button class="btn btn-secondary btn-small" type="button" data-companion-return-action="return">Return To Companion Lane</button>
       </div>
@@ -5126,6 +5149,7 @@ async function main() {
     }
     renderGovernanceOpsPage(ui, {
       ...latestGovernanceOpsContext,
+      companionHandoffContext: companionOpsViewState.handoffContext,
       adminQueueItems: getAdminLifecycleQueueItems(),
       aimxsDecisionBindingSpine: buildAimxsDecisionBindingSpineModel("governanceops"),
       viewState: governanceOpsViewState
@@ -5135,7 +5159,10 @@ async function main() {
     if (context && typeof context === "object") {
       latestRuntimeOpsContext = context;
     }
-    renderRuntimeOpsPage(ui, latestRuntimeOpsContext, session, {
+    renderRuntimeOpsPage(ui, {
+      ...latestRuntimeOpsContext,
+      companionHandoffContext: companionOpsViewState.handoffContext
+    }, session, {
       viewState: runtimeOpsViewState
     });
   };
@@ -5154,6 +5181,7 @@ async function main() {
     }
     renderAuditOpsPage(ui, {
       ...latestAuditOpsContext,
+      companionHandoffContext: companionOpsViewState.handoffContext,
       adminQueueItems: getAdminLifecycleQueueItems(),
       aimxsDecisionBindingSpine: buildAimxsDecisionBindingSpineModel("auditops"),
       incidentHistory: {
@@ -5169,6 +5197,7 @@ async function main() {
     }
     renderEvidenceOpsPage(ui, {
       ...latestEvidenceOpsContext,
+      companionHandoffContext: companionOpsViewState.handoffContext,
       adminQueueItems: getAdminLifecycleQueueItems(),
       aimxsDecisionBindingSpine: buildAimxsDecisionBindingSpineModel("evidenceops"),
       incidentHistory: {
@@ -5215,6 +5244,7 @@ async function main() {
     }
     renderIncidentOpsPage(ui, {
       ...latestIncidentOpsContext,
+      companionHandoffContext: companionOpsViewState.handoffContext,
       aimxsDecisionBindingSpine: buildAimxsDecisionBindingSpineModel("incidentops"),
       incidentHistory: {
         items: store.getIncidentPackageHistory()
@@ -15686,19 +15716,22 @@ function getCurrentIncidentOpsEntry(entryId = "") {
     const nextKind = String(kind || "").trim().toLowerCase();
     const runId = String(options.runId || "").trim();
     const approvalId = String(options.approvalId || "").trim();
+    const checkpointId = String(options.checkpointId || "").trim();
+    const gatewayRequestId = String(options.gatewayRequestId || "").trim();
     const incidentId = String(options.incidentId || "").trim();
     const sourceClient = String(options.sourceClient || "").trim();
     const openContext = (view) => {
-      setCompanionHandoffContext({
+      setCompanionHandoffContext(createCompanionProofHandoffContext(buildCompanionRenderContext(), {
         kind: nextKind || "handoff",
         approvalId,
         runId,
+        checkpointId,
         incidentId,
-        gatewayRequestId: String(options.gatewayRequestId || "").trim(),
+        gatewayRequestId,
         sourceClient,
         openedFrom: "companionops",
         view: String(view || "").trim().toLowerCase()
-      });
+      }));
     };
     if (nextKind === "workbench") {
       openContext(companionOpsViewState.lastWorkbenchDomain || "agentops");
@@ -15735,6 +15768,12 @@ function getCurrentIncidentOpsEntry(entryId = "") {
       openContext("auditops");
       setWorkspaceView("auditops", true);
       focusRenderedRegion(ui.auditOpsContent, { scroll: false });
+      return true;
+    }
+    if (nextKind === "evidence") {
+      await refresh();
+      openContext("evidenceops");
+      await openAimxsSpineWorkspace("evidenceops", runId);
       return true;
     }
     if (nextKind === "incident") {
@@ -15786,6 +15825,14 @@ function getCurrentIncidentOpsEntry(entryId = "") {
     if (!action) {
       return;
     }
+    const actionOptions = {
+      runId: String(actionNode.dataset.homeopsRunId || "").trim(),
+      approvalId: String(actionNode.dataset.homeopsApprovalId || "").trim(),
+      checkpointId: String(actionNode.dataset.homeopsCheckpointId || "").trim(),
+      gatewayRequestId: String(actionNode.dataset.homeopsGatewayRequestId || "").trim(),
+      incidentId: String(actionNode.dataset.homeopsIncidentId || "").trim(),
+      sourceClient: String(actionNode.dataset.homeopsSourceClient || "").trim()
+    };
 
     if (action === "open-domain") {
       const view = String(actionNode.dataset.homeopsView || "").trim();
@@ -15801,7 +15848,7 @@ function getCurrentIncidentOpsEntry(entryId = "") {
     }
 
     if (action === "focus-live-approvals") {
-      focusCompanionHomeSection("live-approvals");
+      focusCompanionHomeSection("needs-attention");
       return;
     }
 
@@ -15816,7 +15863,12 @@ function getCurrentIncidentOpsEntry(entryId = "") {
     }
 
     if (action === "open-audit-depth") {
-      await openCompanionWorkbenchTarget("audit");
+      await openCompanionWorkbenchTarget("audit", actionOptions);
+      return;
+    }
+
+    if (action === "open-evidence-item") {
+      await openCompanionWorkbenchTarget("evidence", actionOptions);
       return;
     }
 
@@ -15835,10 +15887,7 @@ function getCurrentIncidentOpsEntry(entryId = "") {
     }
 
     if (action === "open-approval-item") {
-      await openCompanionWorkbenchTarget("approval", {
-        runId: String(actionNode.dataset.homeopsRunId || "").trim(),
-        approvalId: String(actionNode.dataset.homeopsApprovalId || "").trim()
-      });
+      await openCompanionWorkbenchTarget("approval", actionOptions);
       return;
     }
 
@@ -15849,17 +15898,12 @@ function getCurrentIncidentOpsEntry(entryId = "") {
       if (ui.runsPage) {
         ui.runsPage.value = "1";
       }
-      await openCompanionWorkbenchTarget(action === "open-run-item" ? "run" : "runs", {
-        runId: String(actionNode.dataset.homeopsRunId || "").trim()
-      });
+      await openCompanionWorkbenchTarget(action === "open-run-item" ? "run" : "runs", actionOptions);
       return;
     }
 
     if (action === "open-incident-item") {
-      await openCompanionWorkbenchTarget("incident", {
-        runId: String(actionNode.dataset.homeopsRunId || "").trim(),
-        incidentId: String(actionNode.dataset.homeopsIncidentId || "").trim()
-      });
+      await openCompanionWorkbenchTarget("incident", actionOptions);
       return;
     }
   });

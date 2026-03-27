@@ -160,6 +160,35 @@ test("incidentops page restores visible triage and closure clusters", () => {
   assert.match(ui.incidentOpsContent.innerHTML, /Focused/);
 });
 
+test("incidentops page preserves companion handoff context in the receiving prelude", () => {
+  const ui = { incidentOpsContent: { innerHTML: "" } };
+  renderIncidentOpsPage(ui, {
+    companionHandoffContext: {
+      view: "incidentops",
+      arrivalRationale:
+        "Companion opened incident depth because escalation or closure follow-through is now part of the governed path.",
+      proof: {
+        tone: "ok",
+        label: "Proof ready",
+        summary: "bundle=sealed; record=recorded; incident=incident-20260327T120500Z-run-20260327-005"
+      },
+      receipt: {
+        tone: "warn",
+        label: "Approval receipt pending",
+        summary: "Approval approval-20260327-005 is still pending review."
+      },
+      runId: "run-20260327-005",
+      approvalId: "approval-20260327-005",
+      incidentPackageId: "incident-20260327T120500Z-run-20260327-005"
+    }
+  });
+
+  assert.match(ui.incidentOpsContent.innerHTML, /Companion handoff context/);
+  assert.match(ui.incidentOpsContent.innerHTML, /Proof ready/);
+  assert.match(ui.incidentOpsContent.innerHTML, /Approval receipt pending/);
+  assert.match(ui.incidentOpsContent.innerHTML, /incident-20260327T120500Z-run-20260327-005/);
+});
+
 test("incidentops empty state renders without loaded incident posture", () => {
   const ui = { incidentOpsContent: { innerHTML: "" } };
   renderIncidentOpsEmptyState(ui, {

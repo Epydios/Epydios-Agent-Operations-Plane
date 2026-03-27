@@ -659,6 +659,352 @@ function createSystemStatusRegion(context = {}) {
   };
 }
 
+function findRunById(context = {}, runId = "") {
+  const normalizedRunId = String(runId || "").trim();
+  if (!normalizedRunId) {
+    return null;
+  }
+  return (
+    readItems(context.runs).find((item) => String(item?.runId || "").trim() === normalizedRunId) || null
+  );
+}
+
+function findApprovalById(context = {}, approvalId = "") {
+  const normalizedApprovalId = String(approvalId || "").trim();
+  if (!normalizedApprovalId) {
+    return null;
+  }
+  return (
+    readItems(context.approvals).find((item) => String(item?.approvalId || "").trim() === normalizedApprovalId) || null
+  );
+}
+
+function findApprovalByRunId(context = {}, runId = "") {
+  const normalizedRunId = String(runId || "").trim();
+  if (!normalizedRunId) {
+    return null;
+  }
+  return (
+    readItems(context.approvals).find((item) => String(item?.runId || "").trim() === normalizedRunId) || null
+  );
+}
+
+function findIncidentById(context = {}, incidentId = "") {
+  const normalizedIncidentId = String(incidentId || "").trim();
+  if (!normalizedIncidentId) {
+    return null;
+  }
+  return (
+    readItems(context.incidentHistory).find((item) => String(item?.id || "").trim() === normalizedIncidentId) || null
+  );
+}
+
+function findIncidentByRunId(context = {}, runId = "") {
+  const normalizedRunId = String(runId || "").trim();
+  if (!normalizedRunId) {
+    return null;
+  }
+  return (
+    readItems(context.incidentHistory).find((item) => String(item?.runId || "").trim() === normalizedRunId) || null
+  );
+}
+
+function collectRunEvidenceRefs(run = {}) {
+  const policyResponse = readObject(run?.policyResponse);
+  return Array.from(
+    new Set(
+      [
+        ...(Array.isArray(policyResponse?.evidenceRefs) ? policyResponse.evidenceRefs : []),
+        ...(Array.isArray(run?.evidenceRefs) ? run.evidenceRefs : [])
+      ]
+        .map((item) => String(item || "").trim())
+        .filter(Boolean)
+    )
+  );
+}
+
+function countLinkedAuditEvents(context = {}, runId = "", approvalId = "") {
+  const normalizedRunId = String(runId || "").trim();
+  const normalizedApprovalId = String(approvalId || "").trim();
+  return readItems(context.audit).filter((item) => {
+    if (normalizedRunId && String(item?.runId || "").trim() === normalizedRunId) {
+      return true;
+    }
+    if (normalizedApprovalId && String(item?.approvalId || "").trim() === normalizedApprovalId) {
+      return true;
+    }
+    return false;
+  }).length;
+}
+
+function findLinkedGatewayHold(context = {}, options = {}) {
+  const gatewayRequestId = String(options.gatewayRequestId || "").trim();
+  const approvalId = String(options.approvalId || "").trim();
+  const runId = String(options.runId || "").trim();
+  return (
+    pendingGatewayHolds(context).find((item) => {
+      if (gatewayRequestId && String(item?.gatewayRequestId || "").trim() === gatewayRequestId) {
+        return true;
+      }
+      if (approvalId && String(item?.approvalId || "").trim() === approvalId) {
+        return true;
+      }
+      if (runId && String(item?.runId || "").trim() === runId) {
+        return true;
+      }
+      return false;
+    }) || null
+  );
+}
+
+function findLinkedNativeApprovalRailItem(context = {}, options = {}) {
+  const checkpointId = String(options.checkpointId || "").trim();
+  const approvalId = String(options.approvalId || "").trim();
+  const runId = String(options.runId || "").trim();
+  return (
+    readNativeApprovalRailItems(context).find((item) => {
+      if (checkpointId && String(item?.checkpointId || "").trim() === checkpointId) {
+        return true;
+      }
+      if (approvalId && String(item?.approvalId || "").trim() === approvalId) {
+        return true;
+      }
+      if (runId && String(item?.runId || "").trim() === runId) {
+        return true;
+      }
+      return false;
+    }) || null
+  );
+}
+
+function buildAttachedProofSummary(context = {}, options = {}) {
+  const runId = String(options.runId || "").trim();
+  const approvalId = String(options.approvalId || "").trim();
+  const checkpointId = String(options.checkpointId || "").trim();
+  const incidentId = String(options.incidentId || "").trim();
+  const run = findRunById(context, runId);
+  const incident = incidentId ? findIncidentById(context, incidentId) : findIncidentByRunId(context, runId);
+  const evidenceBundleStatus = formatIdentityLabel(
+    run?.evidenceBundleResponse?.status || run?.evidenceBundleStatus,
+    ""
+  );
+  const evidenceRecordStatus = formatIdentityLabel(
+    run?.evidenceRecordResponse?.status || run?.evidenceRecordStatus,
+    ""
+  );
+  const evidenceRefs = collectRunEvidenceRefs(run || {});
+  const auditCount = countLinkedAuditEvents(context, runId, approvalId);
+  const summaryParts = [];
+  if (evidenceBundleStatus) {
+    summaryParts.push(`bundle=${evidenceBundleStatus}`);
+  }
+  if (evidenceRecordStatus) {
+    summaryParts.push(`record=${evidenceRecordStatus}`);
+  }
+  if (incident?.packageId) {
+    summaryParts.push(`incident=${formatIdentityLabel(incident.packageId)}`);
+  }
+  if (evidenceRefs.length > 0) {
+    summaryParts.push(`refs=${evidenceRefs.length}`);
+  }
+  if (auditCount > 0) {
+    summaryParts.push(`audit=${auditCount}`);
+  }
+  let tone = "warn";
+  let label = "Proof pending";
+  if (
+    incident?.packageId ||
+    ["sealed", "finalized", "ready", "available"].includes(normalizeStatus(evidenceBundleStatus, "")) ||
+    ["recorded", "sealed", "finalized", "ready", "available"].includes(normalizeStatus(evidenceRecordStatus, ""))
+  ) {
+    tone = "ok";
+    label = "Proof ready";
+  } else if (evidenceRefs.length > 0 || auditCount > 0 || approvalId || checkpointId) {
+    tone = "warn";
+    label = "Proof attached";
+  }
+  let action = "";
+  let actionLabel = "";
+  if (runId) {
+    action = "open-evidence-item";
+    actionLabel = "Open Evidence Depth";
+  } else if (incident?.id) {
+    action = "open-incident-item";
+    actionLabel = "Open Incident Depth";
+  } else if (auditCount > 0 || approvalId || checkpointId) {
+    action = "open-audit-depth";
+    actionLabel = "Open AuditOps Depth";
+  }
+  return {
+    tone,
+    label,
+    summary:
+      summaryParts.join("; ") ||
+      (checkpointId
+        ? "Thread approval proof lives on the checkpoint review path."
+        : runId
+          ? "Run-linked proof is still forming."
+          : "Open the owner surface for deeper proof context."),
+    action,
+    actionLabel,
+    runId,
+    approvalId,
+    checkpointId,
+    gatewayRequestId: String(options.gatewayRequestId || "").trim(),
+    sourceClient: String(options.sourceClient || "").trim(),
+    incidentId: String(incident?.id || incidentId || "").trim(),
+    bundleStatus: evidenceBundleStatus,
+    recordStatus: evidenceRecordStatus,
+    evidenceRefCount: evidenceRefs.length,
+    auditCount,
+    incidentPackageId: String(incident?.packageId || "").trim(),
+    incidentStatus: String(incident?.filingStatus || "").trim()
+  };
+}
+
+function buildCompanionArrivalRationale(view = "", kind = "") {
+  const normalizedView = String(view || "").trim().toLowerCase();
+  const normalizedKind = String(kind || "").trim().toLowerCase();
+  switch (normalizedView) {
+    case "governanceops":
+      return "Companion opened governance depth because this governed request needs deeper approval structure, receipt continuity, or exception review.";
+    case "runtimeops":
+      return "Companion opened runtime depth because the governed run needs deeper runtime investigation and proof follow-through.";
+    case "auditops":
+      return "Companion opened audit depth because the governed request needs decision trace and receipt continuity beyond the daily lane.";
+    case "evidenceops":
+      return "Companion opened evidence depth because attached proof is ready for bundle, provenance, or artifact review.";
+    case "incidentops":
+      return "Companion opened incident depth because escalation or closure follow-through is now part of the governed path.";
+    default:
+      if (normalizedKind === "approval" || normalizedKind === "approval-queue") {
+        return "Companion opened Workbench depth because the governed request still needs approval review and receipt continuity.";
+      }
+      if (normalizedKind === "run" || normalizedKind === "runs") {
+        return "Companion opened Workbench depth because the governed run needs deeper investigation beyond the daily lane.";
+      }
+      return "Companion opened Workbench depth because this governed request needs deeper review than the daily lane should carry.";
+  }
+}
+
+function buildCompanionReceiptSummary(context = {}, options = {}) {
+  const approval = options.approval && typeof options.approval === "object" ? options.approval : null;
+  const gatewayHold = options.gatewayHold && typeof options.gatewayHold === "object" ? options.gatewayHold : null;
+  const nativeApprovalRailItem =
+    options.nativeApprovalRailItem && typeof options.nativeApprovalRailItem === "object"
+      ? options.nativeApprovalRailItem
+      : null;
+  const checkpointId = String(options.checkpointId || "").trim();
+  const approvalId = String(approval?.approvalId || options.approvalId || "").trim();
+  const approvalStatus = normalizeStatus(approval?.status, "");
+  if (approvalId) {
+    if (approvalStatus === "approved" || approvalStatus === "denied") {
+      return {
+        tone: "ok",
+        label: "Decision receipt ready",
+        summary: `Approval ${approvalId} is ${approvalStatus}; the decision receipt path is already attached to this governed item.`
+      };
+    }
+    if (approvalStatus === "pending") {
+      return {
+        tone: "warn",
+        label: "Approval receipt pending",
+        summary: `Approval ${approvalId} is still pending review, so receipt continuity is anchored to the live approval path.`
+      };
+    }
+    return {
+      tone: "warn",
+      label: "Approval receipt linked",
+      summary: `Approval ${approvalId} still carries the receipt path for this governed request.`
+    };
+  }
+  if (checkpointId) {
+    return {
+      tone: "warn",
+      label: "Checkpoint receipt path",
+      summary: `Checkpoint ${checkpointId} stays attached to the current-thread approval path until that review is resolved.`
+    };
+  }
+  if (gatewayHold?.gatewayRequestId || gatewayHold?.approvalId) {
+    return {
+      tone: "warn",
+      label: "Gateway hold receipt path",
+      summary: `Held request ${formatIdentityLabel(gatewayHold?.gatewayRequestId || gatewayHold?.approvalId, "-")} is still carrying the live review receipt path.`
+    };
+  }
+  if (nativeApprovalRailItem?.selectionId) {
+    return {
+      tone: "warn",
+      label: "Live review receipt path",
+      summary: `Selection ${formatIdentityLabel(nativeApprovalRailItem.selectionId, "-")} is still attached to the live review rail.`
+    };
+  }
+  return {
+    tone: "neutral",
+    label: "Receipt continuity attached",
+    summary: "This governed item still carries receipt continuity into Workbench depth."
+  };
+}
+
+export function createCompanionProofHandoffContext(context = {}, options = {}) {
+  const kind = String(options.kind || "handoff").trim().toLowerCase() || "handoff";
+  const view = String(options.view || "").trim().toLowerCase();
+  const runId = String(options.runId || "").trim();
+  const approvalId = String(options.approvalId || "").trim();
+  const checkpointId = String(options.checkpointId || "").trim();
+  const gatewayRequestId = String(options.gatewayRequestId || "").trim();
+  const incidentId = String(options.incidentId || "").trim();
+  const gatewayHold = findLinkedGatewayHold(context, { gatewayRequestId, approvalId, runId });
+  const nativeApprovalRailItem = findLinkedNativeApprovalRailItem(context, {
+    checkpointId,
+    approvalId,
+    runId
+  });
+  const approval = findApprovalById(context, approvalId) || findApprovalByRunId(context, runId);
+  const sourceClient = formatIdentityLabel(
+    options.sourceClient ||
+      gatewayHold?.sourceClient?.name ||
+      gatewayHold?.clientSurface ||
+      nativeApprovalRailItem?.clientLabel,
+    ""
+  );
+  const proof = buildAttachedProofSummary(context, {
+    runId,
+    approvalId,
+    checkpointId,
+    gatewayRequestId,
+    incidentId,
+    sourceClient
+  });
+  const receipt = buildCompanionReceiptSummary(context, {
+    approval,
+    approvalId,
+    checkpointId,
+    gatewayHold,
+    nativeApprovalRailItem
+  });
+  return {
+    kind,
+    view,
+    runId,
+    approvalId,
+    checkpointId,
+    gatewayRequestId,
+    sourceClient,
+    incidentId: String(proof.incidentId || incidentId || "").trim(),
+    openedFrom: String(options.openedFrom || "").trim(),
+    arrivalRationale: buildCompanionArrivalRationale(view, kind),
+    proof,
+    receipt,
+    bundleStatus: proof.bundleStatus,
+    recordStatus: proof.recordStatus,
+    evidenceRefCount: proof.evidenceRefCount,
+    auditCount: proof.auditCount,
+    incidentPackageId: proof.incidentPackageId,
+    incidentStatus: proof.incidentStatus
+  };
+}
+
 function createAttentionItems(context = {}) {
   const approvals = readItems(context.approvals);
   const runs = readItems(context.runs);
@@ -783,7 +1129,11 @@ function createRecentGovernedActions(context = {}) {
       approvalId: String(hold?.approvalId || "").trim(),
       gatewayRequestId: formatIdentityLabel(hold?.gatewayRequestId, ""),
       action: "open-approval-item",
-      actionLabel: "Open Workbench Review"
+      actionLabel: "Open Workbench Review",
+      proof: buildAttachedProofSummary(context, {
+        runId,
+        approvalId: String(hold?.approvalId || "").trim()
+      })
     });
   });
   readItems(context.runs)
@@ -820,7 +1170,11 @@ function createRecentGovernedActions(context = {}) {
         approvalId: String(linkedApproval?.approvalId || "").trim(),
         gatewayRequestId: formatIdentityLabel(run?.requestId, ""),
         action: approvalRequired ? "open-approval-item" : "open-run-item",
-        actionLabel: approvalRequired ? "Open Workbench Review" : "Open RuntimeOps Depth"
+        actionLabel: approvalRequired ? "Open Workbench Review" : "Open RuntimeOps Depth",
+        proof: buildAttachedProofSummary(context, {
+          runId,
+          approvalId: String(linkedApproval?.approvalId || "").trim()
+        })
         }
       ];
     })
@@ -965,6 +1319,158 @@ function createIncidentEscalationItems(context = {}) {
     ];
   }
   return [];
+}
+
+function queueKindWeight(value = "") {
+  switch (String(value || "").trim()) {
+    case "approval":
+      return 0;
+    case "incident":
+      return 1;
+    case "run":
+      return 2;
+    default:
+      return 3;
+  }
+}
+
+function queueToneWeight(value = "") {
+  switch (normalizeStatus(value, "")) {
+    case "danger":
+      return 0;
+    case "warn":
+      return 1;
+    case "ok":
+      return 2;
+    default:
+      return 3;
+  }
+}
+
+function createGovernedRequestQueueItems(context = {}) {
+  const items = [];
+  const queuedRunIds = new Set();
+  const liveApprovals = createLiveApprovalItems(context);
+  liveApprovals.forEach((item) => {
+    const runId = String(item?.runId || "").trim();
+    const approvalId = String(item?.approvalId || "").trim();
+    if (runId) {
+      queuedRunIds.add(runId);
+    }
+    items.push({
+      id: `queue-approval-${item.selectionId || approvalId || runId || items.length}`,
+      queueKind: "approval",
+      tone: item.tone || "warn",
+      kindLabel: item.kindLabel || "Pending Review",
+      title: item.title || "Pending review",
+      summary: item.summary || "-",
+      primaryMeta: item.primaryMeta || "-",
+      secondaryMeta: item.secondaryMeta || "-",
+      occurredAt: formatIdentityLabel(item.createdAt || item.expiresAt, "-"),
+      runId,
+      approvalId,
+      checkpointId: String(item?.checkpointId || "").trim(),
+      selectionId: String(item?.selectionId || "").trim(),
+      action: item.detailAction || "open-approval-item",
+      actionLabel: item.detailActionLabel || "Open Workbench Review",
+      proof: buildAttachedProofSummary(context, {
+        runId,
+        approvalId,
+        checkpointId: String(item?.checkpointId || "").trim()
+      })
+    });
+  });
+
+  const incidentItems = createIncidentEscalationItems(context);
+  incidentItems.forEach((item) => {
+    const runId = String(item?.runId || "").trim();
+    if (runId && queuedRunIds.has(runId)) {
+      return;
+    }
+    if (runId) {
+      queuedRunIds.add(runId);
+    }
+    items.push({
+      id: `queue-incident-${String(item?.id || runId || items.length).trim()}`,
+      queueKind: "incident",
+      tone: item.tone || "warn",
+      kindLabel: "Incident",
+      title: item.title || "Incident context",
+      summary: item.summary || "-",
+      primaryMeta: item.primaryMeta || "-",
+      secondaryMeta: item.secondaryMeta || "-",
+      occurredAt: formatIdentityLabel(item.occurredAt, "-"),
+      runId,
+      incidentId: String(item?.incidentId || item?.id || "").trim(),
+      action: item.action || "open-incident-item",
+      actionLabel: item.actionLabel || "Open Incident Depth",
+      proof: buildAttachedProofSummary(context, {
+        runId,
+        incidentId: String(item?.incidentId || item?.id || "").trim()
+      })
+    });
+  });
+
+  readItems(context.runs)
+    .slice()
+    .sort((left, right) => {
+      const leftTs = parseTimeMs(left?.updatedAt || left?.createdAt);
+      const rightTs = parseTimeMs(right?.updatedAt || right?.createdAt);
+      return rightTs - leftTs;
+    })
+    .forEach((run) => {
+      const runId = String(run?.runId || "").trim();
+      if (!runId || queuedRunIds.has(runId)) {
+        return;
+      }
+      const status = String(run?.status || "").trim().toUpperCase();
+      const decision = String(run?.policyDecision || "").trim().toUpperCase();
+      if (!["FAILED", "POLICY_BLOCKED"].includes(status) && !["DENY", "DEFER"].includes(decision)) {
+        return;
+      }
+      queuedRunIds.add(runId);
+      const linkedApproval = readItems(context.approvals).find(
+        (item) => String(item?.runId || "").trim() === runId
+      );
+      items.push({
+        id: `queue-run-${runId}`,
+        queueKind: "run",
+        tone: status === "FAILED" || decision === "DENY" ? "danger" : "warn",
+        kindLabel: "Run Attention",
+        title: formatIdentityLabel(run?.requestedAction || run?.action || runId, "Governed run"),
+        summary:
+          decision === "DEFER"
+            ? "The governed run is deferred and still needs an operator move."
+            : decision === "DENY"
+              ? "The governed run is blocked by policy and needs review."
+              : "The governed run is still shaping the active operator lane.",
+        primaryMeta: `status=${formatIdentityLabel(run?.status, "-")}; policy=${decision || "-"}`,
+        secondaryMeta: `runId=${runId}; target=${formatIdentityLabel(run?.requestId, "-")}`,
+        occurredAt: formatIdentityLabel(run?.updatedAt || run?.createdAt, "-"),
+        runId,
+        approvalId: String(linkedApproval?.approvalId || "").trim(),
+        action: "open-run-item",
+        actionLabel: "Open RuntimeOps Depth",
+        proof: buildAttachedProofSummary(context, {
+          runId,
+          approvalId: String(linkedApproval?.approvalId || "").trim()
+        })
+      });
+    });
+
+  return items
+    .sort((left, right) => {
+      const toneDelta = queueToneWeight(left?.tone) - queueToneWeight(right?.tone);
+      if (toneDelta !== 0) {
+        return toneDelta;
+      }
+      const kindDelta = queueKindWeight(left?.queueKind) - queueKindWeight(right?.queueKind);
+      if (kindDelta !== 0) {
+        return kindDelta;
+      }
+      return parseTimeMs(right?.occurredAt) - parseTimeMs(left?.occurredAt);
+    })
+    .slice(0, 6);
 }
 
 function createRuntimeDiagnosticsItems(context = {}) {
@@ -1248,6 +1754,9 @@ export function createHomeWorkspaceSnapshot(context = {}) {
     identityAndScope: createIdentityAndScopeSnapshot(snapshot),
     liveApprovals: {
       items: createLiveApprovalItems(snapshot)
+    },
+    governedRequestQueue: {
+      items: createGovernedRequestQueueItems(snapshot)
     },
     attentionQueue: {
       items: createAttentionItems(snapshot)

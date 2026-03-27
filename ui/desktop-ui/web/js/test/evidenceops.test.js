@@ -319,6 +319,35 @@ test("evidenceops page restores visible proof-management clusters", () => {
   assert.match(ui.evidenceOpsContent.innerHTML, /uris=2/);
 });
 
+test("evidenceops page preserves companion handoff context in the receiving prelude", () => {
+  const ui = { evidenceOpsContent: { innerHTML: "" } };
+  renderEvidenceOpsPage(ui, {
+    companionHandoffContext: {
+      view: "evidenceops",
+      arrivalRationale:
+        "Companion opened evidence depth because attached proof is ready for bundle, provenance, or artifact review.",
+      proof: {
+        tone: "ok",
+        label: "Proof ready",
+        summary: "bundle=finalized; record=recorded; refs=2"
+      },
+      receipt: {
+        tone: "ok",
+        label: "Decision receipt ready",
+        summary: "Approval approval-20260327-004 is approved; the decision receipt path is attached."
+      },
+      runId: "run-20260327-004",
+      approvalId: "approval-20260327-004",
+      incidentPackageId: "incident-20260327T120400Z-run-20260327-004"
+    }
+  });
+
+  assert.match(ui.evidenceOpsContent.innerHTML, /Companion handoff context/);
+  assert.match(ui.evidenceOpsContent.innerHTML, /Proof ready/);
+  assert.match(ui.evidenceOpsContent.innerHTML, /Decision receipt ready/);
+  assert.match(ui.evidenceOpsContent.innerHTML, /incident-20260327T120400Z-run-20260327-004/);
+});
+
 test("evidenceops empty state renders without loaded proof material", () => {
   const ui = { evidenceOpsContent: { innerHTML: "" } };
   renderEvidenceOpsEmptyState(ui, {

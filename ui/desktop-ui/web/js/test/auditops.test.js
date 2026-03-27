@@ -239,6 +239,34 @@ test("auditops page restores visible event, trace, and investigation clusters", 
   assert.match(ui.auditOpsContent.innerHTML, /One provider decision trail is delayed\./);
 });
 
+test("auditops page preserves companion handoff context in the receiving prelude", () => {
+  const ui = { auditOpsContent: { innerHTML: "" } };
+  renderAuditOpsPage(ui, {
+    companionHandoffContext: {
+      view: "auditops",
+      arrivalRationale:
+        "Companion opened audit depth because the governed request needs decision trace and receipt continuity beyond the daily lane.",
+      proof: {
+        tone: "ok",
+        label: "Proof ready",
+        summary: "bundle=sealed; record=recorded; audit=3"
+      },
+      receipt: {
+        tone: "warn",
+        label: "Approval receipt pending",
+        summary: "Approval approval-20260327-003 is still pending review."
+      },
+      runId: "run-20260327-003",
+      approvalId: "approval-20260327-003"
+    }
+  });
+
+  assert.match(ui.auditOpsContent.innerHTML, /Companion handoff context/);
+  assert.match(ui.auditOpsContent.innerHTML, /Proof ready/);
+  assert.match(ui.auditOpsContent.innerHTML, /Approval receipt pending/);
+  assert.match(ui.auditOpsContent.innerHTML, /run=run-20260327-003/);
+});
+
 test("auditops empty state renders without loaded audit posture", () => {
   const ui = { auditOpsContent: { innerHTML: "" } };
   renderAuditOpsEmptyState(ui, {

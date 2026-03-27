@@ -232,8 +232,8 @@ test("governanceops page renders runtime approvals plus identity admin proposal 
 
   assert.match(ui.governanceOpsContent.innerHTML, /data-domain-root="governanceops"/);
   assert.match(ui.governanceOpsContent.innerHTML, /GovernanceOps/);
-  assert.match(ui.governanceOpsContent.innerHTML, /Live Review And Approvals/);
-  assert.match(ui.governanceOpsContent.innerHTML, /Governance Structure And Receipts/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Governance Structure, Exceptions, And Receipts/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Focused Review And Routed Holds/);
   assert.match(ui.governanceOpsContent.innerHTML, /Admin Proposal Review/);
   assert.match(ui.governanceOpsContent.innerHTML, /AIMXS Lifecycle Ribbon/);
   assert.match(ui.governanceOpsContent.innerHTML, /AIMXS Decision-Binding Spine/);
@@ -245,11 +245,11 @@ test("governanceops page renders runtime approvals plus identity admin proposal 
   assert.match(ui.governanceOpsContent.innerHTML, /data-aimxs-spine-action="open-workspace"/);
   assert.match(ui.governanceOpsContent.innerHTML, /Decision Binding Contract/);
   assert.match(ui.governanceOpsContent.innerHTML, /Stable Or Replay Refs/);
-  assert.match(ui.governanceOpsContent.innerHTML, /Approval Queue/);
-  assert.match(ui.governanceOpsContent.innerHTML, /Connector Approvals/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Review Backlog/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Connector Hold Review/);
   assert.match(ui.governanceOpsContent.innerHTML, /Authority Ladder/);
   assert.match(ui.governanceOpsContent.innerHTML, /Decision Receipt/);
-  assert.match(ui.governanceOpsContent.innerHTML, /Active Review/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Selected Approval Review/);
   assert.match(ui.governanceOpsContent.innerHTML, /Delegation And Escalation/);
   assert.match(ui.governanceOpsContent.innerHTML, /Override And Exception Posture/);
   assert.match(ui.governanceOpsContent.innerHTML, /approval-run-20260314-queue-001/);
@@ -299,10 +299,43 @@ test("governanceops page renders runtime approvals plus identity admin proposal 
   assert.match(ui.governanceOpsContent.innerHTML, /Copy Decision Receipt/);
   assert.match(ui.governanceOpsContent.innerHTML, /Copy Receipt Snapshot/);
   assert.match(ui.governanceOpsContent.innerHTML, /Open AuditOps/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Companion stays the default daily approval lane/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Companion owns the default daily approval lane/);
   assert.match(ui.governanceOpsContent.innerHTML, /Centralized Enterprise Admin Residency Exception/);
   assert.match(ui.governanceOpsContent.innerHTML, /Centralized Enterprise Admin Quota Overlay/);
   assert.match(ui.governanceOpsContent.innerHTML, /enterprise\.break_glass_admin/);
-  assert.ok(ui.governanceOpsContent.innerHTML.indexOf("Live Review And Approvals") < ui.governanceOpsContent.innerHTML.indexOf("Governance Structure And Receipts"));
+  assert.ok(
+    ui.governanceOpsContent.innerHTML.indexOf("Governance Structure, Exceptions, And Receipts") <
+      ui.governanceOpsContent.innerHTML.indexOf("Focused Review And Routed Holds")
+  );
+});
+
+test("governanceops page preserves companion handoff context in the receiving prelude", () => {
+  const ui = { governanceOpsContent: { innerHTML: "" } };
+  renderGovernanceOpsPage(ui, {
+    companionHandoffContext: {
+      view: "governanceops",
+      arrivalRationale:
+        "Companion opened governance depth because this governed request needs deeper approval structure, receipt continuity, or exception review.",
+      proof: {
+        tone: "ok",
+        label: "Proof ready",
+        summary: "bundle=sealed; record=recorded; audit=2"
+      },
+      receipt: {
+        tone: "warn",
+        label: "Approval receipt pending",
+        summary: "Approval approval-20260327-001 is still pending review."
+      },
+      runId: "run-20260327-001",
+      approvalId: "approval-20260327-001"
+    }
+  });
+
+  assert.match(ui.governanceOpsContent.innerHTML, /Companion handoff context/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Proof ready/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Approval receipt pending/);
+  assert.match(ui.governanceOpsContent.innerHTML, /run=run-20260327-001/);
 });
 
 test("governanceops empty state renders without loaded governance context", () => {
