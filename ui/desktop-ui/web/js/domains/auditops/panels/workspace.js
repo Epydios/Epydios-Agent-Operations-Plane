@@ -98,7 +98,7 @@ function renderRecentEventRows(rows = []) {
 
 function renderRecentInvestigationRows(rows = []) {
   if (!Array.isArray(rows) || rows.length === 0) {
-    return '<div class="auditops-empty">No investigation packages are currently tracked.</div>';
+    return '<div class="auditops-empty">No incident follow-through records are currently tracked.</div>';
   }
   return `
     <div class="auditops-mini-table">
@@ -146,7 +146,7 @@ function renderHandoffPreview(preview) {
   }
   return `
     <div class="auditops-subsection">
-      <div class="auditops-subtitle">Package Summary Preview</div>
+      <div class="auditops-subtitle">Incident Continuation Preview</div>
       <pre class="auditops-preview">${escapeHTML(text)}</pre>
     </div>
   `;
@@ -431,7 +431,7 @@ function renderExportBoard(snapshot) {
   const board = snapshot.exportBoard;
   const rows = [
     {
-      label: "Current Package Set",
+      label: "Current Governed Trace",
       value: renderValuePills([
         { label: "actor", value: board.actor, code: true },
         { label: "source", value: board.source },
@@ -440,7 +440,7 @@ function renderExportBoard(snapshot) {
       ])
     },
     {
-      label: "Package Outputs",
+      label: "Continuity Outputs",
       value: renderValuePills([
         { label: "json rows", value: String(board.matchedCount) },
         { label: "csv lines", value: String(board.csvLineCount) },
@@ -459,7 +459,7 @@ function renderExportBoard(snapshot) {
       ])
     },
     {
-      label: "Latest Incident Package",
+      label: "Latest Incident Follow-Through",
       value: renderValuePills([
         { label: "package", value: board.latestIncident.packageId, code: true },
         { label: "status", value: board.latestIncident.filingStatus },
@@ -468,7 +468,7 @@ function renderExportBoard(snapshot) {
       ])
     },
     {
-      label: "Package Readiness",
+      label: "Continuity Readiness",
       value: renderValuePills([
         { label: "selected run", value: board.selectedRun.runId, code: true },
         { label: "status", value: board.selectedRun.status },
@@ -479,20 +479,20 @@ function renderExportBoard(snapshot) {
   return `
     <article class="metric auditops-card" data-domain-root="auditops" data-auditops-panel="export-board">
       <div class="metric-title-row">
-        <div class="title">Incident Package Handoff</div>
+        <div class="title">Receipt, Proof, And Incident Continuity</div>
         <span class="${chipClassForTone(board.tone)}">${escapeHTML(board.tone)}</span>
       </div>
       <div class="auditops-chip-row">
         <span class="chip chip-neutral chip-compact">rows=${escapeHTML(String(board.matchedCount))}</span>
         <span class="chip chip-neutral chip-compact">csv=${escapeHTML(String(board.csvLineCount))}</span>
-        <span class="chip chip-neutral chip-compact">handoff=${escapeHTML(String(board.handoffLineCount))}</span>
-        <span class="chip chip-neutral chip-compact">queue=${escapeHTML(String(board.queueCount))}</span>
+        <span class="chip chip-neutral chip-compact">summary=${escapeHTML(String(board.handoffLineCount))}</span>
+        <span class="chip chip-neutral chip-compact">incidents=${escapeHTML(String(board.queueCount))}</span>
       </div>
       ${renderActionButtons([
         { label: "Download Audit JSON", command: "export-json", disabled: !board.canExportJson },
         { label: "Download Audit CSV", command: "export-csv", disabled: !board.canExportCsv },
-        { label: "Copy Package Summary", command: "copy-handoff", disabled: !board.canCopyHandoff },
-        { label: "Download Incident Package", command: "export-incident-package", disabled: !board.canExportIncident }
+        { label: "Copy Continuity Summary", command: "copy-handoff", disabled: !board.canCopyHandoff },
+        { label: "Download Incident Handoff", command: "export-incident-package", disabled: !board.canExportIncident }
       ])}
       <div class="auditops-kv-list">${renderKeyValueRows(rows)}</div>
       ${renderHandoffPreview(snapshot.handoffPreview)}
@@ -504,7 +504,7 @@ function renderInvestigationWorkspace(snapshot) {
   const board = snapshot.investigationWorkspace;
   const rows = [
     {
-      label: "Package Queue",
+      label: "Incident Follow-Through",
       value: renderValuePills([
         { label: "drafted", value: String(board.draftedCount) },
         { label: "filed", value: String(board.filedCount) },
@@ -513,7 +513,7 @@ function renderInvestigationWorkspace(snapshot) {
       ])
     },
     {
-      label: "Latest Package",
+      label: "Latest Incident Follow-Through",
       value: renderValuePills([
         { label: "package", value: board.latestIncident.packageId, code: true },
         { label: "status", value: board.latestIncident.filingStatus },
@@ -538,7 +538,7 @@ function renderInvestigationWorkspace(snapshot) {
   return `
     <article class="metric auditops-card" data-domain-root="auditops" data-auditops-panel="investigation-workspace">
       <div class="metric-title-row">
-        <div class="title">Incident Package Flow</div>
+        <div class="title">Incident Follow-Through</div>
         <span class="${chipClassForTone(board.tone)}">${escapeHTML(board.tone)}</span>
       </div>
       <div class="auditops-chip-row">
@@ -548,12 +548,12 @@ function renderInvestigationWorkspace(snapshot) {
         <span class="chip chip-neutral chip-compact">latest=${escapeHTML(board.latestIncident.packageId || "-")}</span>
       </div>
       ${renderActionButtons([
-        { label: "Open Incident Packages", command: "open-incidentops", disabled: !board.canOpenIncidentOps },
-        { label: "Copy Package Summary", command: "copy-latest-handoff", disabled: !board.canCopyLatestHandoff }
+        { label: "Open Incident Follow-Through", command: "open-incidentops", disabled: !board.canOpenIncidentOps },
+        { label: "Copy Continuity Summary", command: "copy-latest-handoff", disabled: !board.canCopyLatestHandoff }
       ])}
       <div class="auditops-kv-list">${renderKeyValueRows(rows)}</div>
       <div class="auditops-subsection">
-        <div class="auditops-subtitle">Recent Packages</div>
+        <div class="auditops-subtitle">Recent Incident Follow-Through</div>
         ${renderRecentInvestigationRows(board.recentInvestigations)}
       </div>
     </article>
@@ -567,7 +567,7 @@ export function renderAuditWorkspace(context = {}) {
     shellClass: "auditops-workspace",
     title: "AuditOps",
     lead:
-      "Use the deeper audit console for event review, actor and decision traceability, and investigation export work once the daily Companion lane is not enough.",
+      "Use the deeper audit console for event review, decision and receipt continuity, and proof and incident follow-through once the daily Companion lane is not enough.",
     layout: "split",
     prelude: `
       ${renderWorkbenchArrivalContext({
@@ -597,13 +597,13 @@ export function renderAuditWorkspace(context = {}) {
         `
       }),
       renderWorkbenchDomainCluster({
-        title: "Investigation And Export",
+        title: "Proof And Incident Continuity",
         lead:
-          "Keep export packaging and the full investigation workspace visible as the deeper audit lane rather than flattening them into event review.",
+          "Keep decision, receipt, proof, and incident continuation legible in one audit lane. Export actions stay available, but they do not define the primary audit story.",
         bodyClass: "stack",
         body: `
-          ${renderExportBoard(snapshot)}
           ${renderInvestigationWorkspace(snapshot)}
+          ${renderExportBoard(snapshot)}
         `
       })
     ]

@@ -206,6 +206,27 @@ function formatIdentityLabel(value, fallback = "-") {
   return normalized || fallback;
 }
 
+function joinMetaLine(parts = [], fallback = "") {
+  const normalized = (Array.isArray(parts) ? parts : [parts])
+    .map((part) => String(part || "").trim())
+    .filter(Boolean);
+  return normalized.length ? normalized.join("; ") : fallback;
+}
+
+function mergeCompanionTone(...values) {
+  const tones = values.map((value) => normalizeStatus(value, "")).filter(Boolean);
+  if (tones.includes("danger") || tones.includes("error")) {
+    return "danger";
+  }
+  if (tones.includes("warn") || tones.includes("warning")) {
+    return "warn";
+  }
+  if (tones.includes("ok") || tones.includes("success")) {
+    return "ok";
+  }
+  return "neutral";
+}
+
 function formatAuthorityBasis(value) {
   const normalized = String(value || "").trim();
   if (!normalized) {
@@ -946,6 +967,175 @@ function buildCompanionReceiptSummary(context = {}, options = {}) {
   };
 }
 
+function buildCompanionIncidentAnchor(options = {}) {
+  const incidentId = String(options.incidentId || "").trim();
+  const incidentPackageId = String(options.incidentPackageId || "").trim();
+  const incidentStatus = normalizeStatus(options.incidentStatus, "");
+  if (incidentPackageId) {
+    const label =
+      incidentStatus === "closed" || incidentStatus === "resolved"
+        ? "Incident closed"
+        : incidentStatus === "draft" || incidentStatus === "drafted"
+          ? "Incident draft"
+          : incidentStatus
+            ? `Incident ${titleCaseToken(incidentStatus, "active").toLowerCase()}`
+            : "Incident linked";
+    const tone =
+      incidentStatus === "closed" || incidentStatus === "resolved"
+        ? "ok"
+        : incidentStatus === "draft" || incidentStatus === "drafted"
+          ? "warn"
+          : "danger";
+    return {
+      id: "incident",
+      title: "Incident",
+      tone,
+      label,
+      summary: `Incident package ${incidentPackageId} is attached to this governed path.`,
+      meta: joinMetaLine(
+        [incidentStatus ? `status=${formatIdentityLabel(options.incidentStatus)}` : "", incidentId ? `incident=${incidentId}` : ""],
+        "Incident follow-through now belongs to IncidentOps depth."
+      )
+    };
+  }
+  if (incidentId) {
+    return {
+      id: "incident",
+      title: "Incident",
+      tone: "warn",
+      label: "Incident attached",
+      summary: `Incident follow-through is already part of this governed path.`,
+      meta: `incident=${incidentId}`
+    };
+  }
+  return {
+    id: "incident",
+    title: "Incident",
+    tone: "neutral",
+    label: "No incident handoff",
+    summary: "Incident follow-through is not attached to this governed path.",
+    meta: "Open IncidentOps only when escalation or closure follow-through is needed."
+  };
+}
+
+function buildCompanionProofSpine(options = {}) {
+  const proof = options.proof && typeof options.proof === "object" ? options.proof : {};
+  const receipt = options.receipt && typeof options.receipt === "object" ? options.receipt : {};
+  const decisionMeta = String(options.decisionMeta || "").trim();
+  return {
+    decision: {
+      id: "decision",
+      title: "Decision",
+      tone: mergeCompanionTone(options.decisionTone, receipt.tone, proof.tone),
+      label: formatIdentityLabel(options.decisionLabel, "Governed review"),
+      summary: formatIdentityLabel(
+        options.decisionSummary,
+        "This governed item is still the active decision path."
+      ),
+      meta: decisionMeta || joinMetaLine(
+        [
+          options.decisionState ? `state=${formatIdentityLabel(options.decisionState)}` : "",
+          options.runId ? `run=${formatIdentityLabel(options.runId)}` : "",
+          options.approvalId ? `approval=${formatIdentityLabel(options.approvalId)}` : "",
+          options.checkpointId ? `checkpoint=${formatIdentityLabel(options.checkpointId)}` : "",
+          options.sourceClient ? `client=${formatIdentityLabel(options.sourceClient)}` : "",
+          options.gatewayRequestId ? `gatewayRequest=${formatIdentityLabel(options.gatewayRequestId)}` : ""
+        ],
+        "Companion keeps this governed decision attached into deeper review."
+      )
+    },
+    receipt: {
+      id: "receipt",
+      title: "Receipt",
+      tone: receipt.tone || "neutral",
+      label: receipt.label || "Receipt continuity attached",
+      summary: receipt.summary || "Receipt continuity stays attached to this governed path.",
+      meta: joinMetaLine(
+        [
+          options.approvalId ? `approval=${formatIdentityLabel(options.approvalId)}` : "",
+          options.checkpointId ? `checkpoint=${formatIdentityLabel(options.checkpointId)}` : "",
+          options.gatewayRequestId ? `gatewayRequest=${formatIdentityLabel(options.gatewayRequestId)}` : ""
+        ],
+        "Receipt continuity remains attached from Companion into deeper review."
+      )
+    },
+    proof: {
+      id: "proof",
+      title: "Proof",
+      tone: proof.tone || "warn",
+      label: proof.label || "Proof pending",
+      summary: proof.summary || "Proof continuity stays attached to this governed path.",
+      meta: joinMetaLine(
+        [
+          proof.bundleStatus ? `bundle=${formatIdentityLabel(proof.bundleStatus)}` : "",
+          proof.recordStatus ? `record=${formatIdentityLabel(proof.recordStatus)}` : "",
+          Number.isFinite(proof.evidenceRefCount) && proof.evidenceRefCount > 0 ? `refs=${proof.evidenceRefCount}` : "",
+          Number.isFinite(proof.auditCount) && proof.auditCount > 0 ? `audit=${proof.auditCount}` : ""
+        ],
+        "Open Workbench depth when bundle, provenance, or audit detail is needed."
+      )
+    },
+    incident: buildCompanionIncidentAnchor({
+      incidentId: options.incidentId || proof.incidentId,
+      incidentPackageId: options.incidentPackageId || proof.incidentPackageId,
+      incidentStatus: options.incidentStatus || proof.incidentStatus
+    })
+  };
+}
+
+function attachCompanionProofSpine(item = {}, options = {}) {
+  const proof = item?.proof && typeof item.proof === "object" ? item.proof : {};
+  const receipt = item?.receipt && typeof item.receipt === "object" ? item.receipt : {};
+  return {
+    ...item,
+    spine: buildCompanionProofSpine({
+      decisionTone: options.decisionTone || item.tone || proof.tone || receipt.tone,
+      decisionLabel:
+        options.decisionLabel ||
+        item.kindLabel ||
+        item.state ||
+        item.actionName ||
+        item.title ||
+        "Governed review",
+      decisionSummary: options.decisionSummary || item.summary,
+      decisionState: options.decisionState || item.state || item.kindLabel,
+      decisionMeta:
+        options.decisionMeta ||
+        joinMetaLine([item.primaryMeta, item.secondaryMeta], ""),
+      runId: item.runId,
+      approvalId: item.approvalId,
+      checkpointId: item.checkpointId,
+      gatewayRequestId: item.gatewayRequestId,
+      sourceClient: item.sourceClient || item.clientLabel,
+      incidentId: item.incidentId,
+      proof,
+      receipt,
+      incidentPackageId: proof.incidentPackageId,
+      incidentStatus: proof.incidentStatus
+    })
+  };
+}
+
+function buildHandoffDecisionLabel(kind = "", view = "") {
+  switch (String(kind || "").trim().toLowerCase()) {
+    case "approval":
+    case "approval-queue":
+      return "Governed review";
+    case "run":
+    case "runs":
+      return "Run investigation";
+    case "audit":
+      return "Trace review";
+    case "incident":
+      return "Incident follow-through";
+    default:
+      if (String(view || "").trim()) {
+        return `${formatOpsLabel(view, "Workbench")} depth`;
+      }
+      return "Workbench depth";
+  }
+}
+
 export function createCompanionProofHandoffContext(context = {}, options = {}) {
   const kind = String(options.kind || "handoff").trim().toLowerCase() || "handoff";
   const view = String(options.view || "").trim().toLowerCase();
@@ -983,6 +1173,7 @@ export function createCompanionProofHandoffContext(context = {}, options = {}) {
     gatewayHold,
     nativeApprovalRailItem
   });
+  const arrivalRationale = buildCompanionArrivalRationale(view, kind);
   return {
     kind,
     view,
@@ -993,9 +1184,35 @@ export function createCompanionProofHandoffContext(context = {}, options = {}) {
     sourceClient,
     incidentId: String(proof.incidentId || incidentId || "").trim(),
     openedFrom: String(options.openedFrom || "").trim(),
-    arrivalRationale: buildCompanionArrivalRationale(view, kind),
+    arrivalRationale,
     proof,
     receipt,
+    spine: buildCompanionProofSpine({
+      decisionTone: mergeCompanionTone(receipt.tone, proof.tone),
+      decisionLabel: buildHandoffDecisionLabel(kind, view),
+      decisionSummary: arrivalRationale,
+      decisionState: view ? `target=${formatOpsLabel(view, "Workbench")}` : "target=Workbench",
+      decisionMeta: joinMetaLine(
+        [
+          view ? `target=${formatOpsLabel(view, "Workbench")}` : "",
+          runId ? `run=${formatIdentityLabel(runId)}` : "",
+          approvalId ? `approval=${formatIdentityLabel(approvalId)}` : "",
+          checkpointId ? `checkpoint=${formatIdentityLabel(checkpointId)}` : "",
+          sourceClient ? `client=${formatIdentityLabel(sourceClient)}` : ""
+        ],
+        "Companion keeps the same governed item attached into this deeper workspace."
+      ),
+      runId,
+      approvalId,
+      checkpointId,
+      gatewayRequestId,
+      sourceClient,
+      incidentId: String(proof.incidentId || incidentId || "").trim(),
+      proof,
+      receipt,
+      incidentPackageId: proof.incidentPackageId,
+      incidentStatus: proof.incidentStatus
+    }),
     bundleStatus: proof.bundleStatus,
     recordStatus: proof.recordStatus,
     evidenceRefCount: proof.evidenceRefCount,
@@ -1115,24 +1332,40 @@ function createRecentGovernedActions(context = {}) {
     if (!runId) {
       return;
     }
+    const approvalId = String(hold?.approvalId || "").trim();
+    const linkedApproval = approvalsByRun.get(runId) || findApprovalById(context, approvalId);
+    const proof = buildAttachedProofSummary(context, {
+      runId,
+      approvalId
+    });
+    const receipt = buildCompanionReceiptSummary(context, {
+      approval: linkedApproval,
+      approvalId,
+      gatewayHold: hold
+    });
     recentItemsByRun.set(runId, {
+      ...attachCompanionProofSpine({
       id: runId,
       clientLabel: deriveGatewayClientLabel(hold, context),
+      sourceClient: deriveGatewayClientLabel(hold, context),
       actionName: gatewayHoldSummaryTarget(hold),
       targetSummary:
         formatScopeLabel([hold?.tenantId], [hold?.projectId]) ||
         formatIdentityLabel(hold?.governanceTarget?.targetRef, "-"),
       state: formatIdentityLabel(hold?.state, "-"),
       policyDecision: "DEFER",
+      summary: `Client ${deriveGatewayClientLabel(hold, context)} is waiting on review for ${gatewayHoldSummaryTarget(hold)}.`,
       occurredAt: formatIdentityLabel(hold?.holdStartedAtUtc || hold?.createdAtUtc, "-"),
       runId,
-      approvalId: String(hold?.approvalId || "").trim(),
+      approvalId,
       gatewayRequestId: formatIdentityLabel(hold?.gatewayRequestId, ""),
       action: "open-approval-item",
       actionLabel: "Open Workbench Review",
-      proof: buildAttachedProofSummary(context, {
-        runId,
-        approvalId: String(hold?.approvalId || "").trim()
+      proof,
+      receipt
+      }, {
+        decisionLabel: "Held request",
+        decisionState: formatIdentityLabel(hold?.state, "held_pending_approval")
       })
     });
   });
@@ -1152,11 +1385,24 @@ function createRecentGovernedActions(context = {}) {
       const policyDecision = String(run?.policyDecision || "").trim().toUpperCase() || "-";
       const approvalRequired =
         String(linkedApproval?.status || "").trim().toUpperCase() === "PENDING" || policyDecision === "DEFER";
+      const proof = buildAttachedProofSummary(context, {
+        runId,
+        approvalId: String(linkedApproval?.approvalId || "").trim()
+      });
+      const receipt = buildCompanionReceiptSummary(context, {
+        approval: linkedApproval,
+        approvalId: String(linkedApproval?.approvalId || "").trim(),
+        gatewayHold: findLinkedGatewayHold(context, {
+          approvalId: String(linkedApproval?.approvalId || "").trim(),
+          runId
+        })
+      });
       return [
         runId,
-        {
+        attachCompanionProofSpine({
         id: runId || String(run?.requestId || "").trim() || `run-${Math.random().toString(36).slice(2, 7)}`,
         clientLabel: deriveGatewayClientLabel(run, context),
+        sourceClient: deriveGatewayClientLabel(run, context),
         actionName: formatIdentityLabel(
           run?.requestedAction || run?.action || run?.requestId || "governed action"
         ),
@@ -1165,17 +1411,19 @@ function createRecentGovernedActions(context = {}) {
           formatIdentityLabel(run?.requestId, runId || "-"),
         state: formatIdentityLabel(run?.status, "-"),
         policyDecision,
+        summary: `Policy ${policyDecision} on ${formatIdentityLabel(run?.requestId, runId || "-")} is part of the governed path.`,
         occurredAt: formatIdentityLabel(run?.updatedAt || run?.createdAt, "-"),
         runId,
         approvalId: String(linkedApproval?.approvalId || "").trim(),
         gatewayRequestId: formatIdentityLabel(run?.requestId, ""),
         action: approvalRequired ? "open-approval-item" : "open-run-item",
         actionLabel: approvalRequired ? "Open Workbench Review" : "Open RuntimeOps Depth",
-        proof: buildAttachedProofSummary(context, {
-          runId,
-          approvalId: String(linkedApproval?.approvalId || "").trim()
+        proof,
+        receipt
+        }, {
+          decisionLabel: formatIdentityLabel(run?.status, "Governed action"),
+          decisionState: policyDecision
         })
-        }
       ];
     })
     .filter(Boolean)
@@ -1354,10 +1602,29 @@ function createGovernedRequestQueueItems(context = {}) {
   liveApprovals.forEach((item) => {
     const runId = String(item?.runId || "").trim();
     const approvalId = String(item?.approvalId || "").trim();
+    const checkpointId = String(item?.checkpointId || "").trim();
+    const linkedApproval = findApprovalById(context, approvalId) || findApprovalByRunId(context, runId);
+    const linkedGatewayHold = findLinkedGatewayHold(context, {
+      approvalId,
+      runId
+    });
+    const proof = buildAttachedProofSummary(context, {
+      runId,
+      approvalId,
+      checkpointId
+    });
+    const receipt = buildCompanionReceiptSummary(context, {
+      approval: linkedApproval,
+      approvalId,
+      checkpointId,
+      gatewayHold: linkedGatewayHold,
+      nativeApprovalRailItem: item
+    });
     if (runId) {
       queuedRunIds.add(runId);
     }
     items.push({
+      ...attachCompanionProofSpine({
       id: `queue-approval-${item.selectionId || approvalId || runId || items.length}`,
       queueKind: "approval",
       tone: item.tone || "warn",
@@ -1369,14 +1636,16 @@ function createGovernedRequestQueueItems(context = {}) {
       occurredAt: formatIdentityLabel(item.createdAt || item.expiresAt, "-"),
       runId,
       approvalId,
-      checkpointId: String(item?.checkpointId || "").trim(),
+      checkpointId,
+      gatewayRequestId: String(linkedGatewayHold?.gatewayRequestId || "").trim(),
+      sourceClient: String(item?.clientLabel || "").trim(),
       selectionId: String(item?.selectionId || "").trim(),
       action: item.detailAction || "open-approval-item",
       actionLabel: item.detailActionLabel || "Open Workbench Review",
-      proof: buildAttachedProofSummary(context, {
-        runId,
-        approvalId,
-        checkpointId: String(item?.checkpointId || "").trim()
+      proof,
+      receipt
+      }, {
+        decisionState: item.kindLabel || "Pending Review"
       })
     });
   });
@@ -1384,6 +1653,19 @@ function createGovernedRequestQueueItems(context = {}) {
   const incidentItems = createIncidentEscalationItems(context);
   incidentItems.forEach((item) => {
     const runId = String(item?.runId || "").trim();
+    const linkedApproval = findApprovalByRunId(context, runId);
+    const proof = buildAttachedProofSummary(context, {
+      runId,
+      incidentId: String(item?.incidentId || item?.id || "").trim()
+    });
+    const receipt = buildCompanionReceiptSummary(context, {
+      approval: linkedApproval,
+      approvalId: String(linkedApproval?.approvalId || "").trim(),
+      gatewayHold: findLinkedGatewayHold(context, {
+        approvalId: String(linkedApproval?.approvalId || "").trim(),
+        runId
+      })
+    });
     if (runId && queuedRunIds.has(runId)) {
       return;
     }
@@ -1391,6 +1673,7 @@ function createGovernedRequestQueueItems(context = {}) {
       queuedRunIds.add(runId);
     }
     items.push({
+      ...attachCompanionProofSpine({
       id: `queue-incident-${String(item?.id || runId || items.length).trim()}`,
       queueKind: "incident",
       tone: item.tone || "warn",
@@ -1404,9 +1687,10 @@ function createGovernedRequestQueueItems(context = {}) {
       incidentId: String(item?.incidentId || item?.id || "").trim(),
       action: item.action || "open-incident-item",
       actionLabel: item.actionLabel || "Open Incident Depth",
-      proof: buildAttachedProofSummary(context, {
-        runId,
-        incidentId: String(item?.incidentId || item?.id || "").trim()
+      proof,
+      receipt
+      }, {
+        decisionState: "Incident"
       })
     });
   });
@@ -1432,7 +1716,20 @@ function createGovernedRequestQueueItems(context = {}) {
       const linkedApproval = readItems(context.approvals).find(
         (item) => String(item?.runId || "").trim() === runId
       );
+      const proof = buildAttachedProofSummary(context, {
+        runId,
+        approvalId: String(linkedApproval?.approvalId || "").trim()
+      });
+      const receipt = buildCompanionReceiptSummary(context, {
+        approval: linkedApproval,
+        approvalId: String(linkedApproval?.approvalId || "").trim(),
+        gatewayHold: findLinkedGatewayHold(context, {
+          approvalId: String(linkedApproval?.approvalId || "").trim(),
+          runId
+        })
+      });
       items.push({
+        ...attachCompanionProofSpine({
         id: `queue-run-${runId}`,
         queueKind: "run",
         tone: status === "FAILED" || decision === "DENY" ? "danger" : "warn",
@@ -1451,9 +1748,10 @@ function createGovernedRequestQueueItems(context = {}) {
         approvalId: String(linkedApproval?.approvalId || "").trim(),
         action: "open-run-item",
         actionLabel: "Open RuntimeOps Depth",
-        proof: buildAttachedProofSummary(context, {
-          runId,
-          approvalId: String(linkedApproval?.approvalId || "").trim()
+        proof,
+        receipt
+        }, {
+          decisionState: decision || status
         })
       });
     });

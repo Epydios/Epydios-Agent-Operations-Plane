@@ -6,7 +6,7 @@ import {
 } from "../domains/incidentops/routes.js";
 import { createAimxsDecisionBindingSpine } from "../shared/aimxs/decision-binding.js";
 
-test("incidentops page restores visible triage and closure clusters", () => {
+test("incidentops page restores visible continuation and closure clusters", () => {
   const ui = { incidentOpsContent: { innerHTML: "" } };
   renderIncidentOpsPage(ui, {
     incidentHistory: {
@@ -117,14 +117,14 @@ test("incidentops page restores visible triage and closure clusters", () => {
 
   assert.match(ui.incidentOpsContent.innerHTML, /data-domain-root="incidentops"/);
   assert.match(ui.incidentOpsContent.innerHTML, /IncidentOps/);
-  assert.match(ui.incidentOpsContent.innerHTML, /Queue And Active Incident/);
-  assert.match(ui.incidentOpsContent.innerHTML, /Timeline And Closure/);
+  assert.match(ui.incidentOpsContent.innerHTML, /Incident Continuation/);
+  assert.match(ui.incidentOpsContent.innerHTML, /Response Timeline And Closure/);
   assert.match(ui.incidentOpsContent.innerHTML, /data-workbench-cluster-layout="split"/);
   assert.match(ui.incidentOpsContent.innerHTML, /IncidentOps action feedback is visible\./);
-  assert.match(ui.incidentOpsContent.innerHTML, /Incident Packages/);
-  assert.match(ui.incidentOpsContent.innerHTML, /Current Incident Package/);
-  assert.match(ui.incidentOpsContent.innerHTML, /Package Priority/);
-  assert.match(ui.incidentOpsContent.innerHTML, /Incident Timeline/);
+  assert.match(ui.incidentOpsContent.innerHTML, /Incident Continuation Queue/);
+  assert.match(ui.incidentOpsContent.innerHTML, /Current Incident Continuation/);
+  assert.match(ui.incidentOpsContent.innerHTML, /Incident Priority/);
+  assert.match(ui.incidentOpsContent.innerHTML, /Incident Continuity Timeline/);
   assert.match(ui.incidentOpsContent.innerHTML, /Closure Readiness/);
   assert.match(ui.incidentOpsContent.innerHTML, /AIMXS Decision-Binding Spine/);
   assert.match(ui.incidentOpsContent.innerHTML, /Authority Chain/);
@@ -144,7 +144,7 @@ test("incidentops page restores visible triage and closure clusters", () => {
   assert.match(ui.incidentOpsContent.innerHTML, /Incident package generated/);
   assert.match(ui.incidentOpsContent.innerHTML, /events=1/);
   assert.match(ui.incidentOpsContent.innerHTML, /audit=0/);
-  assert.match(ui.incidentOpsContent.innerHTML, /handoff=pending/);
+  assert.match(ui.incidentOpsContent.innerHTML, /continuity=pending/);
   assert.match(ui.incidentOpsContent.innerHTML, /blockers=3/);
   assert.match(ui.incidentOpsContent.innerHTML, /approval=pending/);
   assert.match(ui.incidentOpsContent.innerHTML, /audit=linked/);
@@ -184,6 +184,11 @@ test("incidentops page preserves companion handoff context in the receiving prel
   });
 
   assert.match(ui.incidentOpsContent.innerHTML, /Companion handoff context/);
+  assert.match(ui.incidentOpsContent.innerHTML, /Decision \/ Receipt \/ Proof \/ Incident/);
+  assert.match(ui.incidentOpsContent.innerHTML, /data-workbench-arrival-anchor="decision"/);
+  assert.match(ui.incidentOpsContent.innerHTML, /data-workbench-arrival-anchor="receipt"/);
+  assert.match(ui.incidentOpsContent.innerHTML, /data-workbench-arrival-anchor="proof"/);
+  assert.match(ui.incidentOpsContent.innerHTML, /data-workbench-arrival-anchor="incident"/);
   assert.match(ui.incidentOpsContent.innerHTML, /Proof ready/);
   assert.match(ui.incidentOpsContent.innerHTML, /Approval receipt pending/);
   assert.match(ui.incidentOpsContent.innerHTML, /incident-20260327T120500Z-run-20260327-005/);

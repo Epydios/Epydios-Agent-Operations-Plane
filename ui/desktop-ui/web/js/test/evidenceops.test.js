@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { renderEvidenceOpsEmptyState, renderEvidenceOpsPage } from "../domains/evidenceops/routes.js";
 import { createAimxsDecisionBindingSpine } from "../shared/aimxs/decision-binding.js";
 
-test("evidenceops page restores visible proof-management clusters", () => {
+test("evidenceops page restores visible proof-owner clusters", () => {
   const ui = { evidenceOpsContent: { innerHTML: "" } };
   renderEvidenceOpsPage(ui, {
     settings: {
@@ -261,14 +261,14 @@ test("evidenceops page restores visible proof-management clusters", () => {
 
   assert.match(ui.evidenceOpsContent.innerHTML, /data-domain-root="evidenceops"/);
   assert.match(ui.evidenceOpsContent.innerHTML, /EvidenceOps/);
-  assert.match(ui.evidenceOpsContent.innerHTML, /Bundle And Provenance/);
-  assert.match(ui.evidenceOpsContent.innerHTML, /Access And Retention/);
-  assert.match(ui.evidenceOpsContent.innerHTML, /Control Mapping/);
+  assert.match(ui.evidenceOpsContent.innerHTML, /Proof Bundle And Provenance/);
+  assert.match(ui.evidenceOpsContent.innerHTML, /Proof Access And Retention/);
+  assert.match(ui.evidenceOpsContent.innerHTML, /Proof Control Mapping/);
   assert.match(ui.evidenceOpsContent.innerHTML, /data-workbench-cluster-layout="split"/);
   assert.match(ui.evidenceOpsContent.innerHTML, /EvidenceOps Action Complete/);
   assert.match(ui.evidenceOpsContent.innerHTML, /Evidence bundle review JSON downloaded/);
-  assert.match(ui.evidenceOpsContent.innerHTML, /Evidence Package/);
-  assert.match(ui.evidenceOpsContent.innerHTML, /Provenance Board/);
+  assert.match(ui.evidenceOpsContent.innerHTML, /Proof Bundle/);
+  assert.match(ui.evidenceOpsContent.innerHTML, /Proof Provenance/);
   assert.match(ui.evidenceOpsContent.innerHTML, /Admin Change Provenance/);
   assert.match(ui.evidenceOpsContent.innerHTML, /AIMXS Lifecycle Ribbon/);
   assert.match(ui.evidenceOpsContent.innerHTML, /AIMXS Decision-Binding Spine/);
@@ -280,9 +280,9 @@ test("evidenceops page restores visible proof-management clusters", () => {
   assert.match(ui.evidenceOpsContent.innerHTML, /data-aimxs-spine-action="open-workspace"/);
   assert.match(ui.evidenceOpsContent.innerHTML, /Decision Binding Contract/);
   assert.match(ui.evidenceOpsContent.innerHTML, /Stable Or Replay Refs/);
-  assert.match(ui.evidenceOpsContent.innerHTML, /Package Handoff Locations/);
+  assert.match(ui.evidenceOpsContent.innerHTML, /Proof Access Locations/);
   assert.match(ui.evidenceOpsContent.innerHTML, /Retention Board/);
-  assert.match(ui.evidenceOpsContent.innerHTML, /Evidence To Control Mapping Board/);
+  assert.match(ui.evidenceOpsContent.innerHTML, /Proof To Control Mapping/);
   assert.match(ui.evidenceOpsContent.innerHTML, /bundle-governed-001/);
   assert.match(ui.evidenceOpsContent.innerHTML, /approval-20260315-001/);
   assert.match(ui.evidenceOpsContent.innerHTML, /policy-change-aa10-001/);
@@ -343,6 +343,11 @@ test("evidenceops page preserves companion handoff context in the receiving prel
   });
 
   assert.match(ui.evidenceOpsContent.innerHTML, /Companion handoff context/);
+  assert.match(ui.evidenceOpsContent.innerHTML, /Decision \/ Receipt \/ Proof \/ Incident/);
+  assert.match(ui.evidenceOpsContent.innerHTML, /data-workbench-arrival-anchor="decision"/);
+  assert.match(ui.evidenceOpsContent.innerHTML, /data-workbench-arrival-anchor="receipt"/);
+  assert.match(ui.evidenceOpsContent.innerHTML, /data-workbench-arrival-anchor="proof"/);
+  assert.match(ui.evidenceOpsContent.innerHTML, /data-workbench-arrival-anchor="incident"/);
   assert.match(ui.evidenceOpsContent.innerHTML, /Proof ready/);
   assert.match(ui.evidenceOpsContent.innerHTML, /Decision receipt ready/);
   assert.match(ui.evidenceOpsContent.innerHTML, /incident-20260327T120400Z-run-20260327-004/);

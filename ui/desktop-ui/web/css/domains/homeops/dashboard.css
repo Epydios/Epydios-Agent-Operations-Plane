@@ -110,6 +110,27 @@
   gap: var(--space-2);
 }
 
+.homeops-proof-spine-card {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.homeops-proof-spine-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: var(--space-2);
+}
+
+.homeops-proof-spine-anchor {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+  border-radius: var(--radius-2);
+  background: color-mix(in srgb, var(--surface-soft) 82%, var(--panel));
+}
+
 .homeops-command-value,
 .homeops-aimxs-value,
 .homeops-attention-value,

@@ -165,12 +165,12 @@ function renderEvidenceBundleBoard(snapshot) {
       ])
     },
     {
-      label: "Package Links",
+      label: "Governed Path Links",
       value: renderValuePills([
         { label: "approval", value: board.latestBundle.approvalId, code: true },
         { label: "scope", value: board.latestBundle.scope, code: true },
         { label: "audit source", value: board.auditSource, code: true },
-        { label: "incident package", value: board.latestIncidentPackage.packageId, code: true }
+        { label: "incident", value: board.latestIncidentPackage.packageId, code: true }
       ])
     },
     {
@@ -186,7 +186,7 @@ function renderEvidenceBundleBoard(snapshot) {
   return `
     <article class="metric evidenceops-card" data-domain-root="evidenceops" data-evidenceops-panel="evidence-bundle-board">
       <div class="metric-title-row">
-        <div class="title">Evidence Package</div>
+        <div class="title">Proof Bundle</div>
         <span class="${chipClassForTone(board.tone)}">${escapeHTML(board.tone)}</span>
       </div>
       <div class="evidenceops-chip-row">
@@ -196,9 +196,9 @@ function renderEvidenceBundleBoard(snapshot) {
         <span class="chip chip-neutral chip-compact">degraded=${escapeHTML(String(board.degradedCount))}</span>
       </div>
       ${renderActionButtons([
-        { label: "Download Evidence Package", command: "download-bundle-json", disabled: !board.canExportReview },
+        { label: "Download Proof Bundle", command: "download-bundle-json", disabled: !board.canExportReview },
         { label: "Open Governed Run", command: "open-bundle-run", disabled: !board.canOpenRun },
-        { label: "Open Incident Packages", command: "open-incidentops", disabled: !board.canOpenIncidentOps }
+        { label: "Open Incident Continuation", command: "open-incidentops", disabled: !board.canOpenIncidentOps }
       ])}
       <div class="evidenceops-kv-list">${renderKeyValueRows(rows)}</div>
       <div class="evidenceops-subsection">
@@ -252,7 +252,7 @@ function renderProvenanceBoard(snapshot) {
   return `
     <article class="metric evidenceops-card" data-domain-root="evidenceops" data-evidenceops-panel="provenance-board">
       <div class="metric-title-row">
-        <div class="title">Provenance Board</div>
+        <div class="title">Proof Provenance</div>
         <span class="${chipClassForTone(board.tone)}">${escapeHTML(board.tone)}</span>
       </div>
       <div class="evidenceops-chip-row">
@@ -364,7 +364,7 @@ function renderArtifactAccessBoard(snapshot) {
   const board = snapshot.artifactAccessBoard;
   const rows = [
     {
-      label: "Handoff Coverage",
+      label: "Proof Access Coverage",
       value: renderValuePills([
         { label: "artifacts", value: String(board.artifactCount) },
         { label: "direct uris", value: String(board.directUriCount) },
@@ -383,7 +383,7 @@ function renderArtifactAccessBoard(snapshot) {
       ])
     },
     {
-      label: "Linked Review And Incident Flow",
+      label: "Linked Review And Incident Continuity",
       value: renderValuePills([
         { label: "bundles", value: board.latestBundle.bundleId, code: true },
         { label: "bundle status", value: board.latestBundle.status },
@@ -392,7 +392,7 @@ function renderArtifactAccessBoard(snapshot) {
       ])
     },
     {
-      label: "Latest Incident Package",
+      label: "Latest Incident Continuation",
       value: renderValuePills([
         { label: "package", value: board.latestIncidentPackage.packageId, code: true },
         { label: "file", value: board.latestIncidentPackage.fileName, code: true },
@@ -404,7 +404,7 @@ function renderArtifactAccessBoard(snapshot) {
   return `
     <article class="metric evidenceops-card" data-domain-root="evidenceops" data-evidenceops-panel="artifact-access-board">
       <div class="metric-title-row">
-        <div class="title">Package Handoff Locations</div>
+        <div class="title">Proof Access Locations</div>
         <span class="${chipClassForTone(board.tone)}">${escapeHTML(board.tone)}</span>
       </div>
       <div class="evidenceops-chip-row">
@@ -415,12 +415,12 @@ function renderArtifactAccessBoard(snapshot) {
       </div>
       ${renderActionButtons([
         { label: "Copy Latest Evidence Location", command: "copy-latest-uri", disabled: !board.canCopyLatestUri },
-        { label: "Copy Suggested Package Folder", command: "copy-suggested-run-folder", disabled: !board.canCopySuggestedRunFolder },
+        { label: "Copy Suggested Proof Folder", command: "copy-suggested-run-folder", disabled: !board.canCopySuggestedRunFolder },
         { label: "Open Governed Run", command: "open-artifact-run", disabled: !board.canOpenRun }
       ])}
       <div class="evidenceops-kv-list">${renderKeyValueRows(rows)}</div>
       <div class="evidenceops-subsection">
-        <div class="evidenceops-subtitle">Handoff Locations</div>
+        <div class="evidenceops-subtitle">Proof Locations</div>
         ${renderAccessCards(board.accessEntries)}
       </div>
     </article>
@@ -434,7 +434,7 @@ function renderRetentionBoard(snapshot) {
       label: "Retention Defaults",
       value: renderValuePills([
         { label: "audit events", value: `${board.defaults.auditEvents}d` },
-        { label: "incident packages", value: `${board.defaults.incidentPackages}d` },
+        { label: "incident continuations", value: `${board.defaults.incidentPackages}d` },
         { label: "terminal history", value: `${board.defaults.terminalHistory}d` },
         { label: "run snapshots", value: `${board.defaults.runSnapshots}d` }
       ])
@@ -448,20 +448,20 @@ function renderRetentionBoard(snapshot) {
         { label: "bundle", value: board.latestBundle.retentionClass, code: true }
       ])
     },
-    {
-      label: "Latest Retained Material",
-      value: renderValuePills([
-        { label: "artifact", value: board.latestArtifact.artifactId, code: true },
-        { label: "kind", value: board.latestArtifact.kind },
-        { label: "bundle", value: board.latestBundle.bundleId, code: true },
-        { label: "package", value: board.latestIncidentPackage.packageId, code: true }
-      ])
-    },
-    {
-      label: "Package Queue",
-      value: renderValuePills([
-        { label: "drafted", value: String(board.queueCounts.drafted || 0) },
-        { label: "filed", value: String(board.queueCounts.filed || 0) },
+          {
+            label: "Latest Retained Material",
+            value: renderValuePills([
+              { label: "artifact", value: board.latestArtifact.artifactId, code: true },
+              { label: "kind", value: board.latestArtifact.kind },
+              { label: "bundle", value: board.latestBundle.bundleId, code: true },
+              { label: "incident", value: board.latestIncidentPackage.packageId, code: true }
+            ])
+          },
+          {
+            label: "Incident Continuation Retention",
+            value: renderValuePills([
+              { label: "drafted", value: String(board.queueCounts.drafted || 0) },
+              { label: "filed", value: String(board.queueCounts.filed || 0) },
         { label: "closed", value: String(board.queueCounts.closed || 0) },
         { label: "latest status", value: board.latestIncidentPackage.filingStatus }
       ])
@@ -531,7 +531,7 @@ function renderControlMappingBoard(snapshot) {
   return `
     <article class="metric evidenceops-card" data-domain-root="evidenceops" data-evidenceops-panel="control-mapping-board">
       <div class="metric-title-row">
-        <div class="title">Evidence To Control Mapping Board</div>
+        <div class="title">Proof To Control Mapping</div>
         <span class="${chipClassForTone(board.tone)}">${escapeHTML(board.tone)}</span>
       </div>
       <div class="evidenceops-chip-row">
@@ -559,7 +559,7 @@ export function renderEvidenceWorkspace(context = {}) {
     shellClass: "evidenceops-workspace",
     title: "EvidenceOps",
     lead:
-      "Use the deeper proof console for governed bundles, provenance continuity, artifact access, and control mapping without flattening evidence ownership into one long board.",
+      "Use the deeper proof console for governed proof bundles, provenance continuity, artifact access, and control mapping on the same governed path.",
     layout: "split",
     prelude: `
       ${renderWorkbenchArrivalContext({
@@ -571,9 +571,9 @@ export function renderEvidenceWorkspace(context = {}) {
     `,
     clusters: [
       renderWorkbenchDomainCluster({
-        title: "Bundle And Provenance",
+        title: "Proof Bundle And Provenance",
         lead:
-          "Keep the active evidence package, provenance trace, and admin change provenance together so proof continuity stays visible at a glance.",
+          "Keep the active proof bundle, provenance trace, and admin change provenance together so proof ownership stays visible at a glance.",
         bodyClass: "stack",
         body: `
           ${renderEvidenceBundleBoard(snapshot)}
@@ -582,9 +582,9 @@ export function renderEvidenceWorkspace(context = {}) {
         `
       }),
       renderWorkbenchDomainCluster({
-        title: "Access And Retention",
+        title: "Proof Access And Retention",
         lead:
-          "Show artifact handoff paths and retention posture together as the operational evidence access lane rather than scattering them across proof views.",
+          "Show proof access paths and retention posture together as the operational proof-access lane instead of scattering them across adjacent views.",
         bodyClass: "stack",
         body: `
           ${renderArtifactAccessBoard(snapshot)}
@@ -592,9 +592,9 @@ export function renderEvidenceWorkspace(context = {}) {
         `
       }),
       renderWorkbenchDomainCluster({
-        title: "Control Mapping",
+        title: "Proof Control Mapping",
         lead:
-          "Keep control coverage and evidence-to-control traceability visible as the deeper proof-management layer, not just another metrics card.",
+          "Keep control coverage and proof-to-control traceability visible as the deeper proof-owner layer, not just another metrics card.",
         bodyClass: "stack",
         body: `${renderControlMappingBoard(snapshot)}`
       })

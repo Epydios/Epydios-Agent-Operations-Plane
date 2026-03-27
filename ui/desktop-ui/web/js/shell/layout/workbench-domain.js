@@ -33,6 +33,105 @@ function renderArrivalNeutralChip(label = "", value = "") {
   )}</span>`;
 }
 
+function renderArrivalSpineAnchor(anchor = {}, key = "") {
+  const normalizedKey = String(key || anchor.id || "").trim().toLowerCase() || "anchor";
+  return `
+    <div class="workbench-arrival-context-detail" data-workbench-arrival-anchor="${escapeHTML(normalizedKey)}">
+      <div class="title">${escapeHTML(anchor.title || normalizedKey)}</div>
+      <div class="meta">
+        <span class="${chipClassForStatus(anchor.tone || "neutral")} chip-compact">${escapeHTML(anchor.label || "-")}</span>
+      </div>
+      <div class="meta">${escapeHTML(anchor.summary || "-")}</div>
+      <div class="meta">${escapeHTML(anchor.meta || "-")}</div>
+    </div>
+  `;
+}
+
+function resolveWorkbenchArrivalSpine(handoff = {}) {
+  if (handoff?.spine && typeof handoff.spine === "object") {
+    return handoff.spine;
+  }
+  const proof = handoff.proof && typeof handoff.proof === "object" ? handoff.proof : {};
+  const receipt = handoff.receipt && typeof handoff.receipt === "object" ? handoff.receipt : {};
+  const incidentPackageId = String(handoff.incidentPackageId || "").trim();
+  const incidentId = String(handoff.incidentId || "").trim();
+  const incidentStatus = String(handoff.incidentStatus || "").trim();
+  return {
+    decision: {
+      id: "decision",
+      title: "Decision",
+      tone: receipt.tone || proof.tone || "neutral",
+      label: String(handoff.kind || "handoff").trim() || "handoff",
+      summary: String(
+        handoff.arrivalRationale || "Companion opened this Workbench depth because the governed request needs deeper review."
+      ),
+      meta:
+        [
+          handoff.runId ? `run=${handoff.runId}` : "",
+          handoff.approvalId ? `approval=${handoff.approvalId}` : "",
+          handoff.checkpointId ? `checkpoint=${handoff.checkpointId}` : "",
+          handoff.sourceClient ? `client=${handoff.sourceClient}` : ""
+        ]
+          .filter(Boolean)
+          .join("; ") || "Companion keeps the same governed item attached into this deeper workspace."
+    },
+    receipt: {
+      id: "receipt",
+      title: "Receipt",
+      tone: receipt.tone || "neutral",
+      label: receipt.label || "Receipt continuity attached",
+      summary: receipt.summary || "Receipt continuity stays attached from the live governed path.",
+      meta:
+        [
+          handoff.approvalId ? `approval=${handoff.approvalId}` : "",
+          handoff.gatewayRequestId ? `gatewayRequest=${handoff.gatewayRequestId}` : ""
+        ]
+          .filter(Boolean)
+          .join("; ") || "Receipt continuity remains attached from Companion into deeper review."
+    },
+    proof: {
+      id: "proof",
+      title: "Proof",
+      tone: proof.tone || "neutral",
+      label: proof.label || "Proof continuity",
+      summary: proof.summary || "Proof continuity stays attached from Companion into this deeper workspace.",
+      meta:
+        [
+          handoff.bundleStatus ? `bundle=${handoff.bundleStatus}` : "",
+          handoff.recordStatus ? `record=${handoff.recordStatus}` : "",
+          Number.isFinite(handoff.auditCount) && handoff.auditCount > 0 ? `audit=${handoff.auditCount}` : "",
+          Number.isFinite(handoff.evidenceRefCount) && handoff.evidenceRefCount > 0 ? `refs=${handoff.evidenceRefCount}` : ""
+        ]
+          .filter(Boolean)
+          .join("; ") || "Bundle, record, incident, and audit continuity will appear here as they become ready."
+    },
+    incident: {
+      id: "incident",
+      title: "Incident",
+      tone: incidentPackageId ? (incidentStatus === "closed" ? "ok" : "warn") : incidentId ? "warn" : "neutral",
+      label: incidentPackageId
+        ? incidentStatus
+          ? `Incident ${incidentStatus}`
+          : "Incident linked"
+        : incidentId
+          ? "Incident attached"
+          : "No incident handoff",
+      summary: incidentPackageId
+        ? `Incident package ${incidentPackageId} is attached to this governed path.`
+        : incidentId
+          ? "Incident follow-through is already part of this governed path."
+          : "Incident follow-through is not attached to this governed path.",
+      meta:
+        [
+          incidentPackageId ? `incident=${incidentPackageId}` : "",
+          incidentStatus ? `status=${incidentStatus}` : ""
+        ]
+          .filter(Boolean)
+          .join("; ") || "Open IncidentOps only when escalation or closure follow-through is needed."
+    }
+  };
+}
+
 export function renderWorkbenchArrivalContext({ domainRoot = "", handoffContext = null } = {}) {
   const handoff =
     handoffContext && typeof handoffContext === "object"
@@ -46,11 +145,12 @@ export function renderWorkbenchArrivalContext({ domainRoot = "", handoffContext 
   if (targetView && targetView !== normalizedDomainRoot) {
     return "";
   }
-  const proof = handoff.proof && typeof handoff.proof === "object" ? handoff.proof : {};
-  const receipt = handoff.receipt && typeof handoff.receipt === "object" ? handoff.receipt : {};
+  const spine = resolveWorkbenchArrivalSpine(handoff);
   const continuityChips = [
-    renderArrivalChip(proof.label || "Proof continuity", proof.tone || "neutral"),
-    renderArrivalChip(receipt.label || "Receipt continuity", receipt.tone || "neutral"),
+    renderArrivalChip(spine?.decision?.label || "Decision continuity", spine?.decision?.tone || "neutral"),
+    renderArrivalChip(spine?.receipt?.label || "Receipt continuity", spine?.receipt?.tone || "neutral"),
+    renderArrivalChip(spine?.proof?.label || "Proof continuity", spine?.proof?.tone || "neutral"),
+    renderArrivalChip(spine?.incident?.label || "Incident continuity", spine?.incident?.tone || "neutral"),
     renderArrivalNeutralChip("run", handoff.runId),
     renderArrivalNeutralChip("approval", handoff.approvalId),
     renderArrivalNeutralChip("checkpoint", handoff.checkpointId),
@@ -59,23 +159,13 @@ export function renderWorkbenchArrivalContext({ domainRoot = "", handoffContext 
   ]
     .filter(Boolean)
     .join("");
-  const continuitySummary = [
-    handoff.bundleStatus ? `bundle=${handoff.bundleStatus}` : "",
-    handoff.recordStatus ? `record=${handoff.recordStatus}` : "",
-    handoff.incidentPackageId ? `incident=${handoff.incidentPackageId}` : "",
-    Number.isFinite(handoff.auditCount) && handoff.auditCount > 0 ? `audit=${handoff.auditCount}` : "",
-    Number.isFinite(handoff.evidenceRefCount) && handoff.evidenceRefCount > 0
-      ? `refs=${handoff.evidenceRefCount}`
-      : ""
-  ]
-    .filter(Boolean)
-    .join("; ");
   return `
     <section class="workbench-arrival-context" data-workbench-arrival-context data-workbench-arrival-domain="${escapeHTML(normalizedDomainRoot)}">
       <article class="metric workbench-arrival-context-card">
         <div class="workbench-arrival-context-header">
           <div class="workbench-arrival-context-copy">
             <div class="title">Companion handoff context</div>
+            <div class="meta">Decision / Receipt / Proof / Incident stays attached as you enter this deeper workspace.</div>
             <div class="meta">${escapeHTML(
               String(handoff.arrivalRationale || "Companion opened this Workbench depth because the governed request needs deeper review.")
             )}</div>
@@ -86,28 +176,10 @@ export function renderWorkbenchArrivalContext({ domainRoot = "", handoffContext 
           </div>
         </div>
         <div class="workbench-arrival-context-grid">
-          <div class="workbench-arrival-context-detail">
-            <div class="title">Proof continuity</div>
-            <div class="meta">${escapeHTML(
-              String(proof.summary || "Proof continuity stays attached from Companion into this deeper workspace.")
-            )}</div>
-            <div class="meta">${escapeHTML(
-              continuitySummary || "Bundle, record, incident, and audit continuity will appear here as they become ready."
-            )}</div>
-          </div>
-          <div class="workbench-arrival-context-detail">
-            <div class="title">Receipt continuity</div>
-            <div class="meta">${escapeHTML(
-              String(receipt.summary || "Receipt continuity stays attached from the live governed path.")
-            )}</div>
-            <div class="meta">${escapeHTML(
-              handoff.gatewayRequestId
-                ? `gatewayRequest=${handoff.gatewayRequestId}`
-                : handoff.openedFrom
-                  ? `openedFrom=${handoff.openedFrom}`
-                  : "Return to Companion when the deeper review is complete."
-            )}</div>
-          </div>
+          ${renderArrivalSpineAnchor(spine?.decision, "decision")}
+          ${renderArrivalSpineAnchor(spine?.receipt, "receipt")}
+          ${renderArrivalSpineAnchor(spine?.proof, "proof")}
+          ${renderArrivalSpineAnchor(spine?.incident, "incident")}
         </div>
       </article>
     </section>

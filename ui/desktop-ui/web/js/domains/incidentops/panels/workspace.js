@@ -161,7 +161,7 @@ function renderQueueList(items = []) {
     .filter(Boolean)
     .join("");
   if (!list) {
-    return '<div class="incidentops-empty">No incident packages are ready yet.</div>';
+    return '<div class="incidentops-empty">No incident continuations are ready yet.</div>';
   }
   return `<ol class="incidentops-list">${list}</ol>`;
 }
@@ -171,7 +171,7 @@ function renderIncidentQueueBoard(snapshot) {
   return `
     <article class="metric incidentops-card" data-incidentops-panel="incident-queue">
       <div class="metric-title-row">
-        <div class="title">Incident Packages</div>
+        <div class="title">Incident Continuation Queue</div>
         <span class="${chipClassForTone(board.tone)}">${escapeHTML(board.tone)}</span>
       </div>
       <div class="incidentops-chip-row">
@@ -183,7 +183,7 @@ function renderIncidentQueueBoard(snapshot) {
       <div class="incidentops-kv-list">
         ${renderKeyValueRows([
           {
-            label: "Package Flow",
+            label: "Decision And Receipt Flow",
             value: renderValuePills([
               { label: "pending approvals", value: String(board.pendingApprovalCount) },
               { label: "audit sources", value: String(board.auditSourceCount) }
@@ -196,7 +196,7 @@ function renderIncidentQueueBoard(snapshot) {
         ])}
       </div>
       <div class="incidentops-subsection">
-        <div class="incidentops-subtitle">Recent Packages</div>
+        <div class="incidentops-subtitle">Recent Continuations</div>
         ${renderQueueList(board.recentItems)}
       </div>
     </article>
@@ -224,7 +224,7 @@ function renderActiveIncidentBoard(snapshot) {
   return `
     <article class="metric incidentops-card" data-incidentops-panel="active-incident-board">
       <div class="metric-title-row">
-        <div class="title">Current Incident Package</div>
+        <div class="title">Current Incident Continuation</div>
         <span class="${chipClassForTone(board.tone)}">${escapeHTML(board.severity || "low")}</span>
       </div>
       <div class="incidentops-chip-row">
@@ -258,7 +258,7 @@ function renderActiveIncidentBoard(snapshot) {
           entryId: board.entryId
         },
         {
-          label: "Review Evidence Handoff",
+          label: "Review Proof Continuity",
           command: "open-evidenceops",
           entryId: board.entryId
         }
@@ -266,7 +266,7 @@ function renderActiveIncidentBoard(snapshot) {
       <div class="incidentops-kv-list">
         ${renderKeyValueRows([
           {
-            label: "Package File",
+            label: "Incident Record",
             value: renderValuePills([
               { label: "package", value: board.packageId || "-", code: true },
               { label: "file", value: board.fileName || "-", code: true }
@@ -282,7 +282,7 @@ function renderActiveIncidentBoard(snapshot) {
             ])
           },
           {
-            label: "Audit And Package Timing",
+            label: "Audit And Incident Timing",
             value: renderValuePills([
               { label: "source", value: board.auditSource || "-", code: true },
               { label: "generated", value: board.generatedAt ? formatTime(board.generatedAt) : "-" },
@@ -300,7 +300,7 @@ function renderSeverityBoard(snapshot) {
   return `
     <article class="metric incidentops-card" data-incidentops-panel="severity-board">
       <div class="metric-title-row">
-        <div class="title">Package Priority</div>
+        <div class="title">Incident Priority</div>
         <span class="${chipClassForTone(board.tone)}">${escapeHTML(board.tone)}</span>
       </div>
       <div class="incidentops-chip-row">
@@ -323,7 +323,7 @@ function renderSeverityBoard(snapshot) {
             ])
           },
           {
-            label: "Highest Priority Packages",
+            label: "Highest Priority Incidents",
             value: renderValuePills((board.highestPackages || []).map((item) => ({ label: item.packageId, value: item.runId || "-", code: true })))
           }
         ])}
@@ -370,19 +370,19 @@ function renderResponseTimelineBoard(snapshot) {
   return `
     <article class="metric incidentops-card" data-incidentops-panel="response-timeline-board">
       <div class="metric-title-row">
-        <div class="title">Incident Timeline</div>
+        <div class="title">Incident Continuity Timeline</div>
         <span class="${chipClassForTone(board.tone)}">${escapeHTML(board.tone)}</span>
       </div>
       <div class="incidentops-chip-row">
         <span class="chip chip-neutral chip-compact">events=${escapeHTML(String(board.eventCount))}</span>
         <span class="chip chip-neutral chip-compact">audit=${escapeHTML(String(board.auditLinkedCount))}</span>
         <span class="chip chip-neutral chip-compact">approval=${escapeHTML(board.approvalLinked ? "linked" : "none")}</span>
-        <span class="chip chip-neutral chip-compact">handoff=${escapeHTML(board.handoffReady ? "ready" : "pending")}</span>
+        <span class="chip chip-neutral chip-compact">continuity=${escapeHTML(board.handoffReady ? "ready" : "pending")}</span>
       </div>
       <div class="incidentops-kv-list">
         ${renderKeyValueRows([
           {
-            label: "Current Package",
+            label: "Current Incident",
             value: renderValuePills([
               { label: "package", value: board.activePackageId || "-", code: true },
               { label: "run", value: board.activeRunId || "-", code: true },
@@ -392,7 +392,7 @@ function renderResponseTimelineBoard(snapshot) {
         ])}
       </div>
       <div class="incidentops-subsection">
-        <div class="incidentops-subtitle">Package Timeline</div>
+        <div class="incidentops-subtitle">Incident Continuity Timeline</div>
         ${renderTimelineList(board.events)}
       </div>
     </article>
@@ -424,7 +424,7 @@ function renderClosureBoard(snapshot) {
       <div class="incidentops-kv-list">
         ${renderKeyValueRows([
           {
-            label: "Closure Package",
+            label: "Closure Continuity",
             value: renderValuePills([
               { label: "package", value: board.packageId || "-", code: true },
               { label: "run", value: board.runId || "-", code: true },
@@ -462,7 +462,7 @@ export function renderIncidentWorkspace(context = {}) {
     shellClass: "incidentops-workspace",
     title: "IncidentOps",
     lead:
-      "Use the deeper incident console for triage, active response context, and closure follow-through once the daily Companion lane is not enough.",
+      "Use the deeper incident console for governed-path continuation, active response context, and closure follow-through once the daily Companion lane is not enough.",
     layout: "split",
     prelude: `
       ${renderWorkbenchArrivalContext({
@@ -474,9 +474,9 @@ export function renderIncidentWorkspace(context = {}) {
     `,
     clusters: [
       renderWorkbenchDomainCluster({
-        title: "Queue And Active Incident",
+        title: "Incident Continuation",
         lead:
-          "Keep incident intake, the currently focused package, and severity posture visible as the active triage plane instead of compressing them into one card strip.",
+          "Keep the continuing incident path, the currently focused governed item, and response priority visible together so incident depth reads as continuation instead of a separate package queue.",
         bodyClass: "stack",
         body: `
           ${renderIncidentQueueBoard(snapshot)}
@@ -485,9 +485,9 @@ export function renderIncidentWorkspace(context = {}) {
         `
       }),
       renderWorkbenchDomainCluster({
-        title: "Timeline And Closure",
+        title: "Response Timeline And Closure",
         lead:
-          "Keep response timeline and closure readiness together so follow-through remains visible after the queue and active incident move forward.",
+          "Keep response timeline and closure readiness together so the same governed path stays legible through follow-through and closure.",
         bodyClass: "stack",
         body: `
           ${renderResponseTimelineBoard(snapshot)}

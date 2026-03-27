@@ -237,7 +237,14 @@ test("companionops page renders companion as the daily governance lane with work
   assert.match(ui.homeOpsContent.innerHTML, /incident-20260315T161900Z-run-20260315-003/);
   assert.match(ui.homeOpsContent.innerHTML, /Open Incident Depth/);
   assert.match(ui.homeOpsContent.innerHTML, /Runtime depth/);
-  assert.match(ui.homeOpsContent.innerHTML, /Attached Proof/);
+  assert.match(ui.homeOpsContent.innerHTML, /Decision \/ Receipt \/ Proof \/ Incident/);
+  assert.match(ui.homeOpsContent.innerHTML, /data-homeops-proof-spine/);
+  assert.match(ui.homeOpsContent.innerHTML, /data-homeops-proof-anchor="decision"/);
+  assert.match(ui.homeOpsContent.innerHTML, /data-homeops-proof-anchor="receipt"/);
+  assert.match(ui.homeOpsContent.innerHTML, /data-homeops-proof-anchor="proof"/);
+  assert.match(ui.homeOpsContent.innerHTML, /data-homeops-proof-anchor="incident"/);
+  assert.match(ui.homeOpsContent.innerHTML, /Decision receipt ready|Approval receipt pending|Receipt continuity attached/);
+  assert.match(ui.homeOpsContent.innerHTML, /Incident filed|Incident linked|No incident handoff|Incident attached/);
   assert.match(ui.homeOpsContent.innerHTML, /Proof ready|Proof attached/);
   assert.match(ui.homeOpsContent.innerHTML, /bundle=sealed/);
   assert.match(ui.homeOpsContent.innerHTML, /record=recorded/);

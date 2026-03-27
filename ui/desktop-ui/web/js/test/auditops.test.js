@@ -187,7 +187,7 @@ test("auditops page restores visible event, trace, and investigation clusters", 
   assert.match(ui.auditOpsContent.innerHTML, /AuditOps/);
   assert.match(ui.auditOpsContent.innerHTML, /Events/);
   assert.match(ui.auditOpsContent.innerHTML, /Decision And Actor Trace/);
-  assert.match(ui.auditOpsContent.innerHTML, /Investigation And Export/);
+  assert.match(ui.auditOpsContent.innerHTML, /Proof And Incident Continuity/);
   assert.match(ui.auditOpsContent.innerHTML, /data-workbench-cluster-layout="split"/);
   assert.match(ui.auditOpsContent.innerHTML, /Audit Activity/);
   assert.match(ui.auditOpsContent.innerHTML, /Actor Activity Board/);
@@ -203,8 +203,8 @@ test("auditops page restores visible event, trace, and investigation clusters", 
   assert.match(ui.auditOpsContent.innerHTML, /data-aimxs-spine-action="open-workspace"/);
   assert.match(ui.auditOpsContent.innerHTML, /Decision Binding Contract/);
   assert.match(ui.auditOpsContent.innerHTML, /Stable Or Replay Refs/);
-  assert.match(ui.auditOpsContent.innerHTML, /Incident Package Handoff/);
-  assert.match(ui.auditOpsContent.innerHTML, /Incident Package Flow/);
+  assert.match(ui.auditOpsContent.innerHTML, /Receipt, Proof, And Incident Continuity/);
+  assert.match(ui.auditOpsContent.innerHTML, /Incident Follow-Through/);
   assert.match(ui.auditOpsContent.innerHTML, /AuditOps Action Complete/);
   assert.match(ui.auditOpsContent.innerHTML, /Audit JSON exported to audit-export\.json\./);
   assert.match(ui.auditOpsContent.innerHTML, /audit-endpoint/);
@@ -222,8 +222,8 @@ test("auditops page restores visible event, trace, and investigation clusters", 
   assert.match(ui.auditOpsContent.innerHTML, /decisionEvents=2/);
   assert.match(ui.auditOpsContent.innerHTML, /matched=2/);
   assert.match(ui.auditOpsContent.innerHTML, /csv=3/);
-  assert.match(ui.auditOpsContent.innerHTML, /handoff=\d+/);
-  assert.match(ui.auditOpsContent.innerHTML, /queue=2/);
+  assert.match(ui.auditOpsContent.innerHTML, /summary=\d+/);
+  assert.match(ui.auditOpsContent.innerHTML, /incidents=2/);
   assert.match(ui.auditOpsContent.innerHTML, /incident-20260315T011900Z-run-20260315-001/);
   assert.match(ui.auditOpsContent.innerHTML, /tenant-demo\/project-core/);
   assert.match(ui.auditOpsContent.innerHTML, /data-auditops-action="export-json"/);
@@ -232,7 +232,7 @@ test("auditops page restores visible event, trace, and investigation clusters", 
   assert.match(ui.auditOpsContent.innerHTML, /data-auditops-action="export-incident-package"/);
   assert.match(ui.auditOpsContent.innerHTML, /data-auditops-action="open-incidentops"/);
   assert.match(ui.auditOpsContent.innerHTML, /data-auditops-action="copy-latest-handoff"/);
-  assert.match(ui.auditOpsContent.innerHTML, /Package Summary Preview/);
+  assert.match(ui.auditOpsContent.innerHTML, /Incident Continuation Preview/);
   assert.match(ui.auditOpsContent.innerHTML, /selected run/);
   assert.match(ui.auditOpsContent.innerHTML, /drafted=1/);
   assert.match(ui.auditOpsContent.innerHTML, /filed=1/);
@@ -262,6 +262,11 @@ test("auditops page preserves companion handoff context in the receiving prelude
   });
 
   assert.match(ui.auditOpsContent.innerHTML, /Companion handoff context/);
+  assert.match(ui.auditOpsContent.innerHTML, /Decision \/ Receipt \/ Proof \/ Incident/);
+  assert.match(ui.auditOpsContent.innerHTML, /data-workbench-arrival-anchor="decision"/);
+  assert.match(ui.auditOpsContent.innerHTML, /data-workbench-arrival-anchor="receipt"/);
+  assert.match(ui.auditOpsContent.innerHTML, /data-workbench-arrival-anchor="proof"/);
+  assert.match(ui.auditOpsContent.innerHTML, /data-workbench-arrival-anchor="incident"/);
   assert.match(ui.auditOpsContent.innerHTML, /Proof ready/);
   assert.match(ui.auditOpsContent.innerHTML, /Approval receipt pending/);
   assert.match(ui.auditOpsContent.innerHTML, /run=run-20260327-003/);

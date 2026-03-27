@@ -50,6 +50,39 @@ function renderProofBadge(proof = {}) {
   `;
 }
 
+function renderProofSpineAnchor(anchor = {}, key = "") {
+  const normalizedKey = String(key || anchor.id || "").trim().toLowerCase() || "anchor";
+  return `
+    <article class="homeops-proof-spine-anchor" data-homeops-proof-anchor="${escapeHTML(normalizedKey)}">
+      <div class="title">${escapeHTML(anchor.title || normalizedKey)}</div>
+      <div class="meta">
+        <span class="${chipClassForStatus(anchor.tone || "neutral")} chip-compact">${escapeHTML(
+          anchor.label || "-"
+        )}</span>
+      </div>
+      <div class="meta">${escapeHTML(anchor.summary || "-")}</div>
+      <div class="meta">${escapeHTML(anchor.meta || "-")}</div>
+    </article>
+  `;
+}
+
+function renderProofSpine(spine = {}, options = {}) {
+  const anchors = ["decision", "receipt", "proof", "incident"]
+    .map((key) => renderProofSpineAnchor(spine?.[key], key))
+    .join("");
+  return `
+    <article class="metric homeops-proof-spine-card" data-homeops-proof-spine>
+      <div class="title">${escapeHTML(options.title || "Decision / Receipt / Proof / Incident")}</div>
+      <div class="meta">${escapeHTML(
+        options.summary || "The governed path stays visible here before you leave Companion for deeper owner-domain review."
+      )}</div>
+      <div class="homeops-proof-spine-grid">
+        ${anchors}
+      </div>
+    </article>
+  `;
+}
+
 function renderStatusCard(card = {}) {
   return `
     <article class="metric homeops-status-card" data-homeops-card="${escapeHTML(card.id || "companion-status")}">
@@ -68,6 +101,7 @@ function renderStatusCard(card = {}) {
 
 function renderQueueItem(item = {}, index = 0) {
   const proof = item?.proof && typeof item.proof === "object" ? item.proof : {};
+  const spine = item?.spine && typeof item.spine === "object" ? item.spine : {};
   const defaultOpen = index === 0 ? " open" : "";
   const detailAction = renderActionButton(item.action, item.actionLabel || "Open Workbench Depth", item);
   const proofAction = shouldRenderDistinctProofAction(item, proof)
@@ -109,15 +143,9 @@ function renderQueueItem(item = {}, index = 0) {
             <div class="meta">${escapeHTML(item.primaryMeta || "-")}</div>
             <div class="meta">${escapeHTML(item.secondaryMeta || "-")}</div>
           </article>
-          <article class="metric homeops-queue-detail-card">
-            <div class="title">Attached Proof</div>
-            <div class="meta">
-              ${renderProofBadge(proof)}
-              <span class="chip chip-neutral chip-compact">${escapeHTML(item.kindLabel || "Attention")}</span>
-            </div>
-            <div class="meta">${escapeHTML(proof.summary || "Open the owner surface for deeper proof context.")}</div>
-            <div class="meta">run=${escapeHTML(proof.runId || item.runId || "-")}; approval=${escapeHTML(proof.approvalId || item.approvalId || "-")}</div>
-          </article>
+          ${renderProofSpine(spine, {
+            summary: "Companion keeps the active governed path explicit before deeper review is opened."
+          })}
         </div>
         ${
           item.selectionId
@@ -163,6 +191,7 @@ function renderQueueItem(item = {}, index = 0) {
 
 function renderRecentActionRow(item = {}) {
   const proof = item?.proof && typeof item.proof === "object" ? item.proof : {};
+  const spine = item?.spine && typeof item.spine === "object" ? item.spine : {};
   const detailAction = renderActionButton(item.action, item.actionLabel || "Open", item);
   const proofAction = shouldRenderDistinctProofAction(item, proof)
     ? renderActionButton(proof.action, proof.actionLabel || "Open Evidence Depth", proof)
@@ -185,7 +214,9 @@ function renderRecentActionRow(item = {}) {
         <div class="meta">Run: ${escapeHTML(item.runId || "-")}</div>
         <div class="meta">Time: ${escapeHTML(formatTime(item.occurredAt || "-"))}</div>
       </div>
-      <div class="meta">Attached proof: ${escapeHTML(proof.summary || "Open the owner surface for deeper proof context.")}</div>
+      ${renderProofSpine(spine, {
+        summary: "Recent governed actions keep the same decision, receipt, proof, and incident continuity visible in Companion."
+      })}
       <div class="homeops-actions">
         ${detailAction}
         ${proofAction}
@@ -354,7 +385,7 @@ export function renderHomeWorkspace(snapshot = {}) {
       <section class="homeops-board">
         <div class="homeops-board-header">
           <h3>Recent Governed Actions</h3>
-          <p class="homeops-board-lead">Recent governed traffic stays visible in Companion with attached proof summaries. Open depth only when you need fuller runtime, evidence, or governance inspection.</p>
+          <p class="homeops-board-lead">Recent governed traffic stays visible in Companion with decision, receipt, proof, and incident continuity. Open depth only when you need fuller runtime, evidence, or governance inspection.</p>
         </div>
         <div class="homeops-recent-action-list">
           ${recentActions.length ? recentActions.map((item) => renderRecentActionRow(item)).join("") : renderEmptyMessage("No recent governed actions are available yet. Submit work through the local gateway to populate this surface.")}
