@@ -2,7 +2,7 @@
 
 EpydiosOps is an installable operator desktop for governed AI and tool execution.
 
-It puts a visible operator surface in front of requests that are usually buried in middleware. You can launch the desktop, keep interposition explicit, run a real governed request, resolve the decision, and inspect the audit and evidence trail on the same path.
+It puts a visible operator surface in front of requests that are usually buried in middleware. You can launch the desktop, keep interposition explicit, run a real governed request, resolve the decision and inspect the audit and evidence trail on the same path.
 
 ![Epydios Companion overview](docs/images/hero-overview.png)
 
@@ -17,8 +17,6 @@ From the repo root:
 ./ui/desktop-ui/bin/check-m1.sh
 ./ui/desktop-ui/bin/verify-m15-phase-c-governed-request.sh
 ```
-
-This is the fastest honest way to decide whether the repo is real.
 
 It proves:
 
@@ -36,7 +34,6 @@ It proves:
 - macOS `live` installed desktop is the supported lane
 - Linux has a proven Ubuntu 24.04 beta lane
 - Windows has a native packaging and launch beta lane
-- premium AIMXS remains separate and is not required for the OSS proof path
 
 ## What This Repo Contains
 
