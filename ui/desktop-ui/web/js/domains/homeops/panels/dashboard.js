@@ -103,6 +103,62 @@ function renderConnectedClientCard(item = {}) {
   `;
 }
 
+function renderLiveApprovalCard(item = {}) {
+  return `
+    <article
+      class="metric homeops-live-approval-card"
+      data-homeops-live-approval-card
+      data-homeops-selection-id="${escapeHTML(item.selectionId || "")}"
+    >
+      <div class="homeops-recent-action-header">
+        <div class="title">${escapeHTML(item.title || "Pending review")}</div>
+        <div class="meta">
+          <span class="${chipClassForStatus(item.tone || "warn")} chip-compact">${escapeHTML(
+            String(item.tone || "warn")
+          )}</span>
+          <span class="chip chip-neutral chip-compact">${escapeHTML(item.kindLabel || "Review")}</span>
+        </div>
+      </div>
+      <div class="meta">${escapeHTML(item.summary || "-")}</div>
+      <div class="homeops-recent-action-grid">
+        <div class="meta">${escapeHTML(item.primaryMeta || "-")}</div>
+        <div class="meta">${escapeHTML(item.secondaryMeta || "-")}</div>
+        <div class="meta">created=${escapeHTML(item.createdAt || "-")}</div>
+        <div class="meta">expires=${escapeHTML(item.expiresAt || "-")}</div>
+      </div>
+      <div class="field">
+        <span class="label">Decision Reason (Optional)</span>
+        <input
+          class="filter-input"
+          type="text"
+          placeholder="optional; add operator context or leave blank to use the default review note"
+          data-homeops-native-decision-reason
+        />
+      </div>
+      <div class="homeops-actions">
+        <button
+          class="btn btn-ok btn-small"
+          type="button"
+          data-homeops-native-decision-action="APPROVE"
+          data-homeops-native-selection-id="${escapeHTML(item.selectionId || "")}"
+        >Approve</button>
+        <button
+          class="btn btn-danger btn-small"
+          type="button"
+          data-homeops-native-decision-action="DENY"
+          data-homeops-native-selection-id="${escapeHTML(item.selectionId || "")}"
+        >Deny</button>
+        <button
+          class="btn btn-secondary btn-small"
+          type="button"
+          data-homeops-action="${escapeHTML(item.detailAction || "open-approval-queue")}"
+          ${item.runId ? `data-homeops-run-id="${escapeHTML(item.runId)}"` : ""}
+        >${escapeHTML(item.detailActionLabel || "Open Workbench Detail")}</button>
+      </div>
+    </article>
+  `;
+}
+
 function renderEmptyMessage(message) {
   return `<div class="homeops-empty">${escapeHTML(message)}</div>`;
 }
@@ -111,6 +167,7 @@ export function renderHomeWorkspace(snapshot = {}) {
   const systemCards = Array.isArray(snapshot?.systemStatus?.cards) ? snapshot.systemStatus.cards : [];
   const systemActions = Array.isArray(snapshot?.systemStatus?.actions) ? snapshot.systemStatus.actions : [];
   const attentionItems = Array.isArray(snapshot?.attentionQueue?.items) ? snapshot.attentionQueue.items : [];
+  const liveApprovals = Array.isArray(snapshot?.liveApprovals?.items) ? snapshot.liveApprovals.items : [];
   const recentActions = Array.isArray(snapshot?.recentGovernedActions?.items)
     ? snapshot.recentGovernedActions.items
     : [];
@@ -148,6 +205,15 @@ export function renderHomeWorkspace(snapshot = {}) {
         </div>
         <div class="homeops-attention-grid">
           ${attentionItems.length ? attentionItems.map((item) => renderAttentionItem(item)).join("") : renderEmptyMessage("No immediate approvals, degraded services, failed runs, or incident escalations are waiting for action.")}
+        </div>
+      </section>
+      <section class="homeops-board" data-homeops-section="live-approvals">
+        <div class="homeops-board-header">
+          <h3>Live Approvals</h3>
+          <p class="homeops-board-lead">Resolve the normal live approval loop here without leaving Companion. Use Workbench only when you need deeper history or investigation.</p>
+        </div>
+        <div class="homeops-recent-action-list">
+          ${liveApprovals.length ? liveApprovals.map((item) => renderLiveApprovalCard(item)).join("") : renderEmptyMessage("No current-thread approvals or held gateway requests are waiting for direct Companion review.")}
         </div>
       </section>
       <section class="homeops-board">

@@ -192,7 +192,9 @@ function summarizeConnectorApprovalQueue(nativeGatewayHolds = [], settings = {},
       if (!actionType.toLowerCase().startsWith("connector.")) {
         return null;
       }
+      const interpositionRequestId = normalizeString(item?.interpositionRequestId);
       return {
+        selectionId: interpositionRequestId ? `native:hold:${interpositionRequestId}` : "",
         interpositionRequestId: normalizeString(item?.interpositionRequestId, "-"),
         gatewayRequestId: normalizeString(item?.gatewayRequestId, "-"),
         runId: normalizeString(item?.runId, "-"),
@@ -210,6 +212,7 @@ function summarizeConnectorApprovalQueue(nativeGatewayHolds = [], settings = {},
         driverLabel: connectorActionDriverLabel(actionType),
         toolName: connectorActionToolLabel(actionType),
         targetRef: normalizeString(item?.governanceTarget?.targetRef, "-"),
+        canResolve: Boolean(interpositionRequestId && normalizeString(item?.runId)),
         selected:
           selectedRunId &&
           [item?.runId, item?.approvalId, `native:hold:${normalizeString(item?.interpositionRequestId)}`]

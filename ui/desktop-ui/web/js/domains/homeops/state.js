@@ -414,6 +414,10 @@ function readGatewayHoldItems(context = {}) {
   return Array.isArray(context?.nativeGatewayHolds) ? context.nativeGatewayHolds : [];
 }
 
+function readNativeApprovalRailItems(context = {}) {
+  return Array.isArray(context?.nativeApprovalRailItems) ? context.nativeApprovalRailItems : [];
+}
+
 function pendingGatewayHolds(context = {}) {
   return readGatewayHoldItems(context).filter(
     (item) => String(item?.state || "").trim().toLowerCase() === "held_pending_approval"
@@ -469,6 +473,81 @@ function gatewayHoldSummaryTarget(item = {}) {
       item?.governanceTarget?.targetRef ||
       item?.requestSummary?.reason
   );
+}
+
+function liveApprovalKindLabel(item = {}) {
+  const decisionType = normalizeStatus(item?.decisionType, "");
+  if (decisionType === "gateway_hold") {
+    return "Held Request";
+  }
+  if (decisionType === "checkpoint") {
+    return "Current Thread Approval";
+  }
+  return "Pending Review";
+}
+
+function liveApprovalTone(item = {}) {
+  const expiresAt = parseTimeMs(item?.expiresAt);
+  if (expiresAt > 0 && expiresAt - Date.now() <= 300000) {
+    return "danger";
+  }
+  return "warn";
+}
+
+function createLiveApprovalItems(context = {}) {
+  return readNativeApprovalRailItems(context)
+    .filter((item) => {
+      const decisionType = normalizeStatus(item?.decisionType, "");
+      const status = normalizeStatus(item?.status, "");
+      return status === "pending" && (decisionType === "gateway_hold" || decisionType === "checkpoint");
+    })
+    .map((item) => {
+      const decisionType = normalizeStatus(item?.decisionType, "");
+      const selectionId = formatIdentityLabel(item?.selectionId, "");
+      const runId = formatIdentityLabel(item?.runId, "");
+      const approvalId = formatIdentityLabel(item?.approvalId, "");
+      const checkpointId = formatIdentityLabel(item?.checkpointId, "");
+      const clientLabel =
+        decisionType === "gateway_hold"
+          ? formatIdentityLabel(item?.clientLabel || deriveGatewayClientLabel(item, context))
+          : "Companion thread";
+      return {
+        selectionId,
+        runId,
+        approvalId,
+        checkpointId,
+        tone: liveApprovalTone(item),
+        kindLabel: liveApprovalKindLabel(item),
+        title:
+          decisionType === "gateway_hold"
+            ? formatIdentityLabel(item?.summary || gatewayHoldSummaryTarget(item), "Held request")
+            : formatIdentityLabel(item?.summary || item?.reason, "Approval required"),
+        summary:
+          decisionType === "gateway_hold"
+            ? `Client ${clientLabel} is waiting on review before ${formatIdentityLabel(item?.expiresAt, "-")}.`
+            : `${formatIdentityLabel(item?.reason, "Current thread approval is waiting on review.")}`,
+        primaryMeta:
+          decisionType === "gateway_hold"
+            ? `runId=${runId || "-"}; approvalId=${approvalId || "-"}`
+            : `checkpointId=${checkpointId || "-"}; sessionId=${formatIdentityLabel(item?.sessionId, "-")}`,
+        secondaryMeta:
+          decisionType === "gateway_hold"
+            ? `target=${formatIdentityLabel(item?.governanceTarget?.targetRef, "-")}`
+            : `scope=${formatIdentityLabel(item?.scope, "-")}`,
+        createdAt: formatIdentityLabel(item?.createdAt, "-"),
+        expiresAt: formatIdentityLabel(item?.expiresAt, "-"),
+        detailAction:
+          decisionType === "gateway_hold" && runId
+            ? "open-run-item"
+            : "open-approval-queue",
+        detailActionLabel:
+          decisionType === "gateway_hold" && runId
+            ? "Open RuntimeOps"
+            : "Open Workbench Detail"
+      };
+    })
+    .sort((left, right) => parseTimeMs(right?.createdAt || right?.expiresAt) - parseTimeMs(left?.createdAt || left?.expiresAt))
+    .slice(0, 4);
 }
 
 function createSystemStatusRegion(context = {}) {
@@ -555,6 +634,7 @@ function createAttentionItems(context = {}) {
   const gatewayService = readObject(shell.gatewayService);
   const incidents = summarizeIncidents(context.incidentHistory, context.runs, context.approvals);
   const pendingHolds = pendingGatewayHolds(context);
+  const liveApprovals = createLiveApprovalItems(context);
   const latestHold = latestGatewayHold(context);
   const pendingApprovals = approvals.filter(
     (item) => String(item?.status || "").trim().toUpperCase() === "PENDING"
@@ -579,8 +659,8 @@ function createAttentionItems(context = {}) {
       tone: holdDeadlineMs > 0 && holdDeadlineMs - Date.now() <= 300000 ? "danger" : "warn",
       value: String(pendingHolds.length),
       detail: `Latest approval ${formatIdentityLabel(latestHold?.approvalId, "-")} from ${deriveGatewayClientLabel(latestHold, context)} should be reviewed before ${formatIdentityLabel(latestHold?.holdDeadlineAtUtc, "-")}.`,
-      action: "open-approval-item",
-      actionLabel: "Open Approval",
+      action: liveApprovals.length > 0 ? "focus-live-approvals" : "open-approval-item",
+      actionLabel: liveApprovals.length > 0 ? "Review In Companion" : "Open Approval",
       runId: String(latestHold?.runId || "").trim(),
       approvalId: String(latestHold?.approvalId || "").trim()
     });
@@ -590,8 +670,8 @@ function createAttentionItems(context = {}) {
       tone: countExpiringApprovals(approvals) > 0 ? "danger" : "warn",
       value: String(pendingApprovals.length),
       detail: `Latest approval ${formatIdentityLabel(latestPendingApproval?.approvalId, "-")}. ${countExpiringApprovals(approvals)} expiring soon.`,
-      action: "open-approval-item",
-      actionLabel: "Open Approval",
+      action: liveApprovals.length > 0 ? "focus-live-approvals" : "open-approval-item",
+      actionLabel: liveApprovals.length > 0 ? "Review In Companion" : "Open Approval",
       runId: String(latestPendingApproval?.runId || "").trim(),
       approvalId: String(latestPendingApproval?.approvalId || "").trim()
     });
@@ -724,6 +804,7 @@ function createQuickActions(context = {}) {
   const lastWorkbenchDomain = String(context.lastWorkbenchDomain || "agentops").trim().toLowerCase() || "agentops";
   const approvals = readItems(context.approvals);
   const runs = readItems(context.runs);
+  const liveApprovals = createLiveApprovalItems(context);
   const shell = readObject(context.nativeShell);
   return [
     {
@@ -733,10 +814,10 @@ function createQuickActions(context = {}) {
       action: "open-workbench"
     },
     {
-      id: "open-approval-queue",
-      label: "Open Approval Queue",
+      id: liveApprovals.length > 0 ? "review-live-approvals" : "open-approval-queue",
+      label: liveApprovals.length > 0 ? "Review Live Approvals" : "Open Approval Queue",
       summary: `${countPendingApprovals(approvals)} waiting for review`,
-      action: "open-approval-queue"
+      action: liveApprovals.length > 0 ? "focus-live-approvals" : "open-approval-queue"
     },
     {
       id: "open-recent-runs",
@@ -965,6 +1046,9 @@ export function createHomeWorkspaceSnapshot(context = {}) {
     },
     aimxsWorkflow: createAimxsWorkflowSnapshot(snapshot),
     identityAndScope: createIdentityAndScopeSnapshot(snapshot),
+    liveApprovals: {
+      items: createLiveApprovalItems(snapshot)
+    },
     attentionQueue: {
       items: createAttentionItems(snapshot)
     },

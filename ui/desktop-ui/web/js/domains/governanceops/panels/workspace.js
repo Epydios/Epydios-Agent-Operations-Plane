@@ -501,7 +501,31 @@ function renderConnectorApprovalsBoard(snapshot) {
                 { label: "enabled profiles", value: String(board.enabledProfileCount || 0) },
                 { label: "known profiles", value: String(board.profileCount || 0) }
               ])}
+              <div class="meta metric-note">Resolve the held connector request here. RuntimeOps keeps the linked connector continuity and evidence handoff on the related run.</div>
+              <div class="field">
+                <span class="label">Decision Reason (Optional)</span>
+                <input
+                  class="filter-input"
+                  type="text"
+                  placeholder="optional; add context or leave blank to use the default review note"
+                  data-native-decision-reason
+                />
+              </div>
               <div class="governanceops-action-row">
+                <button
+                  class="btn btn-ok btn-small"
+                  type="button"
+                  data-native-decision-action="APPROVE"
+                  data-native-decision-key="${escapeHTML(item.selectionId || "")}"
+                  ${item.canResolve ? "" : "disabled"}
+                >Approve Connector Hold</button>
+                <button
+                  class="btn btn-danger btn-small"
+                  type="button"
+                  data-native-decision-action="DENY"
+                  data-native-decision-key="${escapeHTML(item.selectionId || "")}"
+                  ${item.canResolve ? "" : "disabled"}
+                >Deny Connector Hold</button>
                 <button
                   class="btn btn-primary btn-small"
                   type="button"

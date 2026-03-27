@@ -122,3 +122,37 @@ test("native launcher status renders degraded launcher failure details", () => {
   assert.match(html, /native-launcher-status-switch-callout is-pending/);
   assert.match(html, /https:\/\/api\.openai\.com/);
 });
+
+test("native launcher status renders interposition transition feedback", () => {
+  const html = renderNativeLauncherStatus({
+    launcherState: "ready",
+    mode: "live",
+    runtimeState: "service_running",
+    runtimeProcessMode: "background_supervisor",
+    runtimeService: {
+      state: "starting",
+      health: "starting"
+    },
+    gatewayService: {
+      state: "starting",
+      health: "starting"
+    },
+    interposition: {
+      enabled: true,
+      effective: false,
+      status: "starting",
+      reason: "Turning interposition on. Epydios is getting ready to govern supported requests.",
+      upstreamBaseUrl: "https://api.openai.com/v1",
+      upstreamBearerTokenConfigured: false,
+      upstreamAuthMode: "client_passthrough"
+    },
+    bootstrapConfigState: "loaded"
+  });
+
+  assert.match(html, /Background service starting/);
+  assert.match(html, /Gateway starting/);
+  assert.match(html, /Interposition starting/);
+  assert.match(html, /Turning Interposition ON\.\.\./);
+  assert.match(html, /native-launcher-status-switch-callout is-pending/);
+  assert.match(html, /disabled/);
+});

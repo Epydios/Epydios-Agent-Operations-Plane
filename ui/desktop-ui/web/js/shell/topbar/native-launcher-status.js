@@ -99,6 +99,10 @@ function describeInterpositionStatus(state) {
   switch (String(state || "").trim().toLowerCase()) {
     case "on":
       return "Interposition active";
+    case "starting":
+      return "Interposition starting";
+    case "stopping":
+      return "Interposition stopping";
     case "warming":
       return "Interposition warming";
     case "blocked_mock_mode":
@@ -127,6 +131,10 @@ function interpositionChipClass(state) {
   switch (String(state || "").trim().toLowerCase()) {
     case "on":
       return "chip-success";
+    case "starting":
+    case "stopping":
+    case "warming":
+      return "chip-neutral";
     case "blocked_mock_mode":
     case "blocked_upstream_config":
     case "gateway_unavailable":
@@ -138,6 +146,9 @@ function interpositionChipClass(state) {
 
 function interpositionCalloutClass(enabled, status) {
   const normalizedStatus = String(status || "").trim().toLowerCase();
+  if (["starting", "stopping", "warming"].includes(normalizedStatus)) {
+    return "is-pending";
+  }
   if (enabled && normalizedStatus === "on") {
     return "is-on";
   }
@@ -182,6 +193,7 @@ export function renderNativeLauncherStatus(shell = null) {
     interposition.upstreamAuthMode,
     interpositionTokenConfigured ? "saved_token" : "client_passthrough"
   ).toLowerCase();
+  const interpositionBusy = ["starting", "stopping"].includes(interpositionStatus);
   const startupError = String(shell.startupError || "").trim();
   const copy = startupError
     ? "The native launcher opened in a degraded state. Review the diagnostics below before retrying the live path."
@@ -233,7 +245,16 @@ export function renderNativeLauncherStatus(shell = null) {
             type="button"
             data-native-shell-action="toggle-interposition"
             data-native-shell-next-enabled="${interpositionEnabled ? "false" : "true"}"
-          >${escapeHTML(interpositionEnabled ? "Turn Interposition OFF" : "Turn Interposition ON")}</button>
+            ${interpositionBusy ? "disabled" : ""}
+          >${escapeHTML(
+            interpositionStatus === "starting"
+              ? "Turning Interposition ON..."
+              : interpositionStatus === "stopping"
+                ? "Turning Interposition OFF..."
+                : interpositionEnabled
+                  ? "Turn Interposition OFF"
+                  : "Turn Interposition ON"
+          )}</button>
         </div>
         ${
           interpositionReason

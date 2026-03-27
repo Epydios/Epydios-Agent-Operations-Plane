@@ -136,6 +136,34 @@ test("companionops page renders companion status, attention, recent governed act
         }
       }
     ],
+    nativeApprovalRailItems: [
+      {
+        selectionId: "native:hold:ixr-20260315-003",
+        decisionType: "gateway_hold",
+        runId: "run-20260315-003",
+        approvalId: "approval-20260315-003",
+        clientLabel: "Codex",
+        createdAt: "2026-03-15T16:19:00Z",
+        expiresAt: "2026-03-15T16:24:00Z",
+        status: "PENDING",
+        summary: "Restart payments deployment",
+        governanceTarget: {
+          targetRef: "deploy/payments"
+        }
+      },
+      {
+        selectionId: "native:checkpoint:session-1:approval-org-admin-1",
+        decisionType: "checkpoint",
+        sessionId: "session-1",
+        checkpointId: "approval-org-admin-1",
+        createdAt: "2026-03-15T16:18:00Z",
+        expiresAt: "2026-03-15T16:26:00Z",
+        status: "PENDING",
+        reason: "Desktop verify needs approval.",
+        summary: "Desktop verify needs approval.",
+        scope: "org_admin"
+      }
+    ],
     audit: {
       source: "audit-endpoint",
       items: [
@@ -162,6 +190,7 @@ test("companionops page renders companion status, attention, recent governed act
   assert.match(ui.homeOpsContent.innerHTML, /data-domain-root="companionops"/);
   assert.match(ui.homeOpsContent.innerHTML, /System Status/);
   assert.match(ui.homeOpsContent.innerHTML, /Attention Queue/);
+  assert.match(ui.homeOpsContent.innerHTML, /Live Approvals/);
   assert.match(ui.homeOpsContent.innerHTML, /Recent Governed Actions/);
   assert.match(ui.homeOpsContent.innerHTML, /Quick Actions/);
   assert.match(ui.homeOpsContent.innerHTML, /Connected Client Context/);
@@ -177,17 +206,27 @@ test("companionops page renders companion status, attention, recent governed act
   assert.match(ui.homeOpsContent.innerHTML, /Restart Services/);
   assert.match(ui.homeOpsContent.innerHTML, /Show Diagnostics/);
   assert.match(ui.homeOpsContent.innerHTML, /Held request review/);
+  assert.match(ui.homeOpsContent.innerHTML, /Review In Companion/);
   assert.match(ui.homeOpsContent.innerHTML, /Runs requiring attention/);
   assert.match(ui.homeOpsContent.innerHTML, /Incident escalation pending/);
+  assert.match(ui.homeOpsContent.innerHTML, /Resolve the normal live approval loop here without leaving Companion/);
+  assert.match(ui.homeOpsContent.innerHTML, /Current Thread Approval/);
+  assert.match(ui.homeOpsContent.innerHTML, /Held Request/);
+  assert.match(ui.homeOpsContent.innerHTML, /Decision Reason \(Optional\)/);
+  assert.match(ui.homeOpsContent.innerHTML, /data-homeops-native-decision-action="APPROVE"/);
+  assert.match(ui.homeOpsContent.innerHTML, /data-homeops-native-decision-action="DENY"/);
+  assert.match(ui.homeOpsContent.innerHTML, /data-homeops-native-selection-id="native:hold:ixr-20260315-003"/);
+  assert.match(ui.homeOpsContent.innerHTML, /data-homeops-native-selection-id="native:checkpoint:session-1:approval-org-admin-1"/);
+  assert.match(ui.homeOpsContent.innerHTML, /Review Live Approvals/);
   assert.match(ui.homeOpsContent.innerHTML, /Open Approval/);
   assert.match(ui.homeOpsContent.innerHTML, /Open Run/);
   assert.match(ui.homeOpsContent.innerHTML, /operator@example\.com/);
   assert.match(ui.homeOpsContent.innerHTML, /epydios-runtime-prod-client/);
   assert.match(ui.homeOpsContent.innerHTML, /codex/);
   assert.match(ui.homeOpsContent.innerHTML, /tenant-demo\/project-core/);
-  assert.match(ui.homeOpsContent.innerHTML, /Open Approval Queue/);
   assert.match(ui.homeOpsContent.innerHTML, /Open Recent Runs/);
   assert.match(ui.homeOpsContent.innerHTML, /data-homeops-action="open-workbench"/);
+  assert.match(ui.homeOpsContent.innerHTML, /data-homeops-action="focus-live-approvals"/);
   assert.match(ui.homeOpsContent.innerHTML, /data-homeops-action="open-approval-item"/);
   assert.match(ui.homeOpsContent.innerHTML, /data-homeops-action="open-run-item"/);
 });

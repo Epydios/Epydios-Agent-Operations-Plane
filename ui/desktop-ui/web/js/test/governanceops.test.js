@@ -251,6 +251,13 @@ test("governanceops page renders runtime approvals plus identity admin proposal 
   assert.match(ui.governanceOpsContent.innerHTML, /Browser MCP/);
   assert.match(ui.governanceOpsContent.innerHTML, /click_destructive_button/);
   assert.match(ui.governanceOpsContent.innerHTML, /Phase2 Test Shim/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Decision Reason \(Optional\)/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Approve Connector Hold/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Deny Connector Hold/);
+  assert.match(ui.governanceOpsContent.innerHTML, /data-native-decision-action="APPROVE"/);
+  assert.match(ui.governanceOpsContent.innerHTML, /data-native-decision-action="DENY"/);
+  assert.match(ui.governanceOpsContent.innerHTML, /data-native-decision-key="native:hold:ixr-browser-001"/);
+  assert.match(ui.governanceOpsContent.innerHTML, /RuntimeOps keeps the linked connector continuity and evidence handoff on the related run/);
   assert.match(ui.governanceOpsContent.innerHTML, /Open SettingsOps/);
   assert.match(ui.governanceOpsContent.innerHTML, /Open RuntimeOps/);
   assert.match(ui.governanceOpsContent.innerHTML, /aimxs-policy-primary/);

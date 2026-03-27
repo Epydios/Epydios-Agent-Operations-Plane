@@ -4986,6 +4986,7 @@ async function main() {
     ...(snapshot && typeof snapshot === "object" ? snapshot : triageSnapshot),
     nativeShell: config.nativeShell,
     nativeGatewayHolds: Array.isArray(config.nativeGatewayHolds) ? config.nativeGatewayHolds : [],
+    nativeApprovalRailItems: buildCombinedNativeApprovalRailItems(),
     selectedAgentProfileId: latestSettingsSnapshot?.integrations?.selectedAgentProfileId || "",
     lastWorkbenchDomain: companionOpsViewState.lastWorkbenchDomain,
     companionFeedback: companionOpsViewState.feedback,
@@ -11639,6 +11640,7 @@ function getCurrentIncidentOpsEntry(entryId = "") {
           : `Submitting ${normalizedDecision} for checkpoint ${item.checkpointId} on session ${sessionId}...`
     };
     await refresh();
+    let outcome = false;
     try {
       let result = null;
       if (isGatewayHold) {
@@ -11691,17 +11693,31 @@ function getCurrentIncidentOpsEntry(entryId = "") {
             : item?.decisionType === "proposal"
               ? `Tool proposal ${item.proposalId} ${normalizedDecision === "DENY" ? "denied" : "approved"}. ${derived.message}`
               : `Checkpoint ${item.checkpointId} ${normalizedDecision === "DENY" ? "denied" : "approved"}. ${derived.message}`
-          : String(result?.warning || "").trim() || "Native decision was not changed.",
+          : isGatewayHold
+            ? `Held request ${item.interpositionRequestId} is still pending. ${String(result?.warning || "").trim() || "No gateway state change was applied."}`
+            : String(result?.warning || "").trim() || "Native decision was not changed.",
         thread: nextThread
       };
       if (!isGatewayHold) {
         await refreshOperatorChatHistory(session);
       }
+      const feedbackTone = result?.applied ? "ok" : "warn";
       renderApprovalFeedback(
         ui,
-        result?.applied ? "ok" : "warn",
+        feedbackTone,
         operatorChatState.message
       );
+      outcome = {
+        applied: Boolean(result?.applied),
+        tone: feedbackTone,
+        message: operatorChatState.message,
+        decision: normalizedDecision,
+        selectionId,
+        runId: String(item?.runId || "").trim(),
+        approvalId: String(item?.approvalId || "").trim(),
+        interpositionRequestId: String(item?.interpositionRequestId || "").trim(),
+        isGatewayHold
+      };
     } catch (error) {
       operatorChatState = {
         ...operatorChatState,
@@ -11714,9 +11730,20 @@ function getCurrentIncidentOpsEntry(entryId = "") {
         thread: operatorChatState.thread
       };
       renderApprovalFeedback(ui, "error", operatorChatState.message);
+      outcome = {
+        applied: false,
+        tone: "error",
+        message: operatorChatState.message,
+        decision: normalizedDecision,
+        selectionId,
+        runId: String(item?.runId || "").trim(),
+        approvalId: String(item?.approvalId || "").trim(),
+        interpositionRequestId: String(item?.interpositionRequestId || "").trim(),
+        isGatewayHold
+      };
     }
     await refresh();
-    return true;
+    return outcome;
   }
 
   ui.loginButton.addEventListener("click", async () => {
@@ -14757,6 +14784,30 @@ function getCurrentIncidentOpsEntry(entryId = "") {
       focusRenderedRegion(ui.governanceOpsContent, { scroll: false });
       return;
     }
+    const nativeDecisionNode = target.closest("[data-native-decision-action]");
+    if (nativeDecisionNode instanceof HTMLElement) {
+      const selectionId = String(nativeDecisionNode.dataset.nativeDecisionKey || "").trim();
+      const decision = String(nativeDecisionNode.dataset.nativeDecisionAction || "").trim().toUpperCase();
+      const decisionContainer =
+        nativeDecisionNode.closest('[data-governanceops-panel="connector-approval-queue"]') || ui.governanceOpsContent;
+      const reasonInput =
+        decisionContainer instanceof HTMLElement
+          ? decisionContainer.querySelector("[data-native-decision-reason]")
+          : null;
+      const reason = reasonInput instanceof HTMLInputElement ? String(reasonInput.value || "").trim() : "";
+      const result = await submitNativeApprovalRailDecision(selectionId, decision, reason);
+      if (result && typeof result === "object") {
+        governanceOpsViewState = {
+          ...governanceOpsViewState,
+          selectedRunId: String(result.runId || selectionId || governanceOpsViewState.selectedRunId || "").trim()
+        };
+        const continuityMessage = result.applied
+          ? `${result.message} RuntimeOps keeps the linked connector continuity and evidence handoff on the related run.`
+          : result.message;
+        setGovernanceOpsFeedback(String(result.tone || "info").trim().toLowerCase(), continuityMessage);
+      }
+      return;
+    }
     const openRunNode = target.closest("[data-governanceops-open-run-id]");
     const openRunID =
       openRunNode instanceof HTMLElement
@@ -15309,7 +15360,7 @@ function getCurrentIncidentOpsEntry(entryId = "") {
           : "__EPYDIOS_CLEAR_INTERPOSITION_BEARER__"
     };
   };
-  const configureNativeInterposition = async (enabled) => {
+  const configureNativeInterposition = async (enabled, options = {}) => {
     const bridgeContract = readNativeBridgeContract();
     if (!bridgeContract.available) {
       setCompanionOpsFeedback(
@@ -15323,13 +15374,23 @@ function getCurrentIncidentOpsEntry(entryId = "") {
       return false;
     }
     const draft = readNativeInterpositionDraft();
+    const mode = String(options?.mode || "toggle").trim().toLowerCase();
+    const shell = config?.nativeShell && typeof config.nativeShell === "object" ? config.nativeShell : {};
+    const interposition = shell?.interposition && typeof shell.interposition === "object"
+      ? shell.interposition
+      : {};
+    const currentEnabled = Boolean(interposition.enabled);
+    const transitionMessage =
+      mode === "save"
+        ? "Saving upstream interposition config. Epydios will keep the current request-path state while the launcher applies the change."
+        : enabled
+          ? "Turning interposition on. Epydios is getting ready to govern supported requests."
+          : "Turning interposition off. Supported requests are returning to their normal client flow.";
     setNativeLauncherControlsDisabled(true);
-    setCompanionOpsFeedback(
-      "info",
-      enabled
-        ? "Turning interposition on. Epydios is getting ready to govern supported requests."
-        : "Turning interposition off. Supported requests are returning to their normal client flow."
-    );
+    setCompanionOpsFeedback("info", transitionMessage);
+    if (mode === "toggle" && currentEnabled !== Boolean(enabled)) {
+      setNativeInterpositionPendingPresentation(Boolean(enabled), transitionMessage);
+    }
     try {
       const sessionSummary = await bridgeContract.bindings.NativeInterpositionConfigure(
         Boolean(enabled),
@@ -15379,6 +15440,59 @@ function getCurrentIncidentOpsEntry(entryId = "") {
     renderHomePanel();
     focusRenderedRegion(ui.homeOpsContent, { scroll: false });
   };
+  const focusCompanionHomeSection = (sectionId) => {
+    if (!(ui.homeOpsContent instanceof HTMLElement)) {
+      return false;
+    }
+    const normalized = String(sectionId || "").trim().toLowerCase();
+    if (!normalized) {
+      return false;
+    }
+    const section = ui.homeOpsContent.querySelector(`[data-homeops-section="${normalized}"]`);
+    if (!(section instanceof HTMLElement)) {
+      return false;
+    }
+    focusRenderedRegion(section, { scroll: true });
+    return true;
+  };
+  const setNativeInterpositionPendingPresentation = (enabled, message) => {
+    const shell = config?.nativeShell && typeof config.nativeShell === "object" ? config.nativeShell : {};
+    const interposition = shell?.interposition && typeof shell.interposition === "object"
+      ? shell.interposition
+      : {};
+    updateNativeLauncherPresentation({
+      ...shell,
+      startupError: "",
+      interposition: {
+        ...interposition,
+        enabled: enabled ? true : Boolean(interposition.enabled),
+        status: enabled ? "starting" : "stopping",
+        reason: String(message || "").trim()
+      }
+    });
+    setNativeLauncherControlsDisabled(true);
+  };
+  const setNativeServicesPendingPresentation = (message) => {
+    const shell = config?.nativeShell && typeof config.nativeShell === "object" ? config.nativeShell : {};
+    const liveMode = String(shell?.mode || "").trim().toLowerCase() === "live";
+    updateNativeLauncherPresentation({
+      ...shell,
+      startupError: "",
+      runtimeState: "service_starting",
+      runtimeService: {
+        ...(shell?.runtimeService && typeof shell.runtimeService === "object" ? shell.runtimeService : {}),
+        state: "starting",
+        health: "starting"
+      },
+      gatewayService: {
+        ...(shell?.gatewayService && typeof shell.gatewayService === "object" ? shell.gatewayService : {}),
+        state: liveMode ? "starting" : shell?.gatewayService?.state,
+        health: liveMode ? "starting" : shell?.gatewayService?.health
+      }
+    });
+    setNativeLauncherControlsDisabled(true);
+    setCompanionOpsFeedback("info", String(message || "").trim());
+  };
   const restartNativeServicesFromCompanion = async () => {
     const bindings = nativeBindings();
     if (!bindings || typeof bindings.NativeRuntimeServiceRestart !== "function") {
@@ -15388,6 +15502,9 @@ function getCurrentIncidentOpsEntry(entryId = "") {
       );
       return false;
     }
+    setNativeServicesPendingPresentation(
+      "Restarting the local runtime and gateway services. Companion will refresh health after the launcher settles."
+    );
     try {
       await bindings.NativeRuntimeServiceRestart();
       if (
@@ -15404,6 +15521,8 @@ function getCurrentIncidentOpsEntry(entryId = "") {
       await syncNativeShellStateFromBindings().catch(() => {});
       setCompanionOpsFeedback("error", `Restart failed: ${error.message}`);
       return false;
+    } finally {
+      setNativeLauncherControlsDisabled(false);
     }
   };
   const openCompanionWorkbenchTarget = async (kind, options = {}) => {
@@ -15473,6 +15592,27 @@ function getCurrentIncidentOpsEntry(entryId = "") {
     if (!(target instanceof HTMLElement)) {
       return;
     }
+    const nativeDecisionNode = target.closest("[data-homeops-native-decision-action]");
+    if (nativeDecisionNode instanceof HTMLElement) {
+      const selectionId = String(nativeDecisionNode.dataset.homeopsNativeSelectionId || "").trim();
+      const decision = String(nativeDecisionNode.dataset.homeopsNativeDecisionAction || "").trim().toUpperCase();
+      const decisionContainer = nativeDecisionNode.closest("[data-homeops-live-approval-card]");
+      const reasonInput =
+        decisionContainer instanceof HTMLElement
+          ? decisionContainer.querySelector("[data-homeops-native-decision-reason]")
+          : null;
+      const reason = reasonInput instanceof HTMLInputElement ? String(reasonInput.value || "").trim() : "";
+      const result = await submitNativeApprovalRailDecision(selectionId, decision, reason);
+      if (result && typeof result === "object") {
+        const continuityMessage = result.applied
+          ? result.isGatewayHold
+            ? `${result.message} RuntimeOps keeps the linked connector continuity and evidence handoff on the related run.`
+            : `${result.message} Workbench remains available for deeper approval history if you need it.`
+          : result.message;
+        setCompanionOpsFeedback(String(result.tone || "info").trim().toLowerCase(), continuityMessage);
+      }
+      return;
+    }
     const actionNode = target.closest("[data-homeops-action]");
     if (!(actionNode instanceof HTMLElement)) {
       return;
@@ -15492,6 +15632,11 @@ function getCurrentIncidentOpsEntry(entryId = "") {
 
     if (action === "open-workbench") {
       await openCompanionWorkbenchTarget("workbench");
+      return;
+    }
+
+    if (action === "focus-live-approvals") {
+      focusCompanionHomeSection("live-approvals");
       return;
     }
 
@@ -15571,12 +15716,12 @@ function getCurrentIncidentOpsEntry(entryId = "") {
     const action = String(actionNode.dataset.nativeShellAction || "").trim().toLowerCase();
     if (action === "toggle-interposition") {
       const nextEnabled = String(actionNode.dataset.nativeShellNextEnabled || "").trim().toLowerCase() === "true";
-      configureNativeInterposition(nextEnabled).catch(() => {});
+      configureNativeInterposition(nextEnabled, { mode: "toggle" }).catch(() => {});
       return;
     }
     if (action === "save-interposition-config") {
       const draft = readNativeInterpositionDraft();
-      configureNativeInterposition(draft.enabled).catch(() => {});
+      configureNativeInterposition(draft.enabled, { mode: "save" }).catch(() => {});
     }
   });
   ui.nativeLauncherStatus?.addEventListener("submit", (event) => {
@@ -15590,7 +15735,7 @@ function getCurrentIncidentOpsEntry(entryId = "") {
     }
     event.preventDefault();
     const draft = readNativeInterpositionDraft();
-    configureNativeInterposition(draft.enabled).catch(() => {});
+    configureNativeInterposition(draft.enabled, { mode: "save" }).catch(() => {});
   });
   ui.nativeLauncherStatus?.addEventListener("change", (event) => {
     const target = event.target;
