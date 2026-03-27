@@ -101,7 +101,8 @@ go run ./clients/cli-agentops --tenant-id tenant-local --project-id project-loca
 
 ## Local Validation
 
+From the repo root:
+
 ```bash
-cd "/Users/maindrive/Dropbox (Personal)/1 chatGPT SHARED FILES/GITHUB/AGENTOPS DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO"
 go test ./clients/cli-agentops
 ```

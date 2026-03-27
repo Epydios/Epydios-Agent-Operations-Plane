@@ -52,8 +52,10 @@ The IDE panel remains review-first. It does not bypass native approval, tool-act
 
 ## Local Validation
 
+From the module directory:
+
 ```bash
-cd "/Users/maindrive/Dropbox (Personal)/1 chatGPT SHARED FILES/GITHUB/AGENTOPS DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/vscode-agentops"
+cd clients/vscode-agentops
 node --check extension.js
 node --check lib/runtimeClient.js
 node --check lib/sessionReview.js

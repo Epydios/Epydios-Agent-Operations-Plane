@@ -79,7 +79,7 @@ grep -q '"event":"native_window_dom_ready"' "${EVENT_LOG}" || {
   exit 1
 }
 
-python3 - <<'PY' "${SESSION_MANIFEST}" "${CHECKLIST_PATH}" "${LOG_PATH}" "${INSTALLED_APP_PATH}" "${BOOTSTRAP_PATH}"
+python3 - <<'PY' "${SESSION_MANIFEST}" "${CHECKLIST_PATH}" "${LOG_PATH}" "${INSTALLED_APP_PATH}" "${BOOTSTRAP_PATH}" "${M15_REPO_ROOT}"
 import json
 import pathlib
 import sys
@@ -89,6 +89,7 @@ checklist_path = pathlib.Path(sys.argv[2])
 log_path = sys.argv[3]
 installed_app_path = sys.argv[4]
 bootstrap_path = sys.argv[5]
+repo_root = pathlib.Path(sys.argv[6])
 manifest = json.loads(manifest_path.read_text())
 
 assert manifest["mode"] == "live", manifest["mode"]
@@ -119,14 +120,14 @@ checklist = {
     "approvals_runs_incidents_settings_paths": {
         "status": "covered_by_existing_ui_evidence",
         "evidence": [
-            "/Users/maindrive/Dropbox (Personal)/1 chatGPT SHARED FILES/GITHUB/AGENTOPS DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/.epydios/internal-readiness/manual-workflow-qa/20260306T211311Z/summary.json",
-            "/Users/maindrive/Dropbox (Personal)/1 chatGPT SHARED FILES/GITHUB/AGENTOPS DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/.epydios/internal-readiness/v1-perfect-ui-rubric-assessment-latest.json"
+            str(repo_root / ".epydios" / "internal-readiness" / "manual-workflow-qa" / "20260306T211311Z" / "summary.json"),
+            str(repo_root / ".epydios" / "internal-readiness" / "v1-perfect-ui-rubric-assessment-latest.json"),
         ]
     },
     "incident_export_audit_handoff": {
         "status": "covered_by_existing_ui_evidence",
         "evidence": [
-            "/Users/maindrive/Dropbox (Personal)/1 chatGPT SHARED FILES/GITHUB/AGENTOPS DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/.epydios/provenance/desktop-closeout/m13-m14-closeout-latest.summary.json"
+            str(repo_root / ".epydios" / "provenance" / "desktop-closeout" / "m13-m14-closeout-latest.summary.json"),
         ]
     },
     "install_bundle_path": installed_app_path,

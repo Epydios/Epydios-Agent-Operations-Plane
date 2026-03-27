@@ -19,7 +19,7 @@ This SDK does not:
 ## Install
 
 ```bash
-cd "/Users/maindrive/Dropbox (Personal)/1 chatGPT SHARED FILES/GITHUB/AGENTOPS DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/python-epydios"
+cd clients/python-epydios
 ./bin/install-local.sh
 ```
 
@@ -77,7 +77,8 @@ print(final.state, final.status, final.policy_decision)
 
 ## Local Validation
 
+From the repo root:
+
 ```bash
-cd "/Users/maindrive/Dropbox (Personal)/1 chatGPT SHARED FILES/GITHUB/AGENTOPS DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO"
 python3 -m unittest discover -s clients/python-epydios/tests
 ```

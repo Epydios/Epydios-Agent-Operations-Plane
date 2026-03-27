@@ -6,9 +6,7 @@ import unittest
 from contextlib import contextmanager
 
 
-PROVIDER_PATH = pathlib.Path(
-    "/Users/maindrive/Dropbox (Personal)/1 chatGPT SHARED FILES/GITHUB/AGENTOPS DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/bin/aimxs-full-provider.py"
-)
+PROVIDER_PATH = pathlib.Path(__file__).resolve().with_name("aimxs-full-provider.py")
 
 
 def load_provider_module():

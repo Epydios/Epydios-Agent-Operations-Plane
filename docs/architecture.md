@@ -1,8 +1,8 @@
-# Architecture (Initial)
+# EpydiosOps Architecture
 
 ## Product Boundary
 
-`Epydios Agent Operations Plane` is an OSS control plane for AI/agent execution on Kubernetes. It is not a kernel, distro, or desktop operating system.
+`EpydiosOps` combines an installable operator desktop with governed runtime services for AI and tool execution. The repo also carries Kubernetes deployment material for that runtime stack. It is not a kernel, distro, or desktop operating system.
 
 ## Core Design Goals
 
@@ -19,7 +19,7 @@
    - Argo Rollouts, Argo Events
    - KServe first, KubeRay later
 
-2. **Control Plane Core (OSS)**
+2. **Runtime And Governance Core (OSS)**
    - API server/controllers (extension registry + runtime orchestration service implemented)
    - provider registry and routing
    - policy/evidence/profile orchestration
@@ -62,4 +62,4 @@ This allows:
 2. Implement a minimal OSS `PolicyProvider` adapter (OPA passthrough)
 3. Implement a minimal OSS `EvidenceProvider` (Postgres + object store manifest records)
 4. Implement a simple `ProfileResolver` (static rules + tenant defaults)
-5. Wire one end-to-end policy-evidence flow before adding AIMXS plugin
+5. Wire one end-to-end policy-evidence flow before adding the AIMXS plug-in

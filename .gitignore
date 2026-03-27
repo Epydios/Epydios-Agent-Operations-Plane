@@ -16,6 +16,7 @@ coverage/
 build/*
 !build/docker/
 !build/docker/Dockerfile.go-binary
+ui/desktop-ui/build/bin/
 
 # Generated evidence artifacts (not source code)
 provenance/promotion/*

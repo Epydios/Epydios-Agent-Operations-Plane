@@ -89,7 +89,8 @@ go run ./clients/workflow-agentops --tenant-id tenant-local --project-id project
 
 ## Local Validation
 
+From the repo root:
+
 ```bash
-cd "/Users/maindrive/Dropbox (Personal)/1 chatGPT SHARED FILES/GITHUB/AGENTOPS DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO"
 go test ./clients/internal/runtimeclient ./clients/cli-agentops ./clients/workflow-agentops
 ```
