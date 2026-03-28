@@ -13,15 +13,15 @@ This baseline inventories the current enterprise posture after the M19 ingress p
 
 Current baseline is already implemented.
 
-- Runtime authn/authz and scoped identity enforcement exist in [internal/runtime/auth.go](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/auth.go).
-- Tenant/project allow or deny matrix verification already exists in [verify-m9-rbac-matrix.sh](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/platform/local/bin/verify-m9-rbac-matrix.sh) and [verify-m9-authz-tenancy.sh](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/platform/local/bin/verify-m9-authz-tenancy.sh).
-- Runtime contract documentation already captures tenant/project scoping and cross-tenant denial in [runtime-orchestration-service.md](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/docs/runtime-orchestration-service.md).
+- Runtime authn/authz and scoped identity enforcement exist in [internal/runtime/auth.go](../../internal/runtime/auth.go).
+- Tenant/project allow or deny matrix verification already exists in [verify-m9-rbac-matrix.sh](../../platform/local/bin/verify-m9-rbac-matrix.sh) and [verify-m9-authz-tenancy.sh](../../platform/local/bin/verify-m9-authz-tenancy.sh).
+- Runtime contract documentation already captures tenant/project scoping and cross-tenant denial in [runtime-orchestration-service.md](../../docs/runtime-orchestration-service.md).
 
 ### RBAC posture
 
 Current baseline is already implemented.
 
-- OIDC/JWKS and HS256 compatibility modes already exist in [internal/runtime/auth.go](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/auth.go).
+- OIDC/JWKS and HS256 compatibility modes already exist in [internal/runtime/auth.go](../../internal/runtime/auth.go).
 - Runtime read/create decision paths already enforce scoped permissions across run, session, approval, and event surfaces.
 - Existing local verifiers cover authn/authz, scoped tenancy, audit read, and policy lifecycle.
 
@@ -29,21 +29,21 @@ Current baseline is already implemented.
 
 Current baseline is implemented for configuration ingress and is now partially extended to governed report output.
 
-- Runtime integration settings remain `ref://`-only and block raw secret-like values in [runtime-orchestration-service.md](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/docs/runtime-orchestration-service.md) and [api.go](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api.go).
-- Production hardening and secret/cert rotation verifiers already exist in [verify-secret-cert-rotation.sh](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/platform/local/bin/verify-secret-cert-rotation.sh), [verify-admission-enforcement.sh](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/platform/local/bin/verify-admission-enforcement.sh), and [verify-prod-hardening-baseline.sh](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/platform/local/bin/verify-prod-hardening-baseline.sh).
-- Governed enterprise report output now redacts secret-like transcript, evidence, summary, and action-hint content before render in [report_envelope.go](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/internal/runtimeclient/report_envelope.go), [ui/desktop-ui/web/js/runtime/governance-report.js](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/runtime/governance-report.js), and [clients/vscode-agentops/lib/reportEnvelope.js](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/vscode-agentops/lib/reportEnvelope.js), and surfaces any matches through explicit `DLP findings`.
-- Runtime run export now sanitizes secret-like content before JSONL or CSV output in [internal/runtime/export_redaction.go](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/export_redaction.go) and [internal/runtime/api.go](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api.go), resolves governed disposition from the dedicated `run_export` profile, emits `redactionCount` on the audit trail, stamps `X-AgentOps-Export-*` plus `X-AgentOps-Org-Admin-*` headers on the response, and projects persisted org-admin review state from the run-backed session approval boundary.
-- Runtime audit export now sanitizes secret-like content before JSONL or JSON output in [internal/runtime/export_redaction.go](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/export_redaction.go), [internal/runtime/export_disposition.go](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/export_disposition.go), and [internal/runtime/api.go](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api.go), and now stamps the governed export metadata headers plus `X-AgentOps-Export-Redactions` on the response.
-- Runtime session evidence export now sanitizes secret-like content before JSONL or JSON output in [internal/runtime/export_redaction.go](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/export_redaction.go), [internal/runtime/export_disposition.go](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/export_disposition.go), and [internal/runtime/api_v1alpha2.go](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api_v1alpha2.go), and now stamps the governed export metadata headers plus `X-AgentOps-Export-Redactions` on the response.
-- Desktop governed export helpers now normalize `exportProfile` and `audience` from the same client-surface and report-type rules used by enterprise report rendering, and the remaining audit and incident export or handoff flows now pass explicit governed export metadata through that shared helper in [ui/desktop-ui/web/js/main.js](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/main.js).
-- Desktop Chat governed exports now resolve export metadata with `clientSurface=chat` instead of incorrectly inheriting desktop-surface defaults during helper selection in [ui/desktop-ui/web/js/main.js](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/main.js).
+- Runtime integration settings remain `ref://`-only and block raw secret-like values in [runtime-orchestration-service.md](../../docs/runtime-orchestration-service.md) and [api.go](../../internal/runtime/api.go).
+- Production hardening and secret/cert rotation verifiers already exist in [verify-secret-cert-rotation.sh](../../platform/local/bin/verify-secret-cert-rotation.sh), [verify-admission-enforcement.sh](../../platform/local/bin/verify-admission-enforcement.sh), and [verify-prod-hardening-baseline.sh](../../platform/local/bin/verify-prod-hardening-baseline.sh).
+- Governed enterprise report output now redacts secret-like transcript, evidence, summary, and action-hint content before render in [report_envelope.go](../../clients/internal/runtimeclient/report_envelope.go), [ui/desktop-ui/web/js/runtime/governance-report.js](../../ui/desktop-ui/web/js/runtime/governance-report.js), and [clients/vscode-agentops/lib/reportEnvelope.js](../../clients/vscode-agentops/lib/reportEnvelope.js), and surfaces any matches through explicit `DLP findings`.
+- Runtime run export now sanitizes secret-like content before JSONL or CSV output in [internal/runtime/export_redaction.go](../../internal/runtime/export_redaction.go) and [internal/runtime/api.go](../../internal/runtime/api.go), resolves governed disposition from the dedicated `run_export` profile, emits `redactionCount` on the audit trail, stamps `X-AgentOps-Export-*` plus `X-AgentOps-Org-Admin-*` headers on the response, and projects persisted org-admin review state from the run-backed session approval boundary.
+- Runtime audit export now sanitizes secret-like content before JSONL or JSON output in [internal/runtime/export_redaction.go](../../internal/runtime/export_redaction.go), [internal/runtime/export_disposition.go](../../internal/runtime/export_disposition.go), and [internal/runtime/api.go](../../internal/runtime/api.go), and now stamps the governed export metadata headers plus `X-AgentOps-Export-Redactions` on the response.
+- Runtime session evidence export now sanitizes secret-like content before JSONL or JSON output in [internal/runtime/export_redaction.go](../../internal/runtime/export_redaction.go), [internal/runtime/export_disposition.go](../../internal/runtime/export_disposition.go), and [internal/runtime/api_v1alpha2.go](../../internal/runtime/api_v1alpha2.go), and now stamps the governed export metadata headers plus `X-AgentOps-Export-Redactions` on the response.
+- Desktop governed export helpers now normalize `exportProfile` and `audience` from the same client-surface and report-type rules used by enterprise report rendering, and the remaining audit and incident export or handoff flows now pass explicit governed export metadata through that shared helper in [ui/desktop-ui/web/js/main.js](../../ui/desktop-ui/web/js/main.js).
+- Desktop Chat governed exports now resolve export metadata with `clientSurface=chat` instead of incorrectly inheriting desktop-surface defaults during helper selection in [ui/desktop-ui/web/js/main.js](../../ui/desktop-ui/web/js/main.js).
 
 ### Worker capability posture
 
 Current baseline was partially implicit and is now explicit.
 
-- Session workers already persist capability lists in [types_v1alpha2.go](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/types_v1alpha2.go) and [m16_linking.go](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/m16_linking.go).
-- The first shared capability catalog is now explicit and queryable through [worker_capability_catalog.go](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/worker_capability_catalog.go) and `GET /v1alpha2/runtime/worker-capabilities` in [api_v1alpha2.go](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/internal/runtime/api_v1alpha2.go).
+- Session workers already persist capability lists in [types_v1alpha2.go](../../internal/runtime/types_v1alpha2.go) and [m16_linking.go](../../internal/runtime/m16_linking.go).
+- The first shared capability catalog is now explicit and queryable through [worker_capability_catalog.go](../../internal/runtime/worker_capability_catalog.go) and `GET /v1alpha2/runtime/worker-capabilities` in [api_v1alpha2.go](../../internal/runtime/api_v1alpha2.go).
 - The catalog currently covers:
   - managed Codex worker execution
   - direct governed model-invoke profiles for codex, openai, anthropic, google, azure_openai, and bedrock
@@ -53,7 +53,7 @@ Current baseline was partially implicit and is now explicit.
 Current baseline is now partially normalized for enterprise downstream systems.
 
 - Run export, runtime-native audit export, runtime-native session evidence export, desktop audit/incident export, and governed evidence surfaces now exist in the runtime and desktop UI.
-- A shared enterprise reporting envelope now exists in [report_envelope.go](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/internal/runtimeclient/report_envelope.go).
+- A shared enterprise reporting envelope now exists in [report_envelope.go](../../clients/internal/runtimeclient/report_envelope.go).
 - Workflow, chatops, CLI, desktop Chat, and VS Code review surfaces now reuse the same governed reporting model instead of inventing client-specific governance packaging.
 
 ### Export profile and audience posture
@@ -156,12 +156,12 @@ Current retention metadata:
 ### Shared enterprise reporting envelope
 
 Current implementation:
-- [report_envelope.go](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/internal/runtimeclient/report_envelope.go)
-- workflow report surfaces in [clients/workflow-agentops/main.go](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/workflow-agentops/main.go)
-- chatops report surfaces in [clients/chatops-agentops/main.go](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/chatops-agentops/main.go)
-- CLI report surfaces in [clients/cli-agentops/main.go](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/cli-agentops/main.go)
-- desktop Chat report surfaces in [ui/desktop-ui/web/js/views/chat.js](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/views/chat.js) and [ui/desktop-ui/web/js/runtime/governance-report.js](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/ui/desktop-ui/web/js/runtime/governance-report.js)
-- VS Code report surfaces in [clients/vscode-agentops/lib/reportEnvelope.js](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/vscode-agentops/lib/reportEnvelope.js) and [clients/vscode-agentops/extension.js](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/vscode-agentops/extension.js)
+- [report_envelope.go](../../clients/internal/runtimeclient/report_envelope.go)
+- workflow report surfaces in [clients/workflow-agentops/main.go](../../clients/workflow-agentops/main.go)
+- chatops report surfaces in [clients/chatops-agentops/main.go](../../clients/chatops-agentops/main.go)
+- CLI report surfaces in [clients/cli-agentops/main.go](../../clients/cli-agentops/main.go)
+- desktop Chat report surfaces in [ui/desktop-ui/web/js/views/chat.js](../../ui/desktop-ui/web/js/views/chat.js) and [ui/desktop-ui/web/js/runtime/governance-report.js](../../ui/desktop-ui/web/js/runtime/governance-report.js)
+- VS Code report surfaces in [clients/vscode-agentops/lib/reportEnvelope.js](../../clients/vscode-agentops/lib/reportEnvelope.js) and [clients/vscode-agentops/extension.js](../../clients/vscode-agentops/extension.js)
 
 Purpose:
 - normalize enterprise governance reporting without forking workflow- or chat-vendor-specific outbound logic
@@ -179,18 +179,18 @@ Purpose:
 ### Baseline verifier
 
 Verifier:
-- [verify-m20-enterprise-hardening-baseline.sh](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/platform/local/bin/verify-m20-enterprise-hardening-baseline.sh)
+- [verify-m20-enterprise-hardening-baseline.sh](../../platform/local/bin/verify-m20-enterprise-hardening-baseline.sh)
 
 Latest proof log:
-- [verify-m20-enterprise-hardening-baseline-latest.log](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/.epydios/internal-readiness/m20-enterprise-hardening/verify-m20-enterprise-hardening-baseline-latest.log)
+- [verify-m20-enterprise-hardening-baseline-latest.log](../../.epydios/internal-readiness/m20-enterprise-hardening/verify-m20-enterprise-hardening-baseline-latest.log)
 
 ### Exit gate
 
 Verifier:
-- [verify-m20-enterprise-hardening-exit-gate.sh](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/platform/local/bin/verify-m20-enterprise-hardening-exit-gate.sh)
+- [verify-m20-enterprise-hardening-exit-gate.sh](../../platform/local/bin/verify-m20-enterprise-hardening-exit-gate.sh)
 
 Latest proof log:
-- [verify-m20-enterprise-hardening-exit-gate-latest.log](/Users/maindrive/Dropbox%20(Personal)/1%20chatGPT%20SHARED%20FILES/GITHUB/AGENTOPS%20DESKTOP/EPYDIOS_AGENTOPS_DESKTOP_REPO/.epydios/internal-readiness/m20-enterprise-hardening/verify-m20-enterprise-hardening-exit-gate-latest.log)
+- [verify-m20-enterprise-hardening-exit-gate-latest.log](../../.epydios/internal-readiness/m20-enterprise-hardening/verify-m20-enterprise-hardening-exit-gate-latest.log)
 
 ## Follow-on Enterprise Scope
 

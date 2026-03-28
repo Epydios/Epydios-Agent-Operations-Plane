@@ -17,7 +17,7 @@ It proves:
 
 - the desktop module is sane
 - the macOS app can be packaged and launched
-- `Companion` is the daily surface and `Workbench` remains the deep console
+- `Companion` is the daily lane and `Workbench` is the deeper review surface
 - `Interposition OFF / ON` is explicit
 - one governed Codex `/responses` request runs through the local gateway
 - approval, audit, and evidence continuity are real
@@ -35,8 +35,8 @@ If you want the narrower installed-app lane without the governed-request harness
 ## Platform Posture
 
 - macOS `live` installed desktop is the supported OSS lane
-- Linux has a repo-backed Ubuntu 24.04 beta installed evaluation contract
-- Windows has a repo-backed beta installed evaluation contract with native packaging artifacts and launcher helpers
+- Linux ships repo-committed Ubuntu 24.04 beta scripts and artifacts
+- Windows ships repo-committed beta packaging artifacts and launcher helpers
 - stronger Linux or Windows wording waits for linked installed-host proof
 - Windows `live` remains explicitly deferred
 - browser `run-dev.sh` remains a development path, not the product front door

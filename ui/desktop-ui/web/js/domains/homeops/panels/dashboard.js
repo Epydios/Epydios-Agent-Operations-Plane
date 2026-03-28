@@ -74,7 +74,7 @@ function renderProofSpine(spine = {}, options = {}) {
     <article class="metric homeops-proof-spine-card" data-homeops-proof-spine>
       <div class="title">${escapeHTML(options.title || "Decision / Receipt / Proof / Incident")}</div>
       <div class="meta">${escapeHTML(
-        options.summary || "The governed path stays visible here before you leave Companion for deeper owner-domain review."
+        options.summary || "The governed path stays visible here before deeper review."
       )}</div>
       <div class="homeops-proof-spine-grid">
         ${anchors}
@@ -103,9 +103,9 @@ function renderQueueItem(item = {}, index = 0) {
   const proof = item?.proof && typeof item.proof === "object" ? item.proof : {};
   const spine = item?.spine && typeof item.spine === "object" ? item.spine : {};
   const defaultOpen = index === 0 ? " open" : "";
-  const detailAction = renderActionButton(item.action, item.actionLabel || "Open Workbench Depth", item);
+  const detailAction = renderActionButton(item.action, item.actionLabel || "Open Workbench", item);
   const proofAction = shouldRenderDistinctProofAction(item, proof)
-    ? renderActionButton(proof.action, proof.actionLabel || "Open Evidence Depth", proof)
+    ? renderActionButton(proof.action, proof.actionLabel || "Open Evidence", proof)
     : "";
   return `
     <details
@@ -144,7 +144,7 @@ function renderQueueItem(item = {}, index = 0) {
             <div class="meta">${escapeHTML(item.secondaryMeta || "-")}</div>
           </article>
           ${renderProofSpine(spine, {
-            summary: "Companion keeps the active governed path explicit before deeper review is opened."
+            summary: "Companion keeps the active path visible before deeper review."
           })}
         </div>
         ${
@@ -194,7 +194,7 @@ function renderRecentActionRow(item = {}) {
   const spine = item?.spine && typeof item.spine === "object" ? item.spine : {};
   const detailAction = renderActionButton(item.action, item.actionLabel || "Open", item);
   const proofAction = shouldRenderDistinctProofAction(item, proof)
-    ? renderActionButton(proof.action, proof.actionLabel || "Open Evidence Depth", proof)
+    ? renderActionButton(proof.action, proof.actionLabel || "Open Evidence", proof)
     : "";
   return `
     <article class="metric homeops-recent-action-card" data-homeops-run="${escapeHTML(item.runId || item.id || "")}">
@@ -215,7 +215,7 @@ function renderRecentActionRow(item = {}) {
         <div class="meta">Time: ${escapeHTML(formatTime(item.occurredAt || "-"))}</div>
       </div>
       ${renderProofSpine(spine, {
-        summary: "Recent governed actions keep the same decision, receipt, proof, and incident continuity visible in Companion."
+        summary: "Recent actions keep the same path visible in Companion."
       })}
       <div class="homeops-actions">
         ${detailAction}
@@ -243,7 +243,7 @@ function renderAuditEventRow(item = {}) {
         <div class="meta">time=${escapeHTML(formatTime(item.occurredAt || "-"))}</div>
       </div>
       <div class="homeops-actions">
-        ${renderActionButton(item.action, item.actionLabel || "Open AuditOps Depth", item)}
+        ${renderActionButton(item.action, item.actionLabel || "Open Audit", item)}
       </div>
     </article>
   `;
@@ -267,7 +267,7 @@ function renderIncidentEscalationRow(item = {}) {
         <div class="meta">time=${escapeHTML(formatTime(item.occurredAt || "-"))}</div>
       </div>
       <div class="homeops-actions">
-        ${renderActionButton(item.action, item.actionLabel || "Open Incident Depth", item)}
+        ${renderActionButton(item.action, item.actionLabel || "Open Incident", item)}
       </div>
     </article>
   `;
@@ -354,8 +354,8 @@ export function renderHomeWorkspace(snapshot = {}) {
     <div class="homeops-workspace" data-domain-root="companionops">
       <section class="homeops-board">
         <div class="homeops-board-header">
-          <h3>Operator Status</h3>
-          <p class="homeops-board-lead">Companion stays the daily governed-work lane. Workbench stays available for deeper investigation, evidence depth, and admin review.</p>
+          <h3>Daily lane</h3>
+          <p class="homeops-board-lead">Companion is the daily lane. Open Workbench only when the item needs deeper review.</p>
         </div>
         ${
           feedback?.message
@@ -371,57 +371,57 @@ export function renderHomeWorkspace(snapshot = {}) {
       </section>
       <section class="homeops-board homeops-priority-board" data-homeops-section="needs-attention">
         <div class="homeops-board-header">
-          <h3>Needs Attention Now</h3>
-          <p class="homeops-board-lead">This is the primary governed-request queue. Review the active item here, decide it here when possible, and open Workbench only for deeper evidence, audit, runtime, or incident depth.</p>
+          <h3>Needs review</h3>
+          <p class="homeops-board-lead">Review the active governed item here and stay in Companion unless you need deeper evidence, audit, runtime, or incident detail.</p>
         </div>
         <div class="homeops-queue-list">
           ${
             governedRequestQueue.length
               ? governedRequestQueue.map((item, index) => renderQueueItem(item, index)).join("")
-              : renderEmptyMessage("No governed requests, escalations, or blocked items currently need operator action.")
+              : renderEmptyMessage("No governed requests, escalations, or blocked items need action right now.")
           }
         </div>
       </section>
       <section class="homeops-board">
         <div class="homeops-board-header">
-          <h3>Recent Governed Actions</h3>
-          <p class="homeops-board-lead">Recent governed traffic stays visible in Companion with decision, receipt, proof, and incident continuity. Open depth only when you need fuller runtime, evidence, or governance inspection.</p>
+          <h3>Recent decisions</h3>
+          <p class="homeops-board-lead">Recent governed work stays visible here with the same decision, receipt, proof, and incident path attached.</p>
         </div>
         <div class="homeops-recent-action-list">
-          ${recentActions.length ? recentActions.map((item) => renderRecentActionRow(item)).join("") : renderEmptyMessage("No recent governed actions are available yet. Submit work through the local gateway to populate this surface.")}
+          ${recentActions.length ? recentActions.map((item) => renderRecentActionRow(item)).join("") : renderEmptyMessage("No recent governed actions yet. Submit work through the local gateway to populate this view.")}
         </div>
       </section>
       <section class="homeops-board">
         <div class="homeops-board-header">
-          <h3>Live Exceptions And Incidents</h3>
-          <p class="homeops-board-lead">Active failures stay visible in Companion, but deeper incident packaging and long-form response remain in IncidentOps.</p>
+          <h3>Exceptions</h3>
+          <p class="homeops-board-lead">Active failures stay visible here. Open Incident only for escalation or closure follow-through.</p>
         </div>
         <div class="homeops-recent-action-list">
-          ${incidentEscalations.length ? incidentEscalations.map((item) => renderIncidentEscalationRow(item)).join("") : renderEmptyMessage("No active incidents or escalation candidates are shaping the live governance lane right now.")}
+          ${incidentEscalations.length ? incidentEscalations.map((item) => renderIncidentEscalationRow(item)).join("") : renderEmptyMessage("No active incidents or escalation candidates are shaping the lane right now.")}
         </div>
       </section>
       <section class="homeops-board">
         <div class="homeops-board-header">
-          <h3>Recent Audit And Event Stream</h3>
-          <p class="homeops-board-lead">Recent live events stay visible in Companion. Use AuditOps depth for export, long-range history, and deeper investigative review.</p>
+          <h3>Live trail</h3>
+          <p class="homeops-board-lead">Recent events stay visible here. Open Audit only for deeper history or export.</p>
         </div>
         <div class="homeops-recent-action-list">
-          ${liveAuditEvents.length ? liveAuditEvents.map((item) => renderAuditEventRow(item)).join("") : renderEmptyMessage("No recent live audit events are available yet. The next governed decision, approval event, or launcher transition will appear here.")}
+          ${liveAuditEvents.length ? liveAuditEvents.map((item) => renderAuditEventRow(item)).join("") : renderEmptyMessage("No recent audit events yet. The next governed decision, approval event, or launcher transition will appear here.")}
         </div>
       </section>
       <section class="homeops-board">
         <div class="homeops-board-header">
-          <h3>Health And Diagnostics</h3>
-          <p class="homeops-board-lead">Practical runtime and launcher truth stays in Companion. Use diagnostics depth only when the daily lane is not enough.</p>
+          <h3>Launcher and runtime</h3>
+          <p class="homeops-board-lead">Launcher and runtime truth stays here. Open deeper diagnostics only when the daily lane is not enough.</p>
         </div>
         <div class="homeops-command-grid">
-          ${runtimeDiagnostics.length ? runtimeDiagnostics.map((item) => renderRuntimeDiagnosticsCard(item)).join("") : renderEmptyMessage("Runtime and launcher links are not available yet. Refresh the local shell to restore Companion service truth.")}
+          ${runtimeDiagnostics.length ? runtimeDiagnostics.map((item) => renderRuntimeDiagnosticsCard(item)).join("") : renderEmptyMessage("Runtime and launcher links are not available yet. Refresh the shell to restore service truth.")}
         </div>
       </section>
       <section class="homeops-board">
         <div class="homeops-board-header">
-          <h3>Operator Pivots</h3>
-          <p class="homeops-board-lead">Fast pivots for the live lane. These stay secondary to the active governed-request queue.</p>
+          <h3>Quick pivots</h3>
+          <p class="homeops-board-lead">Fast pivots around the daily lane.</p>
         </div>
         <div class="homeops-pivot-grid">
           ${quickActions.map((action) => renderQuickAction(action)).join("")}
@@ -429,7 +429,7 @@ export function renderHomeWorkspace(snapshot = {}) {
       </section>
       <section class="homeops-board">
         <div class="homeops-board-header">
-          <h3>Connected Client Context</h3>
+          <h3>Active client</h3>
           <p class="homeops-board-lead">Signed-in context, active scope, and current traffic posture.</p>
         </div>
         <div class="homeops-summary-grid">

@@ -14,8 +14,8 @@ A release is credible when these pass on the public baseline:
 ## Platform Posture
 
 - macOS `live` installed desktop is the supported OSS lane
-- Linux has a repo-backed Ubuntu 24.04 beta installed evaluation contract
-- Windows has a repo-backed beta installed evaluation contract with native packaging artifacts and launcher helpers
+- Linux ships repo-committed Ubuntu 24.04 beta packaging, install, and verification surfaces
+- Windows ships repo-committed beta packaging, install, and verification surfaces
 
 Linux and Windows are real public beta lanes, but stronger wording waits for linked installed-host proof and they are not equal to the supported macOS lane unless the release artifacts and public docs are updated to say so.
 

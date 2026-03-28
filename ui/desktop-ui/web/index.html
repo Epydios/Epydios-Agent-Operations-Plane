@@ -29,8 +29,8 @@
 
     <div class="workspace-shell">
       <nav class="workspace-nav" data-shell-nav aria-label="Workspace navigation">
-        <section class="workspace-nav-primary" aria-label="Primary product controls">
-          <div class="workspace-nav-eyebrow">Primary controls</div>
+        <section class="workspace-nav-primary" aria-label="Primary daily lane">
+          <div class="workspace-nav-eyebrow">Daily lane</div>
           <div class="workspace-mode-switch" role="group" aria-label="Companion and Workbench modes">
             <div class="workspace-mode-switch-row" role="tablist" aria-label="Primary workspace lane">
               <button
@@ -56,21 +56,22 @@
               </button>
             </div>
             <p class="workspace-nav-copy">
-              Companion is the daily governance lane. Workbench stays for deeper review,
-              administration, and historical investigation.
+              Start in Companion for pending work, recent decisions, exceptions, and launcher
+              truth. Open Workbench only when the item needs deeper review.
             </p>
           </div>
         </section>
 
-        <section class="workspace-nav-section" aria-label="Workbench depth">
-          <div class="workspace-nav-eyebrow">Workbench depth</div>
+        <section class="workspace-nav-section workspace-nav-depth" aria-label="Workbench areas">
+          <div class="workspace-nav-eyebrow">Deeper review</div>
           <p class="workspace-nav-copy">
-            Open the deeper operator console only when Companion is not enough.
+            These secondary areas stay available for investigation, policy follow-through, and
+            administration when Companion is not enough.
           </p>
 
           <div class="workspace-nav-group">
-            <div class="workspace-nav-group-title">Live review</div>
-            <div class="workspace-nav-group-list" role="tablist" aria-orientation="vertical" aria-label="Workbench live review sections">
+            <div class="workspace-nav-group-title">Review and follow-through</div>
+            <div class="workspace-nav-group-list workspace-nav-group-list-compact" role="tablist" aria-orientation="vertical" aria-label="Workbench review and follow-through sections">
               <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="agentops">
                 AgentOps
               </button>
@@ -96,8 +97,8 @@
           </div>
 
           <div class="workspace-nav-group">
-            <div class="workspace-nav-group-title">Platform and admin</div>
-            <div class="workspace-nav-group-list" role="tablist" aria-orientation="vertical" aria-label="Workbench platform and admin sections">
+            <div class="workspace-nav-group-title">Policy and administration</div>
+            <div class="workspace-nav-group-list workspace-nav-group-list-compact" role="tablist" aria-orientation="vertical" aria-label="Workbench policy and administration sections">
               <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="platformops">
                 PlatformOps
               </button>
@@ -132,7 +133,7 @@
         <div class="panel-header">
           <div class="panel-heading">
             <h2>Companion</h2>
-            <p class="panel-lead">Daily status, the next items that need attention, and direct handoff into the deeper tools when you need them.</p>
+            <p class="panel-lead">Primary queue, recent decisions, exceptions, and launcher truth. Open deeper tools only when the item needs full review.</p>
           </div>
           <button id="refresh-button" class="btn btn-secondary">Refresh</button>
         </div>

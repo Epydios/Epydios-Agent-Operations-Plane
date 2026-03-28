@@ -595,8 +595,8 @@ function createLiveApprovalItems(context = {}) {
             : "open-approval-queue",
         detailActionLabel:
           decisionType === "gateway_hold" && runId
-            ? "Open RuntimeOps Depth"
-            : "Open Workbench Review"
+            ? "Open Runtime"
+            : "Open Workbench"
       };
     })
     .sort((left, right) => parseTimeMs(right?.createdAt || right?.expiresAt) - parseTimeMs(left?.createdAt || left?.expiresAt))
@@ -660,7 +660,7 @@ function createSystemStatusRegion(context = {}) {
     actions: [
       {
         id: "open-workbench",
-        label: "Open Workbench Depth",
+        label: "Open Workbench",
         summary: `Deep review in ${lastWorkbenchDomain}`,
         action: "open-workbench"
       },
@@ -848,13 +848,13 @@ function buildAttachedProofSummary(context = {}, options = {}) {
   let actionLabel = "";
   if (runId) {
     action = "open-evidence-item";
-    actionLabel = "Open Evidence Depth";
+    actionLabel = "Open Evidence";
   } else if (incident?.id) {
     action = "open-incident-item";
-    actionLabel = "Open Incident Depth";
+    actionLabel = "Open Incident";
   } else if (auditCount > 0 || approvalId || checkpointId) {
     action = "open-audit-depth";
-    actionLabel = "Open AuditOps Depth";
+    actionLabel = "Open Audit";
   }
   return {
     tone,
@@ -1256,7 +1256,7 @@ function createAttentionItems(context = {}) {
       value: String(pendingHolds.length),
       detail: `Latest approval ${formatIdentityLabel(latestHold?.approvalId, "-")} from ${deriveGatewayClientLabel(latestHold, context)} should be reviewed before ${formatIdentityLabel(latestHold?.holdDeadlineAtUtc, "-")}.`,
       action: liveApprovals.length > 0 ? "focus-live-approvals" : "open-approval-item",
-      actionLabel: liveApprovals.length > 0 ? "Review In Companion" : "Open Workbench Review",
+      actionLabel: liveApprovals.length > 0 ? "Review In Companion" : "Open Workbench",
       runId: String(latestHold?.runId || "").trim(),
       approvalId: String(latestHold?.approvalId || "").trim()
     });
@@ -1267,7 +1267,7 @@ function createAttentionItems(context = {}) {
       value: String(pendingApprovals.length),
       detail: `Latest approval ${formatIdentityLabel(latestPendingApproval?.approvalId, "-")}. ${countExpiringApprovals(approvals)} expiring soon.`,
       action: liveApprovals.length > 0 ? "focus-live-approvals" : "open-approval-item",
-      actionLabel: liveApprovals.length > 0 ? "Review In Companion" : "Open Workbench Review",
+      actionLabel: liveApprovals.length > 0 ? "Review In Companion" : "Open Workbench",
       runId: String(latestPendingApproval?.runId || "").trim(),
       approvalId: String(latestPendingApproval?.approvalId || "").trim()
     });
@@ -1300,7 +1300,7 @@ function createAttentionItems(context = {}) {
       detail: `Latest affected run: ${String(latestAttentionRun?.runId || "-").trim() || "-"}.`,
       action: "open-run-item",
       runId: String(latestAttentionRun?.runId || "").trim(),
-      actionLabel: "Open RuntimeOps Depth"
+      actionLabel: "Open Runtime"
     });
   }
   if (incidents.total > 0) {
@@ -1310,7 +1310,7 @@ function createAttentionItems(context = {}) {
       value: String(incidents.total),
       detail: `Latest incident package: ${String(incidents.latest?.packageId || "-").trim() || "-"}.`,
       action: "open-incident-item",
-      actionLabel: "Open Incident Depth",
+      actionLabel: "Open Incident",
       incidentId: String(incidents.latest?.id || "").trim(),
       runId: String(incidents.latest?.runId || "").trim()
     });
@@ -1360,7 +1360,7 @@ function createRecentGovernedActions(context = {}) {
       approvalId,
       gatewayRequestId: formatIdentityLabel(hold?.gatewayRequestId, ""),
       action: "open-approval-item",
-      actionLabel: "Open Workbench Review",
+      actionLabel: "Open Workbench",
       proof,
       receipt
       }, {
@@ -1417,7 +1417,7 @@ function createRecentGovernedActions(context = {}) {
         approvalId: String(linkedApproval?.approvalId || "").trim(),
         gatewayRequestId: formatIdentityLabel(run?.requestId, ""),
         action: approvalRequired ? "open-approval-item" : "open-run-item",
-        actionLabel: approvalRequired ? "Open Workbench Review" : "Open RuntimeOps Depth",
+        actionLabel: approvalRequired ? "Open Workbench" : "Open Runtime",
         proof,
         receipt
         }, {
@@ -1478,10 +1478,10 @@ function createLiveAuditEventItems(context = {}) {
         occurredAt: formatIdentityLabel(item?.ts, "-"),
         action: approvalId ? "open-approval-item" : runId ? "open-run-item" : "open-audit-depth",
         actionLabel: approvalId
-          ? "Open Workbench Review"
+          ? "Open Workbench"
           : runId
-            ? "Open RuntimeOps Depth"
-            : "Open AuditOps Depth",
+            ? "Open Runtime"
+            : "Open Audit",
         runId,
         approvalId
       };
@@ -1513,7 +1513,7 @@ function createIncidentEscalationItems(context = {}) {
         secondaryMeta: `approval=${formatIdentityLabel(item?.approvalStatus, "-")}; severity=${severity}`,
         occurredAt: formatIdentityLabel(item?.filingUpdatedAt || item?.generatedAt, "-"),
         action: "open-incident-item",
-        actionLabel: "Open Incident Depth",
+        actionLabel: "Open Incident",
         incidentId: String(item?.id || "").trim(),
         runId: String(item?.runId || "").trim()
       };
@@ -1540,7 +1540,7 @@ function createIncidentEscalationItems(context = {}) {
         secondaryMeta: `policy=${formatIdentityLabel(latestAttentionRun?.policyDecision, "-")}`,
         occurredAt: formatIdentityLabel(latestAttentionRun?.updatedAt || latestAttentionRun?.createdAt, "-"),
         action: "open-run-item",
-        actionLabel: "Open RuntimeOps Depth",
+        actionLabel: "Open Runtime",
         runId: String(latestAttentionRun?.runId || "").trim()
       }
     ];
@@ -1641,7 +1641,7 @@ function createGovernedRequestQueueItems(context = {}) {
       sourceClient: String(item?.clientLabel || "").trim(),
       selectionId: String(item?.selectionId || "").trim(),
       action: item.detailAction || "open-approval-item",
-      actionLabel: item.detailActionLabel || "Open Workbench Review",
+      actionLabel: item.detailActionLabel || "Open Workbench",
       proof,
       receipt
       }, {
@@ -1686,7 +1686,7 @@ function createGovernedRequestQueueItems(context = {}) {
       runId,
       incidentId: String(item?.incidentId || item?.id || "").trim(),
       action: item.action || "open-incident-item",
-      actionLabel: item.actionLabel || "Open Incident Depth",
+      actionLabel: item.actionLabel || "Open Incident",
       proof,
       receipt
       }, {
@@ -1747,7 +1747,7 @@ function createGovernedRequestQueueItems(context = {}) {
         runId,
         approvalId: String(linkedApproval?.approvalId || "").trim(),
         action: "open-run-item",
-        actionLabel: "Open RuntimeOps Depth",
+        actionLabel: "Open Runtime",
         proof,
         receipt
         }, {
@@ -1785,7 +1785,7 @@ function createRuntimeDiagnosticsItems(context = {}) {
       summary: runtime.detail,
       meta: `attention=${runtime.attentionRuns}; runs=${runtime.runCount}; pendingApprovals=${runtime.pendingApprovals}`,
       action: "open-recent-runs",
-      actionLabel: "Open RuntimeOps Depth"
+      actionLabel: "Open Runtime"
     },
     {
       id: "diagnostics-depth",
@@ -1813,7 +1813,7 @@ function createQuickActions(context = {}) {
   return [
     {
       id: liveApprovals.length > 0 ? "review-live-approvals" : "open-approval-queue",
-      label: liveApprovals.length > 0 ? "Review Live Approvals" : "Open Approval Queue",
+      label: liveApprovals.length > 0 ? "Review In Companion" : "Open Workbench",
       summary: `${countPendingApprovals(approvals)} waiting in the daily Companion lane`,
       action: liveApprovals.length > 0 ? "focus-live-approvals" : "open-approval-queue"
     },
@@ -1837,7 +1837,7 @@ function createQuickActions(context = {}) {
     },
     {
       id: "open-workbench",
-      label: "Open Workbench Depth",
+      label: "Open Workbench",
       summary: `Investigate in ${formatOpsLabel(lastWorkbenchDomain)}`,
       action: "open-workbench"
     }

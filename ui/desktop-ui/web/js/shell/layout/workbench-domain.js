@@ -63,7 +63,7 @@ function resolveWorkbenchArrivalSpine(handoff = {}) {
       tone: receipt.tone || proof.tone || "neutral",
       label: String(handoff.kind || "handoff").trim() || "handoff",
       summary: String(
-        handoff.arrivalRationale || "Companion opened this Workbench depth because the governed request needs deeper review."
+        handoff.arrivalRationale || "Companion opened this workspace because the governed item needs deeper review."
       ),
       meta:
         [
@@ -73,28 +73,28 @@ function resolveWorkbenchArrivalSpine(handoff = {}) {
           handoff.sourceClient ? `client=${handoff.sourceClient}` : ""
         ]
           .filter(Boolean)
-          .join("; ") || "Companion keeps the same governed item attached into this deeper workspace."
+          .join("; ") || "The same governed item stays attached here."
     },
     receipt: {
       id: "receipt",
       title: "Receipt",
       tone: receipt.tone || "neutral",
-      label: receipt.label || "Receipt continuity attached",
-      summary: receipt.summary || "Receipt continuity stays attached from the live governed path.",
+      label: receipt.label || "Receipt attached",
+      summary: receipt.summary || "Receipt context stays attached from the active path.",
       meta:
         [
           handoff.approvalId ? `approval=${handoff.approvalId}` : "",
           handoff.gatewayRequestId ? `gatewayRequest=${handoff.gatewayRequestId}` : ""
         ]
           .filter(Boolean)
-          .join("; ") || "Receipt continuity remains attached from Companion into deeper review."
+          .join("; ") || "Companion keeps receipt context attached into deeper review."
     },
     proof: {
       id: "proof",
       title: "Proof",
       tone: proof.tone || "neutral",
-      label: proof.label || "Proof continuity",
-      summary: proof.summary || "Proof continuity stays attached from Companion into this deeper workspace.",
+      label: proof.label || "Proof attached",
+      summary: proof.summary || "Proof context stays attached from the active path.",
       meta:
         [
           handoff.bundleStatus ? `bundle=${handoff.bundleStatus}` : "",
@@ -103,7 +103,7 @@ function resolveWorkbenchArrivalSpine(handoff = {}) {
           Number.isFinite(handoff.evidenceRefCount) && handoff.evidenceRefCount > 0 ? `refs=${handoff.evidenceRefCount}` : ""
         ]
           .filter(Boolean)
-          .join("; ") || "Bundle, record, incident, and audit continuity will appear here as they become ready."
+          .join("; ") || "Bundle, record, incident, and audit context will appear here as it becomes ready."
     },
     incident: {
       id: "incident",
@@ -164,14 +164,14 @@ export function renderWorkbenchArrivalContext({ domainRoot = "", handoffContext 
       <article class="metric workbench-arrival-context-card">
         <div class="workbench-arrival-context-header">
           <div class="workbench-arrival-context-copy">
-            <div class="title">Companion handoff context</div>
-            <div class="meta">Decision / Receipt / Proof / Incident stays attached as you enter this deeper workspace.</div>
+            <div class="title">Companion handoff</div>
+            <div class="meta">The same decision, receipt, proof, and incident path stays attached here.</div>
             <div class="meta">${escapeHTML(
-              String(handoff.arrivalRationale || "Companion opened this Workbench depth because the governed request needs deeper review.")
+              String(handoff.arrivalRationale || "Companion opened this workspace because the governed item needs deeper review.")
             )}</div>
           </div>
           <div class="workbench-arrival-context-chip-row">
-            <span class="native-launcher-status-badge">Companion handoff</span>
+            <span class="native-launcher-status-badge">From Companion</span>
             ${continuityChips}
           </div>
         </div>

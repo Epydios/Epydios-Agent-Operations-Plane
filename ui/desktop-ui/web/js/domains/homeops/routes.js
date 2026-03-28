@@ -17,7 +17,7 @@ export function renderHomeOpsEmptyState(ui, options = {}) {
     options.tone || "info",
     options.title || "Companion",
     options.message ||
-      "Companion becomes available after Epydios finishes loading your current workspace.",
+      "Companion becomes available after the workspace finishes loading.",
     options.detail ||
       "Refresh the workspace. If Companion should already be available, check launcher status and try again."
   );

@@ -66,9 +66,10 @@ test("workspace shell reserves a native launcher status surface ahead of the wor
   assert.match(INDEX_HTML, /data-workspace-mode="companion"/);
   assert.match(INDEX_HTML, /data-workspace-mode="workbench"/);
   assert.match(INDEX_HTML, /data-workspace-tab="companionops"/);
-  assert.match(INDEX_HTML, /Workbench depth/);
-  assert.match(INDEX_HTML, /Live review/);
-  assert.match(INDEX_HTML, /Platform and admin/);
+  assert.match(INDEX_HTML, /Daily lane/);
+  assert.match(INDEX_HTML, /Deeper review/);
+  assert.match(INDEX_HTML, /Review and follow-through/);
+  assert.match(INDEX_HTML, /Policy and administration/);
   assert.match(INDEX_HTML, /LogOps/);
   assert.match(INDEX_HTML, /data-workspace-tab="logops"/);
 });

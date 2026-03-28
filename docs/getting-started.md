@@ -26,8 +26,8 @@ If you only want the installed desktop lane without the governed-request harness
 
 ## Other Platform Lanes
 
-- Linux has a repo-backed Ubuntu 24.04 beta installed evaluation contract.
-- Windows has a repo-backed beta installed evaluation contract with native packaging artifacts and launcher helpers.
+- Linux ships repo-committed Ubuntu 24.04 beta scripts and artifacts.
+- Windows ships repo-committed beta packaging artifacts and launcher helpers.
 - Both are real, but neither is the supported OSS lane for first evaluation.
 - Stronger Linux or Windows wording waits for linked installed-host proof.
 - Windows `live` remains explicitly deferred.

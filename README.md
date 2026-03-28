@@ -2,7 +2,7 @@
 
 EpydiosOps is an installable operator desktop for governed AI and tool execution.
 
-It puts a visible operator surface in front of requests that are usually buried in middleware. You can launch the desktop, keep interposition explicit, run a real governed request, resolve the decision and inspect the audit and evidence trail on the same path.
+It puts `Companion` in front of requests that are usually buried in middleware and opens `Workbench` only when the run needs deeper runtime, audit, evidence, or incident review.
 
 ![Epydios Companion overview](docs/images/hero-overview.png)
 
@@ -32,8 +32,8 @@ It proves:
 ## Current OSS Posture
 
 - macOS `live` installed desktop is the supported lane
-- Linux has a proven Ubuntu 24.04 beta lane
-- Windows has a native packaging and launch beta lane
+- Linux ships repo-committed Ubuntu 24.04 beta packaging, install, and verification surfaces
+- Windows ships repo-committed beta packaging, install, and verification surfaces
 
 ## What This Repo Contains
 
