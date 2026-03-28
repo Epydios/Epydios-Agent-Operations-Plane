@@ -42,8 +42,9 @@ Release-bar meaning:
 
 - `verify-m15-phase-c.sh` proves the supported macOS installed `live` lane
 - `verify-m15-phase-c-governed-request.sh` proves sign-in, `Interposition OFF / ON`, one governed Codex `/responses` request, approval resolution, and audit/evidence handoff on that supported lane
-- Linux remains a proved Ubuntu 24.04 beta installed evaluation lane
-- Windows remains a beta installed evaluation lane with native packaging and launch proof
+- Linux remains a repo-backed Ubuntu 24.04 beta installed evaluation contract
+- Windows remains a repo-backed beta installed evaluation contract with native packaging artifacts and launcher helpers
+- stronger Linux or Windows wording waits for linked installed-host proof
 - Windows `live` is explicitly deferred and is not a release blocker for this runbook
 
 ## 2. Push The Release Commit
@@ -158,7 +159,8 @@ Confirm:
    - `docs/images/README.md`
 4. Platform posture is still stated truthfully:
    - macOS `live` supported
-   - Linux beta installed evaluation lane
-   - Windows beta installed evaluation lane with native packaging and launch proof
+   - Linux beta installed evaluation contract
+   - Windows beta installed evaluation contract with native packaging artifacts and launcher helpers
+   - stronger Linux or Windows wording still waits for linked installed-host proof
    - Windows `live` deferred
 5. `provenance/images.lock.yaml` and `platform/overlays/production/patch-image-digests.yaml` both reflect the released digests.

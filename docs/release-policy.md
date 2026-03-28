@@ -14,10 +14,10 @@ A release is credible when these pass on the public baseline:
 ## Platform Posture
 
 - macOS `live` installed desktop is the supported OSS lane
-- Linux has a proven Ubuntu 24.04 beta installed evaluation lane
-- Windows has a beta installed evaluation lane with native packaging and launch proof
+- Linux has a repo-backed Ubuntu 24.04 beta installed evaluation contract
+- Windows has a repo-backed beta installed evaluation contract with native packaging artifacts and launcher helpers
 
-Linux and Windows are real public lanes, but they are not equal to the supported macOS lane unless the release artifacts and public docs are updated to say so.
+Linux and Windows are real public beta lanes, but stronger wording waits for linked installed-host proof and they are not equal to the supported macOS lane unless the release artifacts and public docs are updated to say so.
 
 ## Beta Installed Evaluation Lanes
 
@@ -25,8 +25,9 @@ The current public beta lanes are real, but still below the supported macOS lane
 
 - Linux uses an AppImage primary artifact with a tarball fallback plus installed launcher and uninstall helpers
 - Windows uses an installer primary artifact with a packaged executable pair plus installed launcher helpers
+- both lanes have committed beta-lane scripts and summary artifacts in-tree
 - both lanes keep manual reinstall as the update posture
-- both lanes remain below supported parity until fresh installed-host proof closes the remaining gap
+- stronger Linux or Windows wording waits for linked installed-host proof
 - Windows `live` operator parity remains explicitly deferred
 
 ## Supported Installed Contract

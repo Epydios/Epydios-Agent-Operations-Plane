@@ -1,7 +1,7 @@
 # Pilot Readiness Sign-off (Draft)
 
-Last updated: 2026-03-25  
-Status: Approved (all evidence complete and approvals recorded)
+Last updated: 2026-03-27  
+Status: Approved for the recorded pilot scope; the public-baseline addendum stays limited to the committed evidence in this repo
 
 ## Scope
 
@@ -17,12 +17,12 @@ It now also carries a release-baseline addendum for the current public desktop p
 Current truthful baseline:
 
 - macOS installed desktop in `live` is the supported lane
-- Linux has a proven Ubuntu 24.04 beta installed evaluation lane
-- Windows has a beta installed evaluation lane with native packaging and launch proof
+- Linux has a repo-backed Ubuntu 24.04 beta installed evaluation contract
+- Windows has a repo-backed beta installed evaluation contract with native packaging artifacts and launcher helpers
 - Windows `live` is not yet proved and remains deferred
 - the supported macOS `live` lane now has dedicated governed-request proof
 
-Current baseline proof:
+Current committed baseline evidence:
 
 1. Supported macOS installed `live` lane
    - Command: `./ui/desktop-ui/bin/verify-m15-phase-c.sh`
@@ -32,6 +32,25 @@ Current baseline proof:
    - Command: `./ui/desktop-ui/bin/verify-m15-phase-c-governed-request.sh`
    - Must include: sign-in, `Interposition OFF / ON` clarity, one real governed Codex `/responses` request, approval resolution, and audit/evidence handoff.
    - Status: `pass`
+3. Linux beta installed evaluation contract in-tree
+   - Artifacts:
+     - `./ui/desktop-ui/bin/package-m15-linux.sh`
+     - `./ui/desktop-ui/bin/install-m15-linux-beta.sh`
+     - `./ui/desktop-ui/bin/verify-m15-phase-b.sh`
+     - `./ui/desktop-ui/bin/verify-m15-linux-beta.sh`
+     - `ui/desktop-ui/.epydios/internal-readiness/m15-native-phase-b/package-m15-linux-latest.summary.json`
+   - Must include: explicit beta contract fields plus truthful non-Linux-host blocker recording when the active host cannot produce the lane.
+   - Status: `truthful-beta-contract`
+4. Windows beta installed evaluation contract in-tree
+   - Artifacts:
+     - `./ui/desktop-ui/bin/package-m15-windows.sh`
+     - `./ui/desktop-ui/bin/install-m15-windows-beta.sh`
+     - `./ui/desktop-ui/bin/verify-m15-phase-d.sh`
+     - `./ui/desktop-ui/bin/verify-m15-windows-beta.sh`
+     - `ui/desktop-ui/.epydios/internal-readiness/m15-native-phase-d/package-m15-windows-latest.summary.json`
+     - `ui/desktop-ui/.epydios/internal-readiness/m15-native-phase-d/verify-m15-phase-d-latest.summary.json`
+   - Must include: explicit beta contract fields plus truthful non-Windows-host blocker recording when the active host cannot produce the lane.
+   - Status: `truthful-beta-contract`
 
 Explicit deferred items:
 
@@ -99,5 +118,5 @@ Explicit deferred items:
 
 ## Open Items Before Final Sign-off
 
-1. Preserve the explicit beta/deferred posture for Linux and Windows in public release artifacts until new host proof exists.
+1. Preserve the explicit beta/deferred posture for Linux and Windows in public release artifacts until linked installed-host proof exists.
 2. Maintain this record as a living approval artifact and refresh evidence on each release tag.
