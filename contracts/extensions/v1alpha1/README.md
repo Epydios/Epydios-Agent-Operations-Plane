@@ -7,11 +7,12 @@ This package freezes the first versioned plug-in boundary for:
 - `ProfileResolver`
 - `DesktopProvider` (`observe`, `actuate`, `verify`)
 
-These interfaces are the public OSS contracts that private modules (including AIMXS) can implement.
+These interfaces are the public OSS contracts that baseline providers and private modules (including AIMXS) can implement.
 
 ## Purpose
 
 - Keep AIMXS out of the OSS build graph
+- Keep the baseline decision contract real in OSS
 - Preserve a stable integration target
 - Enable OSS baseline providers and private providers to coexist
 
@@ -20,7 +21,7 @@ These interfaces are the public OSS contracts that private modules (including AI
 - `provider-contracts.openapi.yaml`
   - HTTP/JSON request-response contracts for provider services
 - `provider-registration-crd.yaml`
-  - Kubernetes registration resource used by the control plane to discover/select providers
+  - Kubernetes registration resource used by the runtime and desktop surfaces to discover/select providers
 
 ## Compatibility Rules
 

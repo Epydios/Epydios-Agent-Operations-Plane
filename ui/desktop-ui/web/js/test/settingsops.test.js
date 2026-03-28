@@ -175,14 +175,15 @@ test("settingsops renders bounded preferences, secure refs, environment, support
   assert.match(html, /Secure Refs/);
   assert.match(html, /Local Environment/);
   assert.match(html, /Supported Setup/);
-  assert.match(html, /Connector Governance/);
+  assert.match(html, /Connector Capability Contract/);
   assert.match(html, /Setup Recovery/);
   assert.match(html, /Supported Setup Editor/);
   assert.match(html, /Setup Status/);
-  assert.match(html, /Current Connector Lane/);
+  assert.match(html, /Current Connector Capability/);
   assert.match(html, /Browser MCP/);
   assert.match(html, /approval-gated destructive click/);
-  assert.match(html, /Show connector profile inventory/);
+  assert.match(html, /SettingsOps defines the bounded connector contract that GovernanceOps reviews and RuntimeOps follows through on\./);
+  assert.match(html, /Show connector capability inventory/);
   assert.match(html, /data-settings-connector-id="browser-proof"/);
   assert.match(html, /Endpoint Inventory/);
   assert.match(html, /data-settings-endpoint-id="integrationsettings"/);

@@ -278,7 +278,7 @@ test("runtimeops page renders the first inspect-only runtime boards", () => {
   assert.match(ui.runtimeOpsContent.innerHTML, /RuntimeOps/);
   assert.match(ui.runtimeOpsContent.innerHTML, /Current Run And Session/);
   assert.match(ui.runtimeOpsContent.innerHTML, /Investigation And Follow-Through/);
-  assert.match(ui.runtimeOpsContent.innerHTML, /Routing And Inventory/);
+  assert.match(ui.runtimeOpsContent.innerHTML, /Routing, Connectors, And Inventory/);
   assert.match(ui.runtimeOpsContent.innerHTML, /Use the deeper runtime console to inspect governed runs, follow session continuity, and confirm runtime posture/);
   assert.match(ui.runtimeOpsContent.innerHTML, /Run And Session Follow-Through/);
   assert.match(ui.runtimeOpsContent.innerHTML, /Selected Session Review/);
@@ -349,7 +349,7 @@ test("runtimeops page renders the first inspect-only runtime boards", () => {
   );
   assert.ok(
     ui.runtimeOpsContent.innerHTML.indexOf("Investigation And Follow-Through") <
-      ui.runtimeOpsContent.innerHTML.indexOf("Routing And Inventory")
+      ui.runtimeOpsContent.innerHTML.indexOf("Routing, Connectors, And Inventory")
   );
 });
 

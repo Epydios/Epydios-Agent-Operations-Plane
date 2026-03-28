@@ -40,12 +40,17 @@ write_summary() {
 {
   "generated_at_utc": "${STAMP}",
   "status": "installed_macos_beta_bundle",
+  "app_bundle_name": "${APP_INSTALL_NAME}",
+  "install_contract": "reference_macos_installed_lane",
   "install_root": "${INSTALL_ROOT}",
   "install_path": "${INSTALL_PATH}",
   "app_executable_path": "${APP_EXECUTABLE_PATH}",
   "support_root": "${SUPPORT_ROOT}",
   "bootstrap_path": "${BOOTSTRAP_PATH}",
   "launch_helper_path": "${LAUNCH_HELPER_PATH}",
+  "release_support_lane": "supported_macos_installed_live_lane",
+  "update_posture": "manual_reinstall_from_released_artifact",
+  "runtime_posture": "cluster_backed_live_lane",
   "log_path": "${LOG_PATH}",
   "source_bundle_path": "${APP_SOURCE_PATH}"
 }
@@ -55,7 +60,7 @@ EOF
 }
 
 {
-  echo "Installing ${APP_SOURCE_PATH} -> ${INSTALL_PATH}"
+  echo "Installing supported macOS reference lane bundle ${APP_SOURCE_PATH} -> ${INSTALL_PATH}"
   mkdir -p "${INSTALL_ROOT}" "${SUPPORT_ROOT}"
   rm -rf "${INSTALL_PATH}"
   if command -v rsync >/dev/null 2>&1; then
@@ -76,6 +81,7 @@ EOF
   cat > "${LAUNCH_HELPER_PATH}" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
+# Installed relaunch entry for the supported macOS reference lane.
 export EPYDIOS_NATIVEAPP_BOOTSTRAP_PATH="${BOOTSTRAP_PATH}"
 exec "${INSTALL_PATH}/Contents/MacOS/epydios-agentops-desktop" "\$@"
 EOF
@@ -84,4 +90,4 @@ EOF
 
 write_summary
 
-echo "install-m15-macos-beta: installed bundle at ${INSTALL_PATH}"
+echo "install-m15-macos-beta: installed supported macOS reference lane bundle at ${INSTALL_PATH}"

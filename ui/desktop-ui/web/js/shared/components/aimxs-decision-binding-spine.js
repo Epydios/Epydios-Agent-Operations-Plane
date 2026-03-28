@@ -61,6 +61,11 @@ export function renderAimxsDecisionBindingSpine(model = {}) {
     .map(renderPivotButton)
     .filter(Boolean)
     .join("");
+  const authorityTitle = String(model?.authorityTitle || "Authority Chain").trim() || "Authority Chain";
+  const grantTitle = String(model?.grantTitle || "Grant Chain").trim() || "Grant Chain";
+  const receiptTitle = String(model?.receiptTitle || "Receipt Chain").trim() || "Receipt Chain";
+  const replayTitle = String(model?.replayTitle || "Replay Chain").trim() || "Replay Chain";
+  const evidenceTitle = String(model?.evidenceTitle || "Evidence Chain").trim() || "Evidence Chain";
   return `
     <div class="aimxs-spine-shell" data-aimxs-spine="shared">
       <div class="aimxs-spine-topline">
@@ -70,11 +75,11 @@ export function renderAimxsDecisionBindingSpine(model = {}) {
         <span class="chip chip-neutral chip-compact">approval=${escapeHTML(String(model?.approvalId || "-"))}</span>
       </div>
       <div class="aimxs-spine-grid">
-        ${renderChain("Authority Chain", model.authorityChain)}
-        ${renderChain("Grant Chain", model.grantChain)}
-        ${renderChain("Receipt Chain", model.receiptChain)}
-        ${renderChain("Replay Chain", model.replayChain)}
-        ${renderChain("Evidence Chain", model.evidenceChain)}
+        ${renderChain(authorityTitle, model.authorityChain)}
+        ${renderChain(grantTitle, model.grantChain)}
+        ${renderChain(receiptTitle, model.receiptChain)}
+        ${renderChain(replayTitle, model.replayChain)}
+        ${renderChain(evidenceTitle, model.evidenceChain)}
       </div>
       ${model?.summary ? `<div class="aimxs-summary">${escapeHTML(String(model.summary))}</div>` : ""}
       ${pivots ? `<div class="aimxs-spine-pivot-row">${pivots}</div>` : ""}

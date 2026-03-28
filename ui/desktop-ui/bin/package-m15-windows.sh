@@ -45,6 +45,13 @@ write_summary() {
 {
   "generated_at_utc": "$(m15_json_escape "${STAMP}")",
   "status": "$(m15_json_escape "${status}")",
+  "artifact_kind": "windows_installer_with_executable_pair",
+  "install_contract": "beta_windows_installed_evaluation_lane",
+  "release_support_lane": "beta_windows_installed_evaluation_lane",
+  "primary_artifact_path": "$(m15_json_escape "${host_installer_path}")",
+  "paired_artifact_path": "$(m15_json_escape "${host_binary_path}")",
+  "update_posture": "manual_reinstall_from_packaged_artifact",
+  "runtime_posture": "beta_cluster_backed_live_lane",
   "host_os": "$(m15_json_escape "${HOST_OS}")",
   "host_arch": "$(m15_json_escape "${HOST_ARCH}")",
   "reason": "$(m15_json_escape "${reason}")",
@@ -72,7 +79,7 @@ if [ "${HOST_OS}" != "linux" ] && ! is_windows_host; then
   : > "${LOG_PATH}"
   write_summary \
     "blocked_active_host_unsupported_windows_builder" \
-    "Windows packaging baseline currently supports the Linux Docker builder or a native Windows host toolchain." \
+    "Windows beta installed evaluation lane packaging currently supports the Linux Docker builder or a native Windows host toolchain." \
     "" \
     ""
   echo "package-m15-windows: active host is ${HOST_OS}; blocker recorded at ${SUMMARY_PATH}" >&2
@@ -93,7 +100,7 @@ if [ "${#missing[@]}" -ne 0 ]; then
   : > "${LOG_PATH}"
   write_summary \
     "blocked_missing_windows_packaging_toolchain" \
-    "Missing Windows packaging toolchain components: ${missing[*]}." \
+    "Missing Windows beta installed evaluation lane packaging toolchain components: ${missing[*]}." \
     "" \
     ""
   echo "package-m15-windows: missing tooling ${missing[*]}" >&2
@@ -155,7 +162,7 @@ export EPYDIOS_STAGE_WEB_DIST="$(m15_frontend_stage_root "phase-d-${STAMP}")"
 ) >"${LOG_PATH}" 2>&1 || {
   write_summary \
     "failed_windows_build_or_packaging" \
-    "Windows packaging failed during toolchain preflight, tests, frontend staging, or Wails packaging. See log_path." \
+    "Windows beta installed evaluation lane packaging failed during toolchain preflight, tests, frontend staging, or Wails packaging. See log_path." \
     "" \
     ""
   echo "package-m15-windows: packaging failed; see ${LOG_PATH}" >&2
@@ -168,7 +175,7 @@ INSTALLER_SOURCE="$(find "${STAGE_MODULE_ROOT}/build/bin" -type f \( -iname '*.m
 if [ -z "${APP_EXE_SOURCE}" ] || [ ! -f "${APP_EXE_SOURCE}" ]; then
   write_summary \
     "failed_missing_windows_binary" \
-    "Windows packaging completed without the packaged application executable." \
+    "Windows beta installed evaluation lane packaging completed without the paired application executable." \
     "" \
     ""
   echo "package-m15-windows: missing packaged application executable" >&2
@@ -181,7 +188,7 @@ cp "${APP_EXE_SOURCE}" "${ARTIFACT_BINARY}"
 if [ -z "${INSTALLER_SOURCE}" ] || [ ! -f "${INSTALLER_SOURCE}" ]; then
   write_summary \
     "packaged_windows_binary_without_installer" \
-    "Windows application executable was produced, but no MSI or installer artifact was found." \
+    "Windows beta installed evaluation lane packaging produced the paired application executable, but no primary installer artifact was found." \
     "${ARTIFACT_BINARY}" \
     ""
   echo "package-m15-windows: installer artifact missing after packaging" >&2
@@ -194,7 +201,7 @@ cp "${INSTALLER_SOURCE}" "${ARTIFACT_INSTALLER}"
 
 write_summary \
   "packaged_windows_installer_baseline" \
-  "Windows application executable and installer baseline were produced." \
+  "Windows beta installed evaluation lane installer primary artifact and executable pair were produced." \
   "${ARTIFACT_BINARY}" \
   "${ARTIFACT_INSTALLER}"
 

@@ -811,9 +811,9 @@ export function renderRuntimeWorkspace(context = {}, session = {}, options = {})
         `
       }),
       renderWorkbenchDomainCluster({
-        title: "Routing And Inventory",
+        title: "Routing, Connectors, And Inventory",
         lead:
-          "Keep provider routing, identity posture, route boundary echoes, and governed run inventory visible as one coherent runtime ownership area.",
+          "Keep provider routing, connector continuity, identity posture, route boundary echoes, and governed run inventory visible as one coherent runtime ownership area.",
         bodyClass: "runtimeops-primary-grid runtimeops-cluster-grid",
         body: `
           ${renderProviderRoutingBoard(snapshot)}

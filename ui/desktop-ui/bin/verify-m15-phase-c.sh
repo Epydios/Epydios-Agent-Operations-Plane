@@ -38,17 +38,24 @@ trap cleanup EXIT
 INSTALL_SUMMARY="${PHASE_ROOT}/install-m15-macos-beta-latest.summary.json"
 INSTALLED_APP_PATH="$(jq -r '.install_path // ""' "${INSTALL_SUMMARY}")"
 BOOTSTRAP_PATH="$(jq -r '.bootstrap_path // ""' "${INSTALL_SUMMARY}")"
+LAUNCH_HELPER_PATH="$(jq -r '.launch_helper_path // ""' "${INSTALL_SUMMARY}")"
+INSTALL_CONTRACT="$(jq -r '.install_contract // ""' "${INSTALL_SUMMARY}")"
+UPDATE_POSTURE="$(jq -r '.update_posture // ""' "${INSTALL_SUMMARY}")"
+RUNTIME_POSTURE="$(jq -r '.runtime_posture // ""' "${INSTALL_SUMMARY}")"
 EXECUTABLE_PATH="${INSTALLED_APP_PATH}/Contents/MacOS/epydios-agentops-desktop"
 [ -x "${EXECUTABLE_PATH}" ] || {
   echo "verify-m15-phase-c failed: installed executable missing at ${EXECUTABLE_PATH}" >&2
+  exit 1
+}
+[ -x "${LAUNCH_HELPER_PATH}" ] || {
+  echo "verify-m15-phase-c failed: installed launch helper missing at ${LAUNCH_HELPER_PATH}" >&2
   exit 1
 }
 
 (
   export HOME="${HOME_ROOT}"
   export XDG_CACHE_HOME="${CACHE_ROOT}"
-  export EPYDIOS_NATIVEAPP_BOOTSTRAP_PATH="${BOOTSTRAP_PATH}"
-  "${EXECUTABLE_PATH}"
+  "${LAUNCH_HELPER_PATH}"
 ) >>"${LOG_PATH}" 2>&1 &
 APP_PID=$!
 
@@ -79,7 +86,7 @@ grep -q '"event":"native_window_dom_ready"' "${EVENT_LOG}" || {
   exit 1
 }
 
-python3 - <<'PY' "${SESSION_MANIFEST}" "${CHECKLIST_PATH}" "${LOG_PATH}" "${INSTALLED_APP_PATH}" "${BOOTSTRAP_PATH}" "${M15_REPO_ROOT}"
+python3 - <<'PY' "${SESSION_MANIFEST}" "${CHECKLIST_PATH}" "${LOG_PATH}" "${INSTALLED_APP_PATH}" "${BOOTSTRAP_PATH}" "${LAUNCH_HELPER_PATH}" "${INSTALL_CONTRACT}" "${UPDATE_POSTURE}" "${RUNTIME_POSTURE}" "${M15_REPO_ROOT}"
 import json
 import pathlib
 import sys
@@ -89,7 +96,11 @@ checklist_path = pathlib.Path(sys.argv[2])
 log_path = sys.argv[3]
 installed_app_path = sys.argv[4]
 bootstrap_path = sys.argv[5]
-repo_root = pathlib.Path(sys.argv[6])
+launch_helper_path = sys.argv[6]
+install_contract = sys.argv[7]
+update_posture = sys.argv[8]
+runtime_posture = sys.argv[9]
+repo_root = pathlib.Path(sys.argv[10])
 manifest = json.loads(manifest_path.read_text())
 
 assert manifest["mode"] == "live", manifest["mode"]
@@ -110,12 +121,21 @@ assert manifest["gatewayService"]["health"] == "healthy", manifest["gatewayServi
 assert manifest["gatewayService"]["statusPath"] == manifest["paths"]["gatewayStatusPath"], manifest["gatewayService"]["statusPath"]
 assert manifest["interposition"]["enabled"] is False, manifest["interposition"]
 assert manifest["interposition"]["status"] == "off", manifest["interposition"]
+assert install_contract == "reference_macos_installed_lane", install_contract
+assert update_posture == "manual_reinstall_from_released_artifact", update_posture
+assert runtime_posture == "cluster_backed_live_lane", runtime_posture
+
+runtime_config = json.loads((pathlib.Path(manifest["paths"]["webDir"]) / "config" / "runtime-config.json").read_text())
+native_shell = runtime_config.get("nativeShell") or {}
+assert native_shell.get("runtimePosture") == "cluster-backed live lane", native_shell
+assert native_shell.get("updatePosture") == "manual reinstall from released artifact", native_shell
+assert native_shell.get("supportRoot") == manifest["paths"]["configRoot"], native_shell
 
 checklist = {
     "startup_reliability": {
         "status": "pass",
         "evidence": str(manifest_path),
-        "notes": "Packaged macOS app launched from installed .app bundle and reached native_window_dom_ready without a browser."
+        "notes": "Packaged macOS app relaunched through the installed helper entry, reached native_window_dom_ready without a browser, and preserved the supported reference-lane bootstrap contract."
     },
     "approvals_runs_incidents_settings_paths": {
         "status": "covered_by_existing_ui_evidence",
@@ -131,6 +151,7 @@ checklist = {
         ]
     },
     "install_bundle_path": installed_app_path,
+    "launch_helper_path": launch_helper_path,
     "bootstrap_path": bootstrap_path,
     "verification_log_path": log_path
 }
@@ -150,9 +171,10 @@ cat > "${SUMMARY_PATH}" <<EOF
 {
   "generated_at_utc": "${STAMP}",
   "status": "phase_c_beta_ready",
-  "reason": "Packaged macOS .app installed locally, launched without a browser using the bootstrap runtime config, and completed the install/uninstall beta flow with sandbox defaults preserved.",
+  "reason": "Packaged macOS .app installed locally, relaunched through the installed helper entry, preserved the bootstrap runtime contract, and completed the install/uninstall reference-lane flow with sandbox defaults preserved.",
   "log_path": "${LOG_PATH}",
   "installed_app_path": "${INSTALLED_APP_PATH}",
+  "launch_helper_path": "${LAUNCH_HELPER_PATH}",
   "bootstrap_path": "${BOOTSTRAP_PATH}",
   "session_manifest_path": "${SESSION_MANIFEST}",
   "event_log_path": "${EVENT_LOG}",

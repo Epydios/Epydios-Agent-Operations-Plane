@@ -493,6 +493,17 @@ func waitForRuntimeHealthUntil(url string, deadline time.Time) error {
 	return fmt.Errorf("runtime health endpoint did not become ready: %s", url)
 }
 
+func nativeShellRuntimePosture(opts LaunchOptions) string {
+	if opts.Mode == modeLive {
+		return "cluster-backed live lane"
+	}
+	return "mock local lane"
+}
+
+func nativeShellUpdatePosture() string {
+	return "manual reinstall from released artifact"
+}
+
 func patchRuntimeConfig(webDir string, opts LaunchOptions, manifest SessionManifest) error {
 	configPath := filepath.Join(webDir, "config", "runtime-config.json")
 	content, err := os.ReadFile(configPath)
@@ -535,6 +546,8 @@ func patchRuntimeConfig(webDir string, opts LaunchOptions, manifest SessionManif
 		"bridgeCheckedAtUtc":     manifest.BridgeCheckedAtUTC,
 		"bridgeReason":           manifest.BridgeReason,
 		"mode":                   opts.Mode,
+		"runtimePosture":         nativeShellRuntimePosture(opts),
+		"updatePosture":          nativeShellUpdatePosture(),
 		"runtimeProcessMode":     manifest.RuntimeProcessMode,
 		"runtimeState":           manifest.RuntimeState,
 		"runtimeService":         manifest.RuntimeService,
@@ -546,6 +559,7 @@ func patchRuntimeConfig(webDir string, opts LaunchOptions, manifest SessionManif
 		"interposition":          manifest.Interposition,
 		"startupError":           manifest.StartupError,
 		"configRoot":             manifest.Paths.ConfigRoot,
+		"supportRoot":            manifest.Paths.ConfigRoot,
 		"cacheRoot":              manifest.Paths.CacheRoot,
 		"logDir":                 manifest.Paths.LogDir,
 		"crashDir":               manifest.Paths.CrashDir,
@@ -581,7 +595,10 @@ func patchRuntimeConfig(webDir string, opts LaunchOptions, manifest SessionManif
 			"gatewayRoot":         manifest.Paths.GatewayRoot,
 			"crashDir":            manifest.Paths.CrashDir,
 			"configRoot":          manifest.Paths.ConfigRoot,
+			"supportRoot":         manifest.Paths.ConfigRoot,
 			"cacheRoot":           manifest.Paths.CacheRoot,
+			"runtimePosture":      nativeShellRuntimePosture(opts),
+			"updatePosture":       nativeShellUpdatePosture(),
 		},
 	}
 	encoded, err := json.MarshalIndent(payload, "", "  ")

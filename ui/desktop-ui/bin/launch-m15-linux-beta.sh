@@ -16,11 +16,11 @@ if [ -x "${LAUNCH_HELPER_PATH}" ]; then
 fi
 
 [ -x "${INSTALL_PATH}" ] || {
-  echo "launch-m15-linux-beta failed: installed AppImage missing at ${INSTALL_PATH}" >&2
+  echo "launch-m15-linux-beta failed: Linux beta installed evaluation lane AppImage missing at ${INSTALL_PATH}" >&2
   exit 1
 }
 [ -f "${BOOTSTRAP_PATH}" ] || {
-  echo "launch-m15-linux-beta failed: bootstrap config missing at ${BOOTSTRAP_PATH}" >&2
+  echo "launch-m15-linux-beta failed: Linux beta installed evaluation lane bootstrap config missing at ${BOOTSTRAP_PATH}" >&2
   exit 1
 }
 

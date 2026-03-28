@@ -58,12 +58,19 @@ write_summary() {
 {
   "generated_at_utc": "$(m15_json_escape "${STAMP}")",
   "status": "installed_windows_beta_bundle",
+  "artifact_kind": "$(m15_json_escape "windows_executable_installed_bundle")",
+  "install_contract": "$(m15_json_escape "beta_windows_installed_evaluation_lane")",
+  "release_support_lane": "$(m15_json_escape "beta_windows_installed_evaluation_lane")",
   "install_root": "$(m15_json_escape "${INSTALL_ROOT}")",
   "install_path": "$(m15_json_escape "${INSTALL_PATH}")",
   "support_root": "$(m15_json_escape "${SUPPORT_ROOT}")",
   "bootstrap_path": "$(m15_json_escape "${BOOTSTRAP_PATH}")",
+  "launcher_entry_path": "$(m15_json_escape "${LAUNCHER_CMD_PATH}")",
+  "launcher_support_path": "$(m15_json_escape "${LAUNCHER_SH_PATH}")",
   "launcher_cmd_path": "$(m15_json_escape "${LAUNCHER_CMD_PATH}")",
   "launcher_sh_path": "$(m15_json_escape "${LAUNCHER_SH_PATH}")",
+  "update_posture": "$(m15_json_escape "manual_reinstall_from_packaged_artifact")",
+  "runtime_posture": "$(m15_json_escape "beta_cluster_backed_live_lane")",
   "log_path": "$(m15_json_escape "${LOG_PATH}")",
   "source_binary_path": "$(m15_json_escape "${WINDOWS_BINARY_PATH}")",
   "source_installer_path": "$(m15_json_escape "${WINDOWS_INSTALLER_PATH}")"
@@ -74,7 +81,7 @@ EOF
 }
 
 {
-  echo "Installing ${WINDOWS_BINARY_PATH} -> ${INSTALL_PATH}"
+  echo "Installing Windows beta installed evaluation lane bundle ${WINDOWS_BINARY_PATH} -> ${INSTALL_PATH}"
   mkdir -p "${INSTALL_ROOT}" "${SUPPORT_ROOT}"
   cp "${WINDOWS_BINARY_PATH}" "${INSTALL_PATH}"
   cat > "${BOOTSTRAP_PATH}" <<EOF
@@ -114,4 +121,4 @@ EOF
 
 write_summary
 
-echo "install-m15-windows-beta: installed bundle at ${INSTALL_PATH}"
+echo "install-m15-windows-beta: installed Windows beta evaluation lane bundle at ${INSTALL_PATH}"

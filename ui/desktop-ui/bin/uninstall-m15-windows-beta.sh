@@ -34,15 +34,21 @@ cat > "${SUMMARY_PATH}" <<EOF
 {
   "generated_at_utc": "$(m15_json_escape "${STAMP}")",
   "status": "uninstalled_windows_beta_bundle",
+  "install_contract": "$(m15_json_escape "beta_windows_installed_evaluation_lane")",
+  "release_support_lane": "$(m15_json_escape "beta_windows_installed_evaluation_lane")",
   "install_root": "$(m15_json_escape "${INSTALL_ROOT}")",
   "install_path": "$(m15_json_escape "${INSTALL_PATH}")",
   "support_root": "$(m15_json_escape "${SUPPORT_ROOT}")",
+  "launcher_entry_path": "$(m15_json_escape "${LAUNCHER_CMD_PATH}")",
+  "launcher_support_path": "$(m15_json_escape "${LAUNCHER_SH_PATH}")",
   "launcher_cmd_path": "$(m15_json_escape "${LAUNCHER_CMD_PATH}")",
   "launcher_sh_path": "$(m15_json_escape "${LAUNCHER_SH_PATH}")",
+  "update_posture": "$(m15_json_escape "manual_reinstall_from_packaged_artifact")",
+  "runtime_posture": "$(m15_json_escape "beta_cluster_backed_live_lane")",
   "log_path": "$(m15_json_escape "${LOG_PATH}")"
 }
 EOF
 cp "${LOG_PATH}" "${LATEST_LOG}"
 cp "${SUMMARY_PATH}" "${LATEST_SUMMARY}"
 
-echo "uninstall-m15-windows-beta: removed bundle from ${INSTALL_PATH}"
+echo "uninstall-m15-windows-beta: removed Windows beta evaluation lane bundle from ${INSTALL_PATH}"

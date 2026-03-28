@@ -31,6 +31,13 @@ write_summary() {
 {
   "generated_at_utc": "${STAMP}",
   "status": "${status}",
+  "artifact_kind": "linux_appimage_with_tarball_fallback",
+  "install_contract": "beta_linux_installed_evaluation_lane",
+  "release_support_lane": "beta_linux_installed_evaluation_lane",
+  "primary_artifact_path": "${appimage_path}",
+  "paired_artifact_path": "${tarball_path}",
+  "update_posture": "manual_reinstall_from_packaged_artifact",
+  "runtime_posture": "beta_cluster_backed_live_lane",
   "host_os": "${HOST_OS}",
   "host_arch": "${HOST_ARCH}",
   "reason": "${reason}",
@@ -50,7 +57,7 @@ if [ "${HOST_OS}" != "linux" ]; then
   ) >"${LOG_PATH}" 2>&1 || true
   write_summary \
     "blocked_active_host_non_linux" \
-    "Wails reports that crosscompiling to Linux is not currently supported on the active host." \
+    "Linux beta installed evaluation lane packaging requires a Linux build host because Wails crosscompiling is not currently supported on the active host." \
     "" \
     ""
   echo "package-m15-linux: active host is ${HOST_OS}; blocker recorded at ${SUMMARY_PATH}" >&2
@@ -86,7 +93,7 @@ if ! command -v appimagetool >/dev/null 2>&1; then
   : > "${LOG_PATH}"
   write_summary \
     "failed_missing_appimagetool" \
-    "Linux packaging requires appimagetool on the Linux build host." \
+    "Linux beta installed evaluation lane packaging requires appimagetool on the Linux build host." \
     "" \
     ""
   echo "package-m15-linux: missing appimagetool on Linux host" >&2
@@ -109,7 +116,7 @@ export EPYDIOS_STAGE_WEB_DIST="$(m15_frontend_stage_root "phase-b-${STAMP}")"
 ) >"${LOG_PATH}" 2>&1 || {
   write_summary \
     "failed_linux_build_or_toolchain" \
-    "Linux packaging failed during toolchain preflight, test, frontend build, or native binary build. See log_path." \
+    "Linux beta installed evaluation lane packaging failed during toolchain preflight, test, frontend build, or native binary build. See log_path." \
     "" \
     ""
   echo "package-m15-linux: Linux packaging failed before archive creation; see ${LOG_PATH}" >&2
@@ -175,7 +182,7 @@ APPIMAGE_TMP_QUOTED="${APPIMAGE_TMP}\""
 ) >>"${LOG_PATH}" 2>&1 || {
   write_summary \
     "failed_appimage_packaging" \
-    "appimagetool failed while creating the Linux AppImage baseline. See log_path." \
+    "appimagetool failed while creating the Linux beta installed evaluation lane AppImage baseline. See log_path." \
     "${TARBALL_PATH}" \
     "${APPIMAGE_PATH}"
   echo "package-m15-linux: appimagetool failed; see ${LOG_PATH}" >&2
@@ -191,7 +198,7 @@ fi
 if [ ! -f "${TARBALL_PATH}" ] || [ ! -f "${APPIMAGE_PATH}" ]; then
   write_summary \
     "failed_missing_linux_artifacts" \
-    "Linux packaging did not produce both the tarball and AppImage baseline." \
+    "Linux beta installed evaluation lane packaging did not produce both the tarball fallback and AppImage primary artifact." \
     "${TARBALL_PATH}" \
     "${APPIMAGE_PATH}"
   echo "package-m15-linux: missing packaged Linux artifacts" >&2
@@ -200,7 +207,7 @@ fi
 
 write_summary \
   "packaged_linux_baseline" \
-  "Linux tarball and AppImage baseline produced." \
+  "Linux beta installed evaluation lane AppImage primary artifact and tarball fallback were produced." \
   "${TARBALL_PATH}" \
   "${APPIMAGE_PATH}"
 

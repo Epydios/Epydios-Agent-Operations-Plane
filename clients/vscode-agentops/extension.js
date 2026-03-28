@@ -93,7 +93,7 @@ class AgentOpsThreadProvider {
     try {
       const connection = await this.client.checkConnection();
       if (normalizedString(connection?.state) !== "connected") {
-        const item = new vscode.TreeItem("AgentOps connection not ready", vscode.TreeItemCollapsibleState.None);
+        const item = new vscode.TreeItem("EpydiosOps connection not ready", vscode.TreeItemCollapsibleState.None);
         item.description = clipText(normalizedString(connection?.message, "Check runtime connection settings."), 90);
         item.tooltip = new vscode.MarkdownString([
           `**Status**: ${normalizedString(connection?.state, "-")}`,
@@ -361,8 +361,8 @@ class ThreadPanel {
       reason: normalizedString(message?.reason),
       requestId: `vscode-approval-${Date.now()}`
     });
-    const decisionLabel = decision === "DENY" ? "denied" : "approved";
-    vscode.window.showInformationMessage(`AgentOps ${decisionLabel} approval ${target.targetId}.`);
+    const decisionLabel = decision === "DENY" ? "DENY" : "APPROVE";
+    vscode.window.showInformationMessage(`EpydiosOps recorded ${decisionLabel} for approval ${target.targetId}.`);
     this.selectedSessionId = target.sessionId;
     await this.load();
   }
@@ -382,8 +382,8 @@ class ThreadPanel {
       reason: normalizedString(message?.reason),
       requestId: `vscode-proposal-${Date.now()}`
     });
-    const decisionLabel = decision === "DENY" ? "denied" : "approved";
-    vscode.window.showInformationMessage(`AgentOps ${decisionLabel} tool proposal ${target.targetId}.`);
+    const decisionLabel = decision === "DENY" ? "DENY" : "APPROVE";
+    vscode.window.showInformationMessage(`EpydiosOps recorded ${decisionLabel} for tool proposal ${target.targetId}.`);
     this.selectedSessionId = target.sessionId;
     await this.load();
   }
@@ -410,14 +410,14 @@ class ThreadPanel {
     });
     this.selectedSessionId = normalizedString(response?.sessionId, this.selectedSessionId);
     vscode.window.showInformationMessage(
-      `AgentOps governed turn submitted on ${normalizedString(response?.sessionId, this.taskId)}.`
+      `EpydiosOps governed turn submitted on ${normalizedString(response?.sessionId, this.taskId)}.`
     );
     await this.load();
   }
 
   renderError(error) {
     const message = clipText(error instanceof RuntimeClientError ? error.message : String(error?.message || error), 600);
-    this.panel.webview.html = `<!DOCTYPE html><html><body style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: 16px;"><h2>AgentOps thread review failed</h2><pre>${escapeHtml(message)}</pre></body></html>`;
+    this.panel.webview.html = `<!DOCTYPE html><html><body style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: 16px;"><h2>EpydiosOps thread review failed</h2><pre>${escapeHtml(message)}</pre></body></html>`;
   }
 
   render() {
@@ -431,14 +431,14 @@ class ThreadPanel {
     model.catalogs = this.catalogs || {};
     const report = buildThreadGovernanceReport(model, this.governedReportSelection);
     await vscode.env.clipboard.writeText(normalizedString(report?.renderedText));
-    vscode.window.showInformationMessage("AgentOps enterprise governance report copied to clipboard.");
+    vscode.window.showInformationMessage("EpydiosOps governed thread report copied to clipboard.");
   }
 
   async copyAuditEvidenceHandoff() {
     const model = buildThreadReviewModel(this.thread, this.selectedSessionId);
     const handoff = buildAuditEvidenceHandoff(model);
     await vscode.env.clipboard.writeText(normalizedString(handoff?.renderedText));
-    vscode.window.showInformationMessage("AgentOps audit and evidence handoff copied to clipboard.");
+    vscode.window.showInformationMessage("EpydiosOps audit and evidence handoff copied to clipboard.");
   }
 
   async selectGovernanceReportProfile() {
@@ -562,7 +562,7 @@ function buildThreadGovernanceReport(model = {}, selection = {}) {
     exportProfile: normalizedString(selection?.exportProfile),
     audience: normalizedString(selection?.audience),
     retentionClass: normalizedString(selection?.retentionClass),
-    header: "AgentOps enterprise governance report",
+    header: "EpydiosOps governed thread report",
     reportType: "review",
     details: [
       selectedSessionId ? `Selected session: ${selectedSessionId}` : "",
@@ -611,7 +611,7 @@ function renderHtml(model, selection = {}, connection = {}) {
   const pendingProposals = pendingProposalItems(selectedSummary);
   const pendingDecisionCount = pendingApprovals.length + pendingProposals.length;
   const governedUpdate = buildGovernedUpdateEnvelope(model, {
-    header: "AgentOps thread update",
+    header: "EpydiosOps governed thread update",
     updateType: "review",
     details: [
       selectedSessionId ? `Selected session: ${selectedSessionId}` : "",
@@ -891,7 +891,7 @@ function renderHtml(model, selection = {}, connection = {}) {
 <meta charset="utf-8" />
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>${escapeHtml(normalizedString(model?.task?.title, model?.task?.taskId || "AgentOps Thread"))}</title>
+<title>${escapeHtml(normalizedString(model?.task?.title, model?.task?.taskId || "EpydiosOps Thread"))}</title>
 <style>
 body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: 16px; color: var(--vscode-foreground); background: var(--vscode-editor-background); }
 header { display: grid; gap: 10px; margin-bottom: 16px; }
@@ -926,7 +926,7 @@ ul { margin: 8px 0 0; padding-left: 18px; }
 <body>
 <header>
   <div>
-    <h2>${escapeHtml(normalizedString(model?.task?.title, model?.task?.taskId || "AgentOps Thread"))}</h2>
+    <h2>${escapeHtml(normalizedString(model?.task?.title, model?.task?.taskId || "EpydiosOps Thread"))}</h2>
     <div class="meta">taskId=${escapeHtml(normalizedString(model?.task?.taskId))} | status=${escapeHtml(normalizedString(model?.task?.status))} | latestSession=${escapeHtml(normalizedString(model?.task?.latestSessionId, "-"))}</div>
     <div class="meta">${escapeHtml(normalizedString(model?.task?.intent, "No intent recorded."))}</div>
   </div>
@@ -941,7 +941,7 @@ ul { margin: 8px 0 0; padding-left: 18px; }
   ${handoffBlock}
   <section class="panel">
     <h3>Governed Turn</h3>
-    <div class="meta">Submit the next governed turn against this task on the existing M16 or M18 contract.</div>
+    <div class="meta">Submit the next governed turn against this task on the shared governed-thread runtime contract.</div>
     <div class="form-row">
       <div class="form-col compact">
         <label for="execution-mode">Execution Path</label>
@@ -1075,7 +1075,7 @@ async function pickThread(provider) {
   const children = await provider.getChildren();
   const threadItems = children.filter((item) => item instanceof ThreadItem);
   if (!threadItems.length) {
-    vscode.window.showInformationMessage("No AgentOps threads are available for the current scope.");
+    vscode.window.showInformationMessage("No EpydiosOps governed threads are available for the current scope.");
     return null;
   }
   return vscode.window.showQuickPick(
@@ -1086,7 +1086,7 @@ async function pickThread(provider) {
       item
     })),
     {
-      title: "Resume AgentOps Thread Review"
+      title: "Resume EpydiosOps Thread Review"
     }
   );
 }
@@ -1111,8 +1111,8 @@ function activate(context) {
     }),
     vscode.commands.registerCommand("agentops.openThreadById", async () => {
       const taskId = await vscode.window.showInputBox({
-        title: "Open AgentOps thread by task ID",
-        prompt: "Enter an M16 taskId"
+        title: "Open EpydiosOps thread by task ID",
+        prompt: "Enter a governed task ID"
       });
       if (!normalizedString(taskId)) {
         return;
@@ -1126,7 +1126,7 @@ function activate(context) {
         const item = new ThreadItem(thread.task, thread.sessions);
         ThreadPanel.createOrShow(context, client, item);
       } catch (error) {
-        vscode.window.showErrorMessage(`AgentOps thread open failed: ${error.message || error}`);
+        vscode.window.showErrorMessage(`EpydiosOps thread open failed: ${error.message || error}`);
       }
     }),
     vscode.workspace.onDidChangeConfiguration((event) => {

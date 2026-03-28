@@ -17,8 +17,8 @@ It now also carries a release-baseline addendum for the current public desktop p
 Current truthful baseline:
 
 - macOS installed desktop in `live` is the supported lane
-- Linux has a proven Ubuntu 24.04 host-acceptance beta lane
-- Windows has native packaging and launch proved in beta posture
+- Linux has a proven Ubuntu 24.04 beta installed evaluation lane
+- Windows has a beta installed evaluation lane with native packaging and launch proof
 - Windows `live` is not yet proved and remains deferred
 - the supported macOS `live` lane now has dedicated governed-request proof
 

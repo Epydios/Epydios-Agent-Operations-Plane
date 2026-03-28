@@ -30,7 +30,7 @@ export function renderRunPolicyRichnessSection(run) {
                 ${policyOutcome.decision ? `<span class="${chipClassForStatus(policyOutcome.decision)} chip-compact">policy=${escapeHTML(policyOutcome.decision)}</span>` : ""}
               </div>
               <div class="run-detail-chips">
-                <span class="chip chip-neutral chip-compact">operatorGate=${escapeHTML(policyRichness.operatorApprovalRequired ? "manual review" : "policy-first")}</span>
+                <span class="chip chip-neutral chip-compact">operatorGate=${escapeHTML(policyRichness.operatorApprovalRequired ? "manual review" : "baseline decision lane")}</span>
                 <span class="chip chip-neutral chip-compact">provider=${escapeHTML(policyOutcome.provider || "-")}</span>
                 <span class="${chipClassForPolicyEffect(policyOutcome)}">effect=${escapeHTML(policyOutcome.effectLabel)}</span>
               </div>

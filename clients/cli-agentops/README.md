@@ -1,20 +1,20 @@
-# CLI Ingress for Epydios Agent Operations Plane
+# EpydiosOps CLI Governed Thread Client
 
-`cli-agentops` is the first `M19` CLI ingress slice for Epydios Agent Operations Plane.
+`cli-agentops` is the bounded CLI client for the EpydiosOps governed-thread runtime contract.
 
 Scope of this slice:
-- list native M16 tasks as governed threads
-- show native task or session review from `task`, `session`, and `timeline` reads
+- list governed threads from the shared runtime contract
+- show governed task or session review from `task`, `session`, and `timeline` reads
 - follow live native session events from `/v1alpha2/runtime/sessions/{sessionId}/events/stream`
 - render shared governed `update` and `delta-update` envelopes for review and follow flows
-- render enterprise `report` and `delta-report` envelopes for review and follow flows
+- render governed-thread `report` and `delta-report` envelopes for review and follow flows
 - approve or deny native approval checkpoints
 - approve or deny native tool proposals
 - submit a governed turn against an existing `taskId`
 - resolve the active session from `taskId` when a raw `sessionId` is not convenient
 - auto-select a single pending approval or proposal target from native session state
 
-This CLI does not introduce a second orchestration model. It consumes the same native M16/M18 contract used by desktop `Chat` and the VS Code client.
+This CLI does not introduce a second orchestration model. It consumes the same governed-thread runtime contract used by the desktop shell and the other bounded clients.
 
 ## Global Flags
 

@@ -28,14 +28,22 @@ write_summary() {
   local launcher_path="$4"
   local manifest_path="$5"
   local event_log_path="$6"
+  local support_root="${7:-}"
+  local bootstrap_path="${8:-}"
   cat > "${SUMMARY_PATH}" <<EOF
 {
   "generated_at_utc": "${STAMP}",
   "status": "${status}",
+  "install_contract": "beta_linux_installed_evaluation_lane",
+  "release_support_lane": "beta_linux_installed_evaluation_lane",
   "reason": "${reason}",
   "log_path": "${LOG_PATH}",
   "install_path": "${install_path}",
   "launcher_path": "${launcher_path}",
+  "support_root": "${support_root}",
+  "bootstrap_path": "${bootstrap_path}",
+  "update_posture": "manual_reinstall_from_packaged_artifact",
+  "runtime_posture": "beta_cluster_backed_live_lane",
   "session_manifest_path": "${manifest_path}",
   "event_log_path": "${event_log_path}",
   "operator_beta_checklist_path": "${CHECKLIST_PATH}"
@@ -68,7 +76,7 @@ if [ "${CURRENT_HOST}" != "linux" ]; then
       echo "verify-m15-phase-b failed: blocker summary host (${SUMMARY_HOST}) does not match active host (${CURRENT_HOST})." >&2
       exit 1
     fi
-    echo "M15 Phase B verifier recorded the active-host blocker. Linux packaging requires a Linux build host."
+    echo "M15 Phase B verifier recorded the active-host blocker. Linux beta installed evaluation lane packaging requires a Linux build host."
     exit 0
   fi
 
@@ -115,6 +123,11 @@ INSTALL_SUMMARY="${PHASE_ROOT}/install-m15-linux-beta-latest.summary.json"
 INSTALLED_APP_PATH="$(jq -r '.install_path // ""' "${INSTALL_SUMMARY}")"
 LAUNCHER_PATH="$(jq -r '.launcher_path // ""' "${INSTALL_SUMMARY}")"
 BOOTSTRAP_PATH="$(jq -r '.bootstrap_path // ""' "${INSTALL_SUMMARY}")"
+SUPPORT_ROOT_SUMMARY="$(jq -r '.support_root // ""' "${INSTALL_SUMMARY}")"
+INSTALL_CONTRACT="$(jq -r '.install_contract // ""' "${INSTALL_SUMMARY}")"
+RELEASE_SUPPORT_LANE="$(jq -r '.release_support_lane // ""' "${INSTALL_SUMMARY}")"
+UPDATE_POSTURE="$(jq -r '.update_posture // ""' "${INSTALL_SUMMARY}")"
+RUNTIME_POSTURE="$(jq -r '.runtime_posture // ""' "${INSTALL_SUMMARY}")"
 [ -x "${INSTALLED_APP_PATH}" ] || {
   echo "verify-m15-phase-b failed: installed AppImage missing at ${INSTALLED_APP_PATH}" >&2
   exit 1
@@ -150,27 +163,31 @@ done
 [ -n "${SESSION_MANIFEST}" ] && [ -f "${SESSION_MANIFEST}" ] || {
   write_summary \
     "failed_missing_session_manifest" \
-    "Installed Linux launcher did not create a session manifest before timeout or exit." \
+    "Installed Linux beta evaluation lane launcher did not create a session manifest before timeout or exit." \
     "${INSTALLED_APP_PATH}" \
     "${LAUNCHER_PATH}" \
     "" \
-    ""
+    "" \
+    "${SUPPORT_ROOT_SUMMARY}" \
+    "${BOOTSTRAP_PATH}"
   echo "verify-m15-phase-b failed: missing session manifest" >&2
   exit 1
 }
 [ -f "${EVENT_LOG}" ] || {
   write_summary \
     "failed_missing_event_log" \
-    "Installed Linux launcher created a session manifest but no event log was found." \
+    "Installed Linux beta evaluation lane launcher created a session manifest but no event log was found." \
     "${INSTALLED_APP_PATH}" \
     "${LAUNCHER_PATH}" \
     "${SESSION_MANIFEST}" \
-    ""
+    "" \
+    "${SUPPORT_ROOT_SUMMARY}" \
+    "${BOOTSTRAP_PATH}"
   echo "verify-m15-phase-b failed: missing event log" >&2
   exit 1
 }
 
-python3 - <<'PY' "${SESSION_MANIFEST}" "${CHECKLIST_PATH}" "${LOG_PATH}" "${INSTALLED_APP_PATH}" "${BOOTSTRAP_PATH}" "${LAUNCHER_PATH}"
+python3 - <<'PY' "${SESSION_MANIFEST}" "${CHECKLIST_PATH}" "${LOG_PATH}" "${INSTALLED_APP_PATH}" "${BOOTSTRAP_PATH}" "${LAUNCHER_PATH}" "${SUPPORT_ROOT_SUMMARY}" "${INSTALL_CONTRACT}" "${RELEASE_SUPPORT_LANE}" "${UPDATE_POSTURE}" "${RUNTIME_POSTURE}"
 import json
 import pathlib
 import sys
@@ -181,14 +198,23 @@ log_path = sys.argv[3]
 installed_app_path = sys.argv[4]
 bootstrap_path = sys.argv[5]
 launcher_path = sys.argv[6]
+support_root = sys.argv[7]
+install_contract = sys.argv[8]
+release_support_lane = sys.argv[9]
+update_posture = sys.argv[10]
+runtime_posture = sys.argv[11]
 manifest = json.loads(manifest_path.read_text())
 
+assert install_contract == "beta_linux_installed_evaluation_lane", install_contract
+assert release_support_lane == "beta_linux_installed_evaluation_lane", release_support_lane
+assert update_posture == "manual_reinstall_from_packaged_artifact", update_posture
+assert runtime_posture == "beta_cluster_backed_live_lane", runtime_posture
 assert manifest["mode"] == "mock", manifest["mode"]
 assert manifest["launcherState"] == "ready", manifest["launcherState"]
 assert manifest["runtimeProcessMode"] == "mock_only", manifest["runtimeProcessMode"]
 assert manifest["bootstrapConfigState"] == "loaded", manifest["bootstrapConfigState"]
 assert manifest["bootstrapConfigPath"] == bootstrap_path, manifest["bootstrapConfigPath"]
-assert manifest["paths"]["configRoot"].endswith("EpydiosAgentOpsDesktop"), manifest["paths"]["configRoot"]
+assert manifest["paths"]["configRoot"] == support_root, manifest["paths"]["configRoot"]
 assert manifest["paths"]["cacheRoot"].endswith("EpydiosAgentOpsDesktop"), manifest["paths"]["cacheRoot"]
 assert manifest["paths"]["gatewayRoot"].endswith("localhost-gateway"), manifest["paths"]["gatewayRoot"]
 assert manifest["gatewayService"]["statusPath"] == manifest["paths"]["gatewayStatusPath"], manifest["gatewayService"]["statusPath"]
@@ -227,10 +253,12 @@ EPYDIOS_M15_LINUX_APPLICATIONS_ROOT="${APPLICATIONS_ROOT}" \
 
 write_summary \
   "phase_b_beta_ready" \
-  "Installed Linux AppImage completed the install, launch, session, and uninstall beta flow with launcher diagnostics and bootstrap config in place." \
+  "Installed Linux beta evaluation lane AppImage completed the install, launch, session, and uninstall flow with launcher diagnostics and bootstrap config in place." \
   "${INSTALLED_APP_PATH}" \
   "${LAUNCHER_PATH}" \
   "${SESSION_MANIFEST}" \
-  "${EVENT_LOG}"
+  "${EVENT_LOG}" \
+  "${SUPPORT_ROOT_SUMMARY}" \
+  "${BOOTSTRAP_PATH}"
 
 echo "M15 Phase B verifier passed."

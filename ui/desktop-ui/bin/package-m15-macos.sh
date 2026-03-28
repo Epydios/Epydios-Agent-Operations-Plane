@@ -36,11 +36,16 @@ write_summary() {
 {
   "generated_at_utc": "${STAMP}",
   "status": "${status}",
+  "artifact_kind": "macos_app_bundle",
+  "install_contract": "reference_macos_installed_lane",
   "host_os": "${HOST_OS}",
   "host_arch": "${HOST_ARCH}",
   "reason": "${reason}",
   "log_path": "${LOG_PATH}",
   "app_bundle_path": "${app_path}",
+  "default_install_root": "~/Applications",
+  "default_support_root": "~/Library/Application Support/EpydiosAgentOpsDesktop",
+  "update_posture": "manual_reinstall_from_released_artifact",
   "bootstrap_template_path": "${BOOTSTRAP_TEMPLATE_PATH}"
 }
 EOF
@@ -120,7 +125,7 @@ EOF
 
 write_summary \
   "packaged_macos_app" \
-  "macOS .app bundle produced for beta install and launch tooling." \
+  "macOS .app bundle produced for the supported reference install lane and manual reinstall update flow." \
   "${ARTIFACT_APP_PATH}"
 
 echo "package-m15-macos: packaged macOS beta bundle at ${RUN_ROOT}"

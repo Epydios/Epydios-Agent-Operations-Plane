@@ -81,6 +81,11 @@ fi
   exit 1
 }
 
+PACKAGE_INSTALL_CONTRACT="$(jq -r '.install_contract // ""' "${PACKAGE_SUMMARY}")"
+PACKAGE_RELEASE_SUPPORT_LANE="$(jq -r '.release_support_lane // ""' "${PACKAGE_SUMMARY}")"
+PACKAGE_UPDATE_POSTURE="$(jq -r '.update_posture // ""' "${PACKAGE_SUMMARY}")"
+PACKAGE_RUNTIME_POSTURE="$(jq -r '.runtime_posture // ""' "${PACKAGE_SUMMARY}")"
+
 if ! is_windows_host; then
   (
     cd "${M15_REPO_ROOT}"
@@ -94,7 +99,11 @@ if ! is_windows_host; then
 {
   "generated_at_utc": "$(m15_json_escape "${STAMP}")",
   "status": "phase_d_packaging_baseline_and_verifier_foundation",
-  "reason": "Windows installer baseline was packaged and the existing Windows parity verifier foundation passed. A real installed-launcher proof is still required on a Windows host to close the Phase D exit gate.",
+  "install_contract": "$(m15_json_escape "${PACKAGE_INSTALL_CONTRACT}")",
+  "release_support_lane": "$(m15_json_escape "${PACKAGE_RELEASE_SUPPORT_LANE}")",
+  "update_posture": "$(m15_json_escape "${PACKAGE_UPDATE_POSTURE}")",
+  "runtime_posture": "$(m15_json_escape "${PACKAGE_RUNTIME_POSTURE}")",
+  "reason": "Windows beta installed evaluation lane packaging and verifier foundation passed. A real installed-launcher proof is still required on a Windows host to close the Phase D exit gate.",
   "package_summary_path": "$(m15_json_escape "${PACKAGE_SUMMARY}")",
   "binary_path": "$(m15_json_escape "${PACKAGE_BINARY}")",
   "installer_path": "$(m15_json_escape "${PACKAGE_INSTALLER}")",
@@ -152,9 +161,19 @@ trap cleanup EXIT
 INSTALL_SUMMARY="${PHASE_ROOT}/install-m15-windows-beta-latest.summary.json"
 INSTALLED_APP_PATH="$(jq -r '.install_path // ""' "${INSTALL_SUMMARY}")"
 BOOTSTRAP_PATH="$(jq -r '.bootstrap_path // ""' "${INSTALL_SUMMARY}")"
+SUPPORT_ROOT_SUMMARY="$(jq -r '.support_root // ""' "${INSTALL_SUMMARY}")"
+LAUNCHER_CMD_PATH="$(jq -r '.launcher_cmd_path // ""' "${INSTALL_SUMMARY}")"
 LAUNCHER_SH_PATH="$(jq -r '.launcher_sh_path // ""' "${INSTALL_SUMMARY}")"
+INSTALL_CONTRACT="$(jq -r '.install_contract // ""' "${INSTALL_SUMMARY}")"
+RELEASE_SUPPORT_LANE="$(jq -r '.release_support_lane // ""' "${INSTALL_SUMMARY}")"
+UPDATE_POSTURE="$(jq -r '.update_posture // ""' "${INSTALL_SUMMARY}")"
+RUNTIME_POSTURE="$(jq -r '.runtime_posture // ""' "${INSTALL_SUMMARY}")"
 [ -f "${INSTALLED_APP_PATH}" ] || {
   echo "verify-m15-phase-d failed: installed executable missing at ${INSTALLED_APP_PATH}" >&2
+  exit 1
+}
+[ -f "${LAUNCHER_CMD_PATH}" ] || {
+  echo "verify-m15-phase-d failed: installed command launcher missing at ${LAUNCHER_CMD_PATH}" >&2
   exit 1
 }
 [ -x "${LAUNCHER_SH_PATH}" ] || {
@@ -194,7 +213,7 @@ done
   exit 1
 }
 
-python3 - <<'PY' "${SESSION_MANIFEST}" "${CHECKLIST_PATH}" "${LOG_PATH}" "${INSTALLED_APP_PATH}" "${BOOTSTRAP_PATH}" "${LAUNCHER_SH_PATH}"
+python3 - <<'PY' "${SESSION_MANIFEST}" "${CHECKLIST_PATH}" "${LOG_PATH}" "${INSTALLED_APP_PATH}" "${BOOTSTRAP_PATH}" "${LAUNCHER_SH_PATH}" "${SUPPORT_ROOT_SUMMARY}" "${INSTALL_CONTRACT}" "${RELEASE_SUPPORT_LANE}" "${UPDATE_POSTURE}" "${RUNTIME_POSTURE}"
 import json
 import ntpath
 import pathlib
@@ -206,16 +225,26 @@ log_path = sys.argv[3]
 installed_app_path = sys.argv[4]
 bootstrap_path = sys.argv[5]
 launcher_path = sys.argv[6]
+support_root = sys.argv[7]
+install_contract = sys.argv[8]
+release_support_lane = sys.argv[9]
+update_posture = sys.argv[10]
+runtime_posture = sys.argv[11]
 manifest = json.loads(manifest_path.read_text())
 
 def normalize_windowsish(path: str) -> str:
     return ntpath.normcase(path.replace("/", "\\"))
 
+assert install_contract == "beta_windows_installed_evaluation_lane", install_contract
+assert release_support_lane == "beta_windows_installed_evaluation_lane", release_support_lane
+assert update_posture == "manual_reinstall_from_packaged_artifact", update_posture
+assert runtime_posture == "beta_cluster_backed_live_lane", runtime_posture
 assert manifest["mode"] == "mock", manifest["mode"]
 assert manifest["launcherState"] == "ready", manifest["launcherState"]
 assert manifest["runtimeProcessMode"] == "mock_only", manifest["runtimeProcessMode"]
 assert manifest["bootstrapConfigState"] == "loaded", manifest["bootstrapConfigState"]
 assert normalize_windowsish(manifest["bootstrapConfigPath"]) == normalize_windowsish(bootstrap_path), manifest["bootstrapConfigPath"]
+assert normalize_windowsish(manifest["paths"]["configRoot"]) == normalize_windowsish(support_root), manifest["paths"]["configRoot"]
 assert manifest["paths"]["gatewayRoot"].endswith("localhost-gateway"), manifest["paths"]["gatewayRoot"]
 assert normalize_windowsish(manifest["gatewayService"]["statusPath"]) == normalize_windowsish(manifest["paths"]["gatewayStatusPath"]), manifest["gatewayService"]["statusPath"]
 
@@ -238,12 +267,18 @@ if [ "${KEEP_WINDOWS_BETA_INSTALLED}" = "1" ]; then
 {
   "generated_at_utc": "$(m15_json_escape "${STAMP}")",
   "status": "phase_d_beta_ready_installed",
-  "reason": "Installed Windows launcher completed the package, install, launch, and session beta flow with bootstrap config and launcher diagnostics in place. The installed bundle was intentionally left in place for operator use.",
+  "install_contract": "$(m15_json_escape "${INSTALL_CONTRACT}")",
+  "release_support_lane": "$(m15_json_escape "${RELEASE_SUPPORT_LANE}")",
+  "update_posture": "$(m15_json_escape "${UPDATE_POSTURE}")",
+  "runtime_posture": "$(m15_json_escape "${RUNTIME_POSTURE}")",
+  "reason": "Installed Windows beta evaluation lane completed the package, install, launch, and session flow with bootstrap config and launcher diagnostics in place. The installed bundle was intentionally left in place for operator use.",
   "package_summary_path": "$(m15_json_escape "${PACKAGE_SUMMARY}")",
   "binary_path": "$(m15_json_escape "${PACKAGE_BINARY}")",
   "installer_path": "$(m15_json_escape "${PACKAGE_INSTALLER}")",
   "installed_app_path": "$(m15_json_escape "${INSTALLED_APP_PATH}")",
   "launcher_path": "$(m15_json_escape "${LAUNCHER_SH_PATH}")",
+  "launcher_entry_path": "$(m15_json_escape "${LAUNCHER_CMD_PATH}")",
+  "support_root": "$(m15_json_escape "${SUPPORT_ROOT_SUMMARY}")",
   "bootstrap_path": "$(m15_json_escape "${BOOTSTRAP_PATH}")",
   "session_manifest_path": "$(m15_json_escape "${SESSION_MANIFEST}")",
   "event_log_path": "$(m15_json_escape "${EVENT_LOG}")",
@@ -277,12 +312,18 @@ cat > "${SUMMARY_PATH}" <<EOF
 {
   "generated_at_utc": "$(m15_json_escape "${STAMP}")",
   "status": "phase_d_beta_ready",
-  "reason": "Installed Windows launcher completed the install, launch, session, and uninstall beta flow with bootstrap config and launcher diagnostics in place.",
+  "install_contract": "$(m15_json_escape "${INSTALL_CONTRACT}")",
+  "release_support_lane": "$(m15_json_escape "${RELEASE_SUPPORT_LANE}")",
+  "update_posture": "$(m15_json_escape "${UPDATE_POSTURE}")",
+  "runtime_posture": "$(m15_json_escape "${RUNTIME_POSTURE}")",
+  "reason": "Installed Windows beta evaluation lane completed the install, launch, session, and uninstall flow with bootstrap config and launcher diagnostics in place.",
   "package_summary_path": "$(m15_json_escape "${PACKAGE_SUMMARY}")",
   "binary_path": "$(m15_json_escape "${PACKAGE_BINARY}")",
   "installer_path": "$(m15_json_escape "${PACKAGE_INSTALLER}")",
   "installed_app_path": "$(m15_json_escape "${INSTALLED_APP_PATH}")",
   "launcher_path": "$(m15_json_escape "${LAUNCHER_SH_PATH}")",
+  "launcher_entry_path": "$(m15_json_escape "${LAUNCHER_CMD_PATH}")",
+  "support_root": "$(m15_json_escape "${SUPPORT_ROOT_SUMMARY}")",
   "bootstrap_path": "$(m15_json_escape "${BOOTSTRAP_PATH}")",
   "session_manifest_path": "$(m15_json_escape "${SESSION_MANIFEST}")",
   "event_log_path": "$(m15_json_escape "${EVENT_LOG}")",

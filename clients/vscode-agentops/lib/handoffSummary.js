@@ -221,7 +221,7 @@ function buildAuditEvidenceHandoff(model = {}) {
     ? `${runId ? `Run ${runId}` : `Session ${normalizedString(selectedSession?.sessionId, "-")}`} has ${evidenceCount} evidence record(s) ready for ${packageTargetLabel(task)}.`
     : `${runId ? `Run ${runId}` : `Session ${normalizedString(selectedSession?.sessionId, "-")}`} does not yet have recorded evidence for ${packageTargetLabel(task)}.`;
   const renderedText = [
-    "AgentOps Audit and Evidence Handoff",
+    "EpydiosOps audit and evidence handoff",
     `Task: ${normalizedString(task?.title, normalizedString(task?.taskId, "-"))}`,
     `Session: ${normalizedString(selectedSession?.sessionId, "-")}`,
     `Run: ${runId || "-"}`,
@@ -247,7 +247,7 @@ function buildAuditEvidenceHandoff(model = {}) {
     ...nextActions.map((item) => `- ${item}`)
   ].join("\n");
   return {
-    header: "Audit and Evidence Handoff",
+    header: "EpydiosOps audit and evidence handoff",
     summary,
     sessionId: normalizedString(selectedSession?.sessionId),
     taskId: normalizedString(task?.taskId),

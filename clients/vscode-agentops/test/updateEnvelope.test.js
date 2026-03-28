@@ -19,13 +19,13 @@ test("buildGovernedUpdateEnvelope packages selected thread review state", () => 
       }
     },
     {
-      header: "AgentOps thread update",
+      header: "EpydiosOps governed thread update",
       updateType: "review",
       details: ["Selected session: sess-1"],
       actionHints: ["- approvals decide --session-id sess-1 --decision APPROVE|DENY"]
     }
   );
-  assert.equal(envelope.header, "AgentOps thread update");
+  assert.equal(envelope.header, "EpydiosOps governed thread update");
   assert.equal(envelope.updateType, "review");
   assert.equal(envelope.taskId, "task-1");
   assert.equal(envelope.sessionId, "sess-1");
@@ -53,7 +53,7 @@ test("buildGovernedUpdateEnvelope matches shared M19 parity fixture", () => {
       }
     },
     {
-      header: "AgentOps thread update",
+      header: "EpydiosOps governed thread update",
       updateType: "review",
       details: ["Selected session: sess-parity-1"],
       recent: fixture.expected.eventLines,
@@ -131,7 +131,7 @@ test("buildGovernedUpdateEnvelope projects structured org-admin review state", (
       }
     },
     {
-      header: "AgentOps thread update",
+      header: "EpydiosOps governed thread update",
       updateType: "follow"
     }
   );

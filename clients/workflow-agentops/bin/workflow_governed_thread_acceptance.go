@@ -194,7 +194,7 @@ func main() {
 		"--once",
 		"--render", "delta-update",
 	)
-	assert(strings.Contains(followOutput, "AgentOps ticket update"), "expected workflow follow envelope")
+	assert(strings.Contains(followOutput, "EpydiosOps governed thread update"), "expected workflow follow envelope")
 	assert(strings.Contains(followOutput, "Proposal Decision: Workflow bounded proof proposal accepted."), "expected proposal decision in workflow follow")
 	assert(strings.Contains(followOutput, "Evidence Recorded: audit_bundle"), "expected evidence event in workflow follow")
 	logger.log("followed governed workflow event stream through workflow-agentops")
@@ -237,7 +237,7 @@ func main() {
 	summary := map[string]any{
 		"generated_at_utc":     stamp,
 		"status":               "workflow_governed_thread_proof_ready",
-		"reason":               "Workflow bounded proof accepted connection and auth truth, one governed intake and turn, approval and proposal resolution, live follow, and explicit audit and evidence continuity on the shared M16 contract.",
+		"reason":               "Workflow bounded proof accepted connection and auth truth, one governed intake and turn, approval and proposal resolution, live follow, and explicit audit and evidence continuity on the shared governed-thread runtime contract.",
 		"runtime_api_base_url": proof.runtimeAPIBaseURL,
 		"log_path":             logPath,
 		"checklist_path":       checklistPath,

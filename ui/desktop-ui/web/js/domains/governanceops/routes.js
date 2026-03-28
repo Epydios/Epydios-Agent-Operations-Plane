@@ -18,13 +18,13 @@ export function renderGovernanceOpsEmptyState(ui, options = {}) {
     shellClass: "governanceops-workspace",
     title: options.title || "GovernanceOps",
     lead:
-      "Handle deeper governance review, exception posture, and decision receipts here when Companion awareness is not enough.",
+      "Handle deeper governance routing, receipt posture, and exception follow-through here when Companion awareness is not enough.",
     content: renderPanelStateMetric(
       options.tone || "info",
       options.title || "GovernanceOps",
-      options.message || "Governance posture becomes available after approval, authority, and decision receipt signals load.",
+      options.message || "Governance route, receipt, and exception posture become available after approval, authority, and decision signals load.",
       options.detail ||
-        "Refresh the workspace. If governance posture should be present, verify approval queues, authority inputs, and run decision anchors."
+        "Refresh the workspace. If governance posture should be present, verify approval queues, authority inputs, run decision anchors, and routed admin proposals."
     )
   });
 }

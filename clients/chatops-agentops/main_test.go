@@ -121,7 +121,7 @@ func TestRenderChatopsApprovalDecisionUpdate(t *testing.T) {
 		ReviewedAt:   "2026-03-07T20:40:00Z",
 	}
 	update := renderChatopsApprovalDecisionUpdate(response, nil)
-	if !containsAll(update, "AgentOps thread update", "approval-1", "APPROVE", "APPROVED", "Safe to continue.") {
+	if !containsAll(update, "EpydiosOps governed thread update", "approval-1", "APPROVE", "APPROVED", "Safe to continue.") {
 		t.Fatalf("unexpected update: %s", update)
 	}
 }
@@ -139,7 +139,7 @@ func TestRenderChatopsProposalDecisionUpdate(t *testing.T) {
 		ReviewedAt:   "2026-03-07T20:41:00Z",
 	}
 	update := renderChatopsProposalDecisionUpdate(response, nil)
-	if !containsAll(update, "AgentOps thread update", "proposal-1", "DENY", "DENIED", "tool-1", "POLICY_BLOCKED") {
+	if !containsAll(update, "EpydiosOps governed thread update", "proposal-1", "DENY", "DENIED", "tool-1", "POLICY_BLOCKED") {
 		t.Fatalf("unexpected update: %s", update)
 	}
 }
@@ -164,7 +164,7 @@ func TestRenderChatopsTurnUpdate(t *testing.T) {
 		LatestWorkerSummary: "Awaiting approval.",
 	}
 	update := renderChatopsTurnUpdate(invoke, report)
-	if !containsAll(update, "AgentOps thread update", "1730.55", "sess-2", "managed_codex_worker", "completed", "Awaiting approval.") {
+	if !containsAll(update, "EpydiosOps governed thread update", "1730.55", "sess-2", "managed_codex_worker", "completed", "Awaiting approval.") {
 		t.Fatalf("unexpected update: %s", update)
 	}
 }
@@ -195,7 +195,7 @@ func TestRenderChatopsUpdateIncludesRecentActivityAndActionHints(t *testing.T) {
 	}
 	update := renderChatopsUpdate(report)
 	if !containsAll(update,
-		"AgentOps thread update",
+		"EpydiosOps governed thread update",
 		"Recent activity:",
 		"Worker Progress: Worker collected deployment context.",
 		"Current decision: Pending approval checkpoint approval-1",
@@ -223,7 +223,7 @@ func TestRenderChatopsUpdateSinglePendingUsesDirectHint(t *testing.T) {
 	}
 	update := renderChatopsUpdate(report)
 	if !containsAll(update,
-		"AgentOps thread update",
+		"EpydiosOps governed thread update",
 		"approvals decide --thread-id 1730.55 --source-system slack --channel-id C123 --decision APPROVE|DENY",
 		"proposals decide --thread-id 1730.55 --source-system slack --channel-id C123 --decision APPROVE|DENY",
 	) {
@@ -292,7 +292,7 @@ func TestRenderChatopsDeltaUpdate(t *testing.T) {
 	}
 	update := renderChatopsDeltaUpdate(report, items)
 	if !containsAll(update,
-		"AgentOps thread update",
+		"EpydiosOps governed thread update",
 		"Type: follow_delta",
 		"Observed 2 new native event(s).",
 		"Worker Progress: Worker collected deployment context.",
@@ -335,7 +335,7 @@ func TestRenderChatopsHandoff(t *testing.T) {
 	}
 	rendered := renderChatopsHandoff(report)
 	if !containsAll(rendered,
-		"AgentOps thread update",
+		"EpydiosOps governed thread update",
 		"Type: handoff",
 		"Summary: Conversation handoff package is ready for review or escalation.",
 		"Current decision: No pending approval checkpoints or tool proposals remain.",
@@ -404,7 +404,7 @@ func TestRenderChatopsReport(t *testing.T) {
 		t.Fatalf("render chatops report: %v", err)
 	}
 	if !containsAll(rendered,
-		"AgentOps conversation governance report",
+		"EpydiosOps governed thread report",
 		"Type: report",
 		"Applicable policy packs:",
 		"Managed Codex Worker Operator (managed_codex_worker_operator)",

@@ -116,9 +116,19 @@ export function inferAimxsAuthorityTierFromRoles(roles = [], fallback = "scoped_
 
 export function createAimxsIdentityPostureModel(input = {}) {
   const identityFields = normalizeFields(input?.identityFields);
-  const currentPosture = normalizeSection(input?.currentPosture, "Current Posture");
-  const targetPosture = normalizeSection(input?.targetPosture, "Target Posture");
-  const rationale = normalizeSection(input?.rationale, "Allowed Or Blocked");
+  const identitySectionTitle = normalizeString(input?.identitySectionTitle, "Identity And Authority");
+  const currentPosture = normalizeSection(
+    input?.currentPosture,
+    normalizeString(input?.currentPostureTitle, "Current Posture")
+  );
+  const targetPosture = normalizeSection(
+    input?.targetPosture,
+    normalizeString(input?.targetPostureTitle, "Target Posture")
+  );
+  const rationale = normalizeSection(
+    input?.rationale,
+    normalizeString(input?.rationaleTitle, "Allowed Or Blocked")
+  );
   const summary = normalizeString(input?.summary);
   const surfaceLabel = normalizeString(input?.surfaceLabel);
 
@@ -126,6 +136,7 @@ export function createAimxsIdentityPostureModel(input = {}) {
     available: Boolean(identityFields.length || currentPosture.fields.length || targetPosture.fields.length || rationale.fields.length || summary),
     summary,
     surfaceLabel,
+    identitySectionTitle,
     identityFields,
     currentPosture,
     targetPosture,

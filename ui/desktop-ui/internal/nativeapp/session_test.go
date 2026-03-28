@@ -91,6 +91,15 @@ func TestPrepareSessionPatchesMockConfigAndCreatesPaths(t *testing.T) {
 	if got := nativeShell["bootstrapConfigState"]; got != bootstrapStateMissing {
 		t.Fatalf("expected bootstrapConfigState=%q, got %#v", bootstrapStateMissing, got)
 	}
+	if got := nativeShell["runtimePosture"]; got != "mock local lane" {
+		t.Fatalf("expected runtimePosture mock local lane, got %#v", got)
+	}
+	if got := nativeShell["updatePosture"]; got != "manual reinstall from released artifact" {
+		t.Fatalf("expected updatePosture manual reinstall from released artifact, got %#v", got)
+	}
+	if got := nativeShell["supportRoot"]; got != session.Manifest.Paths.ConfigRoot {
+		t.Fatalf("expected supportRoot to match configRoot, got %#v", got)
+	}
 	if got := nativeShell["eventLogPath"]; got != session.Manifest.Paths.EventLogPath {
 		t.Fatalf("expected eventLogPath to match manifest, got %#v", got)
 	}
@@ -212,6 +221,19 @@ func TestPrepareSessionDisablesAuthForLiveMode(t *testing.T) {
 	}
 	if session.Manifest.RuntimeService.State != runtimeServiceStateStopped {
 		t.Fatalf("expected initial runtime service state stopped, got %q", session.Manifest.RuntimeService.State)
+	}
+	nativeShell, ok := payload["nativeShell"].(map[string]any)
+	if !ok {
+		t.Fatal("expected nativeShell block")
+	}
+	if got := nativeShell["runtimePosture"]; got != "cluster-backed live lane" {
+		t.Fatalf("expected runtimePosture cluster-backed live lane, got %#v", got)
+	}
+	if got := nativeShell["updatePosture"]; got != "manual reinstall from released artifact" {
+		t.Fatalf("expected updatePosture manual reinstall from released artifact, got %#v", got)
+	}
+	if got := nativeShell["supportRoot"]; got != session.Manifest.Paths.ConfigRoot {
+		t.Fatalf("expected supportRoot to match configRoot, got %#v", got)
 	}
 }
 

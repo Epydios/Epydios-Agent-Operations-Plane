@@ -88,13 +88,29 @@ function renderAimxsDecisionBindingSpineBoard(snapshot) {
   if (!board?.available) {
     return "";
   }
+  const premiumDecisionVisible = Boolean(snapshot?.aimxsPremiumVisible);
+  const boardTitle = premiumDecisionVisible ? "Premium Decision-Binding Spine" : "AIMXS Decision-Binding Spine";
   return `
     <article class="metric governanceops-card governanceops-card-wide" data-domain-root="governanceops" data-governanceops-panel="aimxs-decision-binding-spine">
       <div class="metric-title-row">
-        <div class="title">AIMXS Decision-Binding Spine</div>
-        <span class="chip chip-neutral chip-compact">correlated</span>
+        <div class="title">${boardTitle}</div>
+        <span class="chip chip-neutral chip-compact">${escapeHTML(premiumDecisionVisible ? "premium route" : "correlated")}</span>
       </div>
-      ${renderAimxsDecisionBindingSpine(board)}
+      ${renderAimxsDecisionBindingSpine(
+        premiumDecisionVisible
+          ? {
+              ...board,
+              authorityTitle: "Authority And Route Chain",
+              grantTitle: "Grant And Execution Chain",
+              receiptTitle: "Receipt And Proof Chain",
+              replayTitle: "Replay Continuity",
+              evidenceTitle: "Evidence And Audit Chain",
+              summary:
+                String(board.summary || "").trim() ||
+                "Premium decision binding keeps authority, receipt, replay, and evidence anchors on one governed path."
+            }
+          : board
+      )}
     </article>
   `;
 }
@@ -142,7 +158,7 @@ function renderAdminProposalReviewBoard(snapshot) {
     return `
       <article class="metric governanceops-card governanceops-card-wide" data-domain-root="governanceops" data-governanceops-panel="admin-proposal-review">
         <div class="metric-title-row">
-          <div class="title">Admin Proposal Review</div>
+          <div class="title">Routed Admin Proposal Review</div>
           <span class="chip chip-neutral chip-compact">idle</span>
         </div>
         <div class="governanceops-kv-list">
@@ -204,6 +220,18 @@ function renderAdminProposalReviewBoard(snapshot) {
       ])
     }
   ];
+  const premiumDecisionVisible = Boolean(snapshot?.aimxsPremiumVisible);
+  const aimxsLegibility = premiumDecisionVisible
+    ? {
+        ...board.aimxsLegibility,
+        lifecycleTitle: "Premium Decision Lifecycle",
+        bindingTitle: "Authority And Binding Contract",
+        refsTitle: "Receipt, Replay, And Proof Anchors",
+        summary:
+          String(board.aimxsLegibility?.summary || "").trim() ||
+          "Premium route legibility keeps lifecycle, authority, and receipt anchors visible for this routed admin proposal."
+      }
+    : board.aimxsLegibility;
   const ownerLabel = ownerDomainLabel(board.ownerDomain);
   const openOwnerButton =
     String(board.ownerDomain || "").trim().toLowerCase() === "identityops"
@@ -226,7 +254,7 @@ function renderAdminProposalReviewBoard(snapshot) {
   return `
     <article class="metric governanceops-card governanceops-card-wide" data-domain-root="governanceops" data-governanceops-panel="admin-proposal-review">
       <div class="metric-title-row">
-        <div class="title">Admin Proposal Review</div>
+        <div class="title">Routed Admin Proposal Review</div>
         <span class="${governanceAdminStatusChipClass(board.status)}">${escapeHTML(board.status)}</span>
       </div>
       <div class="governanceops-chip-row">
@@ -235,7 +263,7 @@ function renderAdminProposalReviewBoard(snapshot) {
         ${board.decision?.approvalReceiptId && board.decision.approvalReceiptId !== "-" ? '<span class="chip chip-ok chip-compact">receipt issued</span>' : '<span class="chip chip-neutral chip-compact">receipt pending</span>'}
       </div>
       <div class="governanceops-kv-list">${renderKeyValueRows(rows)}</div>
-      ${renderAimxsLegibilityBlock(board.aimxsLegibility)}
+      ${renderAimxsLegibilityBlock(aimxsLegibility)}
       <div class="governanceops-action-layout">
         <label class="field governanceops-reason-field">
           <span class="label">Admin Decision Reason</span>
@@ -296,7 +324,7 @@ function renderActionReviewBoard(snapshot) {
     return `
       <article class="metric governanceops-card governanceops-card-wide" data-domain-root="governanceops" data-governanceops-panel="action-review">
         <div class="metric-title-row">
-          <div class="title">Selected Approval Review</div>
+          <div class="title">Selected Approval Deep Review</div>
           <span class="chip chip-neutral chip-compact">idle</span>
         </div>
         <div class="governanceops-kv-list">
@@ -363,7 +391,7 @@ function renderActionReviewBoard(snapshot) {
   return `
     <article class="metric governanceops-card governanceops-card-wide" data-domain-root="governanceops" data-governanceops-panel="action-review">
       <div class="metric-title-row">
-        <div class="title">Selected Approval Review</div>
+        <div class="title">Selected Approval Deep Review</div>
         <span class="${governanceStatusChipClass(board.approvalStatus)}">${escapeHTML(board.approvalStatus)}</span>
       </div>
       <div class="governanceops-chip-row">
@@ -435,14 +463,14 @@ function renderConnectorApprovalsBoard(snapshot) {
     return `
       <article class="metric governanceops-card" data-domain-root="governanceops" data-governanceops-panel="connector-approval-queue">
         <div class="metric-title-row">
-          <div class="title">Connector Hold Review</div>
+          <div class="title">Connector Approval Hold</div>
           <span class="chip chip-neutral chip-compact">idle</span>
         </div>
         <div class="governanceops-kv-list">
           ${renderKeyValueRows([
             {
               label: "Status",
-              value: '<span class="governanceops-empty">No pending connector approval is currently waiting in the local gateway hold lane.</span>'
+              value: '<span class="governanceops-empty">No pending connector approval is currently waiting in the bounded connector hold lane.</span>'
             },
             {
               label: "Connector Coverage",
@@ -462,7 +490,7 @@ function renderConnectorApprovalsBoard(snapshot) {
   return `
     <article class="metric governanceops-card governanceops-card-wide" data-domain-root="governanceops" data-governanceops-panel="connector-approval-queue">
       <div class="metric-title-row">
-        <div class="title">Connector Hold Review</div>
+        <div class="title">Connector Approval Hold</div>
         <span class="chip chip-warn chip-compact">pending</span>
       </div>
       <div class="governanceops-chip-row">
@@ -474,7 +502,7 @@ function renderConnectorApprovalsBoard(snapshot) {
       <div class="governanceops-kv-list">
         ${renderKeyValueRows([
           {
-            label: "Current Connector Hold",
+            label: "Selected Connector Hold",
             value: renderValuePills([
               { label: "approval", value: item.approvalId, code: true },
               { label: "run", value: item.runId, code: true },
@@ -484,7 +512,7 @@ function renderConnectorApprovalsBoard(snapshot) {
             ])
           },
           {
-            label: "Governance Target",
+            label: "Requested Connector Action",
             value: renderValuePills([
               { label: "title", value: item.requestTitle },
               { label: "target", value: item.targetRef, code: true },
@@ -493,7 +521,7 @@ function renderConnectorApprovalsBoard(snapshot) {
             ])
           },
           {
-            label: "Hold Timing",
+            label: "Hold Window",
             value: renderValuePills([
               { label: "started", value: item.holdStartedAt, code: true },
               { label: "deadline", value: item.holdDeadlineAt, code: true },
@@ -502,7 +530,7 @@ function renderConnectorApprovalsBoard(snapshot) {
             ])
           },
           {
-            label: "Reason And Coverage",
+            label: "Operator Continuity",
             value: `
               ${renderValuePills([
                 { label: "reason", value: item.reason },
@@ -510,7 +538,7 @@ function renderConnectorApprovalsBoard(snapshot) {
                 { label: "enabled profiles", value: String(board.enabledProfileCount || 0) },
                 { label: "known profiles", value: String(board.profileCount || 0) }
               ])}
-              <div class="meta metric-note">Resolve the held connector request here. RuntimeOps keeps the linked connector continuity and evidence handoff on the related run.</div>
+              <div class="meta metric-note">Resolve the bounded connector approval hold here. SettingsOps defines the connector contract, and RuntimeOps keeps the linked run continuity and proof handoff on the same governed path.</div>
               <div class="field">
                 <span class="label">Decision Reason (Optional)</span>
                 <input
@@ -565,7 +593,7 @@ function renderApprovalQueueBoard(snapshot) {
     return `
       <article class="metric governanceops-card governanceops-card-wide" data-domain-root="governanceops" data-governanceops-panel="approval-queue">
         <div class="metric-title-row">
-          <div class="title">Review Backlog</div>
+          <div class="title">Governance Review Backlog</div>
           <span class="chip chip-neutral chip-compact">idle</span>
         </div>
         <div class="governanceops-kv-list">
@@ -635,7 +663,7 @@ function renderApprovalQueueBoard(snapshot) {
   return `
     <article class="metric governanceops-card governanceops-card-wide" data-domain-root="governanceops" data-governanceops-panel="approval-queue">
       <div class="metric-title-row">
-        <div class="title">Review Backlog</div>
+        <div class="title">Governance Review Backlog</div>
         <span class="chip chip-neutral chip-compact">total=${escapeHTML(String(board.counts.total || 0))}</span>
       </div>
       <div class="governanceops-chip-row">
@@ -645,7 +673,7 @@ function renderApprovalQueueBoard(snapshot) {
         <span class="chip chip-warn chip-compact">expired=${escapeHTML(String(board.counts.expired || 0))}</span>
         <span class="chip chip-neutral chip-compact">source=${escapeHTML(board.source)}</span>
       </div>
-      <div class="meta">Companion owns the default daily approval lane. Use this backlog for deeper governance follow-through, receipt continuity, and exception context.</div>
+      <div class="meta">Companion owns the default daily approval lane. Use this backlog only for routed or step-up items that need deeper governance follow-through, receipt continuity, or exception context.</div>
       ${board.warning ? `<div class="meta">${escapeHTML(board.warning)}</div>` : ""}
       <div class="governanceops-queue-list">${queueCards}</div>
     </article>
@@ -730,7 +758,7 @@ function renderDecisionReceiptBoard(snapshot) {
     return `
       <article class="metric governanceops-card" data-domain-root="governanceops" data-governanceops-panel="decision-receipt">
         <div class="metric-title-row">
-          <div class="title">Decision Receipt</div>
+          <div class="title">Governance Decision Receipt</div>
           <span class="chip chip-neutral chip-compact">idle</span>
         </div>
         <div class="governanceops-kv-list">
@@ -782,7 +810,7 @@ function renderDecisionReceiptBoard(snapshot) {
   return `
     <article class="metric governanceops-card" data-domain-root="governanceops" data-governanceops-panel="decision-receipt">
       <div class="metric-title-row">
-        <div class="title">Decision Receipt</div>
+        <div class="title">Governance Decision Receipt</div>
         <span class="${governanceToneChipClass(board.state.tone)}">${escapeHTML(board.state.label)}</span>
       </div>
       <div class="governanceops-chip-row">
@@ -860,7 +888,7 @@ function renderDelegationAndEscalationBoard(snapshot) {
   return `
     <article class="metric governanceops-card" data-domain-root="governanceops" data-governanceops-panel="delegation-escalation">
       <div class="metric-title-row">
-        <div class="title">Delegation And Escalation</div>
+        <div class="title">Governance Route Controls</div>
         <span class="${governanceToneChipClass(board.routeTone)}">${escapeHTML(board.routeState)}</span>
       </div>
       <div class="governanceops-chip-row">
@@ -984,7 +1012,7 @@ export function renderGovernanceWorkspace(context = {}) {
     shellClass: "governanceops-workspace",
     title: "GovernanceOps",
     lead:
-      "Use the deeper governance console for approval structure, exception handling, and durable decision receipts once the daily Companion lane is not enough.",
+      "Use the deeper governance console to inspect route posture, record decision receipts, and handle defer, escalation, or exception follow-through once Companion is no longer enough.",
     layout: "split",
     prelude: renderWorkbenchArrivalContext({
       domainRoot: "governanceops",
@@ -994,7 +1022,7 @@ export function renderGovernanceWorkspace(context = {}) {
       renderWorkbenchDomainCluster({
         title: "Governance Structure, Exceptions, And Receipts",
         lead:
-          "Keep authority ladders, decision-binding depth, exception posture, and receipt continuity visible before stepping into any deeper review action.",
+          "Keep authority ladders, decision-binding depth, route posture, exception posture, and receipt continuity visible before stepping into any deeper governance action.",
         body: `
           ${renderOperationalFeedback(snapshot)}
           ${renderAimxsDecisionBindingSpineBoard(snapshot)}
@@ -1009,7 +1037,7 @@ export function renderGovernanceWorkspace(context = {}) {
       renderWorkbenchDomainCluster({
         title: "Focused Review And Routed Holds",
         lead:
-          "Companion stays the default daily approval lane. Use this deeper governance plane for selected approvals, routed admin proposals, connector holds, and backlog follow-through when receipt or exception context matters.",
+          "Companion stays the default daily approval lane. Use this deeper governance plane only for selected approvals, routed admin proposals, connector holds, and backlog follow-through when route, receipt, defer, escalation, or exception context matters.",
         body: `
           <div class="governanceops-primary-grid">
             ${renderAdminProposalReviewBoard(snapshot)}

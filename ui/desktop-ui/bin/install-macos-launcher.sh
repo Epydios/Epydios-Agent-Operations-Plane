@@ -6,6 +6,7 @@ MODULE_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 TARGET_DIR="${TARGET_DIR:-${HOME}/Applications}"
 LAUNCHER_PATH="${TARGET_DIR}/Epydios AgentOps Desktop.command"
 DEFAULT_MODE="${DEFAULT_MODE:-mock}"
+SUPPORT_ROOT="${SUPPORT_ROOT:-${HOME}/Library/Application Support/EpydiosAgentOpsDesktop}"
 
 usage() {
   cat <<'EOF'
@@ -18,6 +19,7 @@ prefers that app-first path and only falls back to the repo-local script.
 Options:
   --target-dir PATH          Install directory (default: ~/Applications)
   --default-mode mock|live   Launcher run mode default (default: mock)
+  --support-root PATH        Support root that holds runtime-bootstrap.json and launch-installed.sh
   -h, --help                 Show usage
 EOF
 }
@@ -31,6 +33,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --default-mode)
       DEFAULT_MODE="${2:-}"
+      shift 2
+      ;;
+    --support-root)
+      SUPPORT_ROOT="${2:-}"
       shift 2
       ;;
     -h|--help)
@@ -58,8 +64,9 @@ cat > "${LAUNCHER_PATH}" <<EOF
 set -euo pipefail
 cd "${MODULE_ROOT}"
 MODE="\${EPYDIOS_DESKTOP_MODE:-${DEFAULT_MODE}}"
-APP_INSTALL_PATH="\${EPYDIOS_M15_MACOS_INSTALL_PATH:-\${HOME}/Applications/Epydios AgentOps Desktop.app}"
-SUPPORT_ROOT="\${EPYDIOS_M15_MACOS_SUPPORT_ROOT:-\${HOME}/Library/Application Support/EpydiosAgentOpsDesktop}"
+APP_INSTALL_ROOT="\${EPYDIOS_M15_MACOS_INSTALL_ROOT:-\${HOME}/Applications}"
+APP_INSTALL_PATH="\${EPYDIOS_M15_MACOS_INSTALL_PATH:-\${APP_INSTALL_ROOT}/Epydios AgentOps Desktop.app}"
+SUPPORT_ROOT="\${EPYDIOS_M15_MACOS_SUPPORT_ROOT:-${SUPPORT_ROOT}}"
 APP_EXECUTABLE_PATH="\${APP_INSTALL_PATH}/Contents/MacOS/epydios-agentops-desktop"
 BOOTSTRAP_PATH="\${SUPPORT_ROOT}/runtime-bootstrap.json"
 LAUNCH_HELPER_PATH="\${SUPPORT_ROOT}/launch-installed.sh"
@@ -80,4 +87,6 @@ chmod +x "${LAUNCHER_PATH}"
 
 echo "Installed launcher:"
 echo "  ${LAUNCHER_PATH}"
+echo "Support root:"
+echo "  ${SUPPORT_ROOT}"
 echo "Default mode: ${DEFAULT_MODE} (override with EPYDIOS_DESKTOP_MODE=live|mock)"

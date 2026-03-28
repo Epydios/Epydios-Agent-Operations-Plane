@@ -20,7 +20,7 @@ func main() {
 	cfg := runtimeclient.LoadConfigFromEnv()
 	root := flag.NewFlagSet("agentops-cli", flag.ContinueOnError)
 	root.SetOutput(os.Stderr)
-	root.StringVar(&cfg.RuntimeAPIBaseURL, "runtime-api-base-url", cfg.RuntimeAPIBaseURL, "AgentOps runtime API base URL")
+	root.StringVar(&cfg.RuntimeAPIBaseURL, "runtime-api-base-url", cfg.RuntimeAPIBaseURL, "EpydiosOps runtime API base URL")
 	root.StringVar(&cfg.TenantID, "tenant-id", cfg.TenantID, "tenant scope")
 	root.StringVar(&cfg.ProjectID, "project-id", cfg.ProjectID, "project scope")
 	root.StringVar(&cfg.AuthToken, "auth-token", cfg.AuthToken, "optional bearer token")
@@ -106,7 +106,7 @@ func runThreadsCommand(ctx context.Context, client *runtimeclient.Client, cfg ru
 		limit := fs.Int("limit", 25, "max tasks")
 		offset := fs.Int("offset", 0, "offset")
 		status := fs.String("status", "", "task status filter")
-		search := fs.String("search", "", "search taskId, title, intent")
+		search := fs.String("search", "", "search taskId, title, or intent")
 		if err := fs.Parse(args[1:]); err != nil {
 			return err
 		}
@@ -677,7 +677,7 @@ func renderCLIActionHints(view *runtimeclient.ThreadReview) []string {
 func renderCLIThreadEnvelope(view *runtimeclient.ThreadReview) string {
 	if view == nil {
 		return runtimeclient.RenderGovernedUpdateEnvelope(runtimeclient.GovernedUpdateEnvelope{
-			Header:     "AgentOps thread update",
+			Header:     "EpydiosOps governed thread update",
 			UpdateType: "review",
 			Summary:    "Governed thread state refreshed.",
 		})
@@ -688,7 +688,7 @@ func renderCLIThreadEnvelope(view *runtimeclient.ThreadReview) string {
 		summary = runtimeclient.NormalizeStringOrDefault(view.RecentEvents[len(view.RecentEvents)-1].Detail, summary)
 	}
 	envelope := runtimeclient.BuildThreadGovernedUpdateEnvelope(view, runtimeclient.ThreadEnvelopeOptions{
-		Header:       "AgentOps thread update",
+		Header:       "EpydiosOps governed thread update",
 		UpdateType:   "review",
 		ContextLabel: "Thread",
 		ContextValue: runtimeclient.NormalizeStringOrDefault(view.Task.TaskID, "-"),
@@ -703,7 +703,7 @@ func renderCLIThreadEnvelope(view *runtimeclient.ThreadReview) string {
 func renderCLIHandoffEnvelope(view *runtimeclient.ThreadReview) string {
 	if view == nil {
 		return runtimeclient.RenderGovernedUpdateEnvelope(runtimeclient.GovernedUpdateEnvelope{
-			Header:     "AgentOps thread update",
+			Header:     "EpydiosOps governed thread update",
 			UpdateType: "handoff",
 			Summary:    "Governed thread handoff is not ready yet.",
 		})
@@ -713,7 +713,7 @@ func renderCLIHandoffEnvelope(view *runtimeclient.ThreadReview) string {
 		summary = "Governed thread handoff package is ready for review or escalation."
 	}
 	envelope := runtimeclient.BuildThreadGovernedUpdateEnvelope(view, runtimeclient.ThreadEnvelopeOptions{
-		Header:       "AgentOps thread update",
+		Header:       "EpydiosOps governed thread update",
 		UpdateType:   "handoff",
 		ContextLabel: "Thread",
 		ContextValue: runtimeclient.NormalizeStringOrDefault(view.Task.TaskID, "-"),
@@ -793,7 +793,7 @@ func renderCLIReport(ctx context.Context, client *runtimeclient.Client, view *ru
 		return "", err
 	}
 	envelope := runtimeclient.BuildEnterpriseReportEnvelope(runtimeclient.EnterpriseReportSubject{
-		Header:               "AgentOps CLI governance report",
+		Header:               "EpydiosOps governed thread report",
 		ReportType:           "report",
 		ExportProfile:        disposition.ExportProfile,
 		Audience:             disposition.Audience,
@@ -858,7 +858,7 @@ func renderCLIFollowReport(ctx context.Context, client *runtimeclient.Client, ti
 		return "", err
 	}
 	envelope := runtimeclient.BuildEnterpriseReportEnvelope(runtimeclient.EnterpriseReportSubject{
-		Header:               "AgentOps CLI governance report",
+		Header:               "EpydiosOps governed thread report",
 		ReportType:           reportType,
 		ExportProfile:        disposition.ExportProfile,
 		Audience:             disposition.Audience,
@@ -895,7 +895,7 @@ func renderCLIFollowReport(ctx context.Context, client *runtimeclient.Client, ti
 func renderCLIFollowEnvelope(timeline *runtimeapi.SessionTimelineResponse, items []runtimeapi.SessionEventRecord, deltaOnly bool) string {
 	if timeline == nil {
 		return runtimeclient.RenderGovernedUpdateEnvelope(runtimeclient.GovernedUpdateEnvelope{
-			Header:     "AgentOps thread update",
+			Header:     "EpydiosOps governed thread update",
 			UpdateType: "follow",
 			Summary:    runtimeclient.BuildThreadFollowSummary(items),
 			Details:    runtimeclient.BuildThreadFollowDetails(items),
@@ -908,7 +908,7 @@ func renderCLIFollowEnvelope(timeline *runtimeapi.SessionTimelineResponse, items
 	}
 	view := runtimeclient.BuildThreadReview(task, nil, timeline.Session.SessionID, timeline)
 	options := runtimeclient.ThreadEnvelopeOptions{
-		Header:       "AgentOps thread update",
+		Header:       "EpydiosOps governed thread update",
 		UpdateType:   "follow",
 		ContextLabel: "Thread",
 		ContextValue: runtimeclient.NormalizeStringOrDefault(task.TaskID, "-"),

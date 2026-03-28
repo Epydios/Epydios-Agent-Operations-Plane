@@ -531,7 +531,7 @@ async function main() {
     assert.equal(finalModel.selectedSummary.runId, "run-vscode-proof-1");
     assert.equal(finalModel.selectedSummary.evidenceRecords.length, 1);
     const handoff = buildAuditEvidenceHandoff(finalModel);
-    assert.match(handoff.renderedText, /AgentOps Audit and Evidence Handoff/);
+    assert.match(handoff.renderedText, /EpydiosOps audit and evidence handoff/);
     assert.match(handoff.renderedText, /Run: run-vscode-proof-1/);
     assert.match(handoff.renderedText, /Current decision:/);
     assert.match(handoff.renderedText, /Resolved approvals: approval-vscode-proof-1 \(APPROVED\)/);
@@ -544,7 +544,7 @@ async function main() {
         status: "pass",
         steps: [
           "connection/auth truth reported auth-required and connected states",
-          "governed thread review loaded from the shared M16 runtime contract",
+          "governed thread review loaded from the shared governed-thread runtime contract",
           "one governed VS Code turn submitted on the existing task",
           "approval checkpoint resolved through the IDE client contract",
           "tool proposal resolved through the IDE client contract",
@@ -559,7 +559,7 @@ async function main() {
     const summary = {
       generated_at_utc: stamp,
       status: "vscode_governed_thread_proof_ready",
-      reason: "VS Code bounded proof accepted connection/auth truth, one governed turn, approval and proposal resolution, live follow, and audit/evidence handoff on the shared M16 contract.",
+      reason: "VS Code bounded proof accepted connection/auth truth, one governed turn, approval and proposal resolution, live follow, and audit/evidence handoff on the shared governed-thread runtime contract.",
       runtime_api_base_url: runtime.runtimeApiBaseUrl,
       log_path: logPath,
       checklist_path: checklistPath

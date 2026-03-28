@@ -135,7 +135,7 @@ func TestRenderWorkflowUpdateUsesGovernedEnvelope(t *testing.T) {
 	}
 	update := renderWorkflowUpdate(report)
 	if !containsAll(update,
-		"AgentOps ticket update",
+		"EpydiosOps governed thread update",
 		"Type: status",
 		"Workflow: jira | incident-response",
 		"Ticket: OPS-101",
@@ -229,7 +229,7 @@ func TestRenderWorkflowIntakeUpdate(t *testing.T) {
 	}
 	update := renderWorkflowIntakeUpdate(payload, response, report)
 	if !containsAll(update,
-		"AgentOps ticket update",
+		"EpydiosOps governed thread update",
 		"Type: intake",
 		"Workflow: jira | incident-response",
 		"Ticket: OPS-101",
@@ -269,7 +269,7 @@ func TestRenderWorkflowTurnUpdate(t *testing.T) {
 	}
 	update := renderWorkflowTurnUpdate(invoke, report)
 	if !containsAll(update,
-		"AgentOps ticket update",
+		"EpydiosOps governed thread update",
 		"Type: turn",
 		"Workflow: jira | incident-response",
 		"Ticket: OPS-101",
@@ -316,7 +316,7 @@ func TestRenderWorkflowDeltaUpdate(t *testing.T) {
 	}
 	update := renderWorkflowDeltaUpdate(report, items)
 	if !containsAll(update,
-		"AgentOps ticket update",
+		"EpydiosOps governed thread update",
 		"Type: follow_delta",
 		"Observed 2 new native event(s).",
 		"Worker Progress: Worker collected deployment context.",
@@ -359,7 +359,7 @@ func TestRenderWorkflowHandoff(t *testing.T) {
 	}
 	rendered := renderWorkflowHandoff(report)
 	if !containsAll(rendered,
-		"AgentOps ticket update",
+		"EpydiosOps governed thread update",
 		"Type: handoff",
 		"Workflow: jira | incident-response",
 		"Ticket: OPS-101",
@@ -431,7 +431,7 @@ func TestRenderWorkflowReport(t *testing.T) {
 		t.Fatalf("render workflow report: %v", err)
 	}
 	if !containsAll(rendered,
-		"AgentOps workflow governance report",
+		"EpydiosOps governed thread report",
 		"Type: report",
 		"Applicable policy packs:",
 		"Managed Codex Worker Operator (managed_codex_worker_operator)",
@@ -469,7 +469,7 @@ func TestRenderWorkflowApprovalDecisionUpdate(t *testing.T) {
 		ReviewedAt:   "2026-03-07T21:40:00Z",
 	}
 	update := renderWorkflowApprovalDecisionUpdate(response, nil)
-	if !containsAll(update, "AgentOps ticket update", "approval-1", "APPROVE", "APPROVED", "Safe to continue.") {
+	if !containsAll(update, "EpydiosOps governed thread update", "approval-1", "APPROVE", "APPROVED", "Safe to continue.") {
 		t.Fatalf("unexpected approval update: %s", update)
 	}
 }
@@ -487,7 +487,7 @@ func TestRenderWorkflowProposalDecisionUpdate(t *testing.T) {
 		ReviewedAt:   "2026-03-07T21:41:00Z",
 	}
 	update := renderWorkflowProposalDecisionUpdate(response, nil)
-	if !containsAll(update, "AgentOps ticket update", "proposal-1", "DENY", "DENIED", "tool-1", "POLICY_BLOCKED") {
+	if !containsAll(update, "EpydiosOps governed thread update", "proposal-1", "DENY", "DENIED", "tool-1", "POLICY_BLOCKED") {
 		t.Fatalf("unexpected proposal update: %s", update)
 	}
 }

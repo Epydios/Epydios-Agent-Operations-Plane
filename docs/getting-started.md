@@ -26,9 +26,10 @@ If you only want the installed desktop lane without the governed-request harness
 
 ## Other Platform Lanes
 
-- Linux has a proven Ubuntu 24.04 beta lane.
-- Windows has a native packaging and launch beta lane.
+- Linux has a proven Ubuntu 24.04 beta installed evaluation lane.
+- Windows has a beta installed evaluation lane with native packaging and launch proof.
 - Both are real, but neither is the supported OSS lane for first evaluation.
+- Windows `live` remains explicitly deferred.
 
 Use the [desktop module guide](../ui/desktop-ui/README.md) if you need those commands.
 

@@ -45,15 +45,21 @@ cat > "${SUMMARY_PATH}" <<EOF
 {
   "generated_at_utc": "${STAMP}",
   "status": "uninstalled_linux_beta_bundle",
+  "install_contract": "beta_linux_installed_evaluation_lane",
+  "release_support_lane": "beta_linux_installed_evaluation_lane",
   "install_root": "${INSTALL_ROOT}",
   "install_path": "${INSTALL_PATH}",
   "support_root": "${SUPPORT_ROOT}",
+  "launcher_entry_path": "${LAUNCHER_PATH}",
+  "launcher_support_path": "${LAUNCH_HELPER_PATH}",
   "launcher_path": "${LAUNCHER_PATH}",
   "desktop_file_path": "${DESKTOP_FILE_PATH}",
+  "update_posture": "manual_reinstall_from_packaged_artifact",
+  "runtime_posture": "beta_cluster_backed_live_lane",
   "log_path": "${LOG_PATH}"
 }
 EOF
 cp "${LOG_PATH}" "${LATEST_LOG}"
 cp "${SUMMARY_PATH}" "${LATEST_SUMMARY}"
 
-echo "uninstall-m15-linux-beta: removed bundle from ${INSTALL_PATH}"
+echo "uninstall-m15-linux-beta: removed Linux beta evaluation lane bundle from ${INSTALL_PATH}"

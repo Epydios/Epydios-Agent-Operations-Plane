@@ -344,10 +344,13 @@ function renderDecisionProviderScopeBoard(snapshot) {
   const board = snapshot.admin;
   const currentScope = board.currentScope || {};
   const draft = board.draft || {};
+  const rawMode = String(snapshot.currentContract?.mode || "").trim();
+  const decisionMode = rawMode.toLowerCase() === "oss-only" ? "baseline" : rawMode || snapshot.currentContract?.providerLabel || "-";
   const rows = [
     {
-      label: "Current Policy Posture",
+      label: "Current Decision Contract",
       value: renderValuePills([
+        { label: "mode", value: decisionMode },
         { label: "pack", value: currentScope.currentPackId || currentScope.currentPackLabel || "-", code: true },
         { label: "version", value: currentScope.currentPackVersion || "unversioned", code: true },
         { label: "provider", value: currentScope.currentProviderId || "-", code: true },
@@ -358,7 +361,7 @@ function renderDecisionProviderScopeBoard(snapshot) {
       ])
     },
     {
-      label: "Draft Target",
+      label: "Proposed Target Contract",
       value: renderValuePills([
         { label: "change", value: draft.changeKind || "load" },
         { label: "pack", value: currentScope.targetPackId || draft.packId || "-", code: true },
@@ -388,7 +391,7 @@ function renderDecisionProviderScopeBoard(snapshot) {
       ])
     },
     {
-      label: "Catalog Rigor",
+      label: "Catalog Readiness",
       value: renderValuePills([
         { label: "packs", value: String(currentScope.packCount || 0) },
         { label: "source", value: currentScope.catalogSource || "-" },
@@ -405,9 +408,10 @@ function renderDecisionProviderScopeBoard(snapshot) {
   return `
     <article class="metric policyops-card" data-domain-root="policyops" data-policyops-panel="decision-provider-scope">
       <div class="metric-title-row">
-        <div class="title">Decision Provider And Applicability Scope</div>
+        <div class="title">Decision Contract And Applicability Scope</div>
         <span class="${toneChipClass(snapshot.policyCoverage?.tone || "neutral")}">${escapeHTML(snapshot.policyCoverage?.tone || "neutral")}</span>
       </div>
+      <div class="meta">Baseline decisions stay real here. Verify the proposed contract before routing it into GovernanceOps.</div>
       <div class="policyops-kv-list">${renderKeyValueRows(rows)}</div>
     </article>
   `;
@@ -427,7 +431,7 @@ function renderSemanticImpactPreviewBoard(snapshot) {
         <div class="policyops-kv-list">
           <div class="policyops-row">
             <div class="policyops-row-label">Status</div>
-            <div class="policyops-row-value"><span class="policyops-empty">Run a bounded dry-run to preview semantic impact before routing the proposal to GovernanceOps.</span></div>
+            <div class="policyops-row-value"><span class="policyops-empty">Run a bounded dry-run and verify gate before routing this proposal into deeper governance review.</span></div>
           </div>
         </div>
       </article>
@@ -466,7 +470,7 @@ function renderSemanticImpactPreviewBoard(snapshot) {
             ])
           },
           {
-            label: "Verification Gate",
+            label: "Verify Gate",
             value: renderValuePills([
               { label: "gate", value: verification?.passing ? "passed" : verification ? "failed" : "pending" },
               { label: "compile", value: verification?.compileStatus || "-" },
@@ -476,10 +480,10 @@ function renderSemanticImpactPreviewBoard(snapshot) {
             ])
           },
           {
-            label: "Simulation Diff Summary",
+            label: "Verify Gate Diff",
             value: escapeHTML(
               verification?.diffSummary ||
-                "Run Verify Gate to capture the bounded current-versus-target pack diff and golden simulation posture."
+                "Run Verify Gate to capture the bounded current-versus-target decision contract diff and golden simulation posture."
             )
           },
           {
@@ -508,13 +512,13 @@ function renderPolicyGovernanceRouteReceiptBoard(snapshot) {
     return `
       <article class="metric policyops-card policyops-card-wide" data-domain-root="policyops" data-policyops-panel="governance-route-receipt">
         <div class="metric-title-row">
-          <div class="title">Governance Route And Receipt</div>
+          <div class="title">Governance Route And Receipt State</div>
           <span class="chip chip-neutral chip-compact">idle</span>
         </div>
         <div class="policyops-kv-list">
           <div class="policyops-row">
             <div class="policyops-row-label">Status</div>
-            <div class="policyops-row-value"><span class="policyops-empty">Select or queue a policy admin proposal to review governance status, apply posture, and receipt state.</span></div>
+            <div class="policyops-row-value"><span class="policyops-empty">Select or queue a policy admin proposal to review verify gate posture, governance route state, and receipt continuity.</span></div>
           </div>
         </div>
       </article>
@@ -530,7 +534,7 @@ function renderPolicyGovernanceRouteReceiptBoard(snapshot) {
   const canApply = status === "approved" && Boolean(decision?.approvalReceiptId) && !receipt?.receiptId;
   const rows = [
     {
-      label: "Route Status",
+      label: "Route Posture",
       value: renderValuePills([
         { label: "routed", value: item.routedAt },
         { label: "summary", value: item.summary },
@@ -548,7 +552,7 @@ function renderPolicyGovernanceRouteReceiptBoard(snapshot) {
       ])
     },
     {
-      label: "Verification Diff",
+      label: "Verify Gate Diff",
       value: escapeHTML(verification?.diffSummary || "Run Verify Gate before routing this proposal to GovernanceOps.")
     },
     {
@@ -565,7 +569,7 @@ function renderPolicyGovernanceRouteReceiptBoard(snapshot) {
       value: escapeHTML(String(decision?.reason || item.reason || "").trim() || "-")
     },
     {
-      label: "Execution",
+      label: "Apply Posture",
       value: renderValuePills([
         { label: "execution", value: execution?.executionId, code: true },
         { label: "status", value: execution?.status },
@@ -574,7 +578,7 @@ function renderPolicyGovernanceRouteReceiptBoard(snapshot) {
       ])
     },
     {
-      label: "Admin Receipt",
+      label: "Applied Admin Receipt",
       value: renderValuePills([
         { label: "receipt", value: receipt?.receiptId, code: true },
         { label: "issued", value: receipt?.issuedAt },
@@ -596,7 +600,7 @@ function renderPolicyGovernanceRouteReceiptBoard(snapshot) {
   return `
     <article class="metric policyops-card policyops-card-wide" data-domain-root="policyops" data-policyops-panel="governance-route-receipt">
       <div class="metric-title-row">
-        <div class="title">Governance Route And Receipt</div>
+        <div class="title">Governance Route And Receipt State</div>
         <span class="${policyAdminStatusChipClass(status)}">${escapeHTML(status)}</span>
       </div>
       <div class="policyops-chip-row">
@@ -609,6 +613,7 @@ function renderPolicyGovernanceRouteReceiptBoard(snapshot) {
         ${receipt?.receiptId ? '<span class="chip chip-ok chip-compact">admin receipt</span>' : '<span class="chip chip-neutral chip-compact">apply pending</span>'}
         ${rollback?.rollbackId ? `<span class="${policyAdminStatusChipClass(rollback.status)}">${escapeHTML(rollback.action || "rollback")}</span>` : '<span class="chip chip-neutral chip-compact">recovery pending</span>'}
       </div>
+      <div class="meta">Companion stays the daily operator lane. Use this state to confirm verify gate, governance route, and receipt continuity before any live policy-pack change.</div>
       <div class="policyops-kv-list">${renderKeyValueRows(rows)}</div>
       <div class="policyops-action-row">
         <button class="btn btn-secondary btn-small" type="button" data-policyops-admin-action="open-governance" data-policyops-admin-id="${escapeHTML(item.id)}">Open GovernanceOps</button>
@@ -750,17 +755,20 @@ function renderPolicyRollbackHistoryBoard(snapshot) {
 
 function renderDecisionExplanationBoard(snapshot) {
   const board = snapshot.decisionExplanation;
+  const premiumDecisionVisible = Boolean(snapshot?.aimxsPremiumVisible);
+  const boardTitle = premiumDecisionVisible ? "Premium Decision Rationale" : "Decision Explanation";
+  const outcomeTitle = premiumDecisionVisible ? "Current Governed Outcome" : "Current Outcome";
   if (!board.available || !board.richness || !board.outcome) {
     return `
       <article class="metric policyops-card" data-domain-root="policyops" data-policyops-panel="decision-explanation">
         <div class="metric-title-row">
-          <div class="title">Decision Explanation</div>
+          <div class="title">${boardTitle}</div>
           <span class="chip chip-neutral chip-compact">idle</span>
         </div>
         <div class="policyops-kv-list">
           <div class="policyops-row">
             <div class="policyops-row-label">Status</div>
-            <div class="policyops-row-value"><span class="policyops-empty">No recorded policy decision is loaded.</span></div>
+            <div class="policyops-row-value"><span class="policyops-empty">${escapeHTML(premiumDecisionVisible ? "No recorded premium decision rationale is loaded." : "No recorded policy decision is loaded.")}</span></div>
           </div>
         </div>
       </article>
@@ -770,7 +778,7 @@ function renderDecisionExplanationBoard(snapshot) {
   const providerLabel = displayPolicyProviderLabel(board.selectedPolicyProvider || board.outcome.provider || "-");
   const rows = [
     {
-      label: "Decision Source",
+      label: premiumDecisionVisible ? "Decision Path" : "Decision Source",
       value: renderValuePills([
         { label: "decision", value: board.richness.decision || "UNSET" },
         { label: "provider", value: providerLabel, code: true },
@@ -779,7 +787,7 @@ function renderDecisionExplanationBoard(snapshot) {
       ])
     },
     {
-      label: "Governed Request",
+      label: premiumDecisionVisible ? "Governed Contract" : "Governed Request",
       value: renderValuePills([
         { label: "contract", value: board.richness.contractId || "-" , code: true},
         { label: "workflow", value: board.richness.workflowKind || "-" },
@@ -788,7 +796,7 @@ function renderDecisionExplanationBoard(snapshot) {
       ])
     },
     {
-      label: "Rationale",
+      label: premiumDecisionVisible ? "Decision Rationale" : "Rationale",
       value: renderValuePills([
         { label: "boundary", value: board.richness.boundaryClass || "-" },
         { label: "risk", value: board.richness.riskTier || "-" },
@@ -797,7 +805,7 @@ function renderDecisionExplanationBoard(snapshot) {
       ])
     },
     {
-      label: "Authority Input",
+      label: premiumDecisionVisible ? "Authority Basis" : "Authority Input",
       value: renderValuePills([
         { label: "subject", value: board.richness.actorSubject || "-", code: true },
         { label: "basis", value: board.richness.authorityBasis || "-" },
@@ -806,9 +814,9 @@ function renderDecisionExplanationBoard(snapshot) {
       ])
     },
     {
-      label: "Governance Linkage",
+      label: premiumDecisionVisible ? "Binding And Follow-Through" : "Governance Linkage",
       value: renderValuePills([
-        { label: "operator approval", value: board.richness.operatorApprovalRequired ? "required" : "policy-first" },
+        { label: "operator approval", value: board.richness.operatorApprovalRequired ? "required" : "baseline decision lane" },
         { label: "evidence refs", value: String(board.richness.evidenceRefCount || 0) },
         { label: "audit ref", value: board.richness.auditEventRef || "-", code: true }
       ])
@@ -818,12 +826,12 @@ function renderDecisionExplanationBoard(snapshot) {
   return `
     <article class="metric policyops-card policyops-card-wide" data-domain-root="policyops" data-policyops-panel="decision-explanation">
       <div class="metric-title-row">
-        <div class="title">Decision Explanation</div>
+        <div class="title">${boardTitle}</div>
         ${board.outcome.decision ? `<span class="${chipClassForStatus(board.outcome.decision)} chip-compact">${escapeHTML(board.outcome.decision)}</span>` : ""}
       </div>
       ${renderActionButtons([
         {
-          label: "Export Decision Explanation",
+          label: premiumDecisionVisible ? "Export Premium Decision Rationale" : "Export Decision Explanation",
           command: "export-decision-explanation",
           disabled: !board.exportable
         },
@@ -833,14 +841,14 @@ function renderDecisionExplanationBoard(snapshot) {
           disabled: !snapshot.stableReferences.contractId && !snapshot.stableReferences.runId
         },
         {
-          label: "Open Linked Governance",
+          label: premiumDecisionVisible ? "Open Governance Route" : "Open Linked Governance",
           command: "open-linked-governance",
           disabled: !board.runId
         }
       ])}
       <div class="${escapeHTML(board.outcome.bannerClass)}">
         <div class="metric-title-row">
-          <div class="title">Current Outcome</div>
+          <div class="title">${outcomeTitle}</div>
           <span class="${chipClassForPolicyEffect(board.outcome)}">${escapeHTML(board.outcome.effectLabel)}</span>
         </div>
         <div class="policy-outcome-detail">${escapeHTML(board.outcome.headline)}</div>
@@ -851,6 +859,8 @@ function renderDecisionExplanationBoard(snapshot) {
         <span class="chip chip-neutral chip-compact">provider=${escapeHTML(providerLabel)}</span>
         <span class="chip chip-neutral chip-compact">workflow=${escapeHTML(board.richness.workflowKind || "-")}</span>
         <span class="chip chip-neutral chip-compact">env=${escapeHTML(board.richness.environment || "-")}</span>
+        ${premiumDecisionVisible ? `<span class="chip chip-neutral chip-compact">authority=${escapeHTML(board.richness.authorityBasis || "-")}</span>` : ""}
+        ${premiumDecisionVisible ? `<span class="chip chip-neutral chip-compact">path=${escapeHTML(board.richness.decisionPath || "-")}</span>` : ""}
       </div>
       <div class="policyops-kv-list">${renderKeyValueRows(rows)}</div>
     </article>
@@ -1039,7 +1049,7 @@ function renderAimxsIdentityPostureEchoBoard(snapshot) {
   return `
     <article class="metric policyops-card policyops-card-wide" data-domain-root="policyops" data-policyops-panel="aimxs-identity-posture-echo">
       <div class="metric-title-row">
-        <div class="title">${escapeHTML(aimxsPremiumVisible ? "AIMXS Identity And Posture Echo" : "Identity And Posture Echo")}</div>
+        <div class="title">${escapeHTML(aimxsPremiumVisible ? "Premium Identity And Authority Posture" : "Identity And Posture Echo")}</div>
         <span class="chip chip-neutral chip-compact">read-only</span>
       </div>
       ${renderAimxsIdentityPostureBlock(snapshot.aimxsIdentityPosture)}

@@ -438,7 +438,7 @@ function renderConnectorGovernanceBoard(snapshot) {
       data-settingsops-panel="connector-governance"
     >
       <div class="metric-title-row">
-        <div class="title">Connector Governance</div>
+        <div class="title">Connector Capability Contract</div>
         <span class="${chipClassForTone(board.tone)}">${escapeHTML(board.tone)}</span>
       </div>
       <div class="settingsops-chip-row">
@@ -447,10 +447,11 @@ function renderConnectorGovernanceBoard(snapshot) {
         <span class="chip chip-neutral chip-compact">profiles=${escapeHTML(String(board.profileCount))}</span>
         <span class="chip chip-neutral chip-compact">source=${escapeHTML(board.source)}</span>
       </div>
+      <div class="meta">SettingsOps defines the bounded connector contract that GovernanceOps reviews and RuntimeOps follows through on.</div>
       <div class="settingsops-kv-list">
         ${renderKeyValueRows([
           {
-            label: "Current Connector Lane",
+            label: "Current Connector Capability",
             value: renderValuePills([
               { label: "profile", value: board.selectedConnectorLabel },
               { label: "profile id", value: board.selectedConnectorId, code: true },
@@ -460,7 +461,7 @@ function renderConnectorGovernanceBoard(snapshot) {
             ])
           },
           {
-            label: "Allowed Tools",
+            label: "Allowed Operations",
             value:
               board.selectedAllowedTools.length > 0
                 ? renderValuePills(
@@ -473,14 +474,14 @@ function renderConnectorGovernanceBoard(snapshot) {
                 : '<span class="settingsops-empty">No connector tools are configured.</span>'
           },
           {
-            label: "Bounded Scope",
+            label: "Bounded Contract Scope",
             value:
               scopePills.length > 0
                 ? renderValuePills(scopePills)
                 : '<span class="settingsops-empty">No bounded scope details are currently recorded for the selected connector.</span>'
           },
           {
-            label: "Profile Coverage",
+            label: "Capability Coverage",
             value: renderValuePills([
               { label: "enabled", value: String(board.enabledProfileCount) },
               { label: "total", value: String(board.profileCount) },
@@ -491,7 +492,7 @@ function renderConnectorGovernanceBoard(snapshot) {
         ])}
       </div>
       <details class="details-shell">
-        <summary>Show connector profile inventory</summary>
+        <summary>Show connector capability inventory</summary>
         <div class="settingsops-kv-list">
           ${renderKeyValueRows([
             {
@@ -499,7 +500,7 @@ function renderConnectorGovernanceBoard(snapshot) {
               value: renderConnectorProfileInventoryRows(board.profiles)
             },
             {
-              label: "Connector Endpoint",
+              label: "Connector Contract Endpoint",
               value: renderValuePills([
                 { label: "state", value: board.endpointState, code: true },
                 { label: "detail", value: board.endpointDetail },
@@ -598,7 +599,7 @@ export function renderSettingsWorkspace(context = {}) {
       renderWorkbenchDomainCluster({
         title: "Integrations And Recovery",
         lead:
-          "Edit the supported workspace setup, review the current connector lane, and keep recovery steps visible without turning SettingsOps into a control-plane catchall.",
+          "Edit the supported workspace setup, review the current connector capability contract, and keep recovery steps visible without turning SettingsOps into a control-plane catchall.",
         bodyClass: "settingsops-board-grid settingsops-cluster-grid",
         body: `
           ${renderIntegrationSettingsBoard(snapshot)}

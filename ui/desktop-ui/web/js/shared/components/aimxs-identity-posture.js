@@ -42,13 +42,14 @@ export function renderAimxsIdentityPostureBlock(model = {}) {
     .map(renderField)
     .filter(Boolean)
     .join("");
+  const identitySectionTitle = String(model?.identitySectionTitle || "Identity And Authority").trim() || "Identity And Authority";
   return `
     <div class="aimxs-posture-shell" data-aimxs-identity-posture="shared">
       ${model?.summary ? `<div class="aimxs-posture-summary">${escapeHTML(model.summary)}</div>` : ""}
       ${model?.surfaceLabel ? `<div class="aimxs-posture-surface">${escapeHTML(model.surfaceLabel)}</div>` : ""}
       <div class="aimxs-posture-section">
         <div class="aimxs-posture-header">
-          <div class="aimxs-posture-title">Identity And Authority</div>
+          <div class="aimxs-posture-title">${escapeHTML(identitySectionTitle)}</div>
         </div>
         ${
           identityFields

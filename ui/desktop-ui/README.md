@@ -35,8 +35,9 @@ If you want the narrower installed-app lane without the governed-request harness
 ## Platform Posture
 
 - macOS `live` installed desktop is the supported OSS lane
-- Linux has a proven Ubuntu 24.04 beta lane
-- Windows has a native packaging and launch beta lane
+- Linux has a proven Ubuntu 24.04 beta installed evaluation lane
+- Windows has a beta installed evaluation lane with native packaging and launch proof
+- Windows `live` remains explicitly deferred
 - browser `run-dev.sh` remains a development path, not the product front door
 
 Use the platform-specific scripts in [bin/](bin) only if you are intentionally evaluating the beta Linux or Windows lanes.

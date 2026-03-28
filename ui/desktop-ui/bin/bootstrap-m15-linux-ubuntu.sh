@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "Bootstrapping Ubuntu host for Epydios AgentOps Desktop native Linux path..."
+echo "Bootstrapping Ubuntu host for the EpydiosOps Desktop Linux beta installed evaluation lane..."
 
 sudo apt update
 sudo apt install -y \

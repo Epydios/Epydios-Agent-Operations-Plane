@@ -1,7 +1,7 @@
 {
   "name": "epydios-agentops-vscode",
-  "displayName": "Epydios AgentOps VS Code",
-  "description": "VS Code thread review client for the native M16/M18 AgentOps session contract.",
+  "displayName": "EpydiosOps VS Code",
+  "description": "VS Code governed-thread review client for the shared EpydiosOps runtime contract.",
   "version": "0.0.1",
   "publisher": "epydios-local",
   "engines": {
@@ -22,7 +22,7 @@
       "activitybar": [
         {
           "id": "agentops",
-          "title": "AgentOps",
+          "title": "EpydiosOps",
           "icon": "media/agentops.svg"
         }
       ]
@@ -31,41 +31,41 @@
       "agentops": [
         {
           "id": "agentopsThreads",
-          "name": "Threads"
+          "name": "Governed Threads"
         }
       ]
     },
     "commands": [
       {
         "command": "agentops.refreshThreads",
-        "title": "AgentOps: Refresh Threads"
+        "title": "EpydiosOps: Refresh Threads"
       },
       {
         "command": "agentops.resumeThread",
-        "title": "AgentOps: Resume Thread Review"
+        "title": "EpydiosOps: Resume Thread Review"
       },
       {
         "command": "agentops.openThreadById",
-        "title": "AgentOps: Open Thread By Task ID"
+        "title": "EpydiosOps: Open Thread By Task ID"
       }
     ],
     "configuration": {
-      "title": "AgentOps",
+      "title": "EpydiosOps",
       "properties": {
         "agentops.runtimeApiBaseUrl": {
           "type": "string",
           "default": "http://127.0.0.1:8080",
-          "description": "Base URL for the AgentOps runtime API."
+          "description": "Base URL for the EpydiosOps runtime API."
         },
         "agentops.tenantId": {
           "type": "string",
           "default": "",
-          "description": "Optional tenant filter for native AgentOps thread listing."
+          "description": "Optional tenant filter for governed thread listing."
         },
         "agentops.projectId": {
           "type": "string",
           "default": "",
-          "description": "Optional project filter for native AgentOps thread listing."
+          "description": "Optional project filter for governed thread listing."
         },
         "agentops.authToken": {
           "type": "string",

@@ -94,7 +94,7 @@ func main() {
 	cfg := runtimeclient.LoadConfigFromEnv()
 	root := flag.NewFlagSet("chatops-agentops", flag.ContinueOnError)
 	root.SetOutput(os.Stderr)
-	root.StringVar(&cfg.RuntimeAPIBaseURL, "runtime-api-base-url", cfg.RuntimeAPIBaseURL, "AgentOps runtime API base URL")
+	root.StringVar(&cfg.RuntimeAPIBaseURL, "runtime-api-base-url", cfg.RuntimeAPIBaseURL, "EpydiosOps runtime API base URL")
 	root.StringVar(&cfg.TenantID, "tenant-id", cfg.TenantID, "tenant scope")
 	root.StringVar(&cfg.ProjectID, "project-id", cfg.ProjectID, "project scope")
 	root.StringVar(&cfg.AuthToken, "auth-token", cfg.AuthToken, "optional bearer token")
@@ -816,7 +816,7 @@ func reportSessionID(report *chatopsStatusReport) string {
 
 func renderChatopsThreadEnvelope(updateType, summary string, report *chatopsStatusReport, details, recent, hints []string) string {
 	envelope := runtimeclient.GovernedUpdateEnvelope{
-		Header:      "AgentOps thread update",
+		Header:      "EpydiosOps governed thread update",
 		UpdateType:  updateType,
 		Summary:     summary,
 		Details:     details,
@@ -937,7 +937,7 @@ func renderChatopsReport(ctx context.Context, client *runtimeclient.Client, repo
 		return "", err
 	}
 	envelope := runtimeclient.BuildEnterpriseReportEnvelope(runtimeclient.EnterpriseReportSubject{
-		Header:               "AgentOps conversation governance report",
+		Header:               "EpydiosOps governed thread report",
 		ReportType:           "report",
 		ExportProfile:        disposition.ExportProfile,
 		Audience:             disposition.Audience,
@@ -992,7 +992,7 @@ func renderChatopsDeltaReport(ctx context.Context, client *runtimeclient.Client,
 		return "", err
 	}
 	envelope := runtimeclient.BuildEnterpriseReportEnvelope(runtimeclient.EnterpriseReportSubject{
-		Header:               "AgentOps conversation governance report",
+		Header:               "EpydiosOps governed thread report",
 		ReportType:           "delta-report",
 		ExportProfile:        disposition.ExportProfile,
 		Audience:             disposition.Audience,

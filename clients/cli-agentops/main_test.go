@@ -222,7 +222,7 @@ func TestRenderCLIThreadEnvelopeIncludesGovernedSections(t *testing.T) {
 		}},
 	}
 	rendered := renderCLIThreadEnvelope(view)
-	if !strings.Contains(rendered, "AgentOps thread update") {
+	if !strings.Contains(rendered, "EpydiosOps governed thread update") {
 		t.Fatalf("expected governed header, got %q", rendered)
 	}
 	if !strings.Contains(rendered, "Type: review") {
@@ -255,7 +255,7 @@ func TestRenderCLIHandoffEnvelope(t *testing.T) {
 	view := buildCLIParityThreadReview(t)
 	rendered := renderCLIHandoffEnvelope(view)
 	for _, part := range []string{
-		"AgentOps thread update",
+		"EpydiosOps governed thread update",
 		"Type: handoff",
 		"Current decision: Pending approval checkpoint approval-1",
 		"Approval/proposal linkage: Primary decision detail is not unambiguous yet for task task-parity-1.",
@@ -354,7 +354,7 @@ func TestRenderCLIReportIncludesGovernedSectionsAndRedactsSecrets(t *testing.T) 
 		t.Fatalf("renderCLIReport() error = %v", err)
 	}
 	for _, part := range []string{
-		"AgentOps CLI governance report",
+		"EpydiosOps governed thread report",
 		"Applicable policy packs:",
 		"Role bundles:",
 		"Decision surfaces:",
@@ -377,7 +377,7 @@ func TestRenderCLIFollowReportDeltaIncludesReportType(t *testing.T) {
 		t.Fatalf("renderCLIFollowReport() error = %v", err)
 	}
 	for _, part := range []string{
-		"AgentOps CLI governance report",
+		"EpydiosOps governed thread report",
 		"Type: delta-report",
 		"Decision surfaces:",
 	} {

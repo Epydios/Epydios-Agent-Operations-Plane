@@ -2,6 +2,7 @@ import {
   chipClassForStatus,
   displayPolicyProviderLabel
 } from "../../views/common.js";
+import { isAimxsPremiumVisible } from "../../aimxs/state.js";
 import { createAimxsLegibilityModel } from "../../shared/aimxs/legibility.js";
 
 function normalizeString(value, fallback = "") {
@@ -366,7 +367,9 @@ function summarizeAdminProposalReview(adminQueueItems = [], viewState = {}, aimx
       approvalReceiptRef: selectedItem.decision.approvalReceiptId,
       receiptRef: selectedItem.receipt.receiptId,
       stableRef: selectedItem.receipt.stableRef,
-      summary: selectedItem.summary
+      summary: aimxsRoutingLive
+        ? "Premium route legibility keeps authority basis, receipt anchors, and stable replay refs visible for this routed admin proposal."
+        : selectedItem.summary
     }),
     canApproveDeny: actionable,
     canRoute: actionable && aimxsRoutingLive,
@@ -599,23 +602,23 @@ function summarizeDelegationAndEscalation(
   const scopeBound = tenantIds.length > 0 || projectIds.length > 0;
   let routeState = "clear";
   let routeTone = "neutral";
-  let routeMode = "policy-first";
+  let routeMode = "baseline decision lane";
   if (approvalState === "PENDING") {
     routeState = "active";
     routeTone = "warn";
-    routeMode = "step-up approval";
+    routeMode = "step-up governance review";
   } else if (approvalState === "APPROVED" || approvalState === "DENIED") {
     routeState = "recorded";
     routeTone = "ok";
-    routeMode = "recorded review";
+    routeMode = "recorded governance receipt";
   } else if (approvalState === "EXPIRED") {
     routeState = "expired";
     routeTone = "warn";
-    routeMode = "expired approval";
+    routeMode = "expired governance review";
   } else if (policyDecision === "DEFER") {
     routeState = "watch";
     routeTone = "warn";
-    routeMode = "deferred governance path";
+    routeMode = "deferred governance route";
   }
   const receiverState =
     approvalState === "PENDING"
@@ -899,6 +902,7 @@ export function createGovernanceWorkspaceSnapshot(context = {}) {
   const aimxsRoutingLive = isAimxsRoutingLive(settings);
 
   return {
+    aimxsPremiumVisible: isAimxsPremiumVisible(settings),
     aimxsDecisionBindingSpine:
       context?.aimxsDecisionBindingSpine && typeof context.aimxsDecisionBindingSpine === "object"
         ? context.aimxsDecisionBindingSpine

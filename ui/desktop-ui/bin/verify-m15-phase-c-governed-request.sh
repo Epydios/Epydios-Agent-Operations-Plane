@@ -155,6 +155,9 @@ assert auth.get("mockLogin") is True, auth
 native_shell = runtime_config.get("nativeShell") or {}
 assert native_shell.get("launcherState") == "ready", native_shell
 assert native_shell.get("runtimeState") == "service_running", native_shell
+assert native_shell.get("runtimePosture") == "cluster-backed live lane", native_shell
+assert native_shell.get("updatePosture") == "manual reinstall from released artifact", native_shell
+assert native_shell.get("supportRoot") == manifest["paths"]["configRoot"], native_shell
 assert native_shell.get("serviceStatusPath") == manifest["paths"]["serviceStatusPath"], native_shell.get("serviceStatusPath")
 assert native_shell.get("gatewayStatusPath") == manifest["paths"]["gatewayStatusPath"], native_shell.get("gatewayStatusPath")
 assert (native_shell.get("interposition") or {}).get("status") == expected_status, native_shell.get("interposition")

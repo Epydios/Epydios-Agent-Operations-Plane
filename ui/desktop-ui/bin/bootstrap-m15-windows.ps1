@@ -169,7 +169,7 @@ if (-not (Have-Command "winget")) {
   throw "bootstrap-m15-windows requires winget on the Windows host."
 }
 
-Write-Host "Bootstrapping Windows host for the Epydios AgentOps Desktop beta lane..."
+Write-Host "Bootstrapping the Windows host for the EpydiosOps Desktop beta installed evaluation lane..."
 
 Install-WingetPackage -Ids @("Git.Git") -CommandName "bash"
 Install-WingetPackage -Ids @("GoLang.Go") -CommandName "go"

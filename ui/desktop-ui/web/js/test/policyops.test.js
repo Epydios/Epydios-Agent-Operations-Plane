@@ -9,7 +9,11 @@ test("policyops page renders the first inspect-only policy boards", () => {
       aimxs: {
         mode: "aimxs-full",
         activation: {
-          selectedProviderId: "aimxs-policy-primary"
+          available: true,
+          state: "active",
+          activeMode: "aimxs-full",
+          selectedProviderId: "aimxs-policy-primary",
+          selectedProviderReady: true
         }
       },
       identity: {
@@ -248,24 +252,28 @@ test("policyops page renders the first inspect-only policy boards", () => {
   assert.match(ui.policyOpsContent.innerHTML, /PolicyOps action feedback is visible\./);
   assert.match(ui.policyOpsContent.innerHTML, /Admin Change Queue/);
   assert.match(ui.policyOpsContent.innerHTML, /Policy Pack Load And Activation Draft/);
-  assert.match(ui.policyOpsContent.innerHTML, /Decision Provider And Applicability Scope/);
+  assert.match(ui.policyOpsContent.innerHTML, /Decision Contract And Applicability Scope/);
   assert.match(ui.policyOpsContent.innerHTML, /Semantic Impact Preview/);
-  assert.match(ui.policyOpsContent.innerHTML, /Governance Route And Receipt/);
-  assert.match(ui.policyOpsContent.innerHTML, /Current Policy Contract/);
+  assert.match(ui.policyOpsContent.innerHTML, /Governance Route And Receipt State/);
+  assert.match(ui.policyOpsContent.innerHTML, /Decision Contract/);
+  assert.match(ui.policyOpsContent.innerHTML, /decisionMode=aimxs-full; provider=aimxs-policy-primary/);
+  assert.match(ui.policyOpsContent.innerHTML, /baselineContract=active; premiumRichness=(visible|not-loaded)/);
   assert.match(ui.policyOpsContent.innerHTML, /Policy Pack Catalog/);
+  assert.match(ui.policyOpsContent.innerHTML, /Baseline decisions stay real here\. Verify the proposed contract before routing it into GovernanceOps\./);
   assert.match(ui.policyOpsContent.innerHTML, /policy-pack:\/\/managed_codex_worker_operator@2026\.03\.14/);
   assert.match(ui.policyOpsContent.innerHTML, /bundle:\/\/aimxs\/managed_codex_worker_operator\/2026\.03\.14/);
   assert.match(ui.policyOpsContent.innerHTML, /schema=declared; compile=ready/);
   assert.match(ui.policyOpsContent.innerHTML, /activationTarget=workspace; activationPosture=current/);
-  assert.match(ui.policyOpsContent.innerHTML, /Decision Explanation/);
-  assert.match(ui.policyOpsContent.innerHTML, /Identity And Posture Echo/);
+  assert.match(ui.policyOpsContent.innerHTML, /Premium Decision Rationale/);
+  assert.match(ui.policyOpsContent.innerHTML, /Premium Identity And Authority Posture/);
   assert.match(ui.policyOpsContent.innerHTML, /governed action authority/);
-  assert.match(ui.policyOpsContent.innerHTML, /governance handshake/);
-  assert.match(ui.policyOpsContent.innerHTML, /Current Posture/);
+  assert.match(ui.policyOpsContent.innerHTML, /premium governance handshake/);
+  assert.match(ui.policyOpsContent.innerHTML, /Identity And Authority Basis/);
+  assert.match(ui.policyOpsContent.innerHTML, /Current Authority Posture/);
   assert.match(ui.policyOpsContent.innerHTML, /financial_control/);
-  assert.match(ui.policyOpsContent.innerHTML, /Target Posture/);
+  assert.match(ui.policyOpsContent.innerHTML, /Target Authority Posture/);
   assert.match(ui.policyOpsContent.innerHTML, /activate policy pack|bounded policy draft/);
-  assert.match(ui.policyOpsContent.innerHTML, /Allowed Or Blocked/);
+  assert.match(ui.policyOpsContent.innerHTML, /Decision Rationale/);
   assert.match(ui.policyOpsContent.innerHTML, /Policy Coverage/);
   assert.match(ui.policyOpsContent.innerHTML, /Policy Simulation/);
   assert.match(ui.policyOpsContent.innerHTML, /aimxs-full/);
@@ -289,20 +297,20 @@ test("policyops page renders the first inspect-only policy boards", () => {
   assert.match(ui.policyOpsContent.innerHTML, /decision surfaces/);
   assert.match(ui.policyOpsContent.innerHTML, /catalog/);
   assert.match(ui.policyOpsContent.innerHTML, /Stable References/);
-  assert.match(ui.policyOpsContent.innerHTML, /Catalog Rigor/);
+  assert.match(ui.policyOpsContent.innerHTML, /Catalog Readiness/);
   assert.match(ui.policyOpsContent.innerHTML, /schema ready/);
   assert.match(ui.policyOpsContent.innerHTML, /compile ready/);
   assert.match(ui.policyOpsContent.innerHTML, /Rigor Gate/);
-  assert.match(ui.policyOpsContent.innerHTML, /Verification Gate/);
-  assert.match(ui.policyOpsContent.innerHTML, /Simulation Diff Summary/);
+  assert.match(ui.policyOpsContent.innerHTML, /Verify Gate/);
+  assert.match(ui.policyOpsContent.innerHTML, /Verify Gate Diff/);
   assert.match(ui.policyOpsContent.innerHTML, /Golden Simulation Set/);
   assert.match(ui.policyOpsContent.innerHTML, /Verify gate passed with warnings/);
   assert.match(ui.policyOpsContent.innerHTML, /compile validation/);
   assert.match(ui.policyOpsContent.innerHTML, /lint posture/);
   assert.match(ui.policyOpsContent.innerHTML, /golden simulation set/);
-  assert.match(ui.policyOpsContent.innerHTML, /Export Decision Explanation/);
+  assert.match(ui.policyOpsContent.innerHTML, /Export Premium Decision Rationale/);
   assert.match(ui.policyOpsContent.innerHTML, /Copy Stable Policy References/);
-  assert.match(ui.policyOpsContent.innerHTML, /Open Linked Governance/);
+  assert.match(ui.policyOpsContent.innerHTML, /Open Governance Route/);
   assert.match(ui.policyOpsContent.innerHTML, /Run Bounded Simulation|Refresh Bounded Simulation/);
   assert.match(ui.policyOpsContent.innerHTML, /Open AuditOps/);
   assert.match(ui.policyOpsContent.innerHTML, /Open EvidenceOps/);
@@ -416,7 +424,7 @@ test("policyops page renders apply and receipt actions for approved policy admin
     }
   });
 
-  assert.match(ui.policyOpsContent.innerHTML, /Governance Route And Receipt/);
+  assert.match(ui.policyOpsContent.innerHTML, /Governance Route And Receipt State/);
   assert.match(ui.policyOpsContent.innerHTML, /Rollback And History/);
   assert.match(ui.policyOpsContent.innerHTML, /Apply Approved Change/);
   assert.match(ui.policyOpsContent.innerHTML, /Copy Governance Receipt/);

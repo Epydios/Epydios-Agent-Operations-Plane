@@ -197,7 +197,7 @@ func main() {
 		"--once",
 		"--render", "delta-update",
 	)
-	assert(strings.Contains(followOutput, "AgentOps thread update"), "expected chatops follow envelope")
+	assert(strings.Contains(followOutput, "EpydiosOps governed thread update"), "expected chatops follow envelope")
 	assert(strings.Contains(followOutput, "Proposal Decision: Chatops bounded proof proposal accepted."), "expected proposal decision in chatops follow")
 	assert(strings.Contains(followOutput, "Evidence Recorded: audit_bundle"), "expected evidence event in chatops follow")
 	logger.log("followed governed chat thread event stream through chatops-agentops")
@@ -240,7 +240,7 @@ func main() {
 	summary := map[string]any{
 		"generated_at_utc":     stamp,
 		"status":               "chatops_governed_thread_proof_ready",
-		"reason":               "Chatops bounded proof accepted connection and auth truth, one governed intake and turn, approval and proposal resolution, live follow, and explicit audit and evidence continuity on the shared M16 contract.",
+		"reason":               "Chatops bounded proof accepted connection and auth truth, one governed intake and turn, approval and proposal resolution, live follow, and explicit audit and evidence continuity on the shared governed-thread runtime contract.",
 		"runtime_api_base_url": proof.runtimeAPIBaseURL,
 		"log_path":             logPath,
 		"checklist_path":       checklistPath,

@@ -826,7 +826,7 @@ function buildGovernedReportEnvelope(model = {}, catalogs = {}, options = {}) {
     clientSurface: disposition.clientSurface
   });
   const envelope = {
-    header: normalizedString(options.header, "AgentOps enterprise governance report"),
+    header: normalizedString(options.header, "EpydiosOps governed thread report"),
     reportType: disposition.reportType,
     exportProfile: disposition.exportProfile,
     audience: disposition.audience,
@@ -974,7 +974,7 @@ function appendSection(lines, title, items = []) {
 }
 
 function renderGovernedReportEnvelope(envelope = {}) {
-  const lines = [normalizedString(envelope.header, "AgentOps enterprise governance report")];
+  const lines = [normalizedString(envelope.header, "EpydiosOps governed thread report")];
   lines.push(`Type: ${normalizedString(envelope.reportType, "review")}`);
   lines.push(`Export profile: ${normalizedString(envelope.exportProfile, "operator_review")}`);
   lines.push(`Audience: ${normalizedString(envelope.audience, "operator")}`);

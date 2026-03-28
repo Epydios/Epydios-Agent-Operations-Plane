@@ -89,7 +89,7 @@ func main() {
 	cfg := runtimeclient.LoadConfigFromEnv()
 	root := flag.NewFlagSet("workflow-agentops", flag.ContinueOnError)
 	root.SetOutput(os.Stderr)
-	root.StringVar(&cfg.RuntimeAPIBaseURL, "runtime-api-base-url", cfg.RuntimeAPIBaseURL, "AgentOps runtime API base URL")
+	root.StringVar(&cfg.RuntimeAPIBaseURL, "runtime-api-base-url", cfg.RuntimeAPIBaseURL, "EpydiosOps runtime API base URL")
 	root.StringVar(&cfg.TenantID, "tenant-id", cfg.TenantID, "tenant scope")
 	root.StringVar(&cfg.ProjectID, "project-id", cfg.ProjectID, "project scope")
 	root.StringVar(&cfg.AuthToken, "auth-token", cfg.AuthToken, "optional bearer token")
@@ -878,7 +878,7 @@ func renderWorkflowReport(ctx context.Context, client *runtimeclient.Client, rep
 		return "", err
 	}
 	envelope := runtimeclient.BuildEnterpriseReportEnvelope(runtimeclient.EnterpriseReportSubject{
-		Header:               "AgentOps workflow governance report",
+		Header:               "EpydiosOps governed thread report",
 		ReportType:           "report",
 		ExportProfile:        disposition.ExportProfile,
 		Audience:             disposition.Audience,
@@ -934,7 +934,7 @@ func renderWorkflowDeltaReport(ctx context.Context, client *runtimeclient.Client
 	}
 	summary := runtimeclient.BuildThreadFollowSummary(items)
 	envelope := runtimeclient.BuildEnterpriseReportEnvelope(runtimeclient.EnterpriseReportSubject{
-		Header:               "AgentOps workflow governance report",
+		Header:               "EpydiosOps governed thread report",
 		ReportType:           "delta-report",
 		ExportProfile:        disposition.ExportProfile,
 		Audience:             disposition.Audience,
@@ -1010,7 +1010,7 @@ func renderWorkflowEnvelope(updateType, summary string, report *workflowStatusRe
 		actionHints = runtimeclient.MergeEnvelopeLines(actionHints, orgAdminReview.ActionHints)
 	}
 	return runtimeclient.RenderGovernedUpdateEnvelope(runtimeclient.GovernedUpdateEnvelope{
-		Header:                       "AgentOps ticket update",
+		Header:                       "EpydiosOps governed thread update",
 		UpdateType:                   updateType,
 		ContextLabel:                 "Workflow",
 		ContextValue:                 strings.Join(contextParts, " | "),

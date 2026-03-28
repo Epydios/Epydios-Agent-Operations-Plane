@@ -730,8 +730,8 @@ export function renderRuntimeRunDetail(ui, run, options = {}) {
         </div>
       </div>
       <div class="metric">
-        <div class="title">5. Connector Continuity</div>
-        <div class="meta metric-note">Use this only for connector-governed runs. It keeps the connector request, approval linkage, and evidence summary in one place before handoff.</div>
+        <div class="title">5. Connector Run Continuity</div>
+        <div class="meta metric-note">Use this only for connector-governed runs. It keeps the bounded connector contract, approval linkage, and proof handoff attached to the same governed run after GovernanceOps review.</div>
         <div class="run-detail-chips">
           <span class="chip chip-neutral chip-compact">driver=${escapeHTML(connectorContinuity.driverLabel)}</span>
           <span class="chip chip-neutral chip-compact">tool=${escapeHTML(connectorContinuity.toolName)}</span>
@@ -743,7 +743,7 @@ export function renderRuntimeRunDetail(ui, run, options = {}) {
             connectorContinuity.available
               ? renderDetailKeyValueRows([
                   {
-                    label: "Connector Profile",
+                    label: "Connector Capability Contract",
                     value: renderDetailValuePills([
                       { label: "profile", value: connectorContinuity.connectorLabel },
                       { label: "connector id", value: connectorContinuity.connectorId, code: true },
@@ -752,7 +752,7 @@ export function renderRuntimeRunDetail(ui, run, options = {}) {
                     ])
                   },
                   {
-                    label: "Gateway And Approval",
+                    label: "Gateway And Approval Link",
                     value: renderDetailValuePills([
                       { label: "protocol", value: connectorContinuity.protocol, code: true },
                       { label: "transport", value: connectorContinuity.transport, code: true },
@@ -771,7 +771,7 @@ export function renderRuntimeRunDetail(ui, run, options = {}) {
                     ])
                   },
                   {
-                    label: "Bounded Request",
+                    label: "Bounded Operation Request",
                     value:
                       connectorContinuity.requestEntries.length > 0
                         ? renderDetailValuePills(connectorContinuity.requestEntries)

@@ -37,7 +37,7 @@ test("buildAuditEvidenceHandoff packages evidence and recent audit continuity", 
   assert.equal(handoff.evidenceCount, 1);
   assert.equal(handoff.auditEventCount, 2);
   assert.equal(handoff.runId, "run-9");
-  assert.match(handoff.renderedText, /AgentOps Audit and Evidence Handoff/);
+  assert.match(handoff.renderedText, /EpydiosOps audit and evidence handoff/);
   assert.match(handoff.renderedText, /Run: run-9/);
   assert.match(handoff.renderedText, /Current decision:/);
   assert.match(handoff.renderedText, /Run\/session continuity:/);

@@ -48,7 +48,8 @@ M15 Phase C verifier passed.
 ## Platform Truth
 
 - macOS `live` installed desktop is the supported OSS lane
-- Linux has a proven Ubuntu 24.04 beta lane
-- Windows has a native packaging and launch beta lane
+- Linux has a proven Ubuntu 24.04 beta installed evaluation lane
+- Windows has a beta installed evaluation lane with native packaging and launch proof
+- Windows `live` remains explicitly deferred
 
 This quality story does not claim platform-equal parity outside the supported macOS lane, and it does not prove premium AIMXS behavior.

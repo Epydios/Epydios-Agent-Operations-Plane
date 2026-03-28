@@ -47,14 +47,21 @@ write_summary() {
 {
   "generated_at_utc": "${STAMP}",
   "status": "installed_linux_beta_bundle",
+  "artifact_kind": "linux_appimage_installed_bundle",
+  "install_contract": "beta_linux_installed_evaluation_lane",
+  "release_support_lane": "beta_linux_installed_evaluation_lane",
   "install_root": "${INSTALL_ROOT}",
   "install_path": "${INSTALL_PATH}",
   "support_root": "${SUPPORT_ROOT}",
   "bootstrap_path": "${BOOTSTRAP_PATH}",
+  "launcher_entry_path": "${LAUNCHER_PATH}",
+  "launcher_support_path": "${LAUNCH_HELPER_PATH}",
   "launch_helper_path": "${LAUNCH_HELPER_PATH}",
   "launcher_path": "${LAUNCHER_PATH}",
   "desktop_file_path": "${DESKTOP_FILE_PATH}",
   "icon_path": "${ICON_PATH}",
+  "update_posture": "manual_reinstall_from_packaged_artifact",
+  "runtime_posture": "beta_cluster_backed_live_lane",
   "log_path": "${LOG_PATH}",
   "source_appimage_path": "${APPIMAGE_SOURCE_PATH}"
 }
@@ -64,7 +71,7 @@ EOF
 }
 
 {
-  echo "Installing ${APPIMAGE_SOURCE_PATH} -> ${INSTALL_PATH}"
+  echo "Installing Linux beta installed evaluation lane AppImage ${APPIMAGE_SOURCE_PATH} -> ${INSTALL_PATH}"
   mkdir -p "${INSTALL_ROOT}" "${BIN_ROOT}" "${SUPPORT_ROOT}" "${APPLICATIONS_ROOT}"
   cp "${APPIMAGE_SOURCE_PATH}" "${INSTALL_PATH}"
   chmod +x "${INSTALL_PATH}"
@@ -132,4 +139,4 @@ EOF
 
 write_summary
 
-echo "install-m15-linux-beta: installed bundle at ${INSTALL_PATH}"
+echo "install-m15-linux-beta: installed Linux beta evaluation lane bundle at ${INSTALL_PATH}"

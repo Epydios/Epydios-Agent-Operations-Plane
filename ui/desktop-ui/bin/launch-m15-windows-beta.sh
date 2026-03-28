@@ -63,11 +63,11 @@ BOOTSTRAP_PATH_NATIVE="$(windows_path "${BOOTSTRAP_PATH}")"
 latest_manifest_before="$(find "${SESSION_ROOT}" -name session.json -print 2>/dev/null | sort | tail -n1 || true)"
 
 [ -f "${INSTALL_PATH}" ] || {
-  echo "launch-m15-windows-beta failed: installed executable missing at ${INSTALL_PATH}" >&2
+  echo "launch-m15-windows-beta failed: Windows beta installed evaluation lane executable missing at ${INSTALL_PATH}" >&2
   exit 1
 }
 [ -f "${BOOTSTRAP_PATH}" ] || {
-  echo "launch-m15-windows-beta failed: bootstrap config missing at ${BOOTSTRAP_PATH}" >&2
+  echo "launch-m15-windows-beta failed: Windows beta installed evaluation lane bootstrap config missing at ${BOOTSTRAP_PATH}" >&2
   exit 1
 }
 
@@ -77,11 +77,11 @@ runtime_service="$(read_bootstrap_field '.runtimeService // "orchestration-runti
 
 if [ "${bootstrap_mode}" = "live" ]; then
   if ! command -v kubectl >/dev/null 2>&1; then
-    echo "launch-m15-windows-beta failed: live mode requires kubectl on the Windows host. Run bash ./ui/desktop-ui/bin/bootstrap-m15-windows.sh first." >&2
+    echo "launch-m15-windows-beta failed: Windows beta installed evaluation lane in live mode requires kubectl on the Windows host. Run bash ./ui/desktop-ui/bin/bootstrap-m15-windows.sh first." >&2
     exit 1
   fi
   if ! kubectl -n "${runtime_namespace}" get svc "${runtime_service}" -o name >/dev/null 2>&1; then
-    echo "launch-m15-windows-beta failed: live mode requires a reachable Kubernetes service ${runtime_namespace}/${runtime_service}. The current kube context on this Windows host is not ready." >&2
+    echo "launch-m15-windows-beta failed: Windows beta installed evaluation lane in live mode requires a reachable Kubernetes service ${runtime_namespace}/${runtime_service}. The current kube context on this Windows host is not ready." >&2
     exit 1
   fi
 fi

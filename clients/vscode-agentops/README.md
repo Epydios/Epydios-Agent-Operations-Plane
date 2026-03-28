@@ -1,27 +1,27 @@
-# VS Code Ingress for Epydios Agent Operations Plane
+# EpydiosOps VS Code Governed Thread Client
 
-`vscode-agentops` is the first M19 IDE-facing client slice for Epydios Agent Operations Plane.
+`vscode-agentops` is the bounded VS Code client for the EpydiosOps governed-thread runtime contract.
 
 Scope of this slice:
-- list native M16 tasks as governed threads
+- list governed threads from the shared runtime contract
 - resume thread review from VS Code
 - follow live native session events via `/v1alpha2/runtime/sessions/{sessionId}/events/stream`
 - show managed worker review state from native `timeline`, `approval`, `tool_action`, `evidence`, and `tool_proposal` data
 - package thread review and live follow into a shared governed update panel so operator guidance stays aligned with the other ingress surfaces
-- render the enterprise governance report against the same worker-capability and policy-pack catalogs used by the other enterprise surfaces
+- render the governed thread report against the same worker-capability and policy-pack catalogs used by the other bounded clients
 - approve or deny native approval checkpoints and tool proposals from the IDE review surface
 - submit a governed turn against the existing task through `POST /v1alpha1/runtime/integrations/invoke`
 - auto-select a single pending approval or proposal from the selected session when raw ids are not needed
 - show native action hints when multiple pending approvals or proposals still require explicit selection
 
-This slice does not add a second orchestration model. It consumes the same native session contract that powers the desktop `Chat` surface.
+This client does not add a second orchestration model. It consumes the same governed-thread runtime contract used by the desktop shell and the other bounded clients.
 
 ## Load In VS Code
 
 1. Open this folder in VS Code:
    - `EPYDIOS_AGENTOPS_DESKTOP_REPO/clients/vscode-agentops`
 2. Press `F5` to launch an Extension Development Host.
-3. In the development host, open the `AgentOps` activity bar view.
+3. In the development host, open the `EpydiosOps` activity bar view.
 
 ## Extension Settings
 
@@ -34,9 +34,9 @@ This slice does not add a second orchestration model. It consumes the same nativ
 
 ## Commands
 
-- `AgentOps: Refresh Threads`
-- `AgentOps: Resume Thread Review`
-- `AgentOps: Open Thread By Task ID`
+- `EpydiosOps: Refresh Threads`
+- `EpydiosOps: Resume Thread Review`
+- `EpydiosOps: Open Thread By Task ID`
 
 ## Review Actions
 

@@ -1,15 +1,15 @@
-# Workflow Ingress for Epydios Agent Operations Plane
+# EpydiosOps Workflow Governed Thread Client
 
-`workflow-agentops` is the first `M19` ticket/workflow ingress slice for Epydios Agent Operations Plane.
+`workflow-agentops` is the bounded workflow client for the EpydiosOps governed-thread runtime contract.
 
 Scope of this slice:
-- intake external ticket or workflow payloads into native M16 tasks
+- intake external ticket or workflow payloads into governed tasks on the shared runtime contract
 - optionally start the first governed turn against the created `taskId`
 - support governed follow-up turns and native live follow on existing workflow tasks
 - emit native status summaries for ticket/workflow systems without introducing another orchestration model
-- emit normalized enterprise governance reports from the same native contract for reporting/export consumers
+- emit normalized governed-thread reports from the same runtime contract for reporting and export consumers
 - reuse the same governed update-envelope shape already used by chatops, instead of inventing a workflow-specific status dialect
-- keep ticket/workflow ingress on the same native task, session, worker, timeline, event-stream, approval, tool-action, and evidence contract already used by desktop Chat, VS Code, and CLI
+- keep ticket/workflow ingress on the same governed task, session, worker, timeline, event-stream, approval, tool-action, and evidence contract already used by the desktop shell, VS Code, CLI, and chatops clients
 
 ## Commands
 
@@ -51,7 +51,7 @@ go run ./clients/workflow-agentops --tenant-id tenant-local --project-id project
 go run ./clients/workflow-agentops --tenant-id tenant-local --project-id project-local tickets follow --task-id <task-id> --render delta-report
 ```
 
-`report` and `delta-report` reuse the same native task, session, worker, approval, proposal, tool-action, and evidence state while adding policy-pack and worker-capability coverage for enterprise export consumers.
+`report` and `delta-report` reuse the same governed task, session, worker, approval, proposal, tool-action, and evidence state while adding policy-pack and worker-capability coverage for downstream review consumers.
 
 ```bash
 go run ./clients/workflow-agentops --tenant-id tenant-local --project-id project-local approvals decide --ticket-id OPS-101 --source-system jira --decision APPROVE --render update

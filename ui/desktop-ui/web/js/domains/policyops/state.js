@@ -931,6 +931,7 @@ function buildPolicyAimxsIdentityPosture(snapshot = {}) {
   const richness = explanation?.richness || {};
   const simulation = snapshot?.policySimulation || {};
   const admin = snapshot?.admin || {};
+  const premiumVisible = Boolean(snapshot?.aimxsPremiumVisible);
   const selectedItem = admin?.selectedQueueItem || null;
   const draft = admin?.draft || {};
   const authorityTier = inferAimxsAuthorityTierFromRoles(
@@ -950,8 +951,14 @@ function buildPolicyAimxsIdentityPosture(snapshot = {}) {
 
   return createAimxsIdentityPostureModel({
     summary:
-      "This read-only echo makes the current governed-action authority posture and the next bounded policy-pack posture legible from PolicyOps without adding another write surface.",
-    surfaceLabel: "read-only echo",
+      premiumVisible
+        ? "This read-only premium posture echo makes richer decision rationale, authority basis, and governed outcome posture legible from PolicyOps without adding another write surface."
+        : "This read-only echo makes the current decision and authority posture legible from PolicyOps without adding another write surface.",
+    surfaceLabel: premiumVisible ? "premium read-only echo" : "read-only echo",
+    identitySectionTitle: premiumVisible ? "Identity And Authority Basis" : "Identity And Authority",
+    currentPostureTitle: premiumVisible ? "Current Authority Posture" : "Current Posture",
+    targetPostureTitle: premiumVisible ? "Target Authority Posture" : "Target Posture",
+    rationaleTitle: premiumVisible ? "Decision Rationale" : "Allowed Or Blocked",
     identityFields: [
       createAimxsField("identity class", "governed action authority"),
       createAimxsField("actor", richness?.actorSubject || "-", true),
@@ -960,30 +967,50 @@ function buildPolicyAimxsIdentityPosture(snapshot = {}) {
       createAimxsField("authority basis", richness?.authorityBasis || "unknown"),
       createAimxsField(
         "delegation basis",
-        richness?.operatorApprovalRequired ? "governance handshake" : requiredGrants.length ? "grant-bundle gated" : "direct governed review"
+        richness?.operatorApprovalRequired
+          ? premiumVisible
+            ? "premium governance handshake"
+            : "governance handshake"
+          : requiredGrants.length
+            ? premiumVisible
+              ? "premium grant-bundle gate"
+              : "grant-bundle gated"
+            : premiumVisible
+              ? "premium governed review"
+              : "direct governed review"
       ),
       createAimxsField("grant basis", requiredGrants.length ? requiredGrants.join(", ") : "no additional grants declared", requiredGrants.length > 0),
       createAimxsField(
         "assurance posture",
-        richness?.requestContractEchoPresent && richness?.currentStatePresent ? "continuity echoed" : "partial runtime echo"
+        richness?.requestContractEchoPresent && richness?.currentStatePresent
+          ? premiumVisible
+            ? "authority and continuity echoed"
+            : "continuity echoed"
+          : premiumVisible
+            ? "partial premium runtime echo"
+            : "partial runtime echo"
       ),
       createAimxsField(
         "anomaly posture",
-        richness?.adapterStatus || richness?.adapterErrorCode ? `${richness.adapterStatus || "provider"} ${richness.adapterErrorCode || ""}`.trim() : "no anomaly flag loaded"
+        richness?.adapterStatus || richness?.adapterErrorCode
+          ? `${richness.adapterStatus || "provider"} ${richness.adapterErrorCode || ""}`.trim()
+          : premiumVisible
+            ? "no premium anomaly flag loaded"
+            : "no anomaly flag loaded"
       )
     ].filter(Boolean),
     currentPosture: {
       badge: currentBadge,
       tone: policyAimxsTone(currentBadge),
       note: snapshot?.aimxsPremiumVisible
-        ? "Current posture is derived from the latest governed-run replay and the active AIMXS policy explanation."
-        : "Current posture is derived from the latest governed-run replay and the active policy explanation.",
+        ? "Current posture is derived from the latest governed-run replay and the active premium decision rationale."
+        : "Current posture is derived from the latest governed-run replay and the current baseline decision explanation.",
       fields: [
         createAimxsField("current posture", richness?.decision || "unset"),
         createAimxsField("scope", currentScope, true),
         createAimxsField("boundary", richness?.boundaryClass || "-", true),
         createAimxsField("risk tier", richness?.riskTier || "-"),
-        createAimxsField("provider route", richness?.providerId || explanation?.selectedPolicyProvider || "-", true)
+        createAimxsField("decision provider", richness?.providerId || explanation?.selectedPolicyProvider || "-", true)
       ].filter(Boolean)
     },
     targetPosture: {
@@ -995,7 +1022,7 @@ function buildPolicyAimxsIdentityPosture(snapshot = {}) {
       fields: [
         createAimxsField("target posture", draft?.changeKind ? `${draft.changeKind} policy pack` : "bounded policy draft"),
         createAimxsField("target pack", draft?.packId || selectedItem?.packId || "-", true),
-        createAimxsField("decision provider", draft?.providerId || selectedItem?.providerId || explanation?.selectedPolicyProvider || "-", true),
+        createAimxsField("target provider", draft?.providerId || selectedItem?.providerId || explanation?.selectedPolicyProvider || "-", true),
         createAimxsField("target scope", draft?.targetScope || selectedItem?.targetScope || currentScope, true),
         createAimxsField("requested action", selectedItem?.requestedAction || "")
       ].filter(Boolean)
@@ -1004,8 +1031,9 @@ function buildPolicyAimxsIdentityPosture(snapshot = {}) {
       badge: rationaleBadge,
       tone: policyAimxsTone(rationaleBadge),
       note:
-        normalizeString(simulation?.nextAction) ||
-        normalizeString(explanation?.outcome?.detail) ||
+        (premiumVisible
+          ? normalizeString(explanation?.outcome?.detail) || normalizeString(simulation?.nextAction)
+          : normalizeString(simulation?.nextAction) || normalizeString(explanation?.outcome?.detail)) ||
         "The latest governed policy outcome defines whether the requested posture remains deferred, blocked, or ready.",
       fields: [
         createAimxsField("first reason", richness?.firstReason || ""),

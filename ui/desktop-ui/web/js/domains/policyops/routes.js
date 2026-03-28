@@ -36,8 +36,8 @@ export function renderPolicyOpsEmptyState(ui, options = {}) {
   ui.policyOpsContent.innerHTML = renderPanelStateMetric(
     options.tone || "info",
     options.title || "PolicyOps",
-    options.message || "Policy semantics become available after policy contract, pack, and decision signals load.",
+    options.message || "Decision contract, verify gate, and governance route posture become available after policy pack and governed-decision signals load.",
     options.detail ||
-      "Refresh the workspace. If policy posture should be present, verify settings, policy catalog, and governed run inputs."
+      "Refresh the workspace. If decision posture should be present, verify settings, the policy catalog, governed run inputs, and routed governance anchors."
   );
 }
