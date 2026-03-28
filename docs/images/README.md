@@ -24,10 +24,10 @@ Purpose: keep the release-facing image set aligned with the truthful public base
 
 ## Audit Status
 
-Audit date: 2026-03-25
+Audit date: 2026-03-28
 
-- no screenshot binary changes were required in this release-artifact sweep
-- the current image set is acceptable as long as surrounding release wording preserves the supported macOS `live` lane and the explicit Linux or Windows beta posture
+- screenshot binaries were refreshed for Truthful Surface Convergence closeout
+- the current image set reflects the supported macOS `live` lane, the current shell wording, and the governed request proof path after the 2026-03-28 surface pass
 
 ## Update Rule
 
