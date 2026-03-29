@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"net/http"
+	"reflect"
 	"testing"
 )
 
@@ -25,6 +26,7 @@ func TestRuntimeV1Alpha2ExportProfileCatalog(t *testing.T) {
 	}
 
 	var sawOperatorReview bool
+	var sawAuditExport bool
 	var sawIncidentExport bool
 	var sawEvidenceExport bool
 	var sawRunExport bool
@@ -43,33 +45,65 @@ func TestRuntimeV1Alpha2ExportProfileCatalog(t *testing.T) {
 			}
 		case "incident_export":
 			sawIncidentExport = true
-			if len(item.ClientSurfaces) == 0 || item.ClientSurfaces[0] == "" {
-				t.Fatalf("incident_export client surfaces missing: %+v", item)
+			if !reflect.DeepEqual(item.ClientSurfaces, []string{"desktop"}) {
+				t.Fatalf("incident_export client surfaces=%v", item.ClientSurfaces)
 			}
-			if len(item.AllowedAudiences) == 0 {
-				t.Fatalf("incident_export audiences missing: %+v", item)
+			if !reflect.DeepEqual(item.AllowedAudiences, []string{"incident_response", "security_review", "executive_incident_review"}) {
+				t.Fatalf("incident_export audiences=%v", item.AllowedAudiences)
 			}
-			if len(item.AllowedRetentionClasses) == 0 {
-				t.Fatalf("incident_export retention classes missing: %+v", item)
+			if !reflect.DeepEqual(item.DeliveryChannels, []string{"download", "copy", "preview"}) {
+				t.Fatalf("incident_export delivery channels=%v", item.DeliveryChannels)
+			}
+			if item.RedactionMode != "structured_and_text" {
+				t.Fatalf("incident_export redaction mode=%q want structured_and_text", item.RedactionMode)
 			}
 		case "evidence_export":
 			sawEvidenceExport = true
-			if len(item.ClientSurfaces) == 0 || item.ClientSurfaces[0] != "runtime" {
-				t.Fatalf("evidence_export runtime surface missing: %+v", item)
+			if !reflect.DeepEqual(item.ClientSurfaces, []string{"runtime"}) {
+				t.Fatalf("evidence_export client surfaces=%v", item.ClientSurfaces)
 			}
-			if item.DefaultAudience == "" || item.DefaultRetentionClass == "" {
-				t.Fatalf("evidence_export defaults missing: %+v", item)
+			if item.DefaultAudience != "downstream_review" || item.DefaultRetentionClass != "archive" {
+				t.Fatalf("evidence_export defaults=%+v", item)
+			}
+			if !reflect.DeepEqual(item.DeliveryChannels, []string{"download", "copy"}) {
+				t.Fatalf("evidence_export delivery channels=%v", item.DeliveryChannels)
+			}
+			if item.RedactionMode != "structured_and_text" {
+				t.Fatalf("evidence_export redaction mode=%q want structured_and_text", item.RedactionMode)
 			}
 		case "run_export":
 			sawRunExport = true
-			if len(item.ClientSurfaces) == 0 || item.ClientSurfaces[0] != "runtime" {
-				t.Fatalf("run_export runtime surface missing: %+v", item)
+			if !reflect.DeepEqual(item.ClientSurfaces, []string{"runtime"}) {
+				t.Fatalf("run_export client surfaces=%v", item.ClientSurfaces)
 			}
 			if item.DefaultAudience != "downstream_review" {
 				t.Fatalf("run_export defaultAudience=%q want downstream_review", item.DefaultAudience)
 			}
 			if item.DefaultRetentionClass != "archive" {
 				t.Fatalf("run_export defaultRetentionClass=%q want archive", item.DefaultRetentionClass)
+			}
+			if !reflect.DeepEqual(item.AllowedAudiences, []string{"downstream_review", "security_review", "compliance_review"}) {
+				t.Fatalf("run_export audiences=%v", item.AllowedAudiences)
+			}
+			if !reflect.DeepEqual(item.DeliveryChannels, []string{"download", "copy"}) {
+				t.Fatalf("run_export delivery channels=%v", item.DeliveryChannels)
+			}
+			if item.RedactionMode != "structured_and_text" {
+				t.Fatalf("run_export redaction mode=%q want structured_and_text", item.RedactionMode)
+			}
+		case "audit_export":
+			sawAuditExport = true
+			if !reflect.DeepEqual(item.ClientSurfaces, []string{"desktop", "runtime"}) {
+				t.Fatalf("audit_export client surfaces=%v", item.ClientSurfaces)
+			}
+			if !reflect.DeepEqual(item.AllowedAudiences, []string{"downstream_review", "security_review", "compliance_review"}) {
+				t.Fatalf("audit_export audiences=%v", item.AllowedAudiences)
+			}
+			if !reflect.DeepEqual(item.DeliveryChannels, []string{"download", "copy", "preview"}) {
+				t.Fatalf("audit_export delivery channels=%v", item.DeliveryChannels)
+			}
+			if item.RedactionMode != "structured_and_text" {
+				t.Fatalf("audit_export redaction mode=%q want structured_and_text", item.RedactionMode)
 			}
 		}
 	}
@@ -78,6 +112,9 @@ func TestRuntimeV1Alpha2ExportProfileCatalog(t *testing.T) {
 	}
 	if !sawIncidentExport {
 		t.Fatalf("incident_export export profile missing: %+v", response.Items)
+	}
+	if !sawAuditExport {
+		t.Fatalf("audit_export export profile missing: %+v", response.Items)
 	}
 	if !sawEvidenceExport {
 		t.Fatalf("evidence_export export profile missing: %+v", response.Items)
@@ -108,6 +145,12 @@ func TestRuntimeV1Alpha2ExportProfileCatalogFilters(t *testing.T) {
 	}
 	if item.DefaultAudience != "incident_response" {
 		t.Fatalf("defaultAudience=%q want incident_response", item.DefaultAudience)
+	}
+	if !reflect.DeepEqual(item.DeliveryChannels, []string{"copy", "preview"}) {
+		t.Fatalf("deliveryChannels=%v want [copy preview]", item.DeliveryChannels)
+	}
+	if item.RedactionMode != "text" {
+		t.Fatalf("redactionMode=%q want text", item.RedactionMode)
 	}
 }
 

@@ -47,6 +47,9 @@ Current baseline was partially implicit and is now explicit.
 - The catalog currently covers:
   - managed Codex worker execution
   - direct governed model-invoke profiles for codex, openai, anthropic, google, azure_openai, and bedrock
+- The current baseline capability-grant split is now explicit:
+  - managed Codex worker entries expose `tool_proposal` and `capability_grant` approval kinds for the `codex` target environment
+  - direct governed model-invoke entries stay on the runtime integration path for the `agentops-desktop` target environment and do not expose managed-worker capability-grant approval kinds
 
 ### Reporting and export posture
 
@@ -74,6 +77,10 @@ Current baseline is now explicit and queryable.
   - retention overlays
   - delivery channels
   - redaction modes
+- `allowedAudiences` and `deliveryChannels` are still declarative governance-sink intent on the current boundary; they do not imply shipped SIEM, GRC, or ticket integrations.
+- Current downstream export intent is explicit on the baseline:
+  - `run_export` and `evidence_export` stay on governed `download` / `copy`
+  - `audit_export` and `incident_export` add `preview` on the same governed boundary
 - Desktop Chat and VS Code now also expose explicit operator-selectable `exportProfile`, `audience`, and `retentionClass` controls on top of that same runtime catalog for governed review and export actions.
 - CLI, workflow, and chatops governed report surfaces now load the same runtime export-profile catalog into the shared Go enterprise-report envelope and render the same retention, delivery, and redaction metadata on the same contract.
 - Direct desktop audit and incident export tests now pin governed export metadata, retention overlays, governed disposition summaries, and redaction behavior instead of leaving those paths implied by helper defaults.
@@ -95,6 +102,14 @@ Current filter surface:
 - `executionMode`
 - `workerType`
 - `adapterId`
+
+Current attachment and approval split:
+- managed Codex worker entries
+  - target environment: `codex`
+  - approval kinds: `tool_proposal`, `capability_grant`
+- direct governed model-invoke entries
+  - target environment: `agentops-desktop`
+  - approval kinds: none at the worker-catalog layer; governed review stays on the policy-pack and approval-checkpoint boundary
 
 ### Runtime policy-pack catalog
 
@@ -119,16 +134,19 @@ Current baseline packs:
 - `governed_model_invoke_operator`
 - `managed_codex_worker_operator`
 
-Role-bundle and decision-surface attachment is now explicit in the catalog:
+Role-bundle, decision-surface, and current attachment boundary are now explicit in the catalog:
 - `read_only_review`
   - role bundles: `enterprise.observer`, `enterprise.reviewer`
   - decision surfaces: `review_only`
+  - attachment: review-only reads across `chat`, `vscode`, `cli`, `workflow`, and `chatops` with no run-create permission
 - `governed_model_invoke_operator`
   - role bundles: `enterprise.operator`, `enterprise.ai_operator`
   - decision surfaces: `governed_turn_submission`, `approval_checkpoint`
+  - attachment: `raw_model_invoke` / `model_invoke` on the default direct model-invoke adapter catalog
 - `managed_codex_worker_operator`
   - role bundles: `enterprise.operator`, `enterprise.ai_operator`, `enterprise.worker_controller`
   - decision surfaces: `managed_worker_launch`, `managed_worker_recovery`, `approval_checkpoint`, `tool_proposal`, `governed_tool_action`
+  - attachment: `managed_codex_worker` / `managed_agent` / `codex`
 
 ### Runtime export-profile catalog
 

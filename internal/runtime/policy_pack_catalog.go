@@ -16,7 +16,7 @@ func defaultPolicyPackCatalog(auth *AuthEnforcer) []PolicyPackCatalogEntry {
 		{
 			PackID:       "read_only_review",
 			Label:        "Read-Only Review",
-			Description:  "Review governed task, session, approval, evidence, and worker state without execution privileges.",
+			Description:  "Review-only access to governed task, session, approval, evidence, and worker state without run submission or execution privileges.",
 			RoleBundles:  []string{"enterprise.observer", "enterprise.reviewer"},
 			Roles:        readRoles,
 			Permissions:  []string{PermissionRunRead},
@@ -37,7 +37,7 @@ func defaultPolicyPackCatalog(auth *AuthEnforcer) []PolicyPackCatalogEntry {
 		{
 			PackID:                   "governed_model_invoke_operator",
 			Label:                    "Governed Model Invoke Operator",
-			Description:              "Submit and review direct governed model turns through the native session contract.",
+			Description:              "Submit direct governed model turns and decide approval checkpoints on the native session contract without managed-worker execution.",
 			RoleBundles:              []string{"enterprise.operator", "enterprise.ai_operator"},
 			Roles:                    operatorRoles,
 			Permissions:              []string{PermissionRunRead, PermissionRunCreate},
@@ -60,7 +60,7 @@ func defaultPolicyPackCatalog(auth *AuthEnforcer) []PolicyPackCatalogEntry {
 		{
 			PackID:                   "managed_codex_worker_operator",
 			Label:                    "Managed Codex Worker Operator",
-			Description:              "Control a managed Codex worker with governed tool proposals, approvals, tool execution, and evidence capture.",
+			Description:              "Launch, recover, and control a managed Codex worker with governed tool proposals, approvals, tool execution, and evidence capture.",
 			RoleBundles:              []string{"enterprise.operator", "enterprise.ai_operator", "enterprise.worker_controller"},
 			Roles:                    operatorRoles,
 			Permissions:              []string{PermissionRunRead, PermissionRunCreate},
