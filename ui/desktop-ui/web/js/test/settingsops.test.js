@@ -182,7 +182,9 @@ test("settingsops renders bounded preferences, secure refs, environment, support
   assert.match(html, /Current Connector Capability/);
   assert.match(html, /Browser MCP/);
   assert.match(html, /approval-gated destructive click/);
-  assert.match(html, /SettingsOps defines the bounded connector contract that GovernanceOps reviews and RuntimeOps follows through on\./);
+  assert.match(html, /SettingsOps defines the bounded connector contract\./);
+  assert.match(html, /Use GovernanceOps for connector holds, exceptions, and deeper review, while RuntimeOps follows the linked run continuity on the same governed path\./);
+  assert.match(html, /Route connector holds, exceptions, and deeper review into GovernanceOps instead of turning SettingsOps into a control-plane catchall\./);
   assert.match(html, /Show connector capability inventory/);
   assert.match(html, /data-settings-connector-id="browser-proof"/);
   assert.match(html, /Endpoint Inventory/);

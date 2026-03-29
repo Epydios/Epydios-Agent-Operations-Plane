@@ -39,7 +39,7 @@ The current supported contract is one installed macOS lane:
 - keep session manifests, logs, and crash output under `~/Library/Caches/EpydiosAgentOpsDesktop`
 - relaunch through the installed helper or installed app path, not a repo-local dev flow
 
-When that lane degrades, the operator should still be able to find the bootstrap config, session manifest, UI log, runtime log, and gateway log without reading terminal output first.
+When that lane degrades, the operator should still be able to find the bootstrap config, session manifest, session event log, UI log, runtime log, and gateway log under the installed support roots without reading terminal output first. LogOps intentionally keeps the default surface to the few artifacts that usually matter first instead of turning the supported lane into a full filesystem browser.
 
 ## Update Posture
 

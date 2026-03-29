@@ -164,7 +164,8 @@ export function renderWorkbenchArrivalContext({ domainRoot = "", handoffContext 
       <article class="metric workbench-arrival-context-card">
         <div class="workbench-arrival-context-header">
           <div class="workbench-arrival-context-copy">
-            <div class="title">Companion handoff</div>
+            <div class="title">Companion handoff context</div>
+            <div class="meta">Decision / Receipt / Proof / Incident</div>
             <div class="meta">The same decision, receipt, proof, and incident path stays attached here.</div>
             <div class="meta">${escapeHTML(
               String(handoff.arrivalRationale || "Companion opened this workspace because the governed item needs deeper review.")

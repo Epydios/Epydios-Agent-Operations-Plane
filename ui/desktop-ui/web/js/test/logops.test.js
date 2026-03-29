@@ -67,6 +67,8 @@ test("logops workspace renders open actions for relevant artifacts only", () => 
 
   assert.match(html, /Native Logs And Session Artifacts/);
   assert.match(html, /Relevant Paths/);
+  assert.match(html, /first installed-lane artifacts that usually matter/);
+  assert.match(html, /Other support-root files stay out of the way until deeper recovery is needed/);
   assert.match(html, /data-logops-action="open-path"/);
   assert.match(html, /Session Event Log/);
   assert.match(html, /Gateway Service Log/);

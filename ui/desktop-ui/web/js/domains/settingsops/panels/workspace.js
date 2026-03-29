@@ -447,7 +447,7 @@ function renderConnectorGovernanceBoard(snapshot) {
         <span class="chip chip-neutral chip-compact">profiles=${escapeHTML(String(board.profileCount))}</span>
         <span class="chip chip-neutral chip-compact">source=${escapeHTML(board.source)}</span>
       </div>
-      <div class="meta">SettingsOps defines the bounded connector contract that GovernanceOps reviews and RuntimeOps follows through on.</div>
+      <div class="meta">SettingsOps defines the bounded connector contract. Use GovernanceOps for connector holds, exceptions, and deeper review, while RuntimeOps follows the linked run continuity on the same governed path.</div>
       <div class="settingsops-kv-list">
         ${renderKeyValueRows([
           {
@@ -599,7 +599,7 @@ export function renderSettingsWorkspace(context = {}) {
       renderWorkbenchDomainCluster({
         title: "Integrations And Recovery",
         lead:
-          "Edit the supported workspace setup, review the current connector capability contract, and keep recovery steps visible without turning SettingsOps into a control-plane catchall.",
+          "Edit the supported workspace setup, review the current connector capability contract, and keep recovery steps visible here. Route connector holds, exceptions, and deeper review into GovernanceOps instead of turning SettingsOps into a control-plane catchall.",
         bodyClass: "settingsops-board-grid settingsops-cluster-grid",
         body: `
           ${renderIntegrationSettingsBoard(snapshot)}

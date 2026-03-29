@@ -54,7 +54,7 @@ export function renderLogOpsWorkspace(snapshot = {}) {
       <section class="logops-board">
         <div class="logops-board-header">
           <h3 data-focus-anchor>Native Logs And Session Artifacts</h3>
-          <p class="logops-board-lead">Keep the global launcher strip compact. Use LogOps for the few file paths that actually matter when something needs inspection.</p>
+          <p class="logops-board-lead">Keep the global launcher strip compact. Use LogOps for the first installed-lane artifacts that usually matter when something needs inspection.</p>
         </div>
         ${renderFeedback(snapshot.feedback)}
         ${
@@ -72,7 +72,7 @@ export function renderLogOpsWorkspace(snapshot = {}) {
       <section class="logops-board">
         <div class="logops-board-header">
           <h3>Relevant Paths</h3>
-          <p class="logops-board-lead">These are the logs and session artifacts worth opening from the installed app. The rest of the native support roots stay out of the way.</p>
+          <p class="logops-board-lead">These are the default logs and session artifacts worth opening first from the installed app. Other support-root files stay out of the way until deeper recovery is needed.</p>
         </div>
         ${
           entries.length

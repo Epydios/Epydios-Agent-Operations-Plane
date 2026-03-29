@@ -48,8 +48,9 @@ M15 Phase C verifier passed.
 ## Platform Truth
 
 - macOS `live` installed desktop is the supported OSS lane
-- Linux ships repo-committed Ubuntu 24.04 beta scripts and artifacts
-- Windows ships repo-committed beta packaging artifacts and launcher helpers
+- Linux remains a repo-backed Ubuntu 24.04 beta installed evaluation contract
+- Windows remains a repo-backed beta installed evaluation contract with native packaging artifacts and launcher helpers
+- both beta lanes keep manual reinstall as the update posture
 - stronger Linux or Windows wording waits for linked installed-host proof
 - Windows `live` remains explicitly deferred
 
