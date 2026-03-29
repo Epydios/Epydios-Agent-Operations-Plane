@@ -352,34 +352,34 @@ export function renderHomeWorkspace(snapshot = {}) {
 
   return `
     <div class="homeops-workspace" data-domain-root="companionops">
-      <section class="homeops-board">
+      <section class="homeops-board homeops-priority-board" data-homeops-section="needs-attention">
         <div class="homeops-board-header">
-          <h3>Daily lane</h3>
-          <p class="homeops-board-lead">Companion is the daily lane. Open Workbench only when the item needs deeper review.</p>
+          <h3>Needs review</h3>
+          <p class="homeops-board-lead">Review the active governed item here and stay in Companion unless you need deeper evidence, audit, runtime, or incident detail.</p>
         </div>
         ${
           feedback?.message
             ? `<div class="homeops-feedback ${escapeHTML(feedback.tone || "info")}">${escapeHTML(feedback.message)}</div>`
             : ""
         }
-        <div class="homeops-command-grid">
-          ${systemCards.map((card) => renderStatusCard(card)).join("")}
-        </div>
-        <div class="homeops-pivot-grid">
-          ${systemActions.map((action) => renderQuickAction(action)).join("")}
-        </div>
-      </section>
-      <section class="homeops-board homeops-priority-board" data-homeops-section="needs-attention">
-        <div class="homeops-board-header">
-          <h3>Needs review</h3>
-          <p class="homeops-board-lead">Review the active governed item here and stay in Companion unless you need deeper evidence, audit, runtime, or incident detail.</p>
-        </div>
         <div class="homeops-queue-list">
           ${
             governedRequestQueue.length
               ? governedRequestQueue.map((item, index) => renderQueueItem(item, index)).join("")
               : renderEmptyMessage("No governed requests, escalations, or blocked items need action right now.")
           }
+        </div>
+      </section>
+      <section class="homeops-board">
+        <div class="homeops-board-header">
+          <h3>Daily lane</h3>
+          <p class="homeops-board-lead">Companion is the daily lane. Open Workbench only when the item needs deeper review.</p>
+        </div>
+        <div class="homeops-command-grid">
+          ${systemCards.map((card) => renderStatusCard(card)).join("")}
+        </div>
+        <div class="homeops-pivot-grid">
+          ${systemActions.map((action) => renderQuickAction(action)).join("")}
         </div>
       </section>
       <section class="homeops-board">

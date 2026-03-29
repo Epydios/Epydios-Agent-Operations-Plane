@@ -1,8 +1,8 @@
 # EpydiosOps Desktop
 
-This module is the installable EpydiosOps desktop, native launcher, local supervisor, and localhost gateway behind the repo's public proof lane.
+This module contains the installable EpydiosOps desktop plus the launcher, local supervisor, and localhost gateway behind the public operator workflow.
 
-## Canonical Proof Lane
+## Recommended Product Path
 
 From the repo root:
 
@@ -11,14 +11,14 @@ From the repo root:
 ./ui/desktop-ui/bin/verify-m15-phase-c-governed-request.sh
 ```
 
-This is the desktop path the public repo is centered around.
+Use this path to evaluate the product the way the public repo presents it.
 
-It proves:
+It shows:
 
-- the desktop module is sane
+- the desktop baseline is intact
 - the macOS app can be packaged and launched
 - `Companion` is the daily lane and `Workbench` is the deeper review surface
-- `Interposition OFF / ON` is explicit
+- `Interposition` is visibly `OFF` or `ON`
 - one governed Codex `/responses` request runs through the local gateway
 - approval, audit, and evidence continuity are real
 
@@ -34,11 +34,11 @@ If you want the narrower installed-app lane without the governed-request harness
 
 ## Platform Posture
 
-- macOS `live` installed desktop is the supported OSS lane
-- Linux remains a repo-backed Ubuntu 24.04 beta installed evaluation contract
-- Windows remains a repo-backed beta installed evaluation contract with native packaging artifacts and launcher helpers
-- both beta lanes keep manual reinstall as the update posture
-- stronger Linux or Windows wording waits for linked installed-host proof
+- macOS `live` installed desktop is the supported OSS starting point
+- Linux remains a public Ubuntu 24.04 beta install path
+- Windows remains a public beta install path with native packaging artifacts and launcher helpers
+- both beta paths still use manual reinstall for updates
+- stronger Linux or Windows wording waits for broader installed-host validation
 - Windows `live` remains explicitly deferred
 - browser `run-dev.sh` remains a development path, not the product front door
 

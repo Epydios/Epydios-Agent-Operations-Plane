@@ -209,6 +209,7 @@ test("companionops page renders companion as the daily governance lane with work
   assert.match(ui.homeOpsContent.innerHTML, /data-domain-root="companionops"/);
   assert.match(ui.homeOpsContent.innerHTML, /Daily lane/);
   assert.match(ui.homeOpsContent.innerHTML, /Needs review/);
+  assert.ok(ui.homeOpsContent.innerHTML.indexOf("Needs review") < ui.homeOpsContent.innerHTML.indexOf("Daily lane"));
   assert.match(ui.homeOpsContent.innerHTML, /Recent decisions/);
   assert.match(ui.homeOpsContent.innerHTML, /Live trail/);
   assert.match(ui.homeOpsContent.innerHTML, /Exceptions/);

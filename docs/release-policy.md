@@ -1,6 +1,6 @@
 # Release Policy
 
-The public OSS release promise is intentionally narrow: the installable macOS desktop in `live` is the supported lane, and the governed-request proof for that lane must stay green.
+The public OSS release promise is intentionally narrow: start on the installed macOS desktop in `live`, review governed work first in `Companion`, and open `Workbench` only when the same governed path needs deeper follow-through. That supported lane and its governed-request proof must stay green.
 
 ## Release Bar
 
@@ -11,23 +11,33 @@ A release is credible when these pass on the public baseline:
 - `./ui/desktop-ui/bin/verify-m15-phase-c.sh`
 - `./ui/desktop-ui/bin/verify-m15-phase-c-governed-request.sh`
 
+## Public Proof Sequence
+
+The public release story should stay in this order:
+
+1. governed work first in `Companion`
+2. deeper review in `Workbench` on the same governed path
+3. audit and evidence follow-through on that same path
+
+Shell context and setup posture can support that story, but they do not replace the governed-work-first sequence.
+
 ## Platform Posture
 
 - macOS `live` installed desktop is the supported OSS lane
-- Linux ships repo-committed Ubuntu 24.04 beta packaging, install, and verification surfaces
-- Windows ships repo-committed beta packaging, install, and verification surfaces
+- Linux has public Ubuntu 24.04 beta install and verification paths
+- Windows has public beta install and verification paths
 
-Linux and Windows are real public beta lanes, but stronger wording waits for linked installed-host proof and they are not equal to the supported macOS lane unless the release artifacts and public docs are updated to say so.
+Linux and Windows are real public beta lanes, but they stay below the supported macOS lane until their installed lanes have broader host validation and the release docs say otherwise.
 
-## Beta Installed Evaluation Lanes
+## Beta Installed Paths
 
 The current public beta lanes are real, but still below the supported macOS lane:
 
 - Linux uses an AppImage primary artifact with a tarball fallback plus installed launcher and uninstall helpers
 - Windows uses an installer primary artifact with a packaged executable pair plus installed launcher helpers
-- both lanes have committed beta-lane scripts and summary artifacts in-tree
+- both lanes already ship install, launch, uninstall, and verification helpers in-tree
 - both lanes keep manual reinstall as the update posture
-- stronger Linux or Windows wording waits for linked installed-host proof
+- stronger Linux or Windows wording waits for broader host validation
 - Windows `live` operator parity remains explicitly deferred
 
 ## Supported Installed Contract

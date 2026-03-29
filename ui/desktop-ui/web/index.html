@@ -65,13 +65,21 @@
         <section class="workspace-nav-section workspace-nav-depth" aria-label="Workbench areas">
           <div class="workspace-nav-eyebrow">Deeper review</div>
           <p class="workspace-nav-copy">
-            These secondary areas stay available for investigation, policy follow-through, and
-            administration when Companion is not enough.
+            Choose the task first in Workbench: review the routed item, follow proof or incident
+            continuity, or open policy and admin follow-through when Companion is not enough.
           </p>
 
           <div class="workspace-nav-group">
-            <div class="workspace-nav-group-title">Review and follow-through</div>
-            <div class="workspace-nav-group-list workspace-nav-group-list-compact" role="tablist" aria-orientation="vertical" aria-label="Workbench review and follow-through sections">
+            <div class="workspace-nav-group-title">Start with the task</div>
+            <p class="workspace-nav-copy">
+              Review the item first, then open proof, incident, or admin follow-through only when
+              the governed path needs more than the daily lane.
+            </p>
+          </div>
+
+          <div class="workspace-nav-group">
+            <div class="workspace-nav-group-title">Review the active item</div>
+            <div class="workspace-nav-group-list workspace-nav-group-list-compact" role="tablist" aria-orientation="vertical" aria-label="Workbench active item review sections">
               <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="agentops">
                 AgentOps
               </button>
@@ -81,6 +89,12 @@
               <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="governanceops">
                 GovernanceOps
               </button>
+            </div>
+          </div>
+
+          <div class="workspace-nav-group">
+            <div class="workspace-nav-group-title">Follow proof and incidents</div>
+            <div class="workspace-nav-group-list workspace-nav-group-list-compact" role="tablist" aria-orientation="vertical" aria-label="Workbench proof and incident follow-through sections">
               <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="auditops">
                 AuditOps
               </button>
@@ -97,7 +111,7 @@
           </div>
 
           <div class="workspace-nav-group">
-            <div class="workspace-nav-group-title">Policy and administration</div>
+            <div class="workspace-nav-group-title">Policy and administration follow-through</div>
             <div class="workspace-nav-group-list workspace-nav-group-list-compact" role="tablist" aria-orientation="vertical" aria-label="Workbench policy and administration sections">
               <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-tab="platformops">
                 PlatformOps

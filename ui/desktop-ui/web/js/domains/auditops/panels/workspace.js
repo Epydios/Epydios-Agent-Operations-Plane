@@ -567,7 +567,7 @@ export function renderAuditWorkspace(context = {}) {
     shellClass: "auditops-workspace",
     title: "AuditOps",
     lead:
-      "Use the deeper audit console for event review, decision and receipt continuity, and proof and incident follow-through once the daily Companion lane is not enough.",
+      "Use AuditOps when Companion hands off a governed item that needs event review, decision trace, or incident follow-through beyond the daily lane.",
     layout: "split",
     prelude: `
       ${renderWorkbenchArrivalContext({
@@ -581,14 +581,14 @@ export function renderAuditWorkspace(context = {}) {
       renderWorkbenchDomainCluster({
         title: "Events",
         lead:
-          "Keep recent audit activity visible as its own ownership area instead of collapsing it into the rest of the investigation workspace.",
+          "Start with recent audit activity so you can see what happened on this governed path before drilling into actors, receipts, or incidents.",
         bodyClass: "stack",
         body: `${renderAuditEventBoard(snapshot)}`
       }),
       renderWorkbenchDomainCluster({
         title: "Decision And Actor Trace",
         lead:
-          "Review actor activity, decision paths, and admin lifecycle continuity together so audit depth stays legible when investigation work starts.",
+          "Trace who acted, what was decided, and how the admin path moved once the first event picture is clear.",
         bodyClass: "stack",
         body: `
           ${renderActorActivityBoard(snapshot)}
@@ -599,7 +599,7 @@ export function renderAuditWorkspace(context = {}) {
       renderWorkbenchDomainCluster({
         title: "Proof And Incident Continuity",
         lead:
-          "Keep decision, receipt, proof, and incident continuation legible in one audit lane. Export actions stay available, but they do not define the primary audit story.",
+          "Finish with receipt, proof, and incident follow-through when the investigation needs a durable handoff. Export actions stay available, but they do not define the primary audit task.",
         bodyClass: "stack",
         body: `
           ${renderInvestigationWorkspace(snapshot)}

@@ -261,9 +261,25 @@ test("evidenceops page restores visible proof-owner clusters", () => {
 
   assert.match(ui.evidenceOpsContent.innerHTML, /data-domain-root="evidenceops"/);
   assert.match(ui.evidenceOpsContent.innerHTML, /EvidenceOps/);
+  assert.match(
+    ui.evidenceOpsContent.innerHTML,
+    /Use EvidenceOps when Companion hands off a governed item whose proof bundle, provenance, or artifact follow-through needs deeper review/
+  );
   assert.match(ui.evidenceOpsContent.innerHTML, /Proof Bundle And Provenance/);
+  assert.match(
+    ui.evidenceOpsContent.innerHTML,
+    /Start with the active bundle and provenance so you can confirm what proof exists for this governed item/
+  );
   assert.match(ui.evidenceOpsContent.innerHTML, /Proof Access And Retention/);
+  assert.match(
+    ui.evidenceOpsContent.innerHTML,
+    /Use this lane to retrieve artifacts and confirm retention posture once the proof bundle and provenance are already in view/
+  );
   assert.match(ui.evidenceOpsContent.innerHTML, /Proof Control Mapping/);
+  assert.match(
+    ui.evidenceOpsContent.innerHTML,
+    /Map the proof to controls after the bundle, provenance, and access path are clear/
+  );
   assert.match(ui.evidenceOpsContent.innerHTML, /data-workbench-cluster-layout="split"/);
   assert.match(ui.evidenceOpsContent.innerHTML, /EvidenceOps Action Complete/);
   assert.match(ui.evidenceOpsContent.innerHTML, /Evidence bundle review JSON downloaded/);

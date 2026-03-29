@@ -1,8 +1,8 @@
 # Getting Started
 
-If you want one clean evaluation path for EpydiosOps, use the supported macOS lane first.
+If you want the clearest first run through EpydiosOps, start on the supported macOS path.
 
-## Canonical Evaluation Path
+## Recommended Evaluation Path
 
 From the repo root:
 
@@ -12,11 +12,11 @@ From the repo root:
 ./ui/desktop-ui/bin/verify-m15-phase-c-governed-request.sh
 ```
 
-This path proves the repo can package the desktop, launch the supported macOS `live` lane, run one governed Codex request, resolve approval, and hand the run off into audit and evidence.
+This path packages the desktop, launches the supported macOS `live` app, runs one governed Codex request, resolves approval, and follows the same run into audit and evidence.
 
-## Narrower Install Check
+## Install-Only macOS Path
 
-If you only want the installed desktop lane without the governed-request harness:
+If you want to install and open the product before running the governed-request flow:
 
 ```bash
 ./ui/desktop-ui/bin/install-m15-macos-beta.sh
@@ -24,20 +24,20 @@ If you only want the installed desktop lane without the governed-request harness
 "$HOME/Library/Application Support/EpydiosAgentOpsDesktop/launch-installed.sh"
 ```
 
-## Other Platform Lanes
+## Other Platform Paths
 
-- Linux ships a repo-backed Ubuntu 24.04 beta installed evaluation contract.
-- Windows ships a repo-backed beta installed evaluation contract with native packaging artifacts and launcher helpers.
-- Both are real beta lanes, but neither is the supported OSS lane for first evaluation.
-- Both beta lanes keep manual reinstall as the update posture.
-- Stronger Linux or Windows wording waits for linked installed-host proof.
+- Linux has a public Ubuntu 24.04 beta install path.
+- Windows has a public beta install path with native packaging artifacts and launcher helpers.
+- Both are real beta paths, but neither is the supported OSS starting point.
+- Both beta paths still use manual reinstall for updates.
+- Stronger Linux or Windows wording waits for broader installed-host validation.
 - Windows `live` remains explicitly deferred.
 
 Use the [desktop module guide](../ui/desktop-ui/README.md) if you need those commands.
 
 ## What You Are Evaluating
 
-The OSS repo gives you EpydiosOps in its public baseline:
+The OSS repo gives you the public EpydiosOps baseline:
 
 - the installable operator desktop
 - the local launcher and localhost gateway

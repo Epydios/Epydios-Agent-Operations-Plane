@@ -232,7 +232,15 @@ test("governanceops page renders runtime approvals plus identity admin proposal 
 
   assert.match(ui.governanceOpsContent.innerHTML, /data-domain-root="governanceops"/);
   assert.match(ui.governanceOpsContent.innerHTML, /GovernanceOps/);
+  assert.match(
+    ui.governanceOpsContent.innerHTML,
+    /Finish deeper review here when Companion hands off a governed item/
+  );
   assert.match(ui.governanceOpsContent.innerHTML, /Governance Structure, Exceptions, And Receipts/);
+  assert.match(
+    ui.governanceOpsContent.innerHTML,
+    /Start by checking authority, exception, and receipt posture/
+  );
   assert.match(ui.governanceOpsContent.innerHTML, /Focused Review And Routed Holds/);
   assert.match(ui.governanceOpsContent.innerHTML, /Routed Admin Proposal Review/);
   assert.match(ui.governanceOpsContent.innerHTML, /Premium Decision Lifecycle/);
@@ -299,7 +307,7 @@ test("governanceops page renders runtime approvals plus identity admin proposal 
   assert.match(ui.governanceOpsContent.innerHTML, /Copy Decision Receipt/);
   assert.match(ui.governanceOpsContent.innerHTML, /Copy Receipt Snapshot/);
   assert.match(ui.governanceOpsContent.innerHTML, /Open AuditOps/);
-  assert.match(ui.governanceOpsContent.innerHTML, /Companion stays the default daily approval lane/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Companion remains the daily lane for everything else/);
   assert.match(ui.governanceOpsContent.innerHTML, /Companion owns the default daily approval lane/);
   assert.match(ui.governanceOpsContent.innerHTML, /Centralized Enterprise Admin Residency Exception/);
   assert.match(ui.governanceOpsContent.innerHTML, /Centralized Enterprise Admin Quota Overlay/);

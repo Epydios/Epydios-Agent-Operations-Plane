@@ -778,7 +778,7 @@ export function renderRuntimeWorkspace(context = {}, session = {}, options = {})
     shellClass: "runtimeops-workspace",
     title: "RuntimeOps",
     lead:
-      "Use the deeper runtime console to inspect governed runs, follow session continuity, and confirm runtime posture once Companion needs more than the daily lane.",
+      "Use RuntimeOps when Companion hands off a governed item that needs active run inspection, session follow-through, or runtime health review beyond the daily lane.",
     layout: "split",
     prelude: renderWorkbenchArrivalContext({
       domainRoot: "runtimeops",
@@ -788,7 +788,7 @@ export function renderRuntimeWorkspace(context = {}, session = {}, options = {})
       renderWorkbenchDomainCluster({
         title: "Current Run And Session",
         lead:
-          "Inspect the selected governed run, review the current session, and confirm runtime posture before taking bounded runtime actions.",
+          "Start with the active run and session so you can see what is running, what is blocked, and whether runtime posture is healthy before deeper follow-through.",
         span: "full",
         bodyClass: "runtimeops-primary-grid runtimeops-cluster-grid",
         body: `
@@ -801,7 +801,7 @@ export function renderRuntimeWorkspace(context = {}, session = {}, options = {})
       renderWorkbenchDomainCluster({
         title: "Investigation And Follow-Through",
         lead:
-          "Inspect backlog signals, capacity, session activity, and worker availability without turning RuntimeOps into a second daily queue.",
+          "Use this lane only after the active run and session are clear, when you need backlog, capacity, or worker follow-through without turning RuntimeOps into a second daily queue.",
         bodyClass: "runtimeops-primary-grid runtimeops-cluster-grid",
         body: `
           ${renderQueueBoard(snapshot)}
@@ -813,7 +813,7 @@ export function renderRuntimeWorkspace(context = {}, session = {}, options = {})
       renderWorkbenchDomainCluster({
         title: "Routing, Connectors, And Inventory",
         lead:
-          "Keep provider routing, connector continuity, identity posture, route boundary echoes, and governed run inventory visible as one coherent runtime ownership area.",
+          "Open routing, connector, and inventory detail only when the investigation needs broader runtime context beyond the selected governed run.",
         bodyClass: "runtimeops-primary-grid runtimeops-cluster-grid",
         body: `
           ${renderProviderRoutingBoard(snapshot)}

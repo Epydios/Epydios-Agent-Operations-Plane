@@ -1,6 +1,6 @@
 # Release Images
 
-Purpose: keep the release-facing image set aligned with the truthful public baseline.
+Purpose: keep the release-facing image set aligned with the truthful public baseline and the current governed-work-first public story.
 
 ## Current Truth Rules
 
@@ -11,14 +11,17 @@ Purpose: keep the release-facing image set aligned with the truthful public base
 
 ## Current Asset Roles
 
-- `hero-overview.png`
-  - broad product overview image for the current `Companion`, `Workbench`, and `Interposition OFF / ON` posture
-- `hero-overview small.png`
-  - smaller variant of the same overview image
 - `governed-request-flow.png`
-  - governed workflow illustration for the supported macOS `live` lane
+  - primary public proof image for the supported macOS `live` lane
+  - leads with governed work, decision flow, and the first handoff into deeper review
+- `hero-overview.png`
+  - secondary public context image for the current `Companion`, `Workbench`, and `Interposition OFF / ON` posture
+  - supports the shell story after governed work is already established
+- `hero-overview small.png`
+  - smaller variant of the same secondary context image
 - `audit-evidence.png`
-  - proof-continuity illustration for audit and evidence follow-through
+  - third proof image for audit and evidence follow-through
+  - keeps the same governed path visible through proof and incident continuity
 - `security-seal.png`
   - seal/brand asset, not a product-proof screenshot
 
@@ -28,6 +31,10 @@ Audit date: 2026-03-28
 
 - screenshot binaries were refreshed for Truthful Surface Convergence closeout
 - the current image set reflects the supported macOS `live` lane, the current shell wording, and the governed request proof path after the 2026-03-28 surface pass
+- the current public sequence is:
+  - `governed-request-flow.png` first
+  - `hero-overview.png` / `hero-overview small.png` second as shell-context support
+  - `audit-evidence.png` third for audit and evidence follow-through
 
 ## Update Rule
 
@@ -35,5 +42,6 @@ Refresh the screenshot set when any of the following become true:
 
 - the supported baseline changes materially
 - the visible shell or core governed workflow changes materially
+- the public proof-sequence roles change materially
 - Linux or Windows posture is promoted
 - premium comparison material becomes part of the public release path

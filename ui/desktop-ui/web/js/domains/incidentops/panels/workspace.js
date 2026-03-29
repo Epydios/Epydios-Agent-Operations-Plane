@@ -462,7 +462,7 @@ export function renderIncidentWorkspace(context = {}) {
     shellClass: "incidentops-workspace",
     title: "IncidentOps",
     lead:
-      "Use the deeper incident console for governed-path continuation, active response context, and closure follow-through once the daily Companion lane is not enough.",
+      "Use IncidentOps when Companion hands off a governed item that has moved into escalation, active response, or closure follow-through.",
     layout: "split",
     prelude: `
       ${renderWorkbenchArrivalContext({
@@ -476,7 +476,7 @@ export function renderIncidentWorkspace(context = {}) {
       renderWorkbenchDomainCluster({
         title: "Incident Continuation",
         lead:
-          "Keep the continuing incident path, the currently focused governed item, and response priority visible together so incident depth reads as continuation instead of a separate package queue.",
+          "Start with the active incident so you can see what is in motion, which governed item it belongs to, and how urgent the response is.",
         bodyClass: "stack",
         body: `
           ${renderIncidentQueueBoard(snapshot)}
@@ -487,7 +487,7 @@ export function renderIncidentWorkspace(context = {}) {
       renderWorkbenchDomainCluster({
         title: "Response Timeline And Closure",
         lead:
-          "Keep response timeline and closure readiness together so the same governed path stays legible through follow-through and closure.",
+          "Use the timeline and closure lane after the active incident is clear, so the same governed path stays legible through follow-through and closure.",
         bodyClass: "stack",
         body: `
           ${renderResponseTimelineBoard(snapshot)}

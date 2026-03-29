@@ -68,8 +68,11 @@ test("workspace shell reserves a native launcher status surface ahead of the wor
   assert.match(INDEX_HTML, /data-workspace-tab="companionops"/);
   assert.match(INDEX_HTML, /Daily lane/);
   assert.match(INDEX_HTML, /Deeper review/);
-  assert.match(INDEX_HTML, /Review and follow-through/);
-  assert.match(INDEX_HTML, /Policy and administration/);
+  assert.match(INDEX_HTML, /Choose the task first in Workbench/);
+  assert.match(INDEX_HTML, /Start with the task/);
+  assert.match(INDEX_HTML, /Review the active item/);
+  assert.match(INDEX_HTML, /Follow proof and incidents/);
+  assert.match(INDEX_HTML, /Policy and administration follow-through/);
   assert.match(INDEX_HTML, /LogOps/);
   assert.match(INDEX_HTML, /data-workspace-tab="logops"/);
 });

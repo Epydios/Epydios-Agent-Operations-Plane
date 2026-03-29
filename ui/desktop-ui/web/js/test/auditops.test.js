@@ -185,9 +185,22 @@ test("auditops page restores visible event, trace, and investigation clusters", 
 
   assert.match(ui.auditOpsContent.innerHTML, /data-domain-root="auditops"/);
   assert.match(ui.auditOpsContent.innerHTML, /AuditOps/);
+  assert.match(
+    ui.auditOpsContent.innerHTML,
+    /Use AuditOps when Companion hands off a governed item that needs event review, decision trace, or incident follow-through beyond the daily lane/
+  );
   assert.match(ui.auditOpsContent.innerHTML, /Events/);
+  assert.match(
+    ui.auditOpsContent.innerHTML,
+    /Start with recent audit activity so you can see what happened on this governed path/
+  );
   assert.match(ui.auditOpsContent.innerHTML, /Decision And Actor Trace/);
+  assert.match(ui.auditOpsContent.innerHTML, /Trace who acted, what was decided, and how the admin path moved/);
   assert.match(ui.auditOpsContent.innerHTML, /Proof And Incident Continuity/);
+  assert.match(
+    ui.auditOpsContent.innerHTML,
+    /Finish with receipt, proof, and incident follow-through when the investigation needs a durable handoff/
+  );
   assert.match(ui.auditOpsContent.innerHTML, /data-workbench-cluster-layout="split"/);
   assert.match(ui.auditOpsContent.innerHTML, /Audit Activity/);
   assert.match(ui.auditOpsContent.innerHTML, /Actor Activity Board/);

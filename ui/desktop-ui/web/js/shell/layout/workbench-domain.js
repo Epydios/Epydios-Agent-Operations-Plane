@@ -146,16 +146,10 @@ export function renderWorkbenchArrivalContext({ domainRoot = "", handoffContext 
     return "";
   }
   const spine = resolveWorkbenchArrivalSpine(handoff);
-  const continuityChips = [
-    renderArrivalChip(spine?.decision?.label || "Decision continuity", spine?.decision?.tone || "neutral"),
-    renderArrivalChip(spine?.receipt?.label || "Receipt continuity", spine?.receipt?.tone || "neutral"),
-    renderArrivalChip(spine?.proof?.label || "Proof continuity", spine?.proof?.tone || "neutral"),
-    renderArrivalChip(spine?.incident?.label || "Incident continuity", spine?.incident?.tone || "neutral"),
+  const contextChips = [
     renderArrivalNeutralChip("run", handoff.runId),
     renderArrivalNeutralChip("approval", handoff.approvalId),
-    renderArrivalNeutralChip("checkpoint", handoff.checkpointId),
-    renderArrivalNeutralChip("incident", handoff.incidentPackageId || handoff.incidentId),
-    renderArrivalNeutralChip("client", handoff.sourceClient)
+    renderArrivalNeutralChip("incident", handoff.incidentPackageId || handoff.incidentId)
   ]
     .filter(Boolean)
     .join("");
@@ -164,16 +158,17 @@ export function renderWorkbenchArrivalContext({ domainRoot = "", handoffContext 
       <article class="metric workbench-arrival-context-card">
         <div class="workbench-arrival-context-header">
           <div class="workbench-arrival-context-copy">
-            <div class="title">Companion handoff context</div>
-            <div class="meta">Decision / Receipt / Proof / Incident</div>
-            <div class="meta">The same decision, receipt, proof, and incident path stays attached here.</div>
+            <div class="title">Continue governed work</div>
+            <div class="meta">Companion handoff context.</div>
+            <div class="meta">Finish the same governed item here when daily review needs deeper follow-through.</div>
             <div class="meta">${escapeHTML(
               String(handoff.arrivalRationale || "Companion opened this workspace because the governed item needs deeper review.")
             )}</div>
+            <div class="meta">Decision / Receipt / Proof / Incident stays attached below when you need continuity detail.</div>
           </div>
           <div class="workbench-arrival-context-chip-row">
-            <span class="native-launcher-status-badge">From Companion</span>
-            ${continuityChips}
+            <span class="native-launcher-status-badge">Deeper review</span>
+            ${contextChips}
           </div>
         </div>
         <div class="workbench-arrival-context-grid">

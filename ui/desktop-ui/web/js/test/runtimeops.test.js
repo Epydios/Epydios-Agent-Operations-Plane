@@ -279,7 +279,10 @@ test("runtimeops page renders the first inspect-only runtime boards", () => {
   assert.match(ui.runtimeOpsContent.innerHTML, /Current Run And Session/);
   assert.match(ui.runtimeOpsContent.innerHTML, /Investigation And Follow-Through/);
   assert.match(ui.runtimeOpsContent.innerHTML, /Routing, Connectors, And Inventory/);
-  assert.match(ui.runtimeOpsContent.innerHTML, /Use the deeper runtime console to inspect governed runs, follow session continuity, and confirm runtime posture/);
+  assert.match(
+    ui.runtimeOpsContent.innerHTML,
+    /Use RuntimeOps when Companion hands off a governed item that needs active run inspection, session follow-through, or runtime health review beyond the daily lane/
+  );
   assert.match(ui.runtimeOpsContent.innerHTML, /Run And Session Follow-Through/);
   assert.match(ui.runtimeOpsContent.innerHTML, /Selected Session Review/);
   assert.match(ui.runtimeOpsContent.innerHTML, /Worker Posture/);
@@ -341,8 +344,19 @@ test("runtimeops page renders the first inspect-only runtime boards", () => {
   assert.match(ui.runtimeOpsContent.innerHTML, /data-runtimeops-review-session-id="session-20260314-003"/);
   assert.match(ui.runtimeOpsContent.innerHTML, /data-runtimeops-close-session-id="session-20260314-003"/);
   assert.match(ui.runtimeOpsContent.innerHTML, /data-runtimeops-worker-event-type="heartbeat"/);
-  assert.match(ui.runtimeOpsContent.innerHTML, /Companion needs more than the daily lane/);
+  assert.match(
+    ui.runtimeOpsContent.innerHTML,
+    /Use RuntimeOps when Companion hands off a governed item that needs active run inspection, session follow-through, or runtime health review beyond the daily lane/
+  );
+  assert.match(
+    ui.runtimeOpsContent.innerHTML,
+    /Start with the active run and session so you can see what is running, what is blocked, and whether runtime posture is healthy/
+  );
   assert.match(ui.runtimeOpsContent.innerHTML, /without turning RuntimeOps into a second daily queue/);
+  assert.match(
+    ui.runtimeOpsContent.innerHTML,
+    /Open routing, connector, and inventory detail only when the investigation needs broader runtime context beyond the selected governed run/
+  );
   assert.ok(
     ui.runtimeOpsContent.innerHTML.indexOf("Current Run And Session") <
       ui.runtimeOpsContent.innerHTML.indexOf("Investigation And Follow-Through")
@@ -380,7 +394,9 @@ test("runtimeops page preserves companion handoff context in the receiving prelu
     {}
   );
 
-  assert.match(ui.runtimeOpsContent.innerHTML, /Companion handoff context/);
+  assert.match(ui.runtimeOpsContent.innerHTML, /Continue governed work/);
+  assert.match(ui.runtimeOpsContent.innerHTML, /Companion handoff context\./);
+  assert.match(ui.runtimeOpsContent.innerHTML, /Finish the same governed item here when daily review needs deeper follow-through\./);
   assert.match(ui.runtimeOpsContent.innerHTML, /Proof attached/);
   assert.match(ui.runtimeOpsContent.innerHTML, /Approval receipt pending/);
   assert.match(ui.runtimeOpsContent.innerHTML, /run=run-20260327-002/);

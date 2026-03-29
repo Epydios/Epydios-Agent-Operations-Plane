@@ -559,7 +559,7 @@ export function renderEvidenceWorkspace(context = {}) {
     shellClass: "evidenceops-workspace",
     title: "EvidenceOps",
     lead:
-      "Use the deeper proof console for governed proof bundles, provenance continuity, artifact access, and control mapping on the same governed path.",
+      "Use EvidenceOps when Companion hands off a governed item whose proof bundle, provenance, or artifact follow-through needs deeper review.",
     layout: "split",
     prelude: `
       ${renderWorkbenchArrivalContext({
@@ -573,7 +573,7 @@ export function renderEvidenceWorkspace(context = {}) {
       renderWorkbenchDomainCluster({
         title: "Proof Bundle And Provenance",
         lead:
-          "Keep the active proof bundle, provenance trace, and admin change provenance together so proof ownership stays visible at a glance.",
+          "Start with the active bundle and provenance so you can confirm what proof exists for this governed item before opening artifacts or controls.",
         bodyClass: "stack",
         body: `
           ${renderEvidenceBundleBoard(snapshot)}
@@ -584,7 +584,7 @@ export function renderEvidenceWorkspace(context = {}) {
       renderWorkbenchDomainCluster({
         title: "Proof Access And Retention",
         lead:
-          "Show proof access paths and retention posture together as the operational proof-access lane instead of scattering them across adjacent views.",
+          "Use this lane to retrieve artifacts and confirm retention posture once the proof bundle and provenance are already in view.",
         bodyClass: "stack",
         body: `
           ${renderArtifactAccessBoard(snapshot)}
@@ -594,7 +594,7 @@ export function renderEvidenceWorkspace(context = {}) {
       renderWorkbenchDomainCluster({
         title: "Proof Control Mapping",
         lead:
-          "Keep control coverage and proof-to-control traceability visible as the deeper proof-owner layer, not just another metrics card.",
+          "Map the proof to controls after the bundle, provenance, and access path are clear, so control coverage stays tied to the same governed evidence.",
         bodyClass: "stack",
         body: `${renderControlMappingBoard(snapshot)}`
       })

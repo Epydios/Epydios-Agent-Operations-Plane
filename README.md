@@ -2,13 +2,13 @@
 
 EpydiosOps is an installable operator desktop for governed AI and tool execution.
 
-It puts `Companion` in front of requests that are usually buried in middleware and opens `Workbench` only when the run needs deeper runtime, audit, evidence, or incident review.
+Start with the governed item in `Companion`. If it needs deeper runtime, audit, evidence, or incident follow-through, open `Workbench` and keep the same decision and proof path attached.
 
-![Epydios Companion overview](docs/images/hero-overview.png)
+![Epydios governed request flow](docs/images/governed-request-flow.png)
 
 ## Start Here
 
-The public repo has one canonical proof lane: the installed macOS desktop.
+If you want the clearest way to evaluate EpydiosOps, start with the supported installed macOS path.
 
 From the repo root:
 
@@ -18,22 +18,21 @@ From the repo root:
 ./ui/desktop-ui/bin/verify-m15-phase-c-governed-request.sh
 ```
 
-It proves:
+This path lets you:
 
-- the repo baseline is green
-- the desktop module is sane
-- the macOS app can be packaged and launched
-- `Interposition OFF / ON` is explicit
+- confirm the baseline checks pass
+- package and launch the macOS app
+- review governed work first in `Companion`
+- open `Workbench` only when deeper review is needed
+- see whether `Interposition` is `OFF` or `ON`
 - one governed Codex `/responses` request runs end to end
-- approval resolution, audit, and evidence handoff are real
-
-![Epydios governed request flow](docs/images/governed-request-flow.png)
+- approval, audit, and evidence continuity stay attached
 
 ## Current OSS Posture
 
-- macOS `live` installed desktop is the supported lane
-- Linux ships repo-committed Ubuntu 24.04 beta packaging, install, and verification surfaces
-- Windows ships repo-committed beta packaging, install, and verification surfaces
+- macOS `live` installed desktop is the supported OSS starting point
+- Linux is available as a public Ubuntu 24.04 beta install path
+- Windows is available as a public beta install path with native packaging artifacts and launcher helpers
 
 ## What This Repo Contains
 

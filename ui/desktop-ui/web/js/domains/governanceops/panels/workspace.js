@@ -1012,7 +1012,7 @@ export function renderGovernanceWorkspace(context = {}) {
     shellClass: "governanceops-workspace",
     title: "GovernanceOps",
     lead:
-      "Use the deeper governance console to inspect route posture, record decision receipts, and handle defer, escalation, or exception follow-through once Companion is no longer enough.",
+      "Finish deeper review here when Companion hands off a governed item that needs governance structure, exception handling, or receipt-backed approval follow-through.",
     layout: "split",
     prelude: renderWorkbenchArrivalContext({
       domainRoot: "governanceops",
@@ -1022,7 +1022,7 @@ export function renderGovernanceWorkspace(context = {}) {
       renderWorkbenchDomainCluster({
         title: "Governance Structure, Exceptions, And Receipts",
         lead:
-          "Keep authority ladders, decision-binding depth, route posture, exception posture, and receipt continuity visible before stepping into any deeper governance action.",
+          "Start by checking authority, exception, and receipt posture so you can decide whether this item needs approval, defer, escalation, or exception handling.",
         body: `
           ${renderOperationalFeedback(snapshot)}
           ${renderAimxsDecisionBindingSpineBoard(snapshot)}
@@ -1037,7 +1037,7 @@ export function renderGovernanceWorkspace(context = {}) {
       renderWorkbenchDomainCluster({
         title: "Focused Review And Routed Holds",
         lead:
-          "Companion stays the default daily approval lane. Use this deeper governance plane only for selected approvals, routed admin proposals, connector holds, and backlog follow-through when route, receipt, defer, escalation, or exception context matters.",
+          "Review only the routed approvals, admin proposals, and connector holds that need step-up governance handling here. Companion remains the daily lane for everything else.",
         body: `
           <div class="governanceops-primary-grid">
             ${renderAdminProposalReviewBoard(snapshot)}

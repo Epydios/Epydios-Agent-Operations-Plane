@@ -117,8 +117,20 @@ test("incidentops page restores visible continuation and closure clusters", () =
 
   assert.match(ui.incidentOpsContent.innerHTML, /data-domain-root="incidentops"/);
   assert.match(ui.incidentOpsContent.innerHTML, /IncidentOps/);
+  assert.match(
+    ui.incidentOpsContent.innerHTML,
+    /Use IncidentOps when Companion hands off a governed item that has moved into escalation, active response, or closure follow-through/
+  );
   assert.match(ui.incidentOpsContent.innerHTML, /Incident Continuation/);
+  assert.match(
+    ui.incidentOpsContent.innerHTML,
+    /Start with the active incident so you can see what is in motion, which governed item it belongs to, and how urgent the response is/
+  );
   assert.match(ui.incidentOpsContent.innerHTML, /Response Timeline And Closure/);
+  assert.match(
+    ui.incidentOpsContent.innerHTML,
+    /Use the timeline and closure lane after the active incident is clear/
+  );
   assert.match(ui.incidentOpsContent.innerHTML, /data-workbench-cluster-layout="split"/);
   assert.match(ui.incidentOpsContent.innerHTML, /IncidentOps action feedback is visible\./);
   assert.match(ui.incidentOpsContent.innerHTML, /Incident Continuation Queue/);
