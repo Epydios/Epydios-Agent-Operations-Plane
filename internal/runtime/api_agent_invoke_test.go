@@ -46,18 +46,32 @@ func jsonHTTPResponse(status int, payload map[string]interface{}) (*http.Respons
 }
 
 func newTestAPIServerWithInvoker(t *testing.T, store *memoryRunStore, refValues map[string]interface{}, transport http.RoundTripper) http.Handler {
+	return newTestAPIServerWithInvokerConfig(t, store, refValues, transport, AgentInvokerConfig{})
+}
+
+func newTestAPIServerWithInvokerConfig(t *testing.T, store *memoryRunStore, refValues map[string]interface{}, transport http.RoundTripper, cfg AgentInvokerConfig) http.Handler {
 	t.Helper()
 	refJSON, err := json.Marshal(refValues)
 	if err != nil {
 		t.Fatalf("marshal ref values: %v", err)
 	}
+	cfg.RefValuesJSON = string(refJSON)
+	if cfg.HTTPTimeout <= 0 {
+		cfg.HTTPTimeout = 5 * time.Second
+	}
 	invoker := NewAgentInvoker(store, AgentInvokerConfig{
-		RefValuesJSON: string(refJSON),
-		HTTPTimeout:   5 * time.Second,
+		RefValuesJSON:    cfg.RefValuesJSON,
+		HTTPTimeout:      cfg.HTTPTimeout,
+		ManagedCodexMode: cfg.ManagedCodexMode,
+		CodexCLIPath:     cfg.CodexCLIPath,
+		CodexHome:        cfg.CodexHome,
+		CodexWorkdir:     cfg.CodexWorkdir,
+		CodexSandboxMode: cfg.CodexSandboxMode,
+		CodexExecTimeout: cfg.CodexExecTimeout,
 	})
 	if transport != nil {
 		invoker.httpClient = &http.Client{
-			Timeout:   5 * time.Second,
+			Timeout:   cfg.HTTPTimeout,
 			Transport: transport,
 		}
 	}
@@ -172,7 +186,7 @@ func TestRuntimeIntegrationInvokeManagedCodexWorkerBridge(t *testing.T) {
 		projectID = "project-a"
 	)
 	store := newMemoryRunStore()
-	handler := newTestAPIServerWithInvoker(t, store, map[string]interface{}{
+	handler := newTestAPIServerWithInvokerConfig(t, store, map[string]interface{}{
 		"ref://gateways/litellm/openai-compatible":                     "https://gateway.local",
 		"ref://projects/project-a/gateways/litellm/bearer-token":       "gateway-token",
 		"ref://projects/project-a/providers/openai-compatible/api-key": "unused-direct-key",
@@ -184,7 +198,7 @@ func TestRuntimeIntegrationInvokeManagedCodexWorkerBridge(t *testing.T) {
 				"output_tokens": 34,
 			},
 		})
-	}))
+	}), AgentInvokerConfig{ManagedCodexMode: "legacy"})
 
 	rr := requestJSON(t, handler, http.MethodPost, "/v1alpha1/runtime/integrations/invoke", map[string]interface{}{
 		"meta": map[string]interface{}{
@@ -314,7 +328,7 @@ func TestRuntimeIntegrationInvokeStoresGovernanceContextOnManagedSession(t *test
 		projectID = "project-a"
 	)
 	store := newMemoryRunStore()
-	handler := newTestAPIServerWithInvoker(t, store, map[string]interface{}{
+	handler := newTestAPIServerWithInvokerConfig(t, store, map[string]interface{}{
 		"ref://gateways/litellm/openai-compatible":                     "https://gateway.local",
 		"ref://projects/project-a/gateways/litellm/bearer-token":       "gateway-token",
 		"ref://projects/project-a/providers/openai-compatible/api-key": "unused-direct-key",
@@ -326,7 +340,7 @@ func TestRuntimeIntegrationInvokeStoresGovernanceContextOnManagedSession(t *test
 				"output_tokens": 21,
 			},
 		})
-	}))
+	}), AgentInvokerConfig{ManagedCodexMode: "legacy"})
 
 	rr := requestJSON(t, handler, http.MethodPost, "/v1alpha1/runtime/integrations/invoke", map[string]interface{}{
 		"meta": map[string]interface{}{

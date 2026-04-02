@@ -70,14 +70,14 @@ func TestCodexManagedWorkerAdapterProcessModeParsesStructuredTurn(t *testing.T) 
 	if err != nil {
 		t.Fatalf("RunTurn error: %v", err)
 	}
-	if result.outputText != "Managed Codex summarized the workspace and queued one governed command." {
-		t.Fatalf("outputText=%q", result.outputText)
+	if result.operatorMessage != "Managed Codex summarized the workspace and queued one governed command." {
+		t.Fatalf("operatorMessage=%q", result.operatorMessage)
 	}
 	if result.finishReason != "managed_worker_process" {
 		t.Fatalf("finishReason=%q want managed_worker_process", result.finishReason)
 	}
-	if len(result.workerOutputChunks) == 0 {
-		t.Fatalf("workerOutputChunks should not be empty")
+	if len(result.outputChunks) == 0 {
+		t.Fatalf("outputChunks should not be empty")
 	}
 	if len(result.toolProposals) != 1 {
 		t.Fatalf("toolProposals=%d want 1", len(result.toolProposals))
@@ -90,6 +90,84 @@ func TestCodexManagedWorkerAdapterProcessModeParsesStructuredTurn(t *testing.T) 
 	}
 	if !strings.Contains(string(result.rawResponse), "command_execution") {
 		t.Fatalf("rawResponse missing command_execution: %s", string(result.rawResponse))
+	}
+}
+
+func TestParseCodexProcessTranscriptPreservesManagedWorkerEvents(t *testing.T) {
+	result, err := parseCodexProcessTranscript([]byte(strings.Join([]string{
+		`{"type":"thread.started","thread_id":"thread-1"}`,
+		`{"type":"turn.started"}`,
+		`{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"Inspecting the workspace before deciding what needs approval."}}`,
+		`{"type":"item.completed","item":{"id":"item_1","type":"command_execution","command":"/bin/zsh -lc pwd","aggregated_output":"/tmp\n","exit_code":0,"status":"completed"}}`,
+		`{"type":"item.completed","item":{"id":"item_2","type":"agent_message","text":"{\"message\":\"Managed Codex summarized the workspace and queued one governed command.\",\"tool_proposals\":[{\"type\":\"terminal_command\",\"summary\":\"Run the runtime tests before proceeding.\",\"command\":\"go test ./internal/runtime\",\"stdin\":\"\",\"cwd\":\"/tmp\",\"timeoutSeconds\":30,\"readOnlyRequested\":true,\"confidence\":\"structured\"}]}"}}`,
+		`{"type":"turn.completed","usage":{"input_tokens":12,"output_tokens":34}}`,
+	}, "\n")))
+	if err != nil {
+		t.Fatalf("parseCodexProcessTranscript error: %v", err)
+	}
+	if len(result.events) != 4 {
+		t.Fatalf("events=%d want 4", len(result.events))
+	}
+	if result.events[1].ItemType != "command_execution" {
+		t.Fatalf("event[1] itemType=%q want command_execution", result.events[1].ItemType)
+	}
+	if result.events[1].Command != "/bin/zsh -lc pwd" {
+		t.Fatalf("event[1] command=%q want /bin/zsh -lc pwd", result.events[1].Command)
+	}
+	if got := strings.TrimSpace(result.events[1].Output); got != "/tmp" {
+		t.Fatalf("event[1] output=%q want /tmp", got)
+	}
+	if result.events[3].Type != "turn.completed" {
+		t.Fatalf("event[3] type=%q want turn.completed", result.events[3].Type)
+	}
+	if result.events[3].Usage["output_tokens"] != float64(34) {
+		t.Fatalf("event[3] usage output_tokens=%v want 34", result.events[3].Usage["output_tokens"])
+	}
+}
+
+func TestCodexManagedWorkerAdapterLegacyModeReturnsTypedEnvelope(t *testing.T) {
+	adapter := codexManagedWorkerAdapter{mode: "legacy"}
+	result, err := adapter.RunTurn(context.Background(), AgentInvokeRequest{
+		Prompt: "inspect the workspace and propose one governed command",
+	}, agentProfileConfig{
+		ID:    "codex",
+		Model: "gpt-5-codex",
+	}, nil, &invokeResult{
+		outputText:   "Managed Codex bridge response.\n\n```bash\ngo test ./internal/runtime\n```",
+		finishReason: "stop",
+		usage:        JSONObject{"output_tokens": 12},
+		rawResponse:  json.RawMessage(`{"output_text":"Managed Codex bridge response."}`),
+	})
+	if err != nil {
+		t.Fatalf("RunTurn error: %v", err)
+	}
+	if result.sourceMode != "legacy_fallback" {
+		t.Fatalf("sourceMode=%q want legacy_fallback", result.sourceMode)
+	}
+	if result.operatorMessage == "" {
+		t.Fatal("operatorMessage should not be empty")
+	}
+	if len(result.toolProposals) != 1 {
+		t.Fatalf("toolProposals=%d want 1", len(result.toolProposals))
+	}
+	if got := normalizedInterfaceString(result.toolProposals[0]["command"]); got != "go test ./internal/runtime" {
+		t.Fatalf("proposal command=%q", got)
+	}
+	if len(result.events) != 1 || result.events[0].Type != "legacy_output" {
+		t.Fatalf("legacy events=%+v", result.events)
+	}
+
+	continuation, err := adapter.ContinueTurn(context.Background(), managedWorkerContinuationRequest{
+		ExecutionResult: &TerminalExecutionResult{ExitCode: 0, Output: "ok"},
+	}, nil)
+	if err != nil {
+		t.Fatalf("ContinueTurn error: %v", err)
+	}
+	if continuation.finishReason != "managed_worker_legacy_continuation" {
+		t.Fatalf("finishReason=%q want managed_worker_legacy_continuation", continuation.finishReason)
+	}
+	if len(continuation.events) != 1 || continuation.events[0].Type != "legacy_continuation" {
+		t.Fatalf("continuation events=%+v", continuation.events)
 	}
 }
 
@@ -205,6 +283,35 @@ func TestNewCodexManagedWorkerAdapterProcessModeForcesReadOnlySandbox(t *testing
 	})
 	if adapter.sandboxMode != "read-only" {
 		t.Fatalf("sandboxMode=%q want read-only", adapter.sandboxMode)
+	}
+}
+
+func TestNewCodexManagedWorkerAdapterDefaultsToProcessMode(t *testing.T) {
+	adapter := newCodexManagedWorkerAdapter(AgentInvokerConfig{})
+	if adapter.mode != "process" {
+		t.Fatalf("mode=%q want process", adapter.mode)
+	}
+	if adapter.UsesProviderRoutes() {
+		t.Fatal("default adapter should use process mode, not provider routes")
+	}
+	if adapter.sandboxMode != "read-only" {
+		t.Fatalf("sandboxMode=%q want read-only", adapter.sandboxMode)
+	}
+}
+
+func TestNewCodexManagedWorkerAdapterLegacyModeIsExplicitOptIn(t *testing.T) {
+	adapter := newCodexManagedWorkerAdapter(AgentInvokerConfig{
+		ManagedCodexMode: "legacy",
+		CodexSandboxMode: "workspace-write",
+	})
+	if adapter.mode != "legacy" {
+		t.Fatalf("mode=%q want legacy", adapter.mode)
+	}
+	if !adapter.UsesProviderRoutes() {
+		t.Fatal("explicit legacy mode should keep provider-route behavior")
+	}
+	if adapter.sandboxMode != "workspace-write" {
+		t.Fatalf("sandboxMode=%q want workspace-write", adapter.sandboxMode)
 	}
 }
 

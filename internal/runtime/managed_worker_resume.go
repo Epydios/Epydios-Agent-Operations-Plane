@@ -82,6 +82,31 @@ func copyJSONObject(value JSONObject) JSONObject {
 	return clone
 }
 
+type managedWorkerResumeContext struct {
+	task                *TaskRecord
+	worker              *SessionWorkerRecord
+	profile             agentProfileConfig
+	systemPrompt        string
+	maxOutputTokens     int
+	previousOutputText  string
+	previousRawResponse json.RawMessage
+}
+
+type managedWorkerResumePlan struct {
+	requestPayloadFields map[string]interface{}
+	sessionEventSummary  string
+	progressSummary      string
+	progressStage        string
+	progressPercent      int
+	commandText          string
+	commandCWD           string
+	timeoutSeconds       int
+	executionResult      *TerminalExecutionResult
+	executionError       string
+	governedRun          *RunRecord
+	failureRawResponse   json.RawMessage
+}
+
 func (s *APIServer) findSessionToolActionByID(ctx context.Context, sessionID, toolActionID string) (*ToolActionRecord, error) {
 	if s == nil || s.store == nil || strings.TrimSpace(sessionID) == "" || strings.TrimSpace(toolActionID) == "" {
 		return nil, nil
@@ -163,27 +188,26 @@ func (s *APIServer) selectedManagedCodexWorkerForSession(ctx context.Context, se
 	return nil, nil
 }
 
-func (s *APIServer) continueManagedWorkerAfterToolAction(ctx context.Context, session *SessionRecord, proposal *sessionToolProposal, action *ToolActionRecord, commandText, cwd string, timeoutSeconds int, execResult *TerminalExecutionResult, execErr error, decidedAt time.Time) bool {
+func (s *APIServer) prepareManagedWorkerResumeContext(ctx context.Context, session *SessionRecord, proposal *sessionToolProposal, action *ToolActionRecord) (*managedWorkerResumeContext, error) {
 	if s == nil || s.store == nil || s.agentInvoker == nil || session == nil || action == nil {
-		return false
+		return nil, fmt.Errorf("managed worker continuation is not configured")
 	}
 	task, err := s.store.GetTask(ctx, session.TaskID)
 	if err != nil || task == nil {
-		return false
+		return nil, fmt.Errorf("managed worker task is unavailable")
 	}
 	worker, err := s.selectedManagedCodexWorkerForSession(ctx, session, normalizeStringOrDefault(action.WorkerID, proposal.WorkerID))
 	if err != nil || worker == nil {
-		return false
+		return nil, fmt.Errorf("managed worker is unavailable")
 	}
-
 	settings, err := s.agentInvoker.loadAgentIntegrationSettings(ctx, session.TenantID, session.ProjectID)
 	if err != nil {
-		return false
+		return nil, err
 	}
 	profileID := normalizeStringOrDefault(worker.AgentProfileID, "codex")
 	profile, err := settings.resolveProfile(profileID)
 	if err != nil {
-		return false
+		return nil, err
 	}
 
 	taskAnnotations := parseRawJSONObject(task.Annotations)
@@ -192,72 +216,59 @@ func (s *APIServer) continueManagedWorkerAfterToolAction(ctx context.Context, se
 	maxOutputTokens := normalizedInterfaceInt(sessionSummary["maxOutputTokens"], 1024)
 	previousTurn, err := s.findLatestManagedTurnToolAction(ctx, session.SessionID)
 	if err != nil {
-		return false
-	}
-	previousOutputText := ""
-	var previousRawResponse json.RawMessage
-	if previousTurn != nil {
-		payload := parseRawJSONObject(previousTurn.ResultPayload)
-		previousOutputText = normalizedInterfaceString(payload["outputText"])
-		switch raw := payload["rawResponse"].(type) {
-		case json.RawMessage:
-			previousRawResponse = raw
-		case []byte:
-			previousRawResponse = json.RawMessage(raw)
-		case string:
-			previousRawResponse = json.RawMessage(raw)
-		default:
-			previousRawResponse = mustMarshalJSON(raw)
-		}
+		return nil, err
 	}
 
+	return &managedWorkerResumeContext{
+		task:            task,
+		worker:          worker,
+		profile:         profile,
+		systemPrompt:    systemPrompt,
+		maxOutputTokens: maxOutputTokens,
+		previousOutputText: readStringFromJSONRaw(func() json.RawMessage {
+			if previousTurn == nil {
+				return nil
+			}
+			return previousTurn.ResultPayload
+		}(), "outputText"),
+		previousRawResponse: func() json.RawMessage {
+			if previousTurn == nil {
+				return nil
+			}
+			return readRawResponseFromJSONRaw(previousTurn.ResultPayload)
+		}(),
+	}, nil
+}
+
+func (s *APIServer) continueManagedWorkerWithPlan(ctx context.Context, session *SessionRecord, proposal *sessionToolProposal, action *ToolActionRecord, prepared *managedWorkerResumeContext, plan managedWorkerResumePlan) bool {
+	if s == nil || s.store == nil || s.agentInvoker == nil || session == nil || action == nil || prepared == nil || prepared.task == nil || prepared.worker == nil {
+		return false
+	}
 	now := time.Now().UTC()
 	continuationRequestID := fmt.Sprintf("resume-%s-%d", sanitizeIDFragment(normalizeStringOrDefault(proposal.ProposalID, action.ToolActionID)), now.UnixNano())
 	continuationToolActionID := invokeSessionToolActionID(session.SessionID, "managed_agent_turn", continuationRequestID)
-	continuationRequestPayload := mustMarshalJSON(map[string]interface{}{
+
+	requestPayload := map[string]interface{}{
 		"requestId":               continuationRequestID,
-		"agentProfileId":          profile.ID,
+		"agentProfileId":          prepared.profile.ID,
 		"executionMode":           AgentInvokeExecutionModeManagedCodexWorker,
 		"continuation":            true,
 		"resumeAfterProposalId":   normalizeStringOrDefault(proposal.ProposalID, ""),
 		"resumeAfterToolActionId": action.ToolActionID,
-		"command":                 commandText,
-		"cwd":                     cwd,
-		"timeoutSeconds":          timeoutSeconds,
-		"toolExecution": map[string]interface{}{
-			"status": action.Status,
-			"exitCode": func() int {
-				if execResult != nil {
-					return execResult.ExitCode
-				}
-				return -1
-			}(),
-			"timedOut": execResult != nil && execResult.TimedOut,
-			"outputSha256": func() string {
-				if execResult != nil {
-					return execResult.OutputSHA256
-				}
-				return ""
-			}(),
-			"error": errorString(execErr),
-			"outputPreview": func() string {
-				if execResult == nil {
-					return ""
-				}
-				return truncateManagedCodexContinuationText(execResult.Output, 400)
-			}(),
-		},
-	})
+	}
+	for key, value := range plan.requestPayloadFields {
+		requestPayload[key] = value
+	}
 	s.upsertToolActionBestEffort(ctx, &ToolActionRecord{
 		ToolActionID:   continuationToolActionID,
 		SessionID:      session.SessionID,
-		WorkerID:       worker.WorkerID,
+		WorkerID:       prepared.worker.WorkerID,
 		TenantID:       session.TenantID,
 		ProjectID:      session.ProjectID,
 		ToolType:       "managed_agent_turn",
 		Status:         ToolActionStatusRequested,
 		Source:         "v1alpha2.runtime.workers.codex_bridge.resume",
-		RequestPayload: continuationRequestPayload,
+		RequestPayload: mustMarshalJSON(requestPayload),
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	})
@@ -267,11 +278,11 @@ func (s *APIServer) continueManagedWorkerAfterToolAction(ctx context.Context, se
 		Payload: mustMarshalJSON(map[string]interface{}{
 			"toolActionId":  continuationToolActionID,
 			"toolType":      "managed_agent_turn",
-			"workerId":      worker.WorkerID,
+			"workerId":      prepared.worker.WorkerID,
 			"requestId":     continuationRequestID,
 			"executionMode": AgentInvokeExecutionModeManagedCodexWorker,
 			"proposalId":    normalizeStringOrDefault(proposal.ProposalID, ""),
-			"summary":       "Managed Codex worker resumed after governed tool execution.",
+			"summary":       plan.sessionEventSummary,
 		}),
 		Timestamp: now,
 	})
@@ -280,9 +291,9 @@ func (s *APIServer) continueManagedWorkerAfterToolAction(ctx context.Context, se
 	session.Status = SessionStatusRunning
 	session.CompletedAt = nil
 	session.UpdatedAt = now
-	task.Status = TaskStatusInProgress
-	task.UpdatedAt = now
-	_ = s.store.UpsertTask(ctx, task)
+	prepared.task.Status = TaskStatusInProgress
+	prepared.task.UpdatedAt = now
+	_ = s.store.UpsertTask(ctx, prepared.task)
 	_ = s.store.UpsertSession(ctx, session)
 	if previousSessionStatus != session.Status {
 		s.appendSessionEventBestEffort(ctx, &SessionEventRecord{
@@ -298,313 +309,188 @@ func (s *APIServer) continueManagedWorkerAfterToolAction(ctx context.Context, se
 		})
 	}
 	s.upsertSessionWorkerBestEffort(ctx, &SessionWorkerRecord{
-		WorkerID:          worker.WorkerID,
-		SessionID:         worker.SessionID,
-		TaskID:            worker.TaskID,
-		TenantID:          worker.TenantID,
-		ProjectID:         worker.ProjectID,
-		WorkerType:        worker.WorkerType,
-		AdapterID:         worker.AdapterID,
+		WorkerID:          prepared.worker.WorkerID,
+		SessionID:         prepared.worker.SessionID,
+		TaskID:            prepared.worker.TaskID,
+		TenantID:          prepared.worker.TenantID,
+		ProjectID:         prepared.worker.ProjectID,
+		WorkerType:        prepared.worker.WorkerType,
+		AdapterID:         prepared.worker.AdapterID,
 		Status:            WorkerStatusRunning,
-		Source:            worker.Source,
-		Capabilities:      append([]string(nil), worker.Capabilities...),
-		Routing:           worker.Routing,
-		AgentProfileID:    worker.AgentProfileID,
-		Provider:          worker.Provider,
-		Transport:         worker.Transport,
-		Model:             worker.Model,
-		TargetEnvironment: worker.TargetEnvironment,
-		Annotations:       worker.Annotations,
-		CreatedAt:         worker.CreatedAt,
+		Source:            prepared.worker.Source,
+		Capabilities:      append([]string(nil), prepared.worker.Capabilities...),
+		Routing:           prepared.worker.Routing,
+		AgentProfileID:    prepared.worker.AgentProfileID,
+		Provider:          prepared.worker.Provider,
+		Transport:         prepared.worker.Transport,
+		Model:             prepared.worker.Model,
+		TargetEnvironment: prepared.worker.TargetEnvironment,
+		Annotations:       prepared.worker.Annotations,
+		CreatedAt:         prepared.worker.CreatedAt,
 		UpdatedAt:         now,
 	})
+	progressPayload := map[string]interface{}{
+		"stage":        plan.progressStage,
+		"percent":      plan.progressPercent,
+		"toolActionId": continuationToolActionID,
+		"proposalId":   normalizeStringOrDefault(proposal.ProposalID, ""),
+	}
+	if plan.governedRun != nil {
+		progressPayload["runId"] = plan.governedRun.RunID
+	}
 	s.appendSessionEventBestEffort(ctx, &SessionEventRecord{
 		SessionID: session.SessionID,
 		EventType: SessionEventType("worker.progress"),
 		Payload: mustMarshalJSON(map[string]interface{}{
-			"workerId": worker.WorkerID,
+			"workerId": prepared.worker.WorkerID,
 			"status":   WorkerStatusRunning,
-			"summary":  "Managed Codex worker is resuming after governed tool execution.",
-			"payload": map[string]interface{}{
-				"stage":        "resuming_after_tool_action",
-				"percent":      85,
-				"toolActionId": continuationToolActionID,
-				"proposalId":   normalizeStringOrDefault(proposal.ProposalID, ""),
-			},
+			"summary":  plan.progressSummary,
+			"payload":  progressPayload,
 		}),
 		Timestamp: now,
 	})
 
 	response, err := s.agentInvoker.ContinueManagedWorkerTurn(ctx, managedWorkerContinuationRequest{
 		Meta:                ObjectMeta{TenantID: session.TenantID, ProjectID: session.ProjectID, RequestID: continuationRequestID},
-		Profile:             profile,
-		Task:                task,
+		Profile:             prepared.profile,
+		Task:                prepared.task,
 		Session:             session,
-		Worker:              worker,
+		Worker:              prepared.worker,
 		Proposal:            proposal,
 		ToolAction:          action,
-		CommandText:         commandText,
-		CommandCWD:          cwd,
-		TimeoutSeconds:      timeoutSeconds,
-		ExecutionResult:     execResult,
-		ExecutionError:      errorString(execErr),
-		SystemPrompt:        systemPrompt,
-		MaxOutputTokens:     maxOutputTokens,
-		PreviousOutputText:  previousOutputText,
-		PreviousRawResponse: previousRawResponse,
+		CommandText:         plan.commandText,
+		CommandCWD:          plan.commandCWD,
+		TimeoutSeconds:      plan.timeoutSeconds,
+		ExecutionResult:     plan.executionResult,
+		ExecutionError:      plan.executionError,
+		GovernedRun:         plan.governedRun,
+		SystemPrompt:        prepared.systemPrompt,
+		MaxOutputTokens:     prepared.maxOutputTokens,
+		PreviousOutputText:  prepared.previousOutputText,
+		PreviousRawResponse: prepared.previousRawResponse,
 	})
 	if err != nil {
-		s.markInvokeSessionResult(ctx, task, session, &AgentInvokeResponse{
+		s.markInvokeSessionResult(ctx, prepared.task, session, &AgentInvokeResponse{
 			RequestID:        continuationRequestID,
-			TaskID:           task.TaskID,
+			TaskID:           prepared.task.TaskID,
 			SessionID:        session.SessionID,
-			SelectedWorkerID: worker.WorkerID,
+			SelectedWorkerID: prepared.worker.WorkerID,
 			TenantID:         session.TenantID,
 			ProjectID:        session.ProjectID,
-			AgentProfileID:   profile.ID,
+			AgentProfileID:   prepared.profile.ID,
 			ExecutionMode:    AgentInvokeExecutionModeManagedCodexWorker,
-			WorkerType:       worker.WorkerType,
-			WorkerAdapterID:  worker.AdapterID,
-			Provider:         profile.Provider,
-			Transport:        profile.Transport,
-			Model:            profile.Model,
+			WorkerType:       prepared.worker.WorkerType,
+			WorkerAdapterID:  prepared.worker.AdapterID,
+			Provider:         prepared.profile.Provider,
+			Transport:        prepared.profile.Transport,
+			Model:            prepared.profile.Model,
 			Route:            "managed_worker_process",
+			RawResponse:      append(json.RawMessage(nil), plan.failureRawResponse...),
 		}, err, time.Now().UTC())
 		return true
 	}
-	response.TaskID = task.TaskID
+	response.TaskID = prepared.task.TaskID
 	response.SessionID = session.SessionID
-	response.SelectedWorkerID = worker.WorkerID
+	response.SelectedWorkerID = prepared.worker.WorkerID
 	response.ExecutionMode = AgentInvokeExecutionModeManagedCodexWorker
-	response.WorkerType = worker.WorkerType
-	response.WorkerAdapterID = worker.AdapterID
-	s.markInvokeSessionResult(ctx, task, session, response, nil, time.Now().UTC())
+	response.WorkerType = prepared.worker.WorkerType
+	response.WorkerAdapterID = prepared.worker.AdapterID
+	s.markInvokeSessionResult(ctx, prepared.task, session, response, nil, time.Now().UTC())
 	return true
 }
 
-func (s *APIServer) continueManagedWorkerAfterGovernedAction(ctx context.Context, session *SessionRecord, proposal *sessionToolProposal, action *ToolActionRecord, run *RunRecord, runErr error, decidedAt time.Time) bool {
-	if s == nil || s.store == nil || s.agentInvoker == nil || session == nil || action == nil {
-		return false
-	}
-	task, err := s.store.GetTask(ctx, session.TaskID)
-	if err != nil || task == nil {
-		return false
-	}
-	worker, err := s.selectedManagedCodexWorkerForSession(ctx, session, normalizeStringOrDefault(action.WorkerID, proposal.WorkerID))
-	if err != nil || worker == nil {
-		return false
-	}
-	settings, err := s.agentInvoker.loadAgentIntegrationSettings(ctx, session.TenantID, session.ProjectID)
+func (s *APIServer) continueManagedWorkerAfterToolAction(ctx context.Context, session *SessionRecord, proposal *sessionToolProposal, action *ToolActionRecord, commandText, cwd string, timeoutSeconds int, execResult *TerminalExecutionResult, execErr error, decidedAt time.Time) bool {
+	_ = decidedAt
+	prepared, err := s.prepareManagedWorkerResumeContext(ctx, session, proposal, action)
 	if err != nil {
 		return false
 	}
-	profileID := normalizeStringOrDefault(worker.AgentProfileID, "codex")
-	profile, err := settings.resolveProfile(profileID)
-	if err != nil {
-		return false
-	}
-
-	taskAnnotations := parseRawJSONObject(task.Annotations)
-	sessionSummary := parseRawJSONObject(session.Summary)
-	systemPrompt := normalizedInterfaceString(taskAnnotations["systemPrompt"])
-	maxOutputTokens := normalizedInterfaceInt(sessionSummary["maxOutputTokens"], 1024)
-	previousTurn, err := s.findLatestManagedTurnToolAction(ctx, session.SessionID)
-	if err != nil {
-		return false
-	}
-	previousOutputText := ""
-	var previousRawResponse json.RawMessage
-	if previousTurn != nil {
-		payload := parseRawJSONObject(previousTurn.ResultPayload)
-		previousOutputText = normalizedInterfaceString(payload["outputText"])
-		switch raw := payload["rawResponse"].(type) {
-		case json.RawMessage:
-			previousRawResponse = raw
-		case []byte:
-			previousRawResponse = json.RawMessage(raw)
-		case string:
-			previousRawResponse = json.RawMessage(raw)
-		default:
-			previousRawResponse = mustMarshalJSON(raw)
-		}
-	}
-
-	now := time.Now().UTC()
-	continuationRequestID := fmt.Sprintf("resume-%s-%d", sanitizeIDFragment(normalizeStringOrDefault(proposal.ProposalID, action.ToolActionID)), now.UnixNano())
-	continuationToolActionID := invokeSessionToolActionID(session.SessionID, "managed_agent_turn", continuationRequestID)
-	governedRunSnapshot := buildGovernedActionRunSnapshot(run)
-	continuationRequestPayload := mustMarshalJSON(map[string]interface{}{
-		"requestId":               continuationRequestID,
-		"agentProfileId":          profile.ID,
-		"executionMode":           AgentInvokeExecutionModeManagedCodexWorker,
-		"continuation":            true,
-		"resumeAfterProposalId":   normalizeStringOrDefault(proposal.ProposalID, ""),
-		"resumeAfterToolActionId": action.ToolActionID,
-		"governedAction": map[string]interface{}{
-			"status": action.Status,
-			"runId": func() string {
-				if run != nil {
-					return run.RunID
-				}
-				return ""
-			}(),
-			"runStatus": func() string {
-				if run != nil {
-					return string(run.Status)
-				}
-				return ""
-			}(),
-			"policyDecision": func() string {
-				if run != nil {
-					return run.PolicyDecision
-				}
-				return ""
-			}(),
-			"selectedPolicyProvider": func() string {
-				if run != nil {
-					return run.SelectedPolicyProvider
-				}
-				return ""
-			}(),
-			"error": errorString(runErr),
+	return s.continueManagedWorkerWithPlan(ctx, session, proposal, action, prepared, managedWorkerResumePlan{
+		requestPayloadFields: map[string]interface{}{
+			"command":        commandText,
+			"cwd":            cwd,
+			"timeoutSeconds": timeoutSeconds,
+			"toolExecution": map[string]interface{}{
+				"status": action.Status,
+				"exitCode": func() int {
+					if execResult != nil {
+						return execResult.ExitCode
+					}
+					return -1
+				}(),
+				"timedOut": execResult != nil && execResult.TimedOut,
+				"outputSha256": func() string {
+					if execResult != nil {
+						return execResult.OutputSHA256
+					}
+					return ""
+				}(),
+				"error": errorString(execErr),
+				"outputPreview": func() string {
+					if execResult == nil {
+						return ""
+					}
+					return truncateManagedCodexContinuationText(execResult.Output, 400)
+				}(),
+			},
 		},
+		sessionEventSummary: "Managed Codex worker resumed after governed tool execution.",
+		progressSummary:     "Managed Codex worker is resuming after governed tool execution.",
+		progressStage:       "resuming_after_tool_action",
+		progressPercent:     85,
+		commandText:         commandText,
+		commandCWD:          cwd,
+		timeoutSeconds:      timeoutSeconds,
+		executionResult:     execResult,
+		executionError:      errorString(execErr),
 	})
-	s.upsertToolActionBestEffort(ctx, &ToolActionRecord{
-		ToolActionID:   continuationToolActionID,
-		SessionID:      session.SessionID,
-		WorkerID:       worker.WorkerID,
-		TenantID:       session.TenantID,
-		ProjectID:      session.ProjectID,
-		ToolType:       "managed_agent_turn",
-		Status:         ToolActionStatusRequested,
-		Source:         "v1alpha2.runtime.workers.codex_bridge.resume",
-		RequestPayload: continuationRequestPayload,
-		CreatedAt:      now,
-		UpdatedAt:      now,
-	})
-	s.appendSessionEventBestEffort(ctx, &SessionEventRecord{
-		SessionID: session.SessionID,
-		EventType: SessionEventType("tool_action.requested"),
-		Payload: mustMarshalJSON(map[string]interface{}{
-			"toolActionId":  continuationToolActionID,
-			"toolType":      "managed_agent_turn",
-			"workerId":      worker.WorkerID,
-			"requestId":     continuationRequestID,
-			"executionMode": AgentInvokeExecutionModeManagedCodexWorker,
-			"proposalId":    normalizeStringOrDefault(proposal.ProposalID, ""),
-			"summary":       "Managed Codex worker resumed after governed action evaluation.",
-		}),
-		Timestamp: now,
-	})
+}
 
-	previousSessionStatus := session.Status
-	session.Status = SessionStatusRunning
-	session.CompletedAt = nil
-	session.UpdatedAt = now
-	task.Status = TaskStatusInProgress
-	task.UpdatedAt = now
-	_ = s.store.UpsertTask(ctx, task)
-	_ = s.store.UpsertSession(ctx, session)
-	if previousSessionStatus != session.Status {
-		s.appendSessionEventBestEffort(ctx, &SessionEventRecord{
-			SessionID: session.SessionID,
-			EventType: SessionEventType("session.status.changed"),
-			Payload: mustMarshalJSON(map[string]interface{}{
-				"previousStatus": previousSessionStatus,
-				"status":         session.Status,
-				"proposalId":     normalizeStringOrDefault(proposal.ProposalID, ""),
-				"toolActionId":   continuationToolActionID,
-			}),
-			Timestamp: now,
-		})
+func (s *APIServer) continueManagedWorkerAfterGovernedAction(ctx context.Context, session *SessionRecord, proposal *sessionToolProposal, action *ToolActionRecord, run *RunRecord, runErr error, decidedAt time.Time) bool {
+	_ = decidedAt
+	prepared, err := s.prepareManagedWorkerResumeContext(ctx, session, proposal, action)
+	if err != nil {
+		return false
 	}
-	s.upsertSessionWorkerBestEffort(ctx, &SessionWorkerRecord{
-		WorkerID:          worker.WorkerID,
-		SessionID:         worker.SessionID,
-		TaskID:            worker.TaskID,
-		TenantID:          worker.TenantID,
-		ProjectID:         worker.ProjectID,
-		WorkerType:        worker.WorkerType,
-		AdapterID:         worker.AdapterID,
-		Status:            WorkerStatusRunning,
-		Source:            worker.Source,
-		Capabilities:      append([]string(nil), worker.Capabilities...),
-		Routing:           worker.Routing,
-		AgentProfileID:    worker.AgentProfileID,
-		Provider:          worker.Provider,
-		Transport:         worker.Transport,
-		Model:             worker.Model,
-		TargetEnvironment: worker.TargetEnvironment,
-		Annotations:       worker.Annotations,
-		CreatedAt:         worker.CreatedAt,
-		UpdatedAt:         now,
-	})
-	s.appendSessionEventBestEffort(ctx, &SessionEventRecord{
-		SessionID: session.SessionID,
-		EventType: SessionEventType("worker.progress"),
-		Payload: mustMarshalJSON(map[string]interface{}{
-			"workerId": worker.WorkerID,
-			"status":   WorkerStatusRunning,
-			"summary":  "Managed Codex worker is resuming after governed action evaluation.",
-			"payload": map[string]interface{}{
-				"stage":        "resuming_after_governed_action",
-				"percent":      85,
-				"toolActionId": continuationToolActionID,
-				"proposalId":   normalizeStringOrDefault(proposal.ProposalID, ""),
+	return s.continueManagedWorkerWithPlan(ctx, session, proposal, action, prepared, managedWorkerResumePlan{
+		requestPayloadFields: map[string]interface{}{
+			"governedAction": map[string]interface{}{
+				"status": action.Status,
 				"runId": func() string {
 					if run != nil {
 						return run.RunID
 					}
 					return ""
 				}(),
+				"runStatus": func() string {
+					if run != nil {
+						return string(run.Status)
+					}
+					return ""
+				}(),
+				"policyDecision": func() string {
+					if run != nil {
+						return run.PolicyDecision
+					}
+					return ""
+				}(),
+				"selectedPolicyProvider": func() string {
+					if run != nil {
+						return run.SelectedPolicyProvider
+					}
+					return ""
+				}(),
+				"error": errorString(runErr),
 			},
-		}),
-		Timestamp: now,
+		},
+		sessionEventSummary: "Managed Codex worker resumed after governed action evaluation.",
+		progressSummary:     "Managed Codex worker is resuming after governed action evaluation.",
+		progressStage:       "resuming_after_governed_action",
+		progressPercent:     85,
+		executionError:      errorString(runErr),
+		governedRun:         run,
+		failureRawResponse:  mustMarshalJSON(buildGovernedActionRunSnapshot(run)),
 	})
-
-	response, err := s.agentInvoker.ContinueManagedWorkerTurn(ctx, managedWorkerContinuationRequest{
-		Meta:                ObjectMeta{TenantID: session.TenantID, ProjectID: session.ProjectID, RequestID: continuationRequestID},
-		Profile:             profile,
-		Task:                task,
-		Session:             session,
-		Worker:              worker,
-		Proposal:            proposal,
-		ToolAction:          action,
-		GovernedRun:         run,
-		ExecutionError:      errorString(runErr),
-		SystemPrompt:        systemPrompt,
-		MaxOutputTokens:     maxOutputTokens,
-		PreviousOutputText:  previousOutputText,
-		PreviousRawResponse: previousRawResponse,
-	})
-	if err != nil {
-		s.markInvokeSessionResult(ctx, task, session, &AgentInvokeResponse{
-			RequestID:        continuationRequestID,
-			TaskID:           task.TaskID,
-			SessionID:        session.SessionID,
-			SelectedWorkerID: worker.WorkerID,
-			TenantID:         session.TenantID,
-			ProjectID:        session.ProjectID,
-			AgentProfileID:   profile.ID,
-			ExecutionMode:    AgentInvokeExecutionModeManagedCodexWorker,
-			WorkerType:       worker.WorkerType,
-			WorkerAdapterID:  worker.AdapterID,
-			Provider:         profile.Provider,
-			Transport:        profile.Transport,
-			Model:            profile.Model,
-			Route:            "managed_worker_process",
-			RawResponse:      mustMarshalJSON(governedRunSnapshot),
-		}, err, time.Now().UTC())
-		return true
-	}
-	response.TaskID = task.TaskID
-	response.SessionID = session.SessionID
-	response.SelectedWorkerID = worker.WorkerID
-	response.ExecutionMode = AgentInvokeExecutionModeManagedCodexWorker
-	response.WorkerType = worker.WorkerType
-	response.WorkerAdapterID = worker.AdapterID
-	s.markInvokeSessionResult(ctx, task, session, response, nil, time.Now().UTC())
-	return true
 }
 
 func (s *APIServer) transitionSessionAfterStandaloneToolAction(ctx context.Context, session *SessionRecord, finalStatus ToolActionStatus, changedAt time.Time, proposal *sessionToolProposal, toolActionID string) {

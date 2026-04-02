@@ -204,7 +204,7 @@ func (i *AgentInvoker) Invoke(ctx context.Context, req AgentInvokeRequest) (*Age
 			if err != nil {
 				return nil, err
 			}
-			result := applyManagedWorkerTurnResult(nil, managedTurn)
+			result := applyManagedWorkerTurnEnvelope(nil, managedTurn)
 			return &AgentInvokeResponse{
 				Source:             "runtime-endpoint",
 				Applied:            true,
@@ -261,7 +261,7 @@ func (i *AgentInvoker) Invoke(ctx context.Context, req AgentInvokeRequest) (*Age
 				routeErrors = append(routeErrors, fmt.Sprintf("%s adapter enrich: %v", route.name, err))
 				continue
 			}
-			result = applyManagedWorkerTurnResult(result, managedResult)
+			result = applyManagedWorkerTurnEnvelope(result, managedResult)
 		}
 		return &AgentInvokeResponse{
 			Source:             "runtime-endpoint",
@@ -291,7 +291,7 @@ func (i *AgentInvoker) Invoke(ctx context.Context, req AgentInvokeRequest) (*Age
 	return nil, fmt.Errorf("invoke agent profile %q failed: %s", profile.ID, strings.Join(routeErrors, "; "))
 }
 
-func (i *AgentInvoker) runManagedWorkerTurn(ctx context.Context, req AgentInvokeRequest, profile agentProfileConfig, result *invokeResult) (*managedWorkerTurnResult, error) {
+func (i *AgentInvoker) runManagedWorkerTurn(ctx context.Context, req AgentInvokeRequest, profile agentProfileConfig, result *invokeResult) (*managedWorkerTurnEnvelope, error) {
 	if i == nil {
 		return nil, fmt.Errorf("agent invoker is not configured")
 	}
@@ -404,10 +404,10 @@ func (i *AgentInvoker) ContinueManagedWorkerTurn(ctx context.Context, req manage
 		BoundaryBaseURL:    boundaryURL,
 		StartedAt:          startedAt.Format(time.RFC3339),
 		CompletedAt:        i.now().UTC().Format(time.RFC3339),
-		OutputText:         result.outputText,
+		OutputText:         result.operatorMessage,
 		FinishReason:       result.finishReason,
 		Usage:              result.usage,
-		WorkerOutputChunks: append([]string(nil), result.workerOutputChunks...),
+		WorkerOutputChunks: append([]string(nil), result.outputChunks...),
 		ToolProposals:      append([]JSONObject(nil), result.toolProposals...),
 		RawResponse:        result.rawResponse,
 	}, nil
@@ -419,30 +419,6 @@ func (i *AgentInvoker) buildManagedWorkerBoundaryRoute(ctx context.Context, sett
 		return nil, fmt.Errorf("managed Codex worker process mode requires an AgentOps gateway boundary: %w", err)
 	}
 	return route, nil
-}
-
-func applyManagedWorkerTurnResult(base *invokeResult, managed *managedWorkerTurnResult) *invokeResult {
-	if managed == nil {
-		return base
-	}
-	if base == nil {
-		base = &invokeResult{}
-	}
-	if strings.TrimSpace(managed.outputText) != "" {
-		base.outputText = managed.outputText
-	}
-	if strings.TrimSpace(managed.finishReason) != "" {
-		base.finishReason = managed.finishReason
-	}
-	if len(managed.usage) > 0 {
-		base.usage = managed.usage
-	}
-	if len(managed.rawResponse) > 0 {
-		base.rawResponse = managed.rawResponse
-	}
-	base.workerOutputChunks = append([]string(nil), managed.workerOutputChunks...)
-	base.toolProposals = append([]JSONObject(nil), managed.toolProposals...)
-	return base
 }
 
 func (i *AgentInvoker) loadAgentIntegrationSettings(ctx context.Context, tenantID, projectID string) (agentIntegrationSettings, error) {

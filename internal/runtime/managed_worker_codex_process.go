@@ -96,7 +96,7 @@ var (
 	codexPythonWritePattern    = regexp.MustCompile(`^python3\s+-c\s+(".*"|'[^']*')$`)
 )
 
-func (a codexManagedWorkerAdapter) runCodexProcessTurn(ctx context.Context, req AgentInvokeRequest, profile agentProfileConfig, boundary *managedWorkerProviderBoundary) (*managedWorkerTurnResult, error) {
+func (a codexManagedWorkerAdapter) runCodexProcessTurn(ctx context.Context, req AgentInvokeRequest, profile agentProfileConfig, boundary *managedWorkerProviderBoundary) (*managedWorkerTurnEnvelope, error) {
 	workdir := strings.TrimSpace(a.workdir)
 	if workdir == "" {
 		if cwd, err := os.Getwd(); err == nil {
@@ -590,10 +590,10 @@ func truncateManagedCodexContinuationText(value string, maxLen int) string {
 	return strings.TrimSpace(trimmed[:maxLen-3]) + "..."
 }
 
-func parseCodexProcessTranscript(transcript []byte) (*managedWorkerTurnResult, error) {
+func parseCodexProcessTranscript(transcript []byte) (*managedWorkerTurnEnvelope, error) {
 	lines := strings.Split(strings.ReplaceAll(string(transcript), "\r\n", "\n"), "\n")
 	var (
-		events           []JSONObject
+		events           []managedWorkerEvent
 		messageChunks    []string
 		commandSummaries []string
 		structured       codexStructuredTurn
@@ -605,11 +605,6 @@ func parseCodexProcessTranscript(transcript []byte) (*managedWorkerTurnResult, e
 		if trimmed == "" || !strings.HasPrefix(trimmed, "{") {
 			continue
 		}
-		var raw map[string]interface{}
-		if err := json.Unmarshal([]byte(trimmed), &raw); err != nil {
-			continue
-		}
-		events = append(events, JSONObject(raw))
 		var event codexProcessEvent
 		if err := json.Unmarshal([]byte(trimmed), &event); err != nil {
 			continue
@@ -620,6 +615,7 @@ func parseCodexProcessTranscript(transcript []byte) (*managedWorkerTurnResult, e
 			if err := json.Unmarshal(event.Item, &item); err != nil {
 				continue
 			}
+			events = append(events, codexProcessManagedWorkerEvent(strings.TrimSpace(event.Type), item))
 			switch strings.TrimSpace(item.Type) {
 			case "agent_message":
 				text := strings.TrimSpace(item.Text)
@@ -640,6 +636,10 @@ func parseCodexProcessTranscript(transcript []byte) (*managedWorkerTurnResult, e
 		case "turn.completed":
 			if len(event.Usage) > 0 {
 				usage = event.Usage
+				events = append(events, managedWorkerEvent{
+					Type:  strings.TrimSpace(event.Type),
+					Usage: copyJSONObject(event.Usage),
+				})
 			}
 		case "error", "turn.failed":
 			return nil, fmt.Errorf("codex worker process reported failure: %s", trimmed)
@@ -675,14 +675,36 @@ func parseCodexProcessTranscript(transcript []byte) (*managedWorkerTurnResult, e
 		toolProposals = append(toolProposals, proposalPayload)
 	}
 	rawEvents, _ := json.Marshal(events)
-	return &managedWorkerTurnResult{
-		outputText:         outputText,
-		finishReason:       "managed_worker_process",
-		usage:              usage,
-		rawResponse:        rawEvents,
-		workerOutputChunks: outputChunks,
-		toolProposals:      toolProposals,
+	return &managedWorkerTurnEnvelope{
+		operatorMessage: outputText,
+		finishReason:    "managed_worker_process",
+		usage:           usage,
+		rawResponse:     rawEvents,
+		outputChunks:    outputChunks,
+		toolProposals:   toolProposals,
+		events:          events,
+		sourceMode:      "process",
 	}, nil
+}
+
+func codexProcessManagedWorkerEvent(eventType string, item codexProcessItem) managedWorkerEvent {
+	trimmedType := strings.TrimSpace(item.Type)
+	event := managedWorkerEvent{
+		Type:     eventType,
+		ItemType: trimmedType,
+		Status:   strings.TrimSpace(item.Status),
+	}
+	switch trimmedType {
+	case "agent_message":
+		event.Text = strings.TrimSpace(item.Text)
+	case "command_execution":
+		event.Command = strings.TrimSpace(item.Command)
+		event.Output = strings.TrimSpace(item.AggregatedOutput)
+		event.ExitCode = item.ExitCode
+	default:
+		event.Text = strings.TrimSpace(item.Text)
+	}
+	return event
 }
 
 func parseStructuredCodexTurn(text string) (codexStructuredTurn, bool) {

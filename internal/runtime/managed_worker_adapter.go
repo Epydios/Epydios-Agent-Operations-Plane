@@ -8,15 +8,6 @@ import (
 	"time"
 )
 
-type managedWorkerTurnResult struct {
-	outputText         string
-	finishReason       string
-	usage              JSONObject
-	rawResponse        json.RawMessage
-	workerOutputChunks []string
-	toolProposals      []JSONObject
-}
-
 type managedWorkerProviderBoundary struct {
 	RouteName     string
 	ProviderID    string
@@ -52,8 +43,8 @@ type managedWorkerContinuationRequest struct {
 type managedWorkerAdapter interface {
 	AdapterID() string
 	UsesProviderRoutes() bool
-	RunTurn(ctx context.Context, req AgentInvokeRequest, profile agentProfileConfig, boundary *managedWorkerProviderBoundary, fallback *invokeResult) (*managedWorkerTurnResult, error)
-	ContinueTurn(ctx context.Context, req managedWorkerContinuationRequest, boundary *managedWorkerProviderBoundary) (*managedWorkerTurnResult, error)
+	RunTurn(ctx context.Context, req AgentInvokeRequest, profile agentProfileConfig, boundary *managedWorkerProviderBoundary, fallback *invokeResult) (*managedWorkerTurnEnvelope, error)
+	ContinueTurn(ctx context.Context, req managedWorkerContinuationRequest, boundary *managedWorkerProviderBoundary) (*managedWorkerTurnEnvelope, error)
 }
 
 type codexManagedWorkerAdapter struct {
@@ -69,7 +60,7 @@ type codexManagedWorkerAdapter struct {
 func newCodexManagedWorkerAdapter(cfg AgentInvokerConfig) codexManagedWorkerAdapter {
 	mode := strings.ToLower(strings.TrimSpace(cfg.ManagedCodexMode))
 	if mode == "" {
-		mode = "legacy"
+		mode = "process"
 	}
 	timeout := cfg.CodexExecTimeout
 	if timeout <= 0 {
@@ -99,24 +90,31 @@ func (a codexManagedWorkerAdapter) UsesProviderRoutes() bool {
 	return !strings.EqualFold(strings.TrimSpace(a.mode), "process")
 }
 
-func (a codexManagedWorkerAdapter) RunTurn(ctx context.Context, req AgentInvokeRequest, profile agentProfileConfig, boundary *managedWorkerProviderBoundary, fallback *invokeResult) (*managedWorkerTurnResult, error) {
+func (a codexManagedWorkerAdapter) RunTurn(ctx context.Context, req AgentInvokeRequest, profile agentProfileConfig, boundary *managedWorkerProviderBoundary, fallback *invokeResult) (*managedWorkerTurnEnvelope, error) {
 	if !a.UsesProviderRoutes() {
 		return a.runCodexProcessTurn(ctx, req, profile, boundary)
 	}
 	if fallback == nil {
 		return nil, fmt.Errorf("fallback invoke result is required for legacy managed Codex mode")
 	}
-	return &managedWorkerTurnResult{
-		outputText:         fallback.outputText,
-		finishReason:       fallback.finishReason,
-		usage:              fallback.usage,
-		rawResponse:        fallback.rawResponse,
-		workerOutputChunks: splitManagedCodexOutput(fallback.outputText),
-		toolProposals:      detectManagedCodexToolProposals(req.Prompt, fallback.outputText),
+	return &managedWorkerTurnEnvelope{
+		operatorMessage: fallback.outputText,
+		finishReason:    fallback.finishReason,
+		usage:           fallback.usage,
+		rawResponse:     append(json.RawMessage(nil), fallback.rawResponse...),
+		outputChunks:    splitManagedCodexOutput(fallback.outputText),
+		toolProposals:   detectManagedCodexToolProposals(req.Prompt, fallback.outputText),
+		events: []managedWorkerEvent{
+			{
+				Type: "legacy_output",
+				Text: strings.TrimSpace(fallback.outputText),
+			},
+		},
+		sourceMode: "legacy_fallback",
 	}, nil
 }
 
-func (a codexManagedWorkerAdapter) ContinueTurn(ctx context.Context, req managedWorkerContinuationRequest, boundary *managedWorkerProviderBoundary) (*managedWorkerTurnResult, error) {
+func (a codexManagedWorkerAdapter) ContinueTurn(ctx context.Context, req managedWorkerContinuationRequest, boundary *managedWorkerProviderBoundary) (*managedWorkerTurnEnvelope, error) {
 	if !a.UsesProviderRoutes() {
 		profile := req.Profile
 		if strings.TrimSpace(profile.ID) == "" {
@@ -135,11 +133,17 @@ func (a codexManagedWorkerAdapter) ContinueTurn(ctx context.Context, req managed
 		}, profile, boundary)
 	}
 	summary := buildManagedCodexLegacyContinuationSummary(req)
-	return &managedWorkerTurnResult{
-		outputText:         summary,
-		finishReason:       "managed_worker_legacy_continuation",
-		workerOutputChunks: splitManagedCodexOutput(summary),
-		toolProposals:      nil,
+	return &managedWorkerTurnEnvelope{
+		operatorMessage: summary,
+		finishReason:    "managed_worker_legacy_continuation",
+		outputChunks:    splitManagedCodexOutput(summary),
+		events: []managedWorkerEvent{
+			{
+				Type: "legacy_continuation",
+				Text: summary,
+			},
+		},
+		sourceMode: "legacy_fallback",
 	}, nil
 }
 
