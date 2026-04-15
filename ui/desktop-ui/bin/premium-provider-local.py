@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Thin public provider-route loader/proxy.
+"""Local provider-route loader/proxy.
 
-The OSS repo does not ship separately delivered premium provider logic. This
-process only discovers a separately delivered provider endpoint and forwards
-the public provider-boundary requests to it.
+This process discovers a configured provider endpoint and forwards the public
+provider-boundary requests to it.
 """
 
 from __future__ import annotations
@@ -74,9 +73,9 @@ def resolve_provider_payload_root() -> Path:
     if not candidate.exists():
         default_root = default_provider_install_root() / "extracted"
         raise FileNotFoundError(
-            "Separately delivered provider artifact not installed for local-provider mode. "
+            "Provider artifact not installed for local-provider mode. "
             f"Expected extracted pack root at: {candidate}. "
-            f"Install the official provider artifact under {default_root} "
+            f"Install the provider artifact under {default_root} "
             "or set EPYDIOS_PREMIUM_PROVIDER_EXTRACTED_ROOT to the extracted pack root."
         )
     return candidate

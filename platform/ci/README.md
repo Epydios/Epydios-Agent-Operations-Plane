@@ -186,11 +186,11 @@ This directory contains CI entrypoint scripts invoked by GitHub Actions.
     - `RUN_M10_PROVIDER_CONFORMANCE=1`
     - `RUN_M10_POLICY_GRANT_ENFORCEMENT=1`
     - `RUN_M10_DEPLOYMENT_MODES=1`
-    - `RUN_M10_NO_EGRESS_LOCAL_AIMXS=1`
+    - `RUN_M10_PROVIDER_BOUNDARY_NO_EGRESS=1`
     - `RUN_M10_ENTITLEMENT_DENY=1`
-    - `RUN_M10_AIMXS_PRIVATE_RELEASE=1`
-    - `RUN_M10_CUSTOMER_HOSTED_PACKAGING=1`
-    - Full mode keeps the public placeholders and public boundary checks wired, but detailed premium verification remains outside the OSS repo.
+    - `RUN_M10_PROVIDER_RELEASE_BOUNDARY=1`
+    - `RUN_M10_PROVIDER_PACKAGING_BOUNDARY=1`
+    - Full mode keeps the supported provider-route compatibility and boundary checks wired.
   - M12 operations pack check in full mode (required, no skips):
     - `RUN_M12_SLO_SLI_PACK=1`
     - `RUN_M12_DR_GAMEDAY=1`

@@ -34,7 +34,7 @@ Ship a secure, operator-focused UI module that can monitor and operate the contr
 
 - Policy authoring UI
 - Evidence bundle editing
-- AIMXS internals visualization
+- Provider implementation internals visualization
 - Multi-cluster fleet management
 - End-user agent prompt UX
 
@@ -42,7 +42,6 @@ Ship a secure, operator-focused UI module that can monitor and operate the contr
 
 - API-first: only documented runtime/control-plane endpoints
 - No direct DB connectivity
-- No private AIMXS code dependency
 - Deployable independently from backend control-plane rollout
 
 ## M0 Acceptance Criteria
