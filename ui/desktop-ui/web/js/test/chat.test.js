@@ -91,7 +91,7 @@ test("chat view renders parity fixture state from the native contract", async ()
         taskRef: "task-parity-001",
         evidenceRefs: ["evidence://thread/parity/001"],
         auditRefs: ["approval.reviewed@2026-03-10T14:00:00Z"],
-        summary: "Correlated AIMXS drill-in for the active thread."
+        summary: "Correlated decision drill-in for the active thread."
       })
     }
   );
@@ -115,22 +115,22 @@ test("chat view renders parity fixture state from the native contract", async ()
   assert.match(html, /Agent Profile/);
   assert.match(html, /Execution Path/);
   assert.match(html, /Thread Intent/);
-  assert.match(html, /AIMXS Thread Flow/);
+  assert.match(html, /Routed Thread Flow/);
   assert.match(html, /Current stage:/);
   assert.match(html, /Next Truthful Action/);
   assert.match(html, /Review 2 approval checkpoints/);
   assert.match(html, /Approval Context Drawer/);
-  assert.match(html, /AIMXS Decision Binding/);
-  assert.match(html, /Correlated AIMXS Drill-In/);
-  assert.match(html, /AIMXS Lifecycle Ribbon/);
+  assert.match(html, /Decision Record/);
+  assert.match(html, /Correlated Decision Drill-In/);
+  assert.match(html, /Decision Lifecycle/);
   assert.match(html, /Authority Chain/);
   assert.match(html, /Grant Chain/);
   assert.match(html, /Receipt Chain/);
   assert.match(html, /Replay Chain/);
   assert.match(html, /Evidence Chain/);
   assert.match(html, /data-aimxs-spine-action="open-workspace"/);
-  assert.match(html, /Decision Binding Contract/);
-  assert.match(html, /Stable Or Replay Refs/);
+  assert.match(html, /Decision Record/);
+  assert.match(html, /Evidence And Trace Refs/);
   assert.match(html, /Pinned Approval Review/);
   assert.match(html, /Pin Approval Checkpoints/);
   assert.match(html, /Pin Tool Proposals/);
@@ -142,7 +142,6 @@ test("chat view renders parity fixture state from the native contract", async ()
   assert.match(html, /Pin Latest Tool Action/);
   assert.match(html, /Pin Latest Evidence/);
   assert.match(html, /Pin Managed Transcript/);
-  assert.match(html, /replay ref/i);
   assert.match(html, /Latest Tool Action Drill-In/);
   assert.match(html, /Latest Evidence Drill-In/);
   assert.match(html, /Managed Transcript Anchor/);

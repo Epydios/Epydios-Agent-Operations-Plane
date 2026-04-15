@@ -53,7 +53,7 @@ export function renderAimxsRouteBoundaryBlock(model = {}) {
         ${
           routeFields
             ? `<div class="aimxs-binding-grid">${routeFields}</div>`
-            : '<div class="aimxs-empty">No bounded AIMXS route fields are available yet.</div>'
+            : '<div class="aimxs-empty">No bounded provider-route fields are available yet.</div>'
         }
       </div>
       ${renderSection(model.currentBoundary)}

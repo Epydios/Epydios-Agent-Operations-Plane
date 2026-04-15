@@ -756,8 +756,8 @@ function renderPolicyRollbackHistoryBoard(snapshot) {
 function renderDecisionExplanationBoard(snapshot) {
   const board = snapshot.decisionExplanation;
   const premiumDecisionVisible = Boolean(snapshot?.aimxsPremiumVisible);
-  const boardTitle = premiumDecisionVisible ? "Premium Decision Rationale" : "Decision Explanation";
-  const outcomeTitle = premiumDecisionVisible ? "Current Governed Outcome" : "Current Outcome";
+  const boardTitle = premiumDecisionVisible ? "Routed Decision Explanation" : "Decision Explanation";
+  const outcomeTitle = premiumDecisionVisible ? "Current Routed Outcome" : "Current Outcome";
   if (!board.available || !board.richness || !board.outcome) {
     return `
       <article class="metric policyops-card" data-domain-root="policyops" data-policyops-panel="decision-explanation">
@@ -768,7 +768,7 @@ function renderDecisionExplanationBoard(snapshot) {
         <div class="policyops-kv-list">
           <div class="policyops-row">
             <div class="policyops-row-label">Status</div>
-            <div class="policyops-row-value"><span class="policyops-empty">${escapeHTML(premiumDecisionVisible ? "No recorded premium decision rationale is loaded." : "No recorded policy decision is loaded.")}</span></div>
+            <div class="policyops-row-value"><span class="policyops-empty">${escapeHTML(premiumDecisionVisible ? "No recorded routed decision explanation is loaded." : "No recorded policy decision is loaded.")}</span></div>
           </div>
         </div>
       </article>
@@ -778,7 +778,7 @@ function renderDecisionExplanationBoard(snapshot) {
   const providerLabel = displayPolicyProviderLabel(board.selectedPolicyProvider || board.outcome.provider || "-");
   const rows = [
     {
-      label: premiumDecisionVisible ? "Decision Path" : "Decision Source",
+      label: premiumDecisionVisible ? "Decision Route" : "Decision Source",
       value: renderValuePills([
         { label: "decision", value: board.richness.decision || "UNSET" },
         { label: "provider", value: providerLabel, code: true },
@@ -796,7 +796,7 @@ function renderDecisionExplanationBoard(snapshot) {
       ])
     },
     {
-      label: premiumDecisionVisible ? "Decision Rationale" : "Rationale",
+      label: premiumDecisionVisible ? "Decision Context" : "Rationale",
       value: renderValuePills([
         { label: "boundary", value: board.richness.boundaryClass || "-" },
         { label: "risk", value: board.richness.riskTier || "-" },
@@ -805,7 +805,7 @@ function renderDecisionExplanationBoard(snapshot) {
       ])
     },
     {
-      label: premiumDecisionVisible ? "Authority Basis" : "Authority Input",
+      label: premiumDecisionVisible ? "Authority Context" : "Authority Input",
       value: renderValuePills([
         { label: "subject", value: board.richness.actorSubject || "-", code: true },
         { label: "basis", value: board.richness.authorityBasis || "-" },
@@ -814,7 +814,7 @@ function renderDecisionExplanationBoard(snapshot) {
       ])
     },
     {
-      label: premiumDecisionVisible ? "Binding And Follow-Through" : "Governance Linkage",
+      label: premiumDecisionVisible ? "Follow-Through" : "Governance Linkage",
       value: renderValuePills([
         { label: "operator approval", value: board.richness.operatorApprovalRequired ? "required" : "baseline decision lane" },
         { label: "evidence refs", value: String(board.richness.evidenceRefCount || 0) },
@@ -831,7 +831,7 @@ function renderDecisionExplanationBoard(snapshot) {
       </div>
       ${renderActionButtons([
         {
-          label: premiumDecisionVisible ? "Export Premium Decision Rationale" : "Export Decision Explanation",
+          label: premiumDecisionVisible ? "Export Routed Decision Explanation" : "Export Decision Explanation",
           command: "export-decision-explanation",
           disabled: !board.exportable
         },
@@ -841,7 +841,7 @@ function renderDecisionExplanationBoard(snapshot) {
           disabled: !snapshot.stableReferences.contractId && !snapshot.stableReferences.runId
         },
         {
-          label: premiumDecisionVisible ? "Open Governance Route" : "Open Linked Governance",
+          label: premiumDecisionVisible ? "Open Routed Governance" : "Open Linked Governance",
           command: "open-linked-governance",
           disabled: !board.runId
         }
@@ -1049,7 +1049,7 @@ function renderAimxsIdentityPostureEchoBoard(snapshot) {
   return `
     <article class="metric policyops-card policyops-card-wide" data-domain-root="policyops" data-policyops-panel="aimxs-identity-posture-echo">
       <div class="metric-title-row">
-        <div class="title">${escapeHTML(aimxsPremiumVisible ? "Premium Identity And Authority Posture" : "Identity And Posture Echo")}</div>
+        <div class="title">${escapeHTML(aimxsPremiumVisible ? "Routed Identity And Posture" : "Identity And Posture Echo")}</div>
         <span class="chip chip-neutral chip-compact">read-only</span>
       </div>
       ${renderAimxsIdentityPostureBlock(snapshot.aimxsIdentityPosture)}

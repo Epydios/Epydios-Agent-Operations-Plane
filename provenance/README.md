@@ -12,22 +12,12 @@ What belongs here:
 
 What does not belong here:
 
-- premium AIMXS release-process documentation
-- private AIMXS packaging metadata
+- separately delivered non-OSS release-process documentation
+- private packaging metadata
 - private release evidence payloads
 - raw operational logs that make the OSS repo look incomplete or workspace-dependent
 
-Premium AIMXS release-process docs now live under:
-
-- `docs/premium/`
-
-Default premium AIMXS release metadata and evidence now live outside the repo at:
-
-```bash
-~/.epydios/premium/release/aimxs
-```
-
-Legacy repo-local or workspace-local premium AIMXS metadata paths may still be accepted by some scripts for compatibility, but they are not the primary taxonomy and should not be treated as part of committed OSS provenance.
+Separately delivered non-OSS release metadata and evidence remain outside the public repo. Public provenance in this directory is limited to OSS lockfiles and OSS accountability artifacts.
 
 ## Validation Gate
 

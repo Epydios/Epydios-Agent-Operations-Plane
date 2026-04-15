@@ -138,7 +138,7 @@ test("incidentops page restores visible continuation and closure clusters", () =
   assert.match(ui.incidentOpsContent.innerHTML, /Incident Priority/);
   assert.match(ui.incidentOpsContent.innerHTML, /Incident Continuity Timeline/);
   assert.match(ui.incidentOpsContent.innerHTML, /Closure Readiness/);
-  assert.match(ui.incidentOpsContent.innerHTML, /AIMXS Decision-Binding Spine/);
+  assert.match(ui.incidentOpsContent.innerHTML, /Routed Decision Spine/);
   assert.match(ui.incidentOpsContent.innerHTML, /Authority Chain/);
   assert.match(ui.incidentOpsContent.innerHTML, /Grant Chain/);
   assert.match(ui.incidentOpsContent.innerHTML, /Receipt Chain/);

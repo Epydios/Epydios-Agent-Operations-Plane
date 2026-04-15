@@ -248,8 +248,8 @@ Optional fields:
 - `requiredCapabilities`
 - `requiredVerifierIds`
 - `decisionContext`
-- `grantTokenPresent`
-- `grantTokenSha256`
+- `capabilityGrantPresent`
+- `capabilityGrantSha256`
 
 Approval states:
 

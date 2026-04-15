@@ -211,7 +211,7 @@ function renderAimxsDecisionBindingSpineBoard(snapshot) {
   return `
     <article class="metric incidentops-card" data-domain-root="incidentops" data-incidentops-panel="aimxs-decision-binding-spine">
       <div class="metric-title-row">
-        <div class="title">AIMXS Decision-Binding Spine</div>
+        <div class="title">Routed Decision Spine</div>
         <span class="chip chip-neutral chip-compact">correlated</span>
       </div>
       ${renderAimxsDecisionBindingSpine(board)}

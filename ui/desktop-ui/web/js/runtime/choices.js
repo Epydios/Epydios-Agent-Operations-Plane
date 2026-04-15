@@ -133,7 +133,7 @@ export function resolveRuntimeChoices(config) {
   const realtime = ui.realtime || {};
   const terminal = ui.terminal || {};
   const integrations = ui.integrations || {};
-  const aimxs = ui.aimxs || {};
+  const aimxs = ui.aimxs || ui.premiumProvider || {};
   const theme = ui.theme || {};
   const agentProfiles = normalizeAgentProfiles(integrations.agentProfiles);
   const selectedAgentProfileID = String(integrations.selectedAgentProfileId || "").trim().toLowerCase();

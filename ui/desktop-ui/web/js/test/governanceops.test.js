@@ -225,7 +225,7 @@ test("governanceops page renders runtime approvals plus identity admin proposal 
       taskRef: "task-20260314-queue-001",
       evidenceRefs: ["evidence://finance/transfer/001"],
       auditRefs: ["approval.reviewed@2026-03-14T21:05:00Z"],
-      summary: "Correlated AIMXS drill-in for governance review."
+      summary: "Correlated decision drill-in for governance review."
     }),
     now: "2026-03-14T21:05:00Z"
   });
@@ -243,15 +243,15 @@ test("governanceops page renders runtime approvals plus identity admin proposal 
   );
   assert.match(ui.governanceOpsContent.innerHTML, /Focused Review And Routed Holds/);
   assert.match(ui.governanceOpsContent.innerHTML, /Routed Admin Proposal Review/);
-  assert.match(ui.governanceOpsContent.innerHTML, /Premium Decision Lifecycle/);
-  assert.match(ui.governanceOpsContent.innerHTML, /Premium Decision-Binding Spine/);
-  assert.match(ui.governanceOpsContent.innerHTML, /Authority And Route Chain/);
-  assert.match(ui.governanceOpsContent.innerHTML, /Grant And Execution Chain/);
-  assert.match(ui.governanceOpsContent.innerHTML, /Receipt And Proof Chain/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Routed Decision Lifecycle/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Routed Decision Spine/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Authority And Route Record/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Grant And Execution Record/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Receipt And Proof Record/);
   assert.match(ui.governanceOpsContent.innerHTML, /Replay Continuity/);
-  assert.match(ui.governanceOpsContent.innerHTML, /Evidence And Audit Chain/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Evidence And Audit Record/);
   assert.match(ui.governanceOpsContent.innerHTML, /data-aimxs-spine-action="open-workspace"/);
-  assert.match(ui.governanceOpsContent.innerHTML, /Authority And Binding Contract/);
+  assert.match(ui.governanceOpsContent.innerHTML, /Authority And Decision Record/);
   assert.match(ui.governanceOpsContent.innerHTML, /Receipt, Replay, And Proof Anchors/);
   assert.match(ui.governanceOpsContent.innerHTML, /Governance Review Backlog/);
   assert.match(ui.governanceOpsContent.innerHTML, /Connector Approval Hold/);

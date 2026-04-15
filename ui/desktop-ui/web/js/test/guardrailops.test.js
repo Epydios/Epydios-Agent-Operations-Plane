@@ -269,7 +269,6 @@ test("guardrailops page renders the first inspect-only guardrail boards", () => 
   assert.match(ui.guardrailOpsContent.innerHTML, /Rollback And History/);
   assert.match(ui.guardrailOpsContent.innerHTML, /Guardrail Posture/);
   assert.match(ui.guardrailOpsContent.innerHTML, /Identity And Posture/);
-  assert.doesNotMatch(ui.guardrailOpsContent.innerHTML, /AIMXS Identity And Posture/);
   assert.match(ui.guardrailOpsContent.innerHTML, /desktop execution posture/);
   assert.match(ui.guardrailOpsContent.innerHTML, /approval gate \+ runtime policy/);
   assert.match(ui.guardrailOpsContent.innerHTML, /Current Posture/);

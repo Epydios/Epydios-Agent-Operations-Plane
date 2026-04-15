@@ -71,7 +71,7 @@ function renderEnvironmentOverviewBoard(snapshot) {
       ])
     },
     {
-      label: aimxsPremiumVisible ? "AIMXS Selection" : "Provider Selection",
+      label: aimxsPremiumVisible ? "Routed Selection" : "Provider Selection",
       value: renderValuePills([
         { label: "mode", value: board.activeMode },
         { label: "provider", value: board.selectedProviderId, code: true }
@@ -118,7 +118,7 @@ function renderDeploymentPostureBoard(snapshot) {
       label: "Control Plane Posture",
       value: renderValuePills([
         { label: "pipeline", value: board.pipelineStatus },
-        { label: aimxsPremiumVisible ? "aimxs" : "provider route", value: board.aimxsState },
+        { label: aimxsPremiumVisible ? "routed" : "provider route", value: board.aimxsState },
         { label: "enabled providers", value: String(board.enabledProviderCount) }
       ])
     },
@@ -160,7 +160,7 @@ function renderDependencyReadinessBoard(snapshot) {
       ])
     },
     {
-      label: aimxsPremiumVisible ? "AIMXS Dependencies" : "Provider Route Dependencies",
+      label: aimxsPremiumVisible ? "Routed Dependencies" : "Provider Route Dependencies",
       value: renderValuePills([
         { label: "secrets present", value: String(board.secretPresentCount) },
         { label: "secrets missing", value: String(board.secretMissingCount) },
@@ -217,7 +217,7 @@ function renderProviderRegistrationBoard(snapshot) {
       label: "Registration Signals",
       value: renderValuePills([
         { label: "probed", value: String(board.probedProviderCount) },
-        { label: aimxsPremiumVisible ? "enabled aimxs" : "enabled routed", value: String(board.enabledProviderCount) },
+        { label: aimxsPremiumVisible ? "enabled routed" : "enabled routed", value: String(board.enabledProviderCount) },
         { label: "enabled ready", value: String(board.enabledReadyCount) },
         { label: "first degraded", value: board.firstDegradedProviderId, code: true }
       ])
@@ -280,11 +280,11 @@ function renderAimxsBridgeReadinessBoard(snapshot) {
   return `
     <article class="metric platformops-card" data-domain-root="platformops" data-platformops-panel="aimxs-bridge-readiness">
       <div class="metric-title-row">
-        <div class="title">${escapeHTML(aimxsPremiumVisible ? "AIMXS Bridge Readiness" : "Provider Bridge Readiness")}</div>
+        <div class="title">${escapeHTML(aimxsPremiumVisible ? "Routed Bridge Readiness" : "Provider Bridge Readiness")}</div>
         <span class="${chipClassForTone(board.tone)}">${escapeHTML(board.tone)}</span>
       </div>
       <div class="platformops-chip-row">
-        <span class="${chipClassForStatus(board.state)} chip-compact">${escapeHTML(aimxsPremiumVisible ? "aimxs" : "bridge")}</span>
+        <span class="${chipClassForStatus(board.state)} chip-compact">${escapeHTML(aimxsPremiumVisible ? "routed" : "bridge")}</span>
         <span class="chip chip-neutral chip-compact">mode=${escapeHTML(board.activeMode)}</span>
         <span class="chip chip-neutral chip-compact">warnings=${escapeHTML(String(board.warningCount))}</span>
       </div>
@@ -298,7 +298,7 @@ function renderAimxsRouteBoundaryBoard(snapshot) {
   return `
     <article class="metric platformops-card platformops-card-wide" data-domain-root="platformops" data-platformops-panel="aimxs-route-boundary">
       <div class="metric-title-row">
-        <div class="title">${escapeHTML(aimxsPremiumVisible ? "AIMXS Route And Boundary" : "Route And Boundary")}</div>
+        <div class="title">${escapeHTML(aimxsPremiumVisible ? "Routed Route And Boundary" : "Route And Boundary")}</div>
         <span class="chip chip-neutral chip-compact">primary</span>
       </div>
       ${renderAimxsRouteBoundaryBlock(snapshot.aimxsRouteBoundary)}

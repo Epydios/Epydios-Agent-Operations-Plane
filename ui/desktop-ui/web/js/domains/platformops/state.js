@@ -467,7 +467,7 @@ function buildPlatformAimxsRouteBoundary(snapshot = {}) {
   return createAimxsRouteBoundaryModel({
     summary:
       aimxsPremiumVisible
-        ? "This primary AIMXS view shows which deployment route is currently live on the platform surface and why the release boundary is still allowed or constrained."
+        ? "This primary routed view shows which deployment route is currently live on the platform surface and why the release boundary is still allowed or constrained."
         : "This primary provider-route view shows which deployment route is currently live on the platform surface and why the release boundary is still allowed or constrained.",
     surfaceLabel: "primary platform surface",
     routeFields: [
@@ -483,7 +483,7 @@ function buildPlatformAimxsRouteBoundary(snapshot = {}) {
       badge: bounded ? "current" : "watch",
       tone: bounded ? "ok" : "warn",
       note: aimxsPremiumVisible
-        ? "Current route is derived from AIMXS bridge readiness and the active platform deployment surface."
+        ? "Current route is derived from routed-bridge readiness and the active platform deployment surface."
         : "Current route is derived from bridge readiness and the active platform deployment surface.",
       fields: [
         createAimxsRouteBoundaryField("bridge state", bridge?.state),
@@ -499,7 +499,7 @@ function buildPlatformAimxsRouteBoundary(snapshot = {}) {
       badge: bounded ? "bounded" : "constrained",
       tone: bounded ? "ok" : "warn",
       note: aimxsPremiumVisible
-        ? "Platform boundaries stay bounded by pipeline status, provider readiness, and AIMXS secret posture before any deployment change can proceed."
+        ? "Platform boundaries stay bounded by pipeline status, provider readiness, and routed secret posture before any deployment change can proceed."
         : "Platform boundaries stay bounded by pipeline status, provider readiness, and bridge secret posture before any deployment change can proceed.",
       fields: [
         createAimxsRouteBoundaryField("pipeline", release?.pipelineStatus),

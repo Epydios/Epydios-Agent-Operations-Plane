@@ -36,7 +36,7 @@ test("settings view persists raw response and native timeline disclosure shells"
         activation: {
           available: true,
           state: "active",
-          message: "AIMXS activation switched the live policy-provider path to aimxs-full using the local AIMXS provider shim.",
+          message: "Provider-route activation switched the live policy-provider path to local-provider using the launcher-side provider bridge.",
           namespace: "epydios-system",
           activeMode: "aimxs-full",
           selectedProviderId: "aimxs-full",
@@ -191,13 +191,13 @@ test("settings view persists raw response and native timeline disclosure shells"
   assert.match(ui.settingsContent.innerHTML, /aimxs-full/);
   assert.match(ui.settingsContent.innerHTML, /aimxs-full/);
   assert.match(ui.settingsContent.innerHTML, /Provider CA Ref/);
-  assert.match(ui.settingsContent.innerHTML, /Activate AIMXS Mode/);
-  assert.match(ui.settingsContent.innerHTML, /Refresh Activation Status/);
-  assert.match(ui.settingsContent.innerHTML, /clusterMode=aimxs-full/);
+  assert.match(ui.settingsContent.innerHTML, /Activate Provider Route/);
+  assert.match(ui.settingsContent.innerHTML, /Refresh Provider Status/);
+  assert.match(ui.settingsContent.innerHTML, /clusterMode=local-provider/);
   assert.match(ui.settingsContent.innerHTML, /Current Identity \+ Authority/);
   assert.match(ui.settingsContent.innerHTML, /data-domain-root="identityops"/);
   assert.match(ui.settingsContent.innerHTML, /demo\.operator/);
-  assert.match(ui.settingsContent.innerHTML, /Current Policy Contract/);
+  assert.match(ui.settingsContent.innerHTML, /Decision Contract/);
   assert.match(ui.settingsContent.innerHTML, /data-domain-root="policyops"/);
   assert.match(ui.settingsContent.innerHTML, /Local Demo Identity \+ Policy Overlay/);
   assert.match(ui.settingsContent.innerHTML, /Save Demo Overlay/);

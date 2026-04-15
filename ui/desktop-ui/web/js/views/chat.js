@@ -1699,13 +1699,13 @@ function renderAgentAimxsLegibilityContext(model = {}) {
   return `
     <div class="metric agentops-context-panel">
       <div class="metric-title-row">
-        <div class="title">AIMXS Decision Binding</div>
+        <div class="title">Decision Record</div>
         <span class="chip chip-neutral chip-compact">shared</span>
       </div>
       ${
         model?.available
           ? renderAimxsLegibilityBlock(model)
-          : '<div class="meta">No AIMXS lifecycle or binding anchors are available for the active thread yet.</div>'
+          : '<div class="meta">No decision lifecycle or record anchors are available for the active thread yet.</div>'
       }
     </div>
   `;
@@ -1718,7 +1718,7 @@ function renderAgentAimxsDecisionBindingSpine(model = {}) {
   return `
     <div class="metric agentops-context-panel">
       <div class="metric-title-row">
-        <div class="title">Correlated AIMXS Drill-In</div>
+        <div class="title">Correlated Decision Drill-In</div>
         <span class="chip chip-neutral chip-compact">spine</span>
       </div>
       ${renderAimxsDecisionBindingSpine(model)}
@@ -1886,7 +1886,7 @@ function renderAgentWorkflowClarityContext(context = {}) {
   return `
     <div class="agentops-thread-flow">
       <div class="metric-title-row">
-        <div class="title">AIMXS Thread Flow</div>
+        <div class="title">Routed Thread Flow</div>
         <span class="${toneClass}">${escapeHTML(String(currentStage?.stateLabel || "Pending"))}</span>
       </div>
       <div class="meta">Current stage: ${escapeHTML(String(currentStage?.label || "Governed Ingress"))}</div>
@@ -1907,7 +1907,7 @@ function renderAgentWorkflowClarityContext(context = {}) {
                 .join("")}
             </div>
           `
-          : `<div class="meta">No AIMXS lifecycle anchors are available for the active thread yet.</div>`
+          : `<div class="meta">No decision lifecycle anchors are available for the active thread yet.</div>`
       }
       <div class="agentops-workflow-next">
         <div class="agentops-proof-label">Next Truthful Action</div>

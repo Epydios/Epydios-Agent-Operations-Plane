@@ -32,4 +32,4 @@ kubectl apply -k platform/overlays/production
 4. Update runtime hostnames/parent gateway in `runtime-httproute.yaml`.
 5. If your environment uses non-RFC1918 node addressing, tighten or adjust ingress policy CIDRs accordingly.
 6. Install Kyverno before applying signed-image policy pack: `kubectl apply -k platform/hardening/admission-kyverno`.
-7. Ensure selected policy providers return a short-lived grant token for non-`DENY` decisions (`grantToken` or `output.aimxsGrantToken`) or runtime execution will be blocked.
+7. Ensure selected policy providers return a short-lived capability grant token for non-`DENY` decisions or runtime execution will be blocked.

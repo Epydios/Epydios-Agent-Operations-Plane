@@ -619,7 +619,7 @@ function buildNetworkAimxsRouteBoundary(snapshot = {}) {
   return createAimxsRouteBoundaryModel({
     summary:
       snapshot?.aimxsPremiumVisible
-        ? "This primary AIMXS view correlates the active network route chain, trust boundary, and bounded probe surface. Later bounded network control remains closed."
+        ? "This primary routed view correlates the active network route chain, trust boundary, and bounded probe surface. Later bounded network control remains closed."
         : "This primary provider-route view correlates the active network route chain, trust boundary, and bounded probe surface. Later bounded network control remains closed.",
     surfaceLabel: "primary network surface",
     routeFields: [

@@ -212,7 +212,7 @@ function renderContractLab(snapshot) {
             ])
           },
           {
-            label: "AIMXS And Terminal",
+            label: "Provider Route And Terminal",
             value: renderValuePills([
               { label: "aimxs mode", value: board.aimxsMode, code: true },
               { label: "aimxs provider", value: board.aimxsProviderId, code: true },

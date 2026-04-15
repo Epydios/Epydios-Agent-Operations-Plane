@@ -17,6 +17,6 @@ export function renderNetworkOpsEmptyState(ui, options = {}) {
     options.title || "NetworkOps",
     options.message || "Network posture becomes available after boundary, endpoint, and trust signals load.",
     options.detail ||
-      "Refresh the workspace. If network posture should already be present, verify settings endpoint health, provider route state, and AIMXS trust inputs."
+      "Refresh the workspace. If network posture should already be present, verify settings endpoint health, provider route state, and trust inputs."
   );
 }

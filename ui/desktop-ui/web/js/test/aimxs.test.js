@@ -44,7 +44,7 @@ test("baseline mode renders baseline labels while keeping internal ids", () => {
       activation: {
         available: true,
         state: "active",
-        message: "AIMXS activation switched the live policy-provider path to oss-only.",
+        message: "Provider-route activation switched the live policy-provider path to baseline.",
         namespace: "epydios-system",
         activeMode: "oss-only",
         selectedProviderId: "oss-policy-opa",
@@ -62,9 +62,9 @@ test("baseline mode renders baseline labels while keeping internal ids", () => {
   assert.equal(resolveAimxsContractProfile(settings.aimxs).deploymentLabel, "baseline");
   assert.equal(
     describeAimxsAppliedMessage(settings.aimxs),
-    "AIMXS is set to baseline; policy routing stays on the baseline provider path."
+    "Provider routing is set to baseline; policy routing stays on the baseline provider path."
   );
-  assert.match(metric, /mode=baseline/);
+  assert.match(metric, /policy=baseline/);
   assert.match(metric, /selectedPolicyProvider=baseline/);
   assert.match(metric, />baseline<\/option>/);
   assert.doesNotMatch(metric, />oss-only<\/option>/);
@@ -84,8 +84,8 @@ test("aimxs full mode stays valid without secure refs", () => {
     healthPath: "/healthz",
     capabilitiesPath: "/v1alpha1/capabilities",
     contractVersion: "v1alpha1",
-    deploymentLabel: "aimxs-full",
-    summary: "Full AIMXS local provider shim for the Desktop/runtime stack with no HTTPS or cluster secret dependency."
+    deploymentLabel: "local-provider",
+    summary: "Launcher-side local provider route with no HTTPS or cluster-secret dependency."
   });
 });
 
@@ -105,7 +105,7 @@ test("aimxs https mode requires entitlement and secure refs", () => {
   );
 
   assert.equal(validation.valid, false);
-  assert.match(validation.errors.join(" "), /payment entitlement/i);
+  assert.match(validation.errors.join(" "), /entitlement is active/i);
   assert.match(validation.errors.join(" "), /must use ref:\/\//i);
 });
 
@@ -132,13 +132,13 @@ test("aimxs full rendering shows local mode and no secure ref collection", () =>
       paymentEntitled: false,
       mode: "aimxs-full",
       state: "ready",
-      detail: "1/1 AIMXS providers are ready.",
+      detail: "1/1 routed providers are ready.",
       providerIds: ["aimxs-full"],
       endpointRef: "ref://projects/demo/providers/aimxs/https-endpoint",
       activation: {
         available: true,
         state: "active",
-        message: "AIMXS activation switched the live policy-provider path to aimxs-full using the local AIMXS provider shim.",
+        message: "Provider-route activation switched the live policy-provider path to local-provider using the launcher-side provider bridge.",
         namespace: "epydios-system",
         activeMode: "aimxs-full",
         selectedProviderId: "aimxs-full",
@@ -173,14 +173,14 @@ test("aimxs full rendering shows local mode and no secure ref collection", () =>
   const refs = collectAimxsSecureRefItems(settings);
 
   assert.match(metric, /aimxs-full/);
-  assert.match(metric, /clusterMode=aimxs-full/);
-  assert.match(metric, /clusterSecrets=not required for aimxs-full/);
-  assert.match(metric, /Activate AIMXS Mode/);
-  assert.match(status, /AIMXS Provider Status/);
+  assert.match(metric, /clusterMode=local-provider/);
+  assert.match(metric, /clusterSecrets=not required for local-provider/);
+  assert.match(metric, /Activate Provider Route/);
+  assert.match(status, /Provider Route Status/);
   assert.equal(refs.length, 0);
   assert.equal(
     describeAimxsAppliedMessage(settings.aimxs),
-    "AIMXS is set to aimxs-full on the local provider shim; HTTPS and secure refs are not required in this mode."
+    "Provider routing is set to local-provider; HTTPS and secure refs are not required in this mode."
   );
 });
 
@@ -190,7 +190,7 @@ test("aimxs https rendering still surfaces secure refs", () => {
       paymentEntitled: true,
       mode: "aimxs-https",
       state: "ready",
-      detail: "1/1 AIMXS providers are ready.",
+      detail: "1/1 routed providers are ready.",
       providerIds: ["aimxs-policy-primary"],
       endpointRef: "ref://projects/demo/providers/aimxs/https-endpoint",
       bearerTokenRef: "ref://projects/demo/providers/aimxs/bearer-token",
@@ -200,7 +200,7 @@ test("aimxs https rendering still surfaces secure refs", () => {
       activation: {
         available: true,
         state: "active",
-        message: "AIMXS activation switched the live policy-provider path to aimxs-https.",
+        message: "Provider-route activation switched the live policy-provider path to secure-provider.",
         namespace: "epydios-system",
         activeMode: "aimxs-https",
         selectedProviderId: "aimxs-policy-primary",
@@ -239,7 +239,7 @@ test("aimxs https rendering still surfaces secure refs", () => {
   const refs = collectAimxsSecureRefItems(settings);
 
   assert.match(metric, /aimxs-https/);
-  assert.match(metric, /clusterMode=aimxs-https/);
+  assert.match(metric, /clusterMode=secure-provider/);
   assert.equal(refs.length, 5);
   assert.deepEqual(resolveAimxsContractProfile(settings.aimxs), {
     mode: "aimxs-https",
@@ -248,8 +248,8 @@ test("aimxs https rendering still surfaces secure refs", () => {
     healthPath: "/healthz",
     capabilitiesPath: "/v1alpha1/capabilities",
     contractVersion: "v1alpha1",
-    deploymentLabel: "aimxs-https",
-    summary: "Secure AIMXS HTTPS path with bearer token, client TLS, and provider CA trust."
+    deploymentLabel: "secure-provider",
+    summary: "Secure provider route with bearer token, client TLS, and provider CA trust."
   });
 });
 
@@ -263,7 +263,7 @@ test("aimxs settings disables activation controls when helper is unavailable", (
       activation: {
         available: false,
         state: "unavailable",
-        message: "AIMXS activation helper is unavailable on this launcher."
+        message: "Provider-route activation helper is unavailable on this launcher."
       }
     }
   };
@@ -275,7 +275,7 @@ test("aimxs settings disables activation controls when helper is unavailable", (
 
   assert.match(metric, /data-settings-aimxs-action="activate"[^>]*disabled/);
   assert.match(metric, /data-settings-aimxs-action="refresh-activation"[^>]*disabled/);
-  assert.match(metric, /AIMXS activation helper is unavailable on this launcher\./);
+  assert.match(metric, /Provider-route activation helper is unavailable on this launcher\./);
 });
 
 test("aimxs overrides apply without mutating the base choice object", () => {

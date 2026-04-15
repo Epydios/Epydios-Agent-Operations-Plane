@@ -168,7 +168,7 @@ export function evaluateGovernedActionIssues(input) {
   if (!String(input.requiredGrantsText || "").trim()) {
     issues.push({
       severity: "warn",
-      message: "No required grants are listed. That weakens real AIMXS-vs-baseline differentiation."
+      message: "No required grants are listed. That weakens a clear routed-vs-baseline comparison."
     });
   }
   if (String(input.evidenceReadiness || "").trim().toUpperCase() === "READY") {
@@ -180,13 +180,13 @@ export function evaluateGovernedActionIssues(input) {
   if (!input.handshakeRequired) {
     issues.push({
       severity: "warn",
-      message: "Handshake enforcement is off. Turn it on if you want handshake-related AIMXS signals in the result."
+      message: "Handshake enforcement is off. Turn it on if you want handshake-related routed signals in the result."
     });
   }
   if (String(input.riskTier || "").trim().toLowerCase() !== "high") {
     issues.push({
       severity: "warn",
-      message: "Risk tier is not high. High risk is better for a clear baseline-vs-AIMXS decision difference."
+      message: "Risk tier is not high. High risk is better for a clear baseline-vs-routed decision difference."
     });
   }
   if (String(input.demoProfile || "").trim() === GOVERNED_ACTION_DEMO_PROFILE_FINANCE_PAPER) {
@@ -282,7 +282,7 @@ export function renderGovernedActionPolicyHints(ui, input, issues) {
   const comparisonHint = renderPanelStateMetric(
     "info",
     "Comparison Hygiene",
-    "Keep the same request fields when switching between baseline and aimxs-full. Only the active policy provider should change."
+    "Keep the same request fields when switching between baseline and the local-provider route. Only the active policy provider should change."
   );
   const policyHint = renderPanelStateMetric(
     "info",

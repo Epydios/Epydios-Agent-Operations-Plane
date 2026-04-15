@@ -6547,7 +6547,7 @@ async function main() {
       findings.push("One or more provider registrations remain degraded.");
     }
     if (secretMissingCount > 0) {
-      findings.push("AIMXS activation still has missing secret posture.");
+      findings.push("Provider-route activation still has missing secret posture.");
     }
     if (warnings.length > 0) {
       findings.push(warnings[0]);
@@ -11547,7 +11547,7 @@ function getCurrentIncidentOpsEntry(entryId = "") {
       return false;
     }
     if (!governanceAimxsRoutingLive()) {
-      setGovernanceOpsFeedback("warn", "Defer and escalate stay hidden until AIMXS routing is live. Approve and deny remain available.");
+      setGovernanceOpsFeedback("warn", "Defer and escalate stay hidden until provider routing is live. Approve and deny remain available.");
       return true;
     }
     const queueItem = governanceAdminQueueItemById(changeId);
@@ -11709,7 +11709,7 @@ function getCurrentIncidentOpsEntry(entryId = "") {
       return false;
     }
     if (!governanceAimxsRoutingLive()) {
-      setGovernanceOpsFeedback("warn", "Defer and escalate stay hidden until AIMXS routing is live. Approve and deny remain available.");
+      setGovernanceOpsFeedback("warn", "Defer and escalate stay hidden until provider routing is live. Approve and deny remain available.");
       return true;
     }
     const reasonInput =
@@ -13296,13 +13296,13 @@ function getCurrentIncidentOpsEntry(entryId = "") {
         ? {
             status: "dirty",
             message:
-              "AIMXS draft changed. Review warnings, then run Apply AIMXS Settings to update the active runtime choices.",
+              "Provider-route draft changed. Review warnings, then run Apply Provider Settings to update the active runtime choices.",
             errors: [],
             warnings: validation.warnings
           }
         : {
             status: "invalid",
-            message: "AIMXS apply is blocked. Fix the fields below, then run Apply AIMXS Settings again.",
+            message: "Provider-route apply is blocked. Fix the fields below, then run Apply Provider Settings again.",
             errors: validation.errors,
             warnings: validation.warnings
           };
@@ -13617,7 +13617,7 @@ function getCurrentIncidentOpsEntry(entryId = "") {
       if ((action === "apply" || action === "activate") && !draft) {
         aimxsEditorState = {
           status: "invalid",
-          message: "AIMXS controls are unavailable in this view. Reopen Settings and retry the action.",
+          message: "Provider-route controls are unavailable in this view. Reopen Settings and retry the action.",
           errors: [],
           warnings: []
         };
@@ -13632,17 +13632,17 @@ function getCurrentIncidentOpsEntry(entryId = "") {
             status: "clean",
             message: String(
               aimxsActivationSnapshot.message ||
-                "AIMXS activation status refreshed from the local launcher helper."
+                "Provider-route status refreshed from the local launcher helper."
             ).trim(),
             errors: [],
             warnings: aimxsActivationSnapshot.warnings || [],
             nextStep:
-              "Next step: if the active cluster mode is wrong, adjust the contract and run Activate AIMXS Mode."
+              "Next step: if the active cluster mode is wrong, adjust the contract and run Activate Provider Route."
           };
         } catch (error) {
           aimxsEditorState = {
             status: "error",
-            message: `AIMXS activation status refresh failed: ${error.message}`,
+            message: `Provider-route status refresh failed: ${error.message}`,
             errors: [],
             warnings: []
           };
@@ -13657,7 +13657,7 @@ function getCurrentIncidentOpsEntry(entryId = "") {
           status: "warn",
           message:
             aimxsActivationSnapshot.message ||
-            "AIMXS activation is unavailable on this launcher. Save the contract only, or use the supported launcher helper path.",
+            "Provider-route activation is unavailable on this launcher. Save the contract only, or use the supported launcher helper path.",
           errors: [],
           warnings: Array.isArray(aimxsActivationSnapshot.warnings) ? aimxsActivationSnapshot.warnings : []
         };
@@ -13674,7 +13674,7 @@ function getCurrentIncidentOpsEntry(entryId = "") {
         if (!validation.valid) {
           aimxsEditorState = {
             status: "invalid",
-            message: `AIMXS ${action} is blocked. Fix the fields below, then retry.`,
+            message: `Provider-route ${action} is blocked. Fix the fields below, then retry.`,
             errors: validation.errors,
             warnings: validation.warnings
           };
@@ -13700,7 +13700,7 @@ function getCurrentIncidentOpsEntry(entryId = "") {
             errors: [],
             warnings: validation.warnings,
             nextStep:
-              "Next step: run Activate AIMXS Mode when you want the live policy-provider selection to switch to this contract."
+              "Next step: run Activate Provider Route when you want the live policy-provider selection to switch to this contract."
           };
           renderAimxsEditorFeedbackInline(aimxsEditorState);
           recordConfigChange({
@@ -13725,7 +13725,7 @@ function getCurrentIncidentOpsEntry(entryId = "") {
             message: String(
               activationResult?.message ||
                 aimxsActivationSnapshot.message ||
-                "AIMXS activation request completed."
+                "Provider-route activation request completed."
             ).trim(),
             errors: [],
             warnings: [
@@ -13733,7 +13733,7 @@ function getCurrentIncidentOpsEntry(entryId = "") {
               ...(Array.isArray(aimxsActivationSnapshot.warnings) ? aimxsActivationSnapshot.warnings : [])
             ],
             nextStep:
-              "Next step: confirm provider readiness and capabilities in Settings, then run the live operator loop on the selected AIMXS mode."
+              "Next step: confirm provider readiness and capabilities in Settings, then run the live operator loop on the selected provider route."
           };
           recordConfigChange({
             action: "settings.aimxs.activate",
@@ -13750,13 +13750,13 @@ function getCurrentIncidentOpsEntry(entryId = "") {
         } catch (error) {
           aimxsEditorState = {
             status: "error",
-            message: `AIMXS activation failed: ${error.message}`,
+            message: `Provider-route activation failed: ${error.message}`,
             errors: [],
             warnings: validation.warnings,
             nextStep:
               validation.draft.mode === "aimxs-full"
-                ? "Next step: confirm terminal 2 is still running the live launcher AIMXS shim, then retry Activate AIMXS Mode."
-                : "Next step: verify the AIMXS refs exist in Secure Local Credential Capture, then retry Activate AIMXS Mode."
+                ? "Next step: confirm terminal 2 is still running the launcher-side local provider bridge, then retry Activate Provider Route."
+                : "Next step: verify the provider-route refs exist in Secure Local Credential Capture, then retry Activate Provider Route."
           };
         }
         renderAimxsEditorFeedbackInline(aimxsEditorState);

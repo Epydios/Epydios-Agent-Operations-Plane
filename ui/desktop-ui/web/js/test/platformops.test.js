@@ -103,8 +103,8 @@ test("platformops page renders the first inspect-only platform boards", () => {
   assert.match(ui.platformOpsContent.innerHTML, /Deployment Posture/);
   assert.match(ui.platformOpsContent.innerHTML, /Dependency Readiness/);
   assert.match(ui.platformOpsContent.innerHTML, /Provider Registration/);
-  assert.match(ui.platformOpsContent.innerHTML, /AIMXS Bridge Readiness/);
-  assert.match(ui.platformOpsContent.innerHTML, /AIMXS Route And Boundary/);
+  assert.match(ui.platformOpsContent.innerHTML, /Routed Bridge Readiness/);
+  assert.match(ui.platformOpsContent.innerHTML, /Routed Route And Boundary/);
   assert.match(ui.platformOpsContent.innerHTML, /Release Readiness/);
   assert.match(ui.platformOpsContent.innerHTML, /Support Posture/);
   assert.match(ui.platformOpsContent.innerHTML, /desktop-local/);
@@ -114,7 +114,7 @@ test("platformops page renders the first inspect-only platform boards", () => {
   assert.match(ui.platformOpsContent.innerHTML, /aimxs-policy-primary/);
   assert.match(ui.platformOpsContent.innerHTML, /staging-full-gate-20260314T040000Z\.log/);
   assert.match(ui.platformOpsContent.innerHTML, /prod-full-gate-20260314T041500Z\.log/);
-  assert.match(ui.platformOpsContent.innerHTML, /enabled aimxs/);
+  assert.match(ui.platformOpsContent.innerHTML, /enabled providers|enabled routed/);
   assert.match(ui.platformOpsContent.innerHTML, /warnings=1/);
   assert.match(ui.platformOpsContent.innerHTML, /signals=3/);
   assert.match(ui.platformOpsContent.innerHTML, /issues=1/);
@@ -143,7 +143,7 @@ test("platformops page renders the first inspect-only platform boards", () => {
   assert.match(ui.platformOpsContent.innerHTML, /One or more provider registrations remain degraded\./);
 });
 
-test("platformops neutralizes AIMXS labels in baseline posture", () => {
+test("platformops keeps route labels generic in baseline posture", () => {
   const ui = { platformOpsContent: { innerHTML: "" } };
   renderPlatformOpsPage(ui, {
     health: {
@@ -173,10 +173,6 @@ test("platformops neutralizes AIMXS labels in baseline posture", () => {
   assert.match(ui.platformOpsContent.innerHTML, /Provider Route Dependencies/);
   assert.match(ui.platformOpsContent.innerHTML, /Provider Bridge Readiness/);
   assert.match(ui.platformOpsContent.innerHTML, /Route And Boundary/);
-  assert.doesNotMatch(ui.platformOpsContent.innerHTML, /AIMXS Selection/);
-  assert.doesNotMatch(ui.platformOpsContent.innerHTML, /AIMXS Dependencies/);
-  assert.doesNotMatch(ui.platformOpsContent.innerHTML, /AIMXS Bridge Readiness/);
-  assert.doesNotMatch(ui.platformOpsContent.innerHTML, /AIMXS Route And Boundary/);
 });
 
 test("platformops page renders apply and receipt actions for approved platform admin proposals", () => {

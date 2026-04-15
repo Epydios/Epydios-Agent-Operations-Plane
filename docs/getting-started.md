@@ -44,7 +44,7 @@ The OSS repo gives you the public EpydiosOps baseline:
 - governed execution with audit, evidence, and receipts
 - public provider contracts and OSS baseline providers
 
-Premium AIMXS remains separate and is not required for the OSS path above.
+Separately delivered premium-provider material remains outside the OSS path above.
 
 ## Read Next
 

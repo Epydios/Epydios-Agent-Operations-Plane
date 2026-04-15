@@ -113,14 +113,14 @@
         }
       ]
     },
-    "aimxs": {
+    "premiumProvider": {
       "paymentEntitled": false,
       "mode": "oss-only",
-      "endpointRef": "ref://projects/{projectId}/providers/aimxs/https-endpoint",
-      "bearerTokenRef": "ref://projects/{projectId}/providers/aimxs/bearer-token",
-      "clientTlsCertRef": "ref://projects/{projectId}/providers/aimxs/client-tls-cert",
-      "clientTlsKeyRef": "ref://projects/{projectId}/providers/aimxs/client-tls-key",
-      "caCertRef": "ref://projects/{projectId}/providers/aimxs/provider-ca"
+      "endpointRef": "ref://projects/{projectId}/providers/premium-provider/https-endpoint",
+      "bearerTokenRef": "ref://projects/{projectId}/providers/premium-provider/bearer-token",
+      "clientTlsCertRef": "ref://projects/{projectId}/providers/premium-provider/client-tls-cert",
+      "clientTlsKeyRef": "ref://projects/{projectId}/providers/premium-provider/client-tls-key",
+      "caCertRef": "ref://projects/{projectId}/providers/premium-provider/provider-ca"
     }
   },
   "auth": {

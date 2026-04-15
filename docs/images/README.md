@@ -7,7 +7,7 @@ Purpose: keep the release-facing image set aligned with the truthful public base
 - screenshots should reflect the supported macOS `live` lane first
 - screenshots should not imply Linux or Windows parity beyond the currently documented beta posture
 - screenshots should not imply Windows `live` proof
-- premium AIMXS behavior should only appear in explicitly premium comparison material
+- separately delivered premium-provider behavior should only appear in explicitly premium comparison material
 
 ## Current Asset Roles
 

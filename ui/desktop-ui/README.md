@@ -63,7 +63,7 @@ http://127.0.0.1:4173
 ## Public Limits
 
 - Linux and Windows are still below the supported macOS lane
-- premium AIMXS material is not shipped in this repo
+- separately delivered premium-provider material is not shipped in this repo
 - the OSS baseline does not claim silent background interception or premium `DEFER` behavior
 
 ## Read Next

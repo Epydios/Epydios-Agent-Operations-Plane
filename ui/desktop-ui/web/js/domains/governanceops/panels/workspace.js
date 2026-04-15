@@ -89,25 +89,25 @@ function renderAimxsDecisionBindingSpineBoard(snapshot) {
     return "";
   }
   const premiumDecisionVisible = Boolean(snapshot?.aimxsPremiumVisible);
-  const boardTitle = premiumDecisionVisible ? "Premium Decision-Binding Spine" : "AIMXS Decision-Binding Spine";
+  const boardTitle = premiumDecisionVisible ? "Routed Decision Spine" : "Decision Spine";
   return `
     <article class="metric governanceops-card governanceops-card-wide" data-domain-root="governanceops" data-governanceops-panel="aimxs-decision-binding-spine">
       <div class="metric-title-row">
         <div class="title">${boardTitle}</div>
-        <span class="chip chip-neutral chip-compact">${escapeHTML(premiumDecisionVisible ? "premium route" : "correlated")}</span>
+        <span class="chip chip-neutral chip-compact">${escapeHTML(premiumDecisionVisible ? "routed" : "correlated")}</span>
       </div>
       ${renderAimxsDecisionBindingSpine(
         premiumDecisionVisible
           ? {
               ...board,
-              authorityTitle: "Authority And Route Chain",
-              grantTitle: "Grant And Execution Chain",
-              receiptTitle: "Receipt And Proof Chain",
+              authorityTitle: "Authority And Route Record",
+              grantTitle: "Grant And Execution Record",
+              receiptTitle: "Receipt And Proof Record",
               replayTitle: "Replay Continuity",
-              evidenceTitle: "Evidence And Audit Chain",
+              evidenceTitle: "Evidence And Audit Record",
               summary:
                 String(board.summary || "").trim() ||
-                "Premium decision binding keeps authority, receipt, replay, and evidence anchors on one governed path."
+                "Routed decision linkage keeps authority, receipt, replay, and evidence anchors on one governed path."
             }
           : board
       )}
@@ -224,12 +224,12 @@ function renderAdminProposalReviewBoard(snapshot) {
   const aimxsLegibility = premiumDecisionVisible
     ? {
         ...board.aimxsLegibility,
-        lifecycleTitle: "Premium Decision Lifecycle",
-        bindingTitle: "Authority And Binding Contract",
+        lifecycleTitle: "Routed Decision Lifecycle",
+        bindingTitle: "Authority And Decision Record",
         refsTitle: "Receipt, Replay, And Proof Anchors",
         summary:
           String(board.aimxsLegibility?.summary || "").trim() ||
-          "Premium route legibility keeps lifecycle, authority, and receipt anchors visible for this routed admin proposal."
+          "Routed decision legibility keeps lifecycle, authority, and receipt anchors visible for this admin proposal."
       }
     : board.aimxsLegibility;
   const ownerLabel = ownerDomainLabel(board.ownerDomain);

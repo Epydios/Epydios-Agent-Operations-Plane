@@ -79,7 +79,7 @@ This directory contains CI entrypoint scripts invoked by GitHub Actions.
     - `RUN_M10_NO_EGRESS_LOCAL_AIMXS=1` in full mode (required)
     - `RUN_M10_NO_EGRESS_LOCAL_AIMXS=0` default in fast mode
     - runs `platform/local/bin/verify-m10-no-egress-local-aimxs.sh`
-    - public OSS repo keeps only a placeholder boundary note; detailed premium verification is maintained outside the public repo
+    - public OSS repo keeps only a legacy-named placeholder boundary note; detailed premium verification is maintained outside the public repo
   - M10.6 premium-provider entitlement verification:
     - `RUN_M10_ENTITLEMENT_DENY=1` in full mode (required)
     - `RUN_M10_ENTITLEMENT_DENY=0` default in fast mode
@@ -89,12 +89,12 @@ This directory contains CI entrypoint scripts invoked by GitHub Actions.
     - `RUN_M10_AIMXS_PRIVATE_RELEASE=1` in full mode (required)
     - `RUN_M10_AIMXS_PRIVATE_RELEASE=0` default in fast mode
     - runs `platform/local/bin/verify-m10-aimxs-private-release.sh`
-    - public OSS repo keeps only a placeholder boundary note; detailed premium release evidence is maintained outside the public repo
+    - public OSS repo keeps only a legacy-named placeholder boundary note; detailed premium release evidence is maintained outside the public repo
   - M10.7 premium-provider packaging evidence verification:
     - `RUN_M10_CUSTOMER_HOSTED_PACKAGING=1` in full mode (required)
     - `RUN_M10_CUSTOMER_HOSTED_PACKAGING=0` default in fast mode
     - runs `platform/local/bin/verify-m10-aimxs-full-packaging.sh`
-    - public OSS repo does not publish premium packaging evidence details
+    - public OSS repo does not publish premium packaging evidence details; the verifier name remains only as a compatibility placeholder
   - M13 desktop execution-plane contract + deny-path verifier:
     - `RUN_M13_DESKTOP_PROVIDER=1` in full mode (required)
     - `RUN_M13_DESKTOP_PROVIDER=0` default in fast mode
@@ -267,7 +267,7 @@ This directory contains CI entrypoint scripts invoked by GitHub Actions.
     - `REQUIRE_SIGNED_IMAGE_POLICY=1` (required in full mode; strict profiles fail if Kyverno/signed-policy path is unavailable)
   - Runs public premium-boundary verification by default in full mode:
     - `RUN_AIMXS_BOUNDARY_CHECK=1`
-    - verifies the thin public boundary posture and checks that no direct AIMXS dependency leaked into the OSS repo.
+    - verifies the thin public boundary posture and checks that no direct premium-provider dependency leaked into the OSS repo.
 
 The default GitHub Actions workflow is:
 

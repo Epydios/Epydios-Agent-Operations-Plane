@@ -112,7 +112,7 @@ test("networkops page renders bounded boundary, endpoint, trust, posture, and to
   assert.match(ui.networkOpsContent.innerHTML, /Trust And Certificate Board/);
   assert.match(ui.networkOpsContent.innerHTML, /Egress And Ingress Posture Board/);
   assert.match(ui.networkOpsContent.innerHTML, /Connectivity Topology Board/);
-  assert.match(ui.networkOpsContent.innerHTML, /AIMXS Route And Boundary/);
+  assert.match(ui.networkOpsContent.innerHTML, /Routed Route And Boundary/);
   assert.match(ui.networkOpsContent.innerHTML, /gateway_first/);
   assert.match(ui.networkOpsContent.innerHTML, /litellm/);
   assert.match(ui.networkOpsContent.innerHTML, /routes=6/);
@@ -141,7 +141,7 @@ test("networkops page renders bounded boundary, endpoint, trust, posture, and to
   assert.match(ui.networkOpsContent.innerHTML, /policy route/);
 });
 
-test("networkops neutralizes AIMXS route boundary labeling in baseline posture", () => {
+test("networkops keeps route-boundary labeling generic in baseline posture", () => {
   const ui = { networkOpsContent: { innerHTML: "" } };
   renderNetworkOpsPage(ui, {
     settings: {
@@ -204,9 +204,7 @@ test("networkops neutralizes AIMXS route boundary labeling in baseline posture",
   });
 
   assert.match(ui.networkOpsContent.innerHTML, /Route And Boundary/);
-  assert.doesNotMatch(ui.networkOpsContent.innerHTML, /AIMXS Route And Boundary/);
   assert.match(ui.networkOpsContent.innerHTML, /primary provider-route view/);
-  assert.doesNotMatch(ui.networkOpsContent.innerHTML, /primary AIMXS view/);
 });
 
 test("networkops empty state renders without loaded network posture", () => {

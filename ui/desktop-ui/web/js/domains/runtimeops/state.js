@@ -702,7 +702,7 @@ function buildRuntimeAimxsIdentityPosture(snapshot = {}) {
   return createAimxsIdentityPostureModel({
     summary:
       snapshot?.aimxsPremiumVisible
-        ? "This read-only AIMXS echo shows the current runtime identity posture and the next bounded session posture without opening any new runtime mutation controls."
+        ? "This read-only routed echo shows the current runtime identity posture and the next bounded session posture without opening any new runtime mutation controls."
         : "This read-only echo shows the current runtime identity posture and the next bounded session posture without opening any new runtime mutation controls.",
     surfaceLabel: "read-only echo",
     identityFields: [

@@ -1934,7 +1934,7 @@ function createAimxsWorkflowSnapshot(context = {}) {
       next: {
         title: "GovernanceOps",
         summary: "Resolve the pending approval queue before continuing the current path.",
-        meta: "Governance is the active gate for the next AIMXS-controlled transition.",
+        meta: "Governance is the active gate for the next routed transition.",
         action: "open-approvals-pending",
         actionLabel: "Open Approval Queue"
       }
@@ -1986,11 +1986,11 @@ function createAimxsWorkflowSnapshot(context = {}) {
   }
 
   return {
-    summary: `${aimxsPath.modeLabel} via ${aimxsPath.provider} is the current bounded AIMXS path.`,
+    summary: `${aimxsPath.modeLabel} via ${aimxsPath.provider} is the current bounded routed path.`,
     cards: [
       {
         id: "aimxs-path",
-        title: "Current AIMXS Path",
+        title: "Current Routed Path",
         tone: platform.status === "ok" ? "ok" : "warn",
         value: aimxsPath.provider,
         summary: `mode=${aimxsPath.modeLabel}`,

@@ -13,7 +13,7 @@ It is not where provider implementations or Kubernetes deployment manifests live
 
 - provider implementations
 - Kubernetes deployment manifests
-- private AIMXS code or artifacts
+- separately delivered premium-provider code or artifacts
 
 Provider implementations consume these references through the public contracts under `../contracts/extensions/`.
-The AIMXS boundary seam remains in `../internal/providerboundary/slot.go`.
+Private extension-delivery wiring remains outside this directory.

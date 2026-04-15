@@ -166,7 +166,7 @@ function renderAimxsIdentityPostureBoard(snapshot) {
   return `
     <article class="metric guardrailops-card guardrailops-card-wide" data-domain-root="guardrailops" data-guardrailops-panel="aimxs-identity-posture">
       <div class="metric-title-row">
-        <div class="title">${aimxsPremiumVisible ? "AIMXS Identity And Posture" : "Identity And Posture"}</div>
+        <div class="title">${aimxsPremiumVisible ? "Routed Identity And Posture" : "Identity And Posture"}</div>
         <span class="chip chip-ok chip-compact">primary</span>
       </div>
       ${renderAimxsIdentityPostureBlock(snapshot.aimxsIdentityPosture)}

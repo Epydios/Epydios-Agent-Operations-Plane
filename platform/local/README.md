@@ -657,7 +657,7 @@ RUN_M5_BASELINE=0 ./platform/local/bin/verify-m10-policy-grant-enforcement.sh
 
 Detailed premium-provider entitlement checks are maintained outside the public OSS repo.
 
-The public script remains only as a boundary placeholder so public gate wiring does not imply that the OSS repo contains the premium entitlement path.
+The public script remains only as a boundary placeholder so public gate wiring does not imply that the OSS repo contains the separately delivered premium-provider entitlement path.
 
 ```bash
 ./platform/local/bin/verify-m10-entitlement-deny.sh
@@ -850,7 +850,7 @@ AUTO_INSTALL_MONITORING_STACK=1 ./platform/local/bin/verify-monitoring-alerts.sh
 Validates only the public provider boundary posture:
 - public boundary docs and contracts exist
 - the public premium loader stays thin
-- no direct AIMXS module dependency leaks into the OSS module graph
+- no direct premium-provider module dependency leaks into the OSS module graph
 
 ```bash
 ./platform/local/bin/verify-aimxs-boundary.sh
@@ -1023,7 +1023,7 @@ WITH_SYSTEM_SMOKETEST=1 ./platform/local/bin/bootstrap-k3d.sh
 - `platform/local/bin/verify-m10-deployment-modes.sh` validates the public `oss-only` mode pack and keeps premium modes outside the OSS verification promise
 - `platform/local/bin/verify-m10-no-egress-local-aimxs.sh` is a public placeholder noting that premium no-egress verification is maintained outside the public repo
 - `platform/local/bin/verify-m10-entitlement-deny.sh` is a public placeholder noting that premium entitlement verification is maintained outside the public repo
-- `platform/local/bin/verify-m10-aimxs-full-packaging.sh` remains outside the public premium-seam cleanup scope and should not be used to infer that premium release evidence is published in OSS
+- `platform/local/bin/verify-m10-aimxs-full-packaging.sh` remains a legacy-named public placeholder and should not be used to infer that premium release evidence is published in OSS
 - `platform/local/bin/verify-m13-openfang-adapter.sh` validates Openfang adapter guardrails (Linux-first + sandbox profile + restricted-host blocked default + secure template posture)
 - `platform/local/bin/verify-m13-openfang-runtime-integration.sh` validates runtime observe->actuate->verify and runtime->adapter->upstream contract flow + restricted-host deny assertion
 - `platform/local/bin/verify-m13-runtime-approvals.sh` validates runtime approval queue/decision API semantics (`PENDING|APPROVED|DENIED|EXPIRED`, approve/deny transitions, expired request rejection)
@@ -1046,7 +1046,7 @@ WITH_SYSTEM_SMOKETEST=1 ./platform/local/bin/bootstrap-k3d.sh
 - `platform/local/bin/verify-admission-enforcement.sh` validates admission-deny behavior for mutable tags and optional signed-image enforcement via Kyverno
 - `platform/local/bin/bootstrap-monitoring-stack.sh` installs a local kube-prometheus-stack profile for pilot/staging monitoring validation
 - `platform/local/bin/verify-monitoring-alerts.sh` validates Prometheus/Alertmanager rule load + synthetic firing alert path
-- `platform/local/bin/verify-aimxs-boundary.sh` verifies the thin public provider boundary and checks that no direct AIMXS module dependency leaked into the OSS repo
+- `platform/local/bin/verify-aimxs-boundary.sh` verifies the thin public provider boundary and checks that no direct premium-provider module dependency leaked into the OSS repo
 - `platform/local/bin/verify-provenance-lockfiles.sh` validates chart/image/CRD/license lockfiles (development and strict modes)
 - `platform/local/bin/sync-provenance-image-digests.sh` fills `provenance/images.lock.yaml` digests from running cluster image IDs and optional registry pulls
 

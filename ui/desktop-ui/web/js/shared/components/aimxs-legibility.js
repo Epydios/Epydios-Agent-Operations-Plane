@@ -58,9 +58,9 @@ export function renderAimxsLegibilityBlock(model = {}) {
   const binding = (Array.isArray(model?.bindingFields) ? model.bindingFields : []).map(renderBindingField).filter(Boolean).join("");
   const refs = (Array.isArray(model?.refs) ? model.refs : []).map(renderRef).filter(Boolean).join("");
   const summary = String(model?.summary || "").trim();
-  const lifecycleTitle = String(model?.lifecycleTitle || "AIMXS Lifecycle Ribbon").trim() || "AIMXS Lifecycle Ribbon";
-  const bindingTitle = String(model?.bindingTitle || "Decision Binding Contract").trim() || "Decision Binding Contract";
-  const refsTitle = String(model?.refsTitle || "Stable Or Replay Refs").trim() || "Stable Or Replay Refs";
+  const lifecycleTitle = String(model?.lifecycleTitle || "Decision Lifecycle").trim() || "Decision Lifecycle";
+  const bindingTitle = String(model?.bindingTitle || "Decision Record").trim() || "Decision Record";
+  const refsTitle = String(model?.refsTitle || "Evidence And Trace Refs").trim() || "Evidence And Trace Refs";
   return `
     <div class="aimxs-legibility-shell" data-aimxs-legibility="shared">
       <div class="aimxs-section">
@@ -69,11 +69,11 @@ export function renderAimxsLegibilityBlock(model = {}) {
       </div>
       <div class="aimxs-section">
         <div class="aimxs-section-title">${escapeHTML(bindingTitle)}</div>
-        ${binding ? `<div class="aimxs-binding-grid">${binding}</div>` : '<div class="aimxs-empty">No decision-binding fields are available yet.</div>'}
+        ${binding ? `<div class="aimxs-binding-grid">${binding}</div>` : '<div class="aimxs-empty">No decision-record fields are available yet.</div>'}
       </div>
       <div class="aimxs-section">
         <div class="aimxs-section-title">${escapeHTML(refsTitle)}</div>
-        ${refs ? `<div class="aimxs-ref-group">${refs}</div>` : '<div class="aimxs-empty">No stable or replay references are available yet.</div>'}
+        ${refs ? `<div class="aimxs-ref-group">${refs}</div>` : '<div class="aimxs-empty">No evidence or trace references are available yet.</div>'}
       </div>
       ${summary ? `<div class="aimxs-summary">${escapeHTML(summary)}</div>` : ""}
     </div>

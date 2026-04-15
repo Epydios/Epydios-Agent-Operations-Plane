@@ -54,4 +54,4 @@ M15 Phase C verifier passed.
 - stronger Linux or Windows wording waits for linked installed-host proof
 - Windows `live` remains explicitly deferred
 
-This quality story does not claim platform-equal parity outside the supported macOS lane, and it does not prove premium AIMXS behavior.
+This quality story does not claim platform-equal parity outside the supported macOS lane, and it does not prove separately delivered premium-provider behavior.

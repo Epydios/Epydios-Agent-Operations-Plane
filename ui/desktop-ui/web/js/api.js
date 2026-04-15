@@ -264,7 +264,7 @@ function mockProviderList() {
         providerType: "PolicyProvider",
         ready: true,
         probed: true,
-        message: "External AIMXS endpoint",
+        message: "External premium-provider endpoint",
         endpoint: "https://aimxs-policy.epydios-system.svc.cluster.local:8443"
       }
     ]
@@ -1080,7 +1080,7 @@ function seedMockRuns() {
       policyResponse: {
         decision: "DENY",
         source: "aimxs-policy-primary",
-        reasonCode: "AIMXS_ENTITLEMENT_FEATURE_MISSING"
+        reasonCode: "PREMIUM_PROVIDER_ENTITLEMENT_FEATURE_MISSING"
       },
       evidenceRecordResponse: { status: "recorded" },
       evidenceBundleResponse: { status: "finalized" }
@@ -4527,7 +4527,7 @@ export class AgentOpsApi {
         available: true,
         source: "mock",
         state: "active",
-        message: "Mock AIMXS activation reports aimxs-https as active.",
+        message: "Mock provider-route activation reports secure-provider as active.",
         namespace: "epydios-system",
         activeMode: "aimxs-https",
         selectedProviderId: "aimxs-policy-primary",
@@ -4574,7 +4574,7 @@ export class AgentOpsApi {
           available: false,
           source: "helper-unavailable",
           state: "unavailable",
-          message: "AIMXS activation helper is unavailable on this launcher."
+          message: "Provider-route activation helper is unavailable on this launcher."
         });
       }
       throw error;

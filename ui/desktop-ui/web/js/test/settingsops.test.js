@@ -198,7 +198,7 @@ test("settingsops renders bounded preferences, secure refs, environment, support
   assert.match(html, /data-domain-root="settingsops"/);
   assert.match(html, /data-workbench-cluster-layout="split"/);
   assert.match(html, /data-settings-local-ref-action="save"/);
-  assert.match(html, /Activate AIMXS Mode/);
+  assert.match(html, /Activate Provider Route/);
   assert.doesNotMatch(html, /Open Diagnostics/);
   assert.doesNotMatch(html, /reopen Configuration/i);
   assert.doesNotMatch(html, /App Preferences Board/);
@@ -224,7 +224,7 @@ test("settings empty state uses product-language recovery guidance", () => {
   assert.doesNotMatch(ui.settingsContent.innerHTML, /runtime endpoint availability/i);
 });
 
-test("settingsops hides AIMXS deployment controls in baseline posture", () => {
+test("settingsops hides provider-route deployment controls in baseline posture", () => {
   const ui = { settingsContent: { innerHTML: "" } };
 
   renderSettingsOpsPage(ui, {
@@ -296,7 +296,7 @@ test("settingsops hides AIMXS deployment controls in baseline posture", () => {
 
   const html = ui.settingsContent.innerHTML;
   assert.match(html, /policy=oss-only/);
-  assert.doesNotMatch(html, /AIMXS Deployment Contract/);
-  assert.doesNotMatch(html, /Activate AIMXS Mode/);
-  assert.doesNotMatch(html, /Apply AIMXS Settings/);
+  assert.doesNotMatch(html, /Provider Route Contract/);
+  assert.doesNotMatch(html, /Activate Provider Route/);
+  assert.doesNotMatch(html, /Apply Provider Settings/);
 });

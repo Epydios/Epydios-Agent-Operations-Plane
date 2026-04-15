@@ -450,7 +450,7 @@ function buildIdentityAimxsIdentityPosture(snapshot = {}) {
   return createAimxsIdentityPostureModel({
     summary:
       snapshot?.aimxsPremiumVisible
-        ? "Bounded AIMXS identity posture links the current runtime-bound subject to the next authority or delegation posture without opening new write controls."
+        ? "Bounded routed identity posture links the current runtime-bound subject to the next authority or delegation posture without opening new write controls."
         : "Bounded identity posture links the current runtime-bound subject to the next authority or delegation posture without opening new write controls.",
     surfaceLabel: "primary owner surface",
     identityFields: [

@@ -117,7 +117,7 @@ const DEFAULT_CONFIG = {
         }
       ]
     },
-    aimxs: buildDefaultAimxsSettings()
+    premiumProvider: buildDefaultAimxsSettings()
   },
   auth: {
     enabled: true,
@@ -160,6 +160,12 @@ export async function loadConfig() {
 
   const runtimeConfig = window.__AGENTOPS_CONFIG__ || {};
   const merged = deepMerge(deepMerge(DEFAULT_CONFIG, fileConfig), runtimeConfig);
+  if (merged?.ui?.premiumProvider && !merged.ui.aimxs) {
+    merged.ui.aimxs = merged.ui.premiumProvider;
+  }
+  if (merged?.ui?.aimxs && !merged.ui.premiumProvider) {
+    merged.ui.premiumProvider = merged.ui.aimxs;
+  }
 
   if (!merged.auth.redirectUri) {
     merged.auth.redirectUri = `${window.location.origin}${window.location.pathname}`;

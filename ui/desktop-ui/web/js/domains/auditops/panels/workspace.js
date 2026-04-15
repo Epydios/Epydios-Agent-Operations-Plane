@@ -354,7 +354,7 @@ function renderAimxsDecisionBindingSpineBoard(snapshot) {
   return `
     <article class="metric auditops-card" data-domain-root="auditops" data-auditops-panel="aimxs-decision-binding-spine">
       <div class="metric-title-row">
-        <div class="title">AIMXS Decision-Binding Spine</div>
+        <div class="title">Routed Decision Spine</div>
         <span class="chip chip-neutral chip-compact">correlated</span>
       </div>
       ${renderAimxsDecisionBindingSpine(board)}
