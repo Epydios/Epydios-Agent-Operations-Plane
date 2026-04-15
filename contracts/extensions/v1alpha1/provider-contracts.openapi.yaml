@@ -1,0 +1,404 @@
+openapi: 3.1.0
+info:
+  title: Epydios Extension Provider Contracts
+  version: v1alpha1
+  summary: Public HTTP/JSON provider boundary for the OSS runtime.
+  description: |
+    This document defines the narrow public provider surface used by the OSS runtime.
+    It intentionally stays generic and does not freeze premium-specific routing,
+    entitlement, policy-shaping, or evidence semantics.
+servers:
+  - url: https://provider.internal
+tags:
+  - name: Common
+  - name: PolicyProvider
+  - name: EvidenceProvider
+  - name: ProfileResolver
+  - name: DesktopProvider
+paths:
+  /healthz:
+    get:
+      tags: [Common]
+      operationId: healthz
+      summary: Provider liveness check
+      responses:
+        "200":
+          description: Provider process is alive
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+  /v1alpha1/capabilities:
+    get:
+      tags: [Common]
+      operationId: getCapabilities
+      summary: Return provider identity and capability advertisement
+      responses:
+        "200":
+          description: Provider capability advertisement
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderCapabilitiesResponse"
+  /v1alpha1/policy-provider/evaluate:
+    post:
+      tags: [PolicyProvider]
+      operationId: policyEvaluate
+      summary: Evaluate a governed request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PolicyEvaluateRequest"
+      responses:
+        "200":
+          description: Policy decision
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PolicyEvaluateResponse"
+        "400":
+          $ref: "#/components/responses/ProviderError"
+        "500":
+          $ref: "#/components/responses/ProviderError"
+  /v1alpha1/evidence-provider/record:
+    post:
+      tags: [EvidenceProvider]
+      operationId: evidenceRecord
+      summary: Record evidence or event metadata
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EvidenceRecordRequest"
+      responses:
+        "200":
+          description: Evidence record accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvidenceRecordResponse"
+        "400":
+          $ref: "#/components/responses/ProviderError"
+        "500":
+          $ref: "#/components/responses/ProviderError"
+  /v1alpha1/profile-resolver/resolve:
+    post:
+      tags: [ProfileResolver]
+      operationId: profileResolve
+      summary: Resolve a profile or route for a governed request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProfileResolveRequest"
+      responses:
+        "200":
+          description: Profile resolution result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfileResolveResponse"
+        "400":
+          $ref: "#/components/responses/ProviderError"
+        "500":
+          $ref: "#/components/responses/ProviderError"
+  /v1alpha1/desktop-provider/observe:
+    post:
+      tags: [DesktopProvider]
+      operationId: desktopObserve
+      summary: Observe one desktop step
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DesktopStepRequest"
+      responses:
+        "200":
+          description: Observe step result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DesktopStepResponse"
+        "400":
+          $ref: "#/components/responses/ProviderError"
+        "500":
+          $ref: "#/components/responses/ProviderError"
+  /v1alpha1/desktop-provider/actuate:
+    post:
+      tags: [DesktopProvider]
+      operationId: desktopActuate
+      summary: Execute one desktop step
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DesktopStepRequest"
+      responses:
+        "200":
+          description: Step execution result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DesktopStepResponse"
+        "400":
+          $ref: "#/components/responses/ProviderError"
+        "500":
+          $ref: "#/components/responses/ProviderError"
+  /v1alpha1/desktop-provider/verify:
+    post:
+      tags: [DesktopProvider]
+      operationId: desktopVerify
+      summary: Verify one desktop step result
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DesktopStepRequest"
+      responses:
+        "200":
+          description: Step verification result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DesktopStepResponse"
+        "400":
+          $ref: "#/components/responses/ProviderError"
+        "500":
+          $ref: "#/components/responses/ProviderError"
+components:
+  responses:
+    ProviderError:
+      description: Structured provider error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ProviderError"
+  schemas:
+    HealthResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        details:
+          type: object
+          additionalProperties: true
+    ProviderCapabilitiesResponse:
+      type: object
+      required: [providerType, providerId, contractVersion, capabilities]
+      properties:
+        providerType:
+          type: string
+        providerId:
+          type: string
+        contractVersion:
+          type: string
+        providerVersion:
+          type: string
+        capabilities:
+          type: array
+          items:
+            type: string
+    MetaEnvelope:
+      type: object
+      properties:
+        requestId:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        tenantId:
+          type: string
+        projectId:
+          type: string
+        environment:
+          type: string
+        actor:
+          type: string
+      additionalProperties: true
+    GovernedSubject:
+      type: object
+      properties:
+        type:
+          type: string
+        id:
+          type: string
+        attributes:
+          type: object
+          additionalProperties: true
+      additionalProperties: true
+    GovernedAction:
+      type: object
+      properties:
+        type:
+          type: string
+        verb:
+          type: string
+        target:
+          type: string
+      additionalProperties: true
+    GovernedResource:
+      type: object
+      properties:
+        kind:
+          type: string
+        namespace:
+          type: string
+        name:
+          type: string
+        id:
+          type: string
+      additionalProperties: true
+    GovernedRequest:
+      type: object
+      properties:
+        meta:
+          $ref: "#/components/schemas/MetaEnvelope"
+        subject:
+          $ref: "#/components/schemas/GovernedSubject"
+        action:
+          $ref: "#/components/schemas/GovernedAction"
+        resource:
+          $ref: "#/components/schemas/GovernedResource"
+        context:
+          type: object
+          additionalProperties: true
+        mode:
+          type: string
+        dryRun:
+          type: boolean
+      additionalProperties: true
+    Reason:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+      additionalProperties: true
+    Obligation:
+      type: object
+      properties:
+        type:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+      additionalProperties: true
+    PolicyEvaluateRequest:
+      type: object
+      required: [request]
+      properties:
+        request:
+          $ref: "#/components/schemas/GovernedRequest"
+    PolicyEvaluateResponse:
+      type: object
+      required: [decision]
+      properties:
+        decision:
+          type: string
+          enum: [ALLOW, DENY, CHALLENGE, DEFER]
+        reasons:
+          type: array
+          items:
+            $ref: "#/components/schemas/Reason"
+        obligations:
+          type: array
+          items:
+            $ref: "#/components/schemas/Obligation"
+        references:
+          type: array
+          items:
+            type: string
+        output:
+          type: object
+          additionalProperties: true
+      additionalProperties: true
+    EvidenceRecordRequest:
+      type: object
+      properties:
+        meta:
+          $ref: "#/components/schemas/MetaEnvelope"
+        event:
+          type: object
+          additionalProperties: true
+    EvidenceRecordResponse:
+      type: object
+      required: [accepted]
+      properties:
+        accepted:
+          type: boolean
+        references:
+          type: array
+          items:
+            type: string
+        notes:
+          type: array
+          items:
+            type: string
+      additionalProperties: true
+    ProfileResolveRequest:
+      type: object
+      properties:
+        meta:
+          $ref: "#/components/schemas/MetaEnvelope"
+        request:
+          $ref: "#/components/schemas/GovernedRequest"
+    ProfileResolveResponse:
+      type: object
+      properties:
+        profileId:
+          type: string
+        route:
+          type: string
+        notes:
+          type: array
+          items:
+            type: string
+      additionalProperties: true
+    DesktopStepRequest:
+      type: object
+      properties:
+        meta:
+          $ref: "#/components/schemas/MetaEnvelope"
+        step:
+          type: object
+          additionalProperties: true
+      additionalProperties: true
+    DesktopStepResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok, denied, deferred, failed]
+        notes:
+          type: array
+          items:
+            type: string
+        output:
+          type: object
+          additionalProperties: true
+      additionalProperties: true
+    ProviderError:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
