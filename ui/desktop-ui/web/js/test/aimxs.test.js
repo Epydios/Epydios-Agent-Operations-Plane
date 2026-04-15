@@ -78,8 +78,8 @@ test("aimxs full mode stays valid without secure refs", () => {
   assert.equal(validation.valid, true);
   assert.match(validation.warnings.join(" "), /does not require https/i);
   assert.deepEqual(resolveAimxsContractProfile({ mode: "aimxs-full" }), {
-    mode: "aimxs-full",
-    providerId: "aimxs-full",
+    mode: "provider-local",
+    providerId: "premium-provider-local",
     authMode: "None",
     healthPath: "/healthz",
     capabilitiesPath: "/v1alpha1/capabilities",
@@ -113,7 +113,7 @@ test("aimxs provider status summarizes ready and missing providers", () => {
   const ready = summarizeAimxsStatus({
     items: [
       {
-        providerId: "aimxs-policy-primary",
+        providerId: "premium-policy-primary",
         ready: true,
         probed: true
       }
@@ -122,7 +122,7 @@ test("aimxs provider status summarizes ready and missing providers", () => {
   const missing = summarizeAimxsStatus({ items: [] });
 
   assert.equal(ready.state, "ready");
-  assert.deepEqual(ready.providerIds, ["aimxs-policy-primary"]);
+  assert.deepEqual(ready.providerIds, ["premium-policy-primary"]);
   assert.equal(missing.state, "not_configured");
 });
 
@@ -133,23 +133,23 @@ test("aimxs full rendering shows local mode and no secure ref collection", () =>
       mode: "aimxs-full",
       state: "ready",
       detail: "1/1 routed providers are ready.",
-      providerIds: ["aimxs-full"],
+      providerIds: ["premium-provider-local"],
       endpointRef: "ref://projects/demo/providers/aimxs/https-endpoint",
       activation: {
         available: true,
         state: "active",
         message: "Provider-route activation switched the live policy-provider path to local-provider using the launcher-side provider bridge.",
         namespace: "epydios-system",
-        activeMode: "aimxs-full",
-        selectedProviderId: "aimxs-full",
-        selectedProviderName: "aimxs-full",
+        activeMode: "provider-local",
+        selectedProviderId: "premium-provider-local",
+        selectedProviderName: "premium-provider-local",
         selectedProviderReady: true,
         selectedProviderProbed: true,
         enabledProviders: [
           {
-            name: "aimxs-full",
-            providerId: "aimxs-full",
-            mode: "aimxs-full",
+            name: "premium-provider-local",
+            providerId: "premium-provider-local",
+            mode: "provider-local",
             enabled: true,
             ready: true,
             probed: true,
@@ -158,8 +158,8 @@ test("aimxs full rendering shows local mode and no secure ref collection", () =>
           }
         ],
         secrets: {
-          bearerTokenSecret: { name: "aimxs-policy-token", present: false },
-          clientTlsSecret: { name: "epydios-controller-mtls-client", present: false },
+          bearerTokenSecret: { name: "policy-provider-token", present: false },
+          clientTlsSecret: { name: "epydios-provider-client-tls", present: false },
           caSecret: { name: "epydios-provider-ca", present: false }
         }
       }
@@ -172,8 +172,8 @@ test("aimxs full rendering shows local mode and no secure ref collection", () =>
   const status = renderAimxsStatusMetric(settings, () => "chip chip-ok");
   const refs = collectAimxsSecureRefItems(settings);
 
-  assert.match(metric, /aimxs-full/);
-  assert.match(metric, /clusterMode=local-provider/);
+  assert.match(metric, /premium-provider-local/);
+  assert.match(metric, /clusterMode=provider-local/);
   assert.match(metric, /clusterSecrets=not required for local-provider/);
   assert.match(metric, /Activate Provider Route/);
   assert.match(status, /Provider Route Status/);
@@ -191,7 +191,7 @@ test("aimxs https rendering still surfaces secure refs", () => {
       mode: "aimxs-https",
       state: "ready",
       detail: "1/1 routed providers are ready.",
-      providerIds: ["aimxs-policy-primary"],
+      providerIds: ["premium-policy-primary"],
       endpointRef: "ref://projects/demo/providers/aimxs/https-endpoint",
       bearerTokenRef: "ref://projects/demo/providers/aimxs/bearer-token",
       clientTlsCertRef: "ref://projects/demo/providers/aimxs/client-tls-cert",
@@ -202,9 +202,9 @@ test("aimxs https rendering still surfaces secure refs", () => {
         state: "active",
         message: "Provider-route activation switched the live policy-provider path to secure-provider.",
         namespace: "epydios-system",
-        activeMode: "aimxs-https",
-        selectedProviderId: "aimxs-policy-primary",
-        selectedProviderName: "aimxs-policy-primary",
+        activeMode: "provider-https",
+        selectedProviderId: "premium-policy-primary",
+        selectedProviderName: "premium-policy-primary",
         selectedProviderReady: true,
         selectedProviderProbed: true,
         capabilities: [
@@ -214,9 +214,9 @@ test("aimxs https rendering still surfaces secure refs", () => {
         ],
         enabledProviders: [
           {
-            name: "aimxs-policy-primary",
-            providerId: "aimxs-policy-primary",
-            mode: "aimxs-https",
+            name: "premium-policy-primary",
+            providerId: "premium-policy-primary",
+            mode: "provider-https",
             enabled: true,
             ready: true,
             probed: true,
@@ -225,8 +225,8 @@ test("aimxs https rendering still surfaces secure refs", () => {
           }
         ],
         secrets: {
-          bearerTokenSecret: { name: "aimxs-policy-token", present: true },
-          clientTlsSecret: { name: "epydios-controller-mtls-client", present: true },
+          bearerTokenSecret: { name: "policy-provider-token", present: true },
+          clientTlsSecret: { name: "epydios-provider-client-tls", present: true },
           caSecret: { name: "epydios-provider-ca", present: true }
         }
       }
@@ -238,12 +238,12 @@ test("aimxs https rendering still surfaces secure refs", () => {
   });
   const refs = collectAimxsSecureRefItems(settings);
 
-  assert.match(metric, /aimxs-https/);
-  assert.match(metric, /clusterMode=secure-provider/);
+  assert.match(metric, /provider-https/);
+  assert.match(metric, /clusterMode=provider-https/);
   assert.equal(refs.length, 5);
   assert.deepEqual(resolveAimxsContractProfile(settings.aimxs), {
-    mode: "aimxs-https",
-    providerId: "aimxs-policy-primary",
+    mode: "provider-https",
+    providerId: "premium-policy-primary",
     authMode: "MTLSAndBearerTokenSecret",
     healthPath: "/healthz",
     capabilitiesPath: "/v1alpha1/capabilities",
@@ -259,7 +259,7 @@ test("aimxs settings disables activation controls when helper is unavailable", (
       paymentEntitled: true,
       mode: "aimxs-full",
       state: "ready",
-      providerIds: ["aimxs-policy-primary"],
+      providerIds: ["premium-policy-primary"],
       activation: {
         available: false,
         state: "unavailable",
@@ -302,14 +302,14 @@ test("aimxs activation snapshot normalizes helper state and defaults", () => {
   const snapshot = normalizeAimxsActivationSnapshot({
     available: true,
     state: "ACTIVE",
-    activeMode: "aimxs-https",
-    requestedMode: "aimxs-https",
-    selectedProviderId: "aimxs-policy-primary",
+    activeMode: "provider-https",
+    requestedMode: "provider-https",
+    selectedProviderId: "premium-policy-primary",
     enabledProviders: [
       {
-        name: "aimxs-policy-primary",
-        providerId: "aimxs-policy-primary",
-        mode: "aimxs-https",
+        name: "premium-policy-primary",
+        providerId: "premium-policy-primary",
+        mode: "provider-https",
         enabled: true,
         ready: true,
         probed: true,
@@ -320,8 +320,8 @@ test("aimxs activation snapshot normalizes helper state and defaults", () => {
 
   assert.equal(snapshot.available, true);
   assert.equal(snapshot.state, "active");
-  assert.equal(snapshot.activeMode, "aimxs-https");
-  assert.equal(snapshot.requestedMode, "aimxs-https");
-  assert.equal(snapshot.enabledProviders[0].mode, "aimxs-https");
+  assert.equal(snapshot.activeMode, "provider-https");
+  assert.equal(snapshot.requestedMode, "provider-https");
+  assert.equal(snapshot.enabledProviders[0].mode, "provider-https");
   assert.equal(fallback.secrets.bearerTokenSecret.name, AIMXS_ACTIVATION_SECRET_NAMES.bearerTokenSecret);
 });

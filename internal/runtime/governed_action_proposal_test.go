@@ -324,8 +324,8 @@ func TestBuildRunCreateRequestFromGovernedActionProposalAppliesFinanceGrantOverl
 	if got := normalizedInterfaceString(normalized["evidenceReadiness"]); got != "PARTIAL" {
 		t.Fatalf("evidenceReadiness=%q want PARTIAL", got)
 	}
-	policyStratification := extractJSONObjectValue(runReq.Context["policy_stratification"])
-	if got := normalizedInterfaceString(policyStratification["risk_tier"]); got != "high" {
-		t.Fatalf("run risk_tier=%q want high", got)
+	reviewSignals := extractJSONObjectValue(runReq.Context["review_signals"])
+	if got := normalizedInterfaceString(reviewSignals["review_tier"]); got != "high" {
+		t.Fatalf("run review_tier=%q want high", got)
 	}
 }

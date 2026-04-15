@@ -1,5 +1,6 @@
 import {
   chipClassForStatus,
+  displayAimxsModeLabel,
   displayPolicyProviderLabel,
   escapeHTML
 } from "../../views/common.js";
@@ -38,7 +39,7 @@ export function policyProviderLabel(settings = {}) {
     return displayPolicyProviderLabel("aimxs-full");
   }
   if (mode === "aimxs-https") {
-    return displayPolicyProviderLabel("aimxs-policy-primary");
+    return displayPolicyProviderLabel("premium-policy-primary");
   }
   return "-";
 }
@@ -111,7 +112,7 @@ function normalizePolicyCatalogItem(item = {}, index = 0) {
     String(item?.stableRef || "").trim() || (packId ? `policy-pack://${packId}@${version}` : "");
   const sourceRef =
     String(item?.sourceRef || item?.bundleRef || item?.uri || "").trim() ||
-    (packId ? `bundle://aimxs/${packId}/${version}` : "");
+    (packId ? `bundle://premium-provider/${packId}/${version}` : "");
   const activationTarget = String(item?.activationTarget || item?.scope || "").trim() || "workspace";
   const activationPosture =
     String(item?.activationPosture || "").trim().toLowerCase() || (index === 0 ? "current" : "available");
@@ -470,23 +471,23 @@ export function derivePolicyRichness(run) {
   const requestGoverned = readObject(requestContext.governed_action);
   const actorAuthority = readObject(requestContext.actor_authority);
   const governedAuthority = readObject(requestGoverned.authority_context);
-  const requestPolicy = readObject(requestContext.policy_stratification);
+  const requestPolicy = readObject(requestContext.review_signals || requestContext.policy_stratification);
   const requestTask = readObject(requestPayload.task);
   const policyResponse = readObject(run?.policyResponse);
   const policyOutput = readObject(policyResponse.output);
-  const aimxsOutput = readObject(policyOutput.aimxs);
-  const providerMeta = readObject(aimxsOutput.providerMeta);
-  const providerPolicy = readObject(providerMeta.policy_stratification);
+  const providerOutput = readObject(policyOutput.premiumProvider || policyOutput.providerRoute || policyOutput.aimxs);
+  const providerMeta = readObject(providerOutput.providerMeta);
+  const providerPolicy = readObject(providerMeta.review_signals || providerMeta.policy_stratification);
   const requestContract = readObject(providerMeta.request_contract);
   const providerCurrentState = readObject(providerMeta.current_state);
   const providerContinuity = readObject(providerMeta.state_continuity);
   const providerAuditSink = readObject(providerMeta.audit_sink);
-  const outputContract = readObject(aimxsOutput.requestContract);
-  const evidence = readObject(aimxsOutput.evidence);
+  const outputContract = readObject(providerOutput.requestContract);
+  const evidence = readObject(providerOutput.evidence);
   const financeOrder = readObject(requestGoverned.finance_order);
   const reasons = Array.isArray(policyResponse.reasons) ? policyResponse.reasons : [];
   const firstReason = readObject(reasons[0]);
-  const requiredGrants = readStringArray(requestPolicy.required_grants);
+  const requiredGrants = readStringArray(requestPolicy.required_reviews || requestPolicy.required_grants);
   const authorityRoles = readStringArray(actorAuthority.roles).length
     ? readStringArray(actorAuthority.roles)
     : readStringArray(governedAuthority.roles);
@@ -499,7 +500,7 @@ export function derivePolicyRichness(run) {
   const evidenceRefs = readStringArray(policyResponse.evidenceRefs);
   const contractId = String(requestGoverned.contract_id || requestContract.contract_id || outputContract.contract_id || "").trim();
   const providerId = String(
-    aimxsOutput.providerId ||
+    providerOutput.providerId ||
       providerMeta.providerId ||
       policyResponse.source ||
       run?.selectedPolicyProvider ||
@@ -509,7 +510,8 @@ export function derivePolicyRichness(run) {
   const decisionPath = String(providerMeta.decision_path || "").trim();
   const evidenceHash = String(evidence.evidence_hash || evidence.evidenceHash || "").trim();
   const policyStratificationPresent =
-    Object.keys(providerPolicy).length > 0 || Object.keys(readObject(aimxsOutput.policyStratification)).length > 0;
+    Object.keys(providerPolicy).length > 0 ||
+    Object.keys(readObject(providerOutput.reviewSignals || providerOutput.policyStratification)).length > 0;
   const requestContractEchoPresent =
     Object.keys(requestContract).length > 0 || Object.keys(outputContract).length > 0;
 
@@ -525,9 +527,17 @@ export function derivePolicyRichness(run) {
     actionVerb: String(requestAction.verb || "").trim(),
     approvedForProd: requestSubjectAttributes.approvedForProd === true,
     boundaryClass: String(requestPolicy.boundary_class || providerPolicy.boundary_class || "").trim(),
-    riskTier: String(requestPolicy.risk_tier || providerPolicy.risk_tier || "").trim(),
+    riskTier: String(
+      requestPolicy.review_tier || requestPolicy.risk_tier || providerPolicy.review_tier || providerPolicy.risk_tier || ""
+    ).trim(),
     requiredGrants,
-    evidenceReadiness: String(requestPolicy.evidence_readiness || providerPolicy.evidence_readiness || "").trim(),
+    evidenceReadiness: String(
+      requestPolicy.readiness_state ||
+        requestPolicy.evidence_readiness ||
+        providerPolicy.readiness_state ||
+        providerPolicy.evidence_readiness ||
+        ""
+    ).trim(),
     handshakeRequired:
       requestPolicy?.gates?.handoff_required === true ||
       requestPolicy?.gates?.["core14.adapter_present.enforce_handshake"] === true,
@@ -743,7 +753,7 @@ export function createPolicyWorkspaceSnapshot(context = {}) {
     currentContract: {
       providerLabel: policyProviderLabel(settings),
       providerId,
-      mode: String(settings?.aimxs?.mode || "").trim(),
+      mode: displayAimxsModeLabel(String(settings?.aimxs?.mode || "").trim()),
       catalogSource: summarizePolicyDataSource(policyCatalog?.source || "unknown"),
       packCount: policyCatalog?.count || policyCatalogItems.length || 0,
       policyMatrixRequired: Boolean(runtimeIdentity?.policyMatrixRequired),

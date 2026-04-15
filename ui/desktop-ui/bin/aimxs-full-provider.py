@@ -19,7 +19,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Dict, Tuple
 
-PUBLIC_PROVIDER_ID = "aimxs-full"
+PUBLIC_PROVIDER_ID = "premium-provider-local"
 PUBLIC_PROVIDER_VERSION = "public-loader"
 PUBLIC_CONTRACT_VERSION = "v1alpha1"
 ENDPOINT_MANIFEST_CANDIDATES = (

@@ -813,8 +813,8 @@ func TestRuntimeV1Alpha2GovernedActionProposalDecisionRoutesThroughRunOrchestrat
 	if decisionResp.PolicyDecision != "DEFER" {
 		t.Fatalf("policyDecision=%q want DEFER", decisionResp.PolicyDecision)
 	}
-	if decisionResp.SelectedPolicyProvider != "aimxs-full" {
-		t.Fatalf("selectedPolicyProvider=%q want aimxs-full", decisionResp.SelectedPolicyProvider)
+	if decisionResp.SelectedPolicyProvider != "premium-provider-local" {
+		t.Fatalf("selectedPolicyProvider=%q want premium-provider-local", decisionResp.SelectedPolicyProvider)
 	}
 
 	rr = requestJSON(t, handler, http.MethodGet, "/v1alpha2/runtime/sessions/"+session.SessionID+"/tool-actions", nil)
@@ -845,8 +845,8 @@ func TestRuntimeV1Alpha2GovernedActionProposalDecisionRoutesThroughRunOrchestrat
 	}
 	var runDetail RunRecord
 	decodeResponseBody(t, rr, &runDetail)
-	if runDetail.SelectedPolicyProvider != "aimxs-full" {
-		t.Fatalf("run selected policy provider=%q want aimxs-full", runDetail.SelectedPolicyProvider)
+	if runDetail.SelectedPolicyProvider != "premium-provider-local" {
+		t.Fatalf("run selected policy provider=%q want premium-provider-local", runDetail.SelectedPolicyProvider)
 	}
 	if runDetail.PolicyDecision != "DEFER" {
 		t.Fatalf("run policyDecision=%q want DEFER", runDetail.PolicyDecision)
@@ -2230,18 +2230,39 @@ func fakeGovernedActionPolicyDecision(input interface{}) (string, string, map[st
 	subjectAttributes := extractJSONObjectValue(subject["attributes"])
 	action := extractJSONObjectValue(payload["action"])
 	context := extractJSONObjectValue(payload["context"])
-	policy := extractJSONObjectValue(context["policy_stratification"])
-	requiredGrants := normalizeGovernedActionStringSlice(policy["required_grants"])
-	evidenceReadiness := strings.ToUpper(strings.TrimSpace(normalizedInterfaceString(policy["evidence_readiness"])))
+	policy := extractJSONObjectValue(context["review_signals"])
+	if len(policy) == 0 {
+		policy = extractJSONObjectValue(context["policy_stratification"])
+	}
+	requiredGrants := normalizeGovernedActionStringSlice(policy["required_reviews"])
+	if len(requiredGrants) == 0 {
+		requiredGrants = normalizeGovernedActionStringSlice(policy["required_grants"])
+	}
+	evidenceReadiness := strings.ToUpper(strings.TrimSpace(normalizedInterfaceString(policy["readiness_state"])))
+	if evidenceReadiness == "" {
+		evidenceReadiness = strings.ToUpper(strings.TrimSpace(normalizedInterfaceString(policy["evidence_readiness"])))
+	}
 	environment := strings.ToLower(strings.TrimSpace(normalizedInterfaceString(meta["environment"])))
 	actionVerb := strings.ToLower(strings.TrimSpace(normalizedInterfaceString(action["verb"])))
 	approvedForProd := normalizedInterfaceBool(subjectAttributes["approvedForProd"])
 
 	providerPolicy := map[string]interface{}{
-		"boundary_class":     normalizedInterfaceString(policy["boundary_class"]),
-		"risk_tier":          normalizedInterfaceString(policy["risk_tier"]),
-		"required_grants":    requiredGrants,
-		"evidence_readiness": normalizedInterfaceString(policy["evidence_readiness"]),
+		"boundary_class": normalizedInterfaceString(policy["boundary_class"]),
+		"review_tier": func() string {
+			value := normalizedInterfaceString(policy["review_tier"])
+			if value != "" {
+				return value
+			}
+			return normalizedInterfaceString(policy["risk_tier"])
+		}(),
+		"required_reviews": requiredGrants,
+		"readiness_state": func() string {
+			value := normalizedInterfaceString(policy["readiness_state"])
+			if value != "" {
+				return value
+			}
+			return normalizedInterfaceString(policy["evidence_readiness"])
+		}(),
 	}
 
 	switch {
@@ -2250,7 +2271,7 @@ func fakeGovernedActionPolicyDecision(input interface{}) (string, string, map[st
 	case len(requiredGrants) > 0 || evidenceReadiness != "" && evidenceReadiness != "READY":
 		return "DEFER", "Supervisor trading grant is still required before execution.", providerPolicy
 	default:
-		return "ALLOW", "Governed request passed local AIMXS policy evaluation.", providerPolicy
+		return "ALLOW", "Governed request passed local premium-provider policy evaluation.", providerPolicy
 	}
 }
 
@@ -2265,8 +2286,8 @@ func (c *fakeGovernedActionProviderClient) SelectProvider(_ context.Context, _ s
 		}, nil
 	case "PolicyProvider":
 		return &ProviderTarget{
-			Name:         "aimxs-full",
-			ProviderID:   "aimxs-full",
+			Name:         "premium-provider-local",
+			ProviderID:   "premium-provider-local",
 			ProviderType: "PolicyProvider",
 			Priority:     maxInt64(minPriority, 100),
 		}, nil
@@ -2299,12 +2320,12 @@ func (c *fakeGovernedActionProviderClient) PostJSON(_ context.Context, target *P
 		}
 		decision, message, providerPolicy := fakeGovernedActionPolicyDecision(input)
 		output := map[string]interface{}{
-			"aimxs": map[string]interface{}{
-				"providerId": "aimxs-full",
+			"premiumProvider": map[string]interface{}{
+				"providerId": "premium-provider-local",
 				"providerMeta": map[string]interface{}{
-					"baak_engaged":          true,
-					"decision_path":         map[string]string{"ALLOW": "finance_governed_allow", "DEFER": "finance_governed_defer", "DENY": "finance_governed_deny"}[decision],
-					"policy_stratification": providerPolicy,
+					"baak_engaged":   true,
+					"decision_path":  map[string]string{"ALLOW": "finance_governed_allow", "DEFER": "finance_governed_defer", "DENY": "finance_governed_deny"}[decision],
+					"review_signals": providerPolicy,
 				},
 				"evidence": map[string]interface{}{
 					"evidence_hash": "sha256:governed-action-test",
@@ -2312,13 +2333,13 @@ func (c *fakeGovernedActionProviderClient) PostJSON(_ context.Context, target *P
 			},
 		}
 		if decision == "ALLOW" {
-			output["grantToken"] = "aimxs-grant-test"
+			output["premiumProviderGrantToken"] = "premium-provider-grant-test"
 		}
 		return assignRuntimeTestJSON(out, map[string]interface{}{
 			"decision": decision,
-			"source":   "aimxs-full",
+			"source":   "premium-provider-local",
 			"policyBundle": map[string]interface{}{
-				"policyId":      "AIMXS_FINANCE_DEMO",
+				"policyId":      "PREMIUM_FINANCE_DEMO",
 				"policyVersion": "v1",
 			},
 			"reasons": []map[string]interface{}{

@@ -572,14 +572,14 @@ func buildRunCreateRequestFromGovernedActionProposal(session *SessionRecord, pro
 	if authorityContext := governedActionAuthorityContext(identity); authorityContext != nil {
 		governedContext["authority_context"] = authorityContext
 	}
-	policyStratification := JSONObject{
-		"policy_bucket_id":   normalizedInterfaceString(normalized["policyBucketId"]),
-		"action_class":       normalizedInterfaceString(normalized["actionClass"]),
-		"boundary_class":     normalizedInterfaceString(normalized["boundaryClass"]),
-		"risk_tier":          normalizedInterfaceString(normalized["riskTier"]),
-		"required_grants":    normalizeGovernedActionStringSlice(normalized["requiredGrants"]),
-		"evidence_readiness": normalizedInterfaceString(normalized["evidenceReadiness"]),
-		"gates":              buildGovernedActionReviewSignalsFromProposal(normalized),
+	reviewSignals := JSONObject{
+		"policy_bucket_id": normalizedInterfaceString(normalized["policyBucketId"]),
+		"action_class":     normalizedInterfaceString(normalized["actionClass"]),
+		"boundary_class":   normalizedInterfaceString(normalized["boundaryClass"]),
+		"review_tier":      normalizedInterfaceString(normalized["riskTier"]),
+		"required_reviews": normalizeGovernedActionStringSlice(normalized["requiredGrants"]),
+		"readiness_state":  normalizedInterfaceString(normalized["evidenceReadiness"]),
+		"gates":            buildGovernedActionReviewSignalsFromProposal(normalized),
 	}
 	runReq := RunCreateRequest{
 		Meta: ObjectMeta{
@@ -618,8 +618,8 @@ func buildRunCreateRequestFromGovernedActionProposal(session *SessionRecord, pro
 			"demoProfile":  normalizedInterfaceString(normalized["demoProfile"]),
 		},
 		Context: JSONObject{
-			"governed_action":       governedContext,
-			"policy_stratification": policyStratification,
+			"governed_action": governedContext,
+			"review_signals":  reviewSignals,
 		},
 		Mode:   "enforce",
 		DryRun: normalizedInterfaceBool(normalized["dryRun"]),

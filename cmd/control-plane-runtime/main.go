@@ -253,7 +253,7 @@ func run(cfg Config) error {
 		DesktopMinPriority:   cfg.DesktopMinPriority,
 		DesktopAllowNonLinux: cfg.DesktopAllowNonLinux,
 		RequirePolicyGrant:   cfg.AuthRequirePolicyGrant,
-		AIMXSEntitlement: cpruntime.AIMXSEntitlementConfig{
+		PremiumProviderEntitlement: cpruntime.PremiumProviderEntitlementConfig{
 			Enabled:               cfg.AuthRequirePremiumProviderEntitlement,
 			ProviderNamePrefixes:  splitCommaList(cfg.AuthPremiumProviderPrefixes),
 			AllowedSKUs:           toLowerStringSet(splitCommaList(cfg.AuthPremiumAllowedSKUs)),

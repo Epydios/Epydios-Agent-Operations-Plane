@@ -260,7 +260,7 @@ function mockProviderList() {
         endpoint: "https://openfang.epydios-system.svc.cluster.local:8443"
       },
       {
-        providerId: "aimxs-policy-primary",
+        providerId: "premium-policy-primary",
         providerType: "PolicyProvider",
         ready: true,
         probed: true,
@@ -1055,7 +1055,7 @@ function seedMockRuns() {
       environment: "staging",
       status: "FAILED",
       selectedProfileProvider: "oss-profile-static",
-      selectedPolicyProvider: "aimxs-policy-primary",
+      selectedPolicyProvider: "premium-policy-primary",
       selectedEvidenceProvider: "oss-evidence-memory",
       selectedDesktopProvider: "oss-desktop-openfang-linux",
       policyDecision: "DENY",
@@ -1079,7 +1079,7 @@ function seedMockRuns() {
       profileResponse: { profileId: "profile-static-default" },
       policyResponse: {
         decision: "DENY",
-        source: "aimxs-policy-primary",
+        source: "premium-policy-primary",
         reasonCode: "PREMIUM_PROVIDER_ENTITLEMENT_FEATURE_MISSING"
       },
       evidenceRecordResponse: { status: "recorded" },
@@ -1255,7 +1255,7 @@ function mockAuditEvents() {
         event: "runtime.policy.decision",
         tenantId: "tenant-ops",
         projectId: "project-core",
-        providerId: "aimxs-policy-primary",
+        providerId: "premium-policy-primary",
         decision: "DENY"
       },
       {
@@ -2346,13 +2346,13 @@ function mockSubmitRuntimeSessionToolProposalDecision(sessionId, proposalId, dec
                   ? deepClone(proposalPayload.financeOrder)
                   : undefined
             },
-            policy_stratification: {
+            review_signals: {
               policy_bucket_id: String(proposalPayload?.policyBucketId || "mock-governed-action").trim(),
               action_class: String(proposalPayload?.actionClass || "execute").trim(),
               boundary_class: String(proposalPayload?.boundaryClass || "external_actuator").trim(),
-              risk_tier: String(proposalPayload?.riskTier || "high").trim(),
-              required_grants: Array.isArray(proposalPayload?.requiredGrants) ? deepClone(proposalPayload.requiredGrants) : [],
-              evidence_readiness: String(proposalPayload?.evidenceReadiness || "PARTIAL").trim(),
+              review_tier: String(proposalPayload?.riskTier || "high").trim(),
+              required_reviews: Array.isArray(proposalPayload?.requiredGrants) ? deepClone(proposalPayload.requiredGrants) : [],
+              readiness_state: String(proposalPayload?.evidenceReadiness || "PARTIAL").trim(),
               gates: {
                 "core14.adapter_present.enforce_handshake": proposalPayload?.handshakeRequired === true
               }
@@ -2373,11 +2373,11 @@ function mockSubmitRuntimeSessionToolProposalDecision(sessionId, proposalId, dec
             }
           ],
           output: {
-            aimxs: {
+            premiumProvider: {
               providerId: "mock-policy-provider",
               providerMeta: {
                 decision_path: "mock_governed_path",
-                policy_stratification: {
+                review_signals: {
                   boundary_class: String(proposalPayload?.boundaryClass || "external_actuator").trim()
                 }
               },
@@ -4530,8 +4530,8 @@ export class AgentOpsApi {
         message: "Mock provider-route activation reports secure-provider as active.",
         namespace: "epydios-system",
         activeMode: "aimxs-https",
-        selectedProviderId: "aimxs-policy-primary",
-        selectedProviderName: "aimxs-policy-primary",
+        selectedProviderId: "premium-policy-primary",
+        selectedProviderName: "premium-policy-primary",
         selectedProviderReady: true,
         selectedProviderProbed: true,
         capabilities: [
@@ -4542,8 +4542,8 @@ export class AgentOpsApi {
         ],
         enabledProviders: [
           {
-            name: "aimxs-policy-primary",
-            providerId: "aimxs-policy-primary",
+            name: "premium-policy-primary",
+            providerId: "premium-policy-primary",
             mode: "aimxs-https",
             enabled: true,
             ready: true,
@@ -4559,7 +4559,7 @@ export class AgentOpsApi {
           }
         ],
         secrets: {
-          bearerTokenSecret: { name: "aimxs-policy-token", present: true },
+          bearerTokenSecret: { name: "policy-provider-token", present: true },
           clientTlsSecret: { name: "epydios-controller-mtls-client", present: true },
           caSecret: { name: "epydios-provider-ca", present: true }
         }

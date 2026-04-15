@@ -15,22 +15,22 @@ import (
 )
 
 type Orchestrator struct {
-	Namespace             string
-	Store                 RunStore
-	ProviderRegistry      ProviderClient
-	ProfileMinPriority    int64
-	PolicyMinPriority     int64
-	EvidenceMinPriority   int64
-	DesktopMinPriority    int64
-	DesktopAllowNonLinux  bool
-	RequirePolicyGrant    bool
-	AIMXSEntitlement      AIMXSEntitlementConfig
-	PolicyLifecycle       PolicyLifecycleConfig
-	RetentionDefaultClass string
-	RetentionClassTTLs    map[string]time.Duration
+	Namespace                  string
+	Store                      RunStore
+	ProviderRegistry           ProviderClient
+	ProfileMinPriority         int64
+	PolicyMinPriority          int64
+	EvidenceMinPriority        int64
+	DesktopMinPriority         int64
+	DesktopAllowNonLinux       bool
+	RequirePolicyGrant         bool
+	PremiumProviderEntitlement PremiumProviderEntitlementConfig
+	PolicyLifecycle            PolicyLifecycleConfig
+	RetentionDefaultClass      string
+	RetentionClassTTLs         map[string]time.Duration
 }
 
-type AIMXSEntitlementConfig struct {
+type PremiumProviderEntitlementConfig struct {
 	Enabled               bool
 	ProviderNamePrefixes  []string
 	AllowedSKUs           map[string]struct{}
@@ -246,7 +246,7 @@ func (o *Orchestrator) ExecuteRun(ctx context.Context, req RunCreateRequest) (*R
 
 	var policyResp map[string]interface{}
 	policyDecisionSource := "provider"
-	if denyResp, ok := o.evaluateAIMXSEntitlement(ctx, run, policyProvider, normalizedReq); ok {
+	if denyResp, ok := o.evaluatePremiumProviderEntitlement(ctx, run, policyProvider, normalizedReq); ok {
 		policyResp = denyResp
 		policyDecisionSource = "runtime-entitlement"
 	} else {
@@ -744,8 +744,8 @@ func (o *Orchestrator) evaluatePolicyLifecycle(ctx context.Context, run *RunReco
 	return nil
 }
 
-func (o *Orchestrator) evaluateAIMXSEntitlement(ctx context.Context, run *RunRecord, provider *ProviderTarget, req RunCreateRequest) (map[string]interface{}, bool) {
-	if !o.shouldApplyAIMXSEntitlement(provider) {
+func (o *Orchestrator) evaluatePremiumProviderEntitlement(ctx context.Context, run *RunRecord, provider *ProviderTarget, req RunCreateRequest) (map[string]interface{}, bool) {
+	if !o.shouldApplyPremiumProviderEntitlement(provider) {
 		return nil, false
 	}
 
@@ -756,17 +756,17 @@ func (o *Orchestrator) evaluateAIMXSEntitlement(ctx context.Context, run *RunRec
 	violationCodes := make([]string, 0, 4)
 	violationMessages := make([]string, 0, 4)
 
-	if o.AIMXSEntitlement.RequireEntitlementKey && !tokenPresent {
-		violationCodes = append(violationCodes, "AIMXS_ENTITLEMENT_TOKEN_REQUIRED")
-		violationMessages = append(violationMessages, "missing required AIMXS entitlement token")
+	if o.PremiumProviderEntitlement.RequireEntitlementKey && !tokenPresent {
+		violationCodes = append(violationCodes, "PREMIUM_PROVIDER_ENTITLEMENT_TOKEN_REQUIRED")
+		violationMessages = append(violationMessages, "missing required premium-provider entitlement token")
 	}
-	if len(o.AIMXSEntitlement.AllowedSKUs) > 0 {
+	if len(o.PremiumProviderEntitlement.AllowedSKUs) > 0 {
 		if details.SKU == "" {
-			violationCodes = append(violationCodes, "AIMXS_ENTITLEMENT_SKU_REQUIRED")
-			violationMessages = append(violationMessages, "missing required AIMXS SKU")
-		} else if _, ok := o.AIMXSEntitlement.AllowedSKUs[details.SKU]; !ok {
-			violationCodes = append(violationCodes, "AIMXS_ENTITLEMENT_SKU_NOT_ALLOWED")
-			violationMessages = append(violationMessages, fmt.Sprintf("AIMXS SKU %q is not allowed", details.SKU))
+			violationCodes = append(violationCodes, "PREMIUM_PROVIDER_ENTITLEMENT_SKU_REQUIRED")
+			violationMessages = append(violationMessages, "missing required premium-provider SKU")
+		} else if _, ok := o.PremiumProviderEntitlement.AllowedSKUs[details.SKU]; !ok {
+			violationCodes = append(violationCodes, "PREMIUM_PROVIDER_ENTITLEMENT_SKU_NOT_ALLOWED")
+			violationMessages = append(violationMessages, fmt.Sprintf("premium-provider SKU %q is not allowed", details.SKU))
 		}
 	}
 
@@ -777,11 +777,11 @@ func (o *Orchestrator) evaluateAIMXSEntitlement(ctx context.Context, run *RunRec
 		}
 	}
 	if len(missingFeatures) > 0 {
-		violationCodes = append(violationCodes, "AIMXS_ENTITLEMENT_FEATURE_MISSING")
-		violationMessages = append(violationMessages, fmt.Sprintf("missing required AIMXS features: %s", strings.Join(missingFeatures, ",")))
+		violationCodes = append(violationCodes, "PREMIUM_PROVIDER_ENTITLEMENT_FEATURE_MISSING")
+		violationMessages = append(violationMessages, fmt.Sprintf("missing required premium-provider features: %s", strings.Join(missingFeatures, ",")))
 	}
 
-	emitAuditEvent(ctx, "runtime.aimxs.entitlement.evaluate", map[string]interface{}{
+	emitAuditEvent(ctx, "runtime.premium_provider.entitlement.evaluate", map[string]interface{}{
 		"runId":            run.RunID,
 		"requestId":        run.RequestID,
 		"providerName":     provider.Name,
@@ -795,7 +795,7 @@ func (o *Orchestrator) evaluateAIMXSEntitlement(ctx context.Context, run *RunRec
 	})
 
 	if len(violationCodes) == 0 {
-		emitAuditEvent(ctx, "runtime.aimxs.entitlement.allow", map[string]interface{}{
+		emitAuditEvent(ctx, "runtime.premium_provider.entitlement.allow", map[string]interface{}{
 			"runId":            run.RunID,
 			"requestId":        run.RequestID,
 			"providerName":     provider.Name,
@@ -808,7 +808,7 @@ func (o *Orchestrator) evaluateAIMXSEntitlement(ctx context.Context, run *RunRec
 		return nil, false
 	}
 
-	emitAuditEvent(ctx, "runtime.aimxs.entitlement.deny", map[string]interface{}{
+	emitAuditEvent(ctx, "runtime.premium_provider.entitlement.deny", map[string]interface{}{
 		"runId":            run.RunID,
 		"requestId":        run.RequestID,
 		"providerName":     provider.Name,
@@ -823,11 +823,11 @@ func (o *Orchestrator) evaluateAIMXSEntitlement(ctx context.Context, run *RunRec
 	return buildEntitlementDenyPolicyResponse(provider, details, requiredFeatures, missingFeatures, violationCodes, violationMessages), true
 }
 
-func (o *Orchestrator) shouldApplyAIMXSEntitlement(provider *ProviderTarget) bool {
-	if !o.AIMXSEntitlement.Enabled || provider == nil {
+func (o *Orchestrator) shouldApplyPremiumProviderEntitlement(provider *ProviderTarget) bool {
+	if !o.PremiumProviderEntitlement.Enabled || provider == nil {
 		return false
 	}
-	if len(o.AIMXSEntitlement.ProviderNamePrefixes) == 0 {
+	if len(o.PremiumProviderEntitlement.ProviderNamePrefixes) == 0 {
 		return false
 	}
 	candidates := []string{provider.Name, provider.ProviderID}
@@ -836,7 +836,7 @@ func (o *Orchestrator) shouldApplyAIMXSEntitlement(provider *ProviderTarget) boo
 		if candidateNorm == "" {
 			continue
 		}
-		for _, prefix := range o.AIMXSEntitlement.ProviderNamePrefixes {
+		for _, prefix := range o.PremiumProviderEntitlement.ProviderNamePrefixes {
 			prefixNorm := strings.ToLower(strings.TrimSpace(prefix))
 			if prefixNorm == "" {
 				continue
@@ -850,14 +850,14 @@ func (o *Orchestrator) shouldApplyAIMXSEntitlement(provider *ProviderTarget) boo
 }
 
 func (o *Orchestrator) entitlementRequiredFeaturesForSKU(sku string) []string {
-	required := make(map[string]struct{}, len(o.AIMXSEntitlement.RequiredFeatures))
-	for feature := range o.AIMXSEntitlement.RequiredFeatures {
+	required := make(map[string]struct{}, len(o.PremiumProviderEntitlement.RequiredFeatures))
+	for feature := range o.PremiumProviderEntitlement.RequiredFeatures {
 		if feature != "" {
 			required[feature] = struct{}{}
 		}
 	}
 	if sku != "" {
-		if skuFeatures, ok := o.AIMXSEntitlement.SKUFeatures[sku]; ok {
+		if skuFeatures, ok := o.PremiumProviderEntitlement.SKUFeatures[sku]; ok {
 			for feature := range skuFeatures {
 				if feature != "" {
 					required[feature] = struct{}{}
@@ -878,6 +878,10 @@ func extractEntitlementRequestDetails(req RunCreateRequest) entitlementRequestDe
 
 	annotations := map[string]interface{}(req.Annotations)
 	details.SKU = normalizeEntitlementKey(firstNonEmpty(
+		nestedStringValue(annotations, "premiumProviderEntitlement", "sku"),
+		nestedStringValue(annotations, "premiumProvider", "entitlement", "sku"),
+		stringValue(annotations["premiumProvider.sku"]),
+		stringValue(annotations["premiumProviderSku"]),
 		nestedStringValue(annotations, "aimxsEntitlement", "sku"),
 		nestedStringValue(annotations, "aimxs", "entitlement", "sku"),
 		stringValue(annotations["aimxs.sku"]),
@@ -886,6 +890,10 @@ func extractEntitlementRequestDetails(req RunCreateRequest) entitlementRequestDe
 		stringValue(annotations["entitlementSku"]),
 	))
 	details.Token = strings.TrimSpace(firstNonEmpty(
+		nestedStringValue(annotations, "premiumProviderEntitlement", "token"),
+		nestedStringValue(annotations, "premiumProvider", "entitlement", "token"),
+		stringValue(annotations["premiumProvider.token"]),
+		stringValue(annotations["premiumProviderToken"]),
 		nestedStringValue(annotations, "aimxsEntitlement", "token"),
 		nestedStringValue(annotations, "aimxs", "entitlement", "token"),
 		stringValue(annotations["aimxs.token"]),
@@ -895,6 +903,10 @@ func extractEntitlementRequestDetails(req RunCreateRequest) entitlementRequestDe
 	))
 
 	featureValues := make([]string, 0, 8)
+	featureValues = append(featureValues, entitlementFeaturesFromValue(nestedValue(annotations, "premiumProviderEntitlement", "features"))...)
+	featureValues = append(featureValues, entitlementFeaturesFromValue(nestedValue(annotations, "premiumProvider", "entitlement", "features"))...)
+	featureValues = append(featureValues, entitlementFeaturesFromValue(annotations["premiumProvider.features"])...)
+	featureValues = append(featureValues, entitlementFeaturesFromValue(annotations["premiumProviderFeatures"])...)
 	featureValues = append(featureValues, entitlementFeaturesFromValue(nestedValue(annotations, "aimxsEntitlement", "features"))...)
 	featureValues = append(featureValues, entitlementFeaturesFromValue(nestedValue(annotations, "aimxs", "entitlement", "features"))...)
 	featureValues = append(featureValues, entitlementFeaturesFromValue(annotations["aimxs.features"])...)
@@ -928,7 +940,7 @@ func buildEntitlementDenyPolicyResponse(
 ) map[string]interface{} {
 	reasons := make([]map[string]interface{}, 0, len(violationCodes))
 	for i, code := range violationCodes {
-		message := "AIMXS entitlement validation failed"
+		message := "Premium-provider entitlement validation failed"
 		if i < len(violationMessages) && strings.TrimSpace(violationMessages[i]) != "" {
 			message = violationMessages[i]
 		}
@@ -1198,7 +1210,7 @@ func extractPolicyGrantToken(policyResp map[string]interface{}) (string, string)
 	if len(output) == 0 {
 		return "", ""
 	}
-	for _, candidate := range []string{"grantToken", "grant_token", "aimxsGrantToken", "aimxs_grant_token"} {
+	for _, candidate := range []string{"grantToken", "grant_token", "premiumProviderGrantToken", "premium_provider_grant_token", "aimxsGrantToken", "aimxs_grant_token"} {
 		if token := strings.TrimSpace(policyValueToString(output[candidate])); token != "" {
 			return token, "output." + candidate
 		}
@@ -1227,7 +1239,7 @@ func sanitizePolicyResponse(policyResp map[string]interface{}, grantPresent bool
 	}
 	removeTokenKeys(cloned, "grantToken", "grant_token", "capabilityGrant", "capability_grant")
 	if output, ok := cloned["output"].(map[string]interface{}); ok {
-		removeTokenKeys(output, "grantToken", "grant_token", "aimxsGrantToken", "aimxs_grant_token")
+		removeTokenKeys(output, "grantToken", "grant_token", "premiumProviderGrantToken", "premium_provider_grant_token", "aimxsGrantToken", "aimxs_grant_token")
 	}
 	cloned["grantTokenPresent"] = grantPresent
 	if grantSHA256 != "" {

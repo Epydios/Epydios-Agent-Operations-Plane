@@ -12,7 +12,7 @@ test("policyops page renders the first inspect-only policy boards", () => {
           available: true,
           state: "active",
           activeMode: "aimxs-full",
-          selectedProviderId: "aimxs-policy-primary",
+          selectedProviderId: "premium-policy-primary",
           selectedProviderReady: true
         }
       },
@@ -29,7 +29,7 @@ test("policyops page renders the first inspect-only policy boards", () => {
             packId: "managed_codex_worker_operator",
             label: "Managed Codex Worker Operator",
             version: "2026.03.14",
-            sourceRef: "bundle://aimxs/managed_codex_worker_operator/2026.03.14",
+            sourceRef: "bundle://premium-provider/managed_codex_worker_operator/2026.03.14",
             stableRef: "policy-pack://managed_codex_worker_operator@2026.03.14",
             schemaReadiness: "declared",
             compileReadiness: "ready",
@@ -43,7 +43,7 @@ test("policyops page renders the first inspect-only policy boards", () => {
             packId: "finance_supervisor_review",
             label: "Finance Supervisor Review",
             version: "2026.03.15",
-            sourceRef: "bundle://aimxs/finance_supervisor_review/2026.03.15",
+            sourceRef: "bundle://premium-provider/finance_supervisor_review/2026.03.15",
             stableRef: "policy-pack://finance_supervisor_review@2026.03.15",
             schemaReadiness: "declared",
             compileReadiness: "conditional",
@@ -61,7 +61,7 @@ test("policyops page renders the first inspect-only policy boards", () => {
         {
           runId: "run-20260314-010",
           updatedAt: "2026-03-14T21:01:00Z",
-          selectedPolicyProvider: "aimxs-policy-primary",
+          selectedPolicyProvider: "premium-policy-primary",
           policyDecision: "DEFER",
           requestPayload: {
             meta: { environment: "staging" },
@@ -74,11 +74,11 @@ test("policyops page renders the first inspect-only policy boards", () => {
                 contract_id: "contract-finance-transfer-v1",
                 workflow_kind: "finance_transfer"
               },
-              policy_stratification: {
+              review_signals: {
                 boundary_class: "financial_control",
-                risk_tier: "high",
-                required_grants: ["finance.supervisor.approve"],
-                evidence_readiness: "partial"
+                review_tier: "high",
+                required_reviews: ["finance.supervisor.approve"],
+                readiness_state: "partial"
               },
               actor_authority: {
                 subject: "demo.operator",
@@ -102,16 +102,16 @@ test("policyops page renders the first inspect-only policy boards", () => {
           },
           policyResponse: {
             decision: "DEFER",
-            source: "aimxs-policy-primary",
+            source: "premium-policy-primary",
             reasons: [{ message: "Finance supervisor approval is still required." }],
             evidenceRefs: ["evidence://finance/transfer/001"],
             output: {
-              aimxs: {
+              premiumProvider: {
                 providerMeta: {
                   decision_path: "governance.handshake_validation",
                   audit_sink: {
                     active: true,
-                    event_ref: "aimxs://audit/policy-event-001"
+                    event_ref: "provider://audit/policy-event-001"
                   }
                 }
               }
@@ -136,7 +136,7 @@ test("policyops page renders the first inspect-only policy boards", () => {
       adminDraft: {
         changeKind: "activate",
         packId: "finance_supervisor_review",
-        providerId: "aimxs-policy-primary",
+        providerId: "premium-policy-primary",
         targetScope: "tenant-demo / project-finance",
         reason: "Finance policy pack needs bounded activation preview."
       },
@@ -153,10 +153,10 @@ test("policyops page renders the first inspect-only policy boards", () => {
           targetLabel: "scope",
           changeKind: "activate",
           packId: "finance_supervisor_review",
-          providerId: "aimxs-policy-primary",
+          providerId: "premium-policy-primary",
           status: "simulated",
           reason: "Finance policy pack needs bounded activation preview.",
-          summary: "Activate finance_supervisor_review for tenant-demo / project-finance @ aimxs-policy-primary",
+          summary: "Activate finance_supervisor_review for tenant-demo / project-finance @ premium-policy-primary",
           simulationSummary: "Preview only. This activate proposal requires GovernanceOps approval before any live policy-pack change can execute.",
           verification: {
             changeId: "policy-change-001",
@@ -170,7 +170,7 @@ test("policyops page renders the first inspect-only policy boards", () => {
             lintStatus: "pass",
             goldenStatus: "warn",
             passing: true,
-            diffSummary: "pack managed_codex_worker_operator@2026.03.14 -> finance_supervisor_review@2026.03.15; provider aimxs-policy-primary -> aimxs-policy-primary; scope workspace -> tenant-demo / project-finance",
+            diffSummary: "pack managed_codex_worker_operator@2026.03.14 -> finance_supervisor_review@2026.03.15; provider premium-policy-primary -> premium-policy-primary; scope workspace -> tenant-demo / project-finance",
             findings: [
               "Golden simulation posture still carries bounded warnings or blockers; route is still allowed only if the verify gate itself passes."
             ],
@@ -207,7 +207,7 @@ test("policyops page renders the first inspect-only policy boards", () => {
         lintStatus: "pass",
         goldenStatus: "warn",
         passing: true,
-        diffSummary: "pack managed_codex_worker_operator@2026.03.14 -> finance_supervisor_review@2026.03.15; provider aimxs-policy-primary -> aimxs-policy-primary; scope workspace -> tenant-demo / project-finance",
+        diffSummary: "pack managed_codex_worker_operator@2026.03.14 -> finance_supervisor_review@2026.03.15; provider premium-policy-primary -> premium-policy-primary; scope workspace -> tenant-demo / project-finance",
         findings: [
           "Golden simulation posture still carries bounded warnings or blockers; route is still allowed only if the verify gate itself passes."
         ],
@@ -238,7 +238,7 @@ test("policyops page renders the first inspect-only policy boards", () => {
         updatedAt: "2026-03-14T21:08:00Z",
         facts: [
           { label: "pack", value: "finance_supervisor_review", code: true },
-          { label: "provider", value: "aimxs-policy-primary", code: true },
+          { label: "provider", value: "premium-policy-primary", code: true },
           { label: "scope", value: "tenant-demo / project-finance", code: true }
         ],
         findings: [
@@ -256,16 +256,16 @@ test("policyops page renders the first inspect-only policy boards", () => {
   assert.match(ui.policyOpsContent.innerHTML, /Semantic Impact Preview/);
   assert.match(ui.policyOpsContent.innerHTML, /Governance Route And Receipt State/);
   assert.match(ui.policyOpsContent.innerHTML, /Decision Contract/);
-  assert.match(ui.policyOpsContent.innerHTML, /decisionMode=aimxs-full; provider=aimxs-policy-primary/);
+  assert.match(ui.policyOpsContent.innerHTML, /decisionMode=local-provider; provider=premium-policy-primary/);
   assert.match(ui.policyOpsContent.innerHTML, /baselineContract=active; premiumRichness=(visible|not-loaded)/);
   assert.match(ui.policyOpsContent.innerHTML, /Policy Pack Catalog/);
   assert.match(ui.policyOpsContent.innerHTML, /Baseline decisions stay real here\. Verify the proposed contract before routing it into GovernanceOps\./);
   assert.match(ui.policyOpsContent.innerHTML, /policy-pack:\/\/managed_codex_worker_operator@2026\.03\.14/);
-  assert.match(ui.policyOpsContent.innerHTML, /bundle:\/\/aimxs\/managed_codex_worker_operator\/2026\.03\.14/);
+  assert.match(ui.policyOpsContent.innerHTML, /bundle:\/\/premium-provider\/managed_codex_worker_operator\/2026\.03\.14/);
   assert.match(ui.policyOpsContent.innerHTML, /schema=declared; compile=ready/);
   assert.match(ui.policyOpsContent.innerHTML, /activationTarget=workspace; activationPosture=current/);
-  assert.match(ui.policyOpsContent.innerHTML, /Premium Decision Rationale/);
-  assert.match(ui.policyOpsContent.innerHTML, /Premium Identity And Authority Posture/);
+  assert.match(ui.policyOpsContent.innerHTML, /Decision Rationale/);
+  assert.match(ui.policyOpsContent.innerHTML, /Identity And Authority Basis/);
   assert.match(ui.policyOpsContent.innerHTML, /governed action authority/);
   assert.match(ui.policyOpsContent.innerHTML, /premium governance handshake/);
   assert.match(ui.policyOpsContent.innerHTML, /Identity And Authority Basis/);
@@ -276,8 +276,8 @@ test("policyops page renders the first inspect-only policy boards", () => {
   assert.match(ui.policyOpsContent.innerHTML, /Decision Rationale/);
   assert.match(ui.policyOpsContent.innerHTML, /Policy Coverage/);
   assert.match(ui.policyOpsContent.innerHTML, /Policy Simulation/);
-  assert.match(ui.policyOpsContent.innerHTML, /aimxs-full/);
-  assert.match(ui.policyOpsContent.innerHTML, /aimxs-policy-primary/);
+  assert.match(ui.policyOpsContent.innerHTML, /local-provider/);
+  assert.match(ui.policyOpsContent.innerHTML, /premium-policy-primary/);
   assert.match(ui.policyOpsContent.innerHTML, /managed_codex_worker_operator/);
   assert.match(ui.policyOpsContent.innerHTML, /Finance Supervisor Review/);
   assert.match(ui.policyOpsContent.innerHTML, /2026\.03\.15/);
@@ -287,7 +287,7 @@ test("policyops page renders the first inspect-only policy boards", () => {
   assert.match(ui.policyOpsContent.innerHTML, /Finance supervisor approval is still required\./);
   assert.match(ui.policyOpsContent.innerHTML, /financial_control/);
   assert.match(ui.policyOpsContent.innerHTML, /project-finance/);
-  assert.match(ui.policyOpsContent.innerHTML, /aimxs:\/\/audit\/policy-event-001/);
+  assert.match(ui.policyOpsContent.innerHTML, /provider:\/\/audit\/policy-event-001/);
   assert.match(ui.policyOpsContent.innerHTML, /latest governed run replay/);
   assert.match(ui.policyOpsContent.innerHTML, /required grants/);
   assert.match(ui.policyOpsContent.innerHTML, /blockers=3/);
@@ -308,9 +308,9 @@ test("policyops page renders the first inspect-only policy boards", () => {
   assert.match(ui.policyOpsContent.innerHTML, /compile validation/);
   assert.match(ui.policyOpsContent.innerHTML, /lint posture/);
   assert.match(ui.policyOpsContent.innerHTML, /golden simulation set/);
-  assert.match(ui.policyOpsContent.innerHTML, /Export Premium Decision Rationale/);
+  assert.match(ui.policyOpsContent.innerHTML, /Export Routed Decision Explanation/);
   assert.match(ui.policyOpsContent.innerHTML, /Copy Stable Policy References/);
-  assert.match(ui.policyOpsContent.innerHTML, /Open Governance Route/);
+  assert.match(ui.policyOpsContent.innerHTML, /Open Routed Governance/);
   assert.match(ui.policyOpsContent.innerHTML, /Run Bounded Simulation|Refresh Bounded Simulation/);
   assert.match(ui.policyOpsContent.innerHTML, /Open AuditOps/);
   assert.match(ui.policyOpsContent.innerHTML, /Open EvidenceOps/);
@@ -346,7 +346,7 @@ test("policyops page renders apply and receipt actions for approved policy admin
       aimxs: {
         mode: "aimxs-full",
         activation: {
-          selectedProviderId: "aimxs-policy-primary"
+          selectedProviderId: "premium-policy-primary"
         }
       },
       identity: {
@@ -374,7 +374,7 @@ test("policyops page renders apply and receipt actions for approved policy admin
       adminDraft: {
         changeKind: "activate",
         packId: "read_only_review",
-        providerId: "aimxs-policy-primary",
+        providerId: "premium-policy-primary",
         targetScope: "tenant-demo / workspace",
         reason: "Activate the reviewed pack after governance approval."
       },
@@ -391,10 +391,10 @@ test("policyops page renders apply and receipt actions for approved policy admin
           targetLabel: "scope",
           changeKind: "activate",
           packId: "read_only_review",
-          providerId: "aimxs-policy-primary",
+          providerId: "premium-policy-primary",
           status: "approved",
           reason: "Activate the reviewed pack after governance approval.",
-          summary: "Activate read_only_review for tenant-demo / workspace @ aimxs-policy-primary",
+          summary: "Activate read_only_review for tenant-demo / workspace @ premium-policy-primary",
           simulationSummary: "Preview only. This activate proposal requires GovernanceOps approval before any live policy-pack change can execute.",
           updatedAt: "2026-03-16T23:20:00Z",
           routedAt: "2026-03-16T23:10:00Z",
@@ -417,7 +417,7 @@ test("policyops page renders apply and receipt actions for approved policy admin
         updatedAt: "2026-03-16T23:09:00Z",
         facts: [
           { label: "pack", value: "read_only_review", code: true },
-          { label: "provider", value: "aimxs-policy-primary", code: true }
+          { label: "provider", value: "premium-policy-primary", code: true }
         ],
         findings: []
       }
@@ -440,7 +440,7 @@ test("policyops page renders rollback and bounded history for applied policy adm
       aimxs: {
         mode: "aimxs-full",
         activation: {
-          selectedProviderId: "aimxs-policy-primary"
+          selectedProviderId: "premium-policy-primary"
         }
       },
       identity: {
@@ -469,7 +469,7 @@ test("policyops page renders rollback and bounded history for applied policy adm
       adminDraft: {
         changeKind: "activate",
         packId: "read_only_review",
-        providerId: "aimxs-policy-primary",
+        providerId: "premium-policy-primary",
         targetScope: "tenant-demo / workspace",
         reason: "Activate the reviewed pack after governance approval."
       },
@@ -486,10 +486,10 @@ test("policyops page renders rollback and bounded history for applied policy adm
           targetLabel: "scope",
           changeKind: "activate",
           packId: "read_only_review",
-          providerId: "aimxs-policy-primary",
+          providerId: "premium-policy-primary",
           status: "applied",
           reason: "Activate the reviewed pack after governance approval.",
-          summary: "Activate read_only_review for tenant-demo / workspace @ aimxs-policy-primary",
+          summary: "Activate read_only_review for tenant-demo / workspace @ premium-policy-primary",
           simulationSummary: "Preview only. This activate proposal requires GovernanceOps approval before any live policy-pack change can execute.",
           createdAt: "2026-03-16T23:08:00Z",
           simulatedAt: "2026-03-16T23:09:00Z",
@@ -507,13 +507,13 @@ test("policyops page renders rollback and bounded history for applied policy adm
             executionId: "admin-execution-policy-rollback-001",
             executedAt: "2026-03-16T23:14:00Z",
             status: "applied",
-            summary: "Activate read_only_review for tenant-demo / workspace @ aimxs-policy-primary.",
+            summary: "Activate read_only_review for tenant-demo / workspace @ premium-policy-primary.",
             actorRef: "policy-operator"
           },
           receipt: {
             receiptId: "admin-receipt-policy-rollback-001",
             issuedAt: "2026-03-16T23:14:00Z",
-            summary: "Activate read_only_review for tenant-demo / workspace @ aimxs-policy-primary.",
+            summary: "Activate read_only_review for tenant-demo / workspace @ premium-policy-primary.",
             stableRef: "policy-change-rollback-001/admin-receipt-policy-rollback-001",
             approvalReceiptId: "approval-receipt-policy-rollback-001",
             executionId: "admin-execution-policy-rollback-001"

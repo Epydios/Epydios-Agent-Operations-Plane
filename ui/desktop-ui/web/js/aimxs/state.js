@@ -2,9 +2,14 @@ export const AIMXS_OVERRIDE_KEY = "epydios.agentops.desktop.aimxs.override.v1";
 
 export const AIMXS_ALLOWED_MODES = Object.freeze([
   "oss-only",
-  "aimxs-full",
-  "aimxs-https"
+  "provider-local",
+  "provider-https"
 ]);
+
+const AIMXS_LEGACY_MODE_ALIASES = Object.freeze({
+  "aimxs-full": "provider-local",
+  "aimxs-https": "provider-https"
+});
 
 export const AIMXS_DEFAULT_REFS = Object.freeze({
   endpointRef: "ref://projects/{projectId}/providers/provider-route/https-endpoint",
@@ -37,6 +42,27 @@ function cloneValue(value) {
   return JSON.parse(JSON.stringify(value || {}));
 }
 
+function normalizeAimxsCanonicalMode(value, fallback = "oss-only") {
+  const requested = String(value || "").trim().toLowerCase().replace(/_/g, "-");
+  if (requested === "unknown") {
+    return "unknown";
+  }
+  if (AIMXS_ALLOWED_MODES.includes(requested)) {
+    return requested;
+  }
+  if (AIMXS_LEGACY_MODE_ALIASES[requested]) {
+    return AIMXS_LEGACY_MODE_ALIASES[requested];
+  }
+  const normalizedFallback = String(fallback || "").trim().toLowerCase().replace(/_/g, "-");
+  if (AIMXS_ALLOWED_MODES.includes(normalizedFallback)) {
+    return normalizedFallback;
+  }
+  if (AIMXS_LEGACY_MODE_ALIASES[normalizedFallback]) {
+    return AIMXS_LEGACY_MODE_ALIASES[normalizedFallback];
+  }
+  return "oss-only";
+}
+
 function defaultValidateReference(errors, label, value) {
   const text = String(value || "").trim();
   if (!text) {
@@ -61,15 +87,11 @@ export function buildDefaultAimxsSettings() {
 }
 
 function normalizeAimxsReportedMode(value, fallback = "unknown") {
-  const rawRequested = String(value || "").trim().toLowerCase();
-  const requested = rawRequested.replace(/_/g, "-");
-  if (requested === "unknown") {
-    return "unknown";
-  }
-  if (AIMXS_ALLOWED_MODES.includes(requested)) {
-    return requested;
-  }
-  return fallback;
+  const nextFallback =
+    String(fallback || "").trim().toLowerCase() === "unknown"
+      ? "unknown"
+      : normalizeAimxsCanonicalMode(fallback, "oss-only");
+  return normalizeAimxsCanonicalMode(value, nextFallback);
 }
 
 function normalizeAimxsActivationSecretState(input = {}, name) {
@@ -194,7 +216,7 @@ export function isAimxsLive(input = {}) {
   const aimxs = resolveAimxsSource(input);
   const activation = normalizeAimxsActivationSnapshot(aimxs.activation || aimxs);
   const activationState = String(activation.state || aimxs.state || "").trim().toLowerCase();
-  const activeMode = normalizeAimxsMode(activation.activeMode || aimxs.mode || "oss-only", "oss-only");
+  const activeMode = normalizeAimxsCanonicalMode(activation.activeMode || aimxs.mode || "oss-only", "oss-only");
   return (
     Boolean(activation.available) &&
     activationState === "active" &&
@@ -209,13 +231,15 @@ export function isAimxsPremiumVisible(input = {}) {
 }
 
 export function normalizeAimxsMode(value, fallback = "oss-only") {
-  const requested = String(value || "").trim().toLowerCase();
-  if (AIMXS_ALLOWED_MODES.includes(requested)) {
-    return requested;
+  const canonicalMode = normalizeAimxsCanonicalMode(value, fallback);
+  if (canonicalMode === "provider-local") {
+    return "aimxs-full";
   }
-  const nextFallback = String(fallback || "").trim().toLowerCase();
-  if (AIMXS_ALLOWED_MODES.includes(nextFallback)) {
-    return nextFallback;
+  if (canonicalMode === "provider-https") {
+    return "aimxs-https";
+  }
+  if (canonicalMode === "unknown") {
+    return "unknown";
   }
   return "oss-only";
 }
@@ -269,23 +293,22 @@ export function validateAimxsOverride(override, fallback, validateReference = de
   const errors = [];
   const warnings = [];
   const draft = normalizeAimxsOverride(override || {}, fallback || {});
-  if (draft.mode === "oss-only") {
+  const canonicalMode = normalizeAimxsCanonicalMode(draft.mode, "oss-only");
+  if (canonicalMode === "oss-only") {
     return { valid: true, errors, warnings, draft };
   }
 
-  if (
-    draft.mode === "aimxs-https" && !draft.paymentEntitled
-  ) {
+  if (canonicalMode === "provider-https" && !draft.paymentEntitled) {
     errors.push("Secure provider mode is locked until entitlement is active.");
   }
 
-  if (draft.mode === "aimxs-https") {
+  if (canonicalMode === "provider-https") {
     validateReference(errors, "Provider endpoint ref", draft.endpointRef);
     validateReference(errors, "Provider bearer token ref", draft.bearerTokenRef);
     validateReference(errors, "Provider client TLS cert ref", draft.clientTlsCertRef);
     validateReference(errors, "Provider client TLS key ref", draft.clientTlsKeyRef);
     validateReference(errors, "Provider CA ref", draft.caCertRef);
-  } else if (draft.mode === "aimxs-full") {
+  } else if (canonicalMode === "provider-local") {
     warnings.push("local-provider uses the launcher-side provider bridge and does not require HTTPS or secure ref material.");
   }
 
@@ -331,11 +354,11 @@ export function summarizeAimxsStatus(providerPayload) {
 
 export function collectAimxsSecureRefItems(settings = {}) {
   const aimxs = settings?.aimxs || {};
-  const mode = normalizeAimxsMode(aimxs.mode, "oss-only");
+  const mode = normalizeAimxsCanonicalMode(aimxs.mode, "oss-only");
   if (mode === "oss-only") {
     return [];
   }
-  if (mode === "aimxs-full") {
+  if (mode === "provider-local") {
     return [];
   }
   return [
@@ -368,11 +391,11 @@ export function collectAimxsSecureRefItems(settings = {}) {
 }
 
 export function resolveAimxsContractProfile(aimxs = {}) {
-  const mode = normalizeAimxsMode(aimxs.mode, "oss-only");
-  if (mode === "aimxs-full") {
+  const mode = normalizeAimxsCanonicalMode(aimxs.mode, "oss-only");
+  if (mode === "provider-local") {
     return {
       mode,
-      providerId: "aimxs-full",
+      providerId: "premium-provider-local",
       authMode: "None",
       healthPath: "/healthz",
       capabilitiesPath: "/v1alpha1/capabilities",
@@ -381,10 +404,10 @@ export function resolveAimxsContractProfile(aimxs = {}) {
       summary: "Launcher-side local provider route with no HTTPS or cluster-secret dependency."
     };
   }
-  if (mode === "aimxs-https") {
+  if (mode === "provider-https") {
     return {
       mode,
-      providerId: "aimxs-policy-primary",
+      providerId: "premium-policy-primary",
       authMode: "MTLSAndBearerTokenSecret",
       healthPath: "/healthz",
       capabilitiesPath: "/v1alpha1/capabilities",
@@ -406,8 +429,8 @@ export function resolveAimxsContractProfile(aimxs = {}) {
 }
 
 export function describeAimxsEntitlementMessage(aimxs = {}) {
-  const mode = normalizeAimxsMode(aimxs?.mode, "oss-only");
-  if (mode === "aimxs-full") {
+  const mode = normalizeAimxsCanonicalMode(aimxs?.mode, "oss-only");
+  if (mode === "provider-local") {
     return "local-provider can be enabled without entitlement because it runs through the launcher-side provider bridge.";
   }
   return Boolean(aimxs?.paymentEntitled)
@@ -420,8 +443,8 @@ export function describeAimxsSettingsMessage(aimxs = {}, editorMessage = "") {
   if (message) {
     return message;
   }
-  const mode = normalizeAimxsMode(aimxs?.mode, "oss-only");
-  if (mode === "aimxs-full") {
+  const mode = normalizeAimxsCanonicalMode(aimxs?.mode, "oss-only");
+  if (mode === "provider-local") {
     return "local-provider uses the launcher-side provider bridge and does not require HTTPS, bearer token, client TLS, or provider CA refs.";
   }
   if (mode === "oss-only") {
@@ -433,22 +456,22 @@ export function describeAimxsSettingsMessage(aimxs = {}, editorMessage = "") {
 }
 
 export function describeAimxsAppliedMessage(aimxs = {}) {
-  const mode = normalizeAimxsMode(aimxs?.mode, "oss-only");
-  if (mode === "aimxs-full") {
+  const mode = normalizeAimxsCanonicalMode(aimxs?.mode, "oss-only");
+  if (mode === "provider-local") {
     return "Provider routing is set to local-provider; HTTPS and secure refs are not required in this mode.";
   }
-  if (mode === "aimxs-https") {
+  if (mode === "provider-https") {
     return "Provider routing is set to secure-provider with secure refs prepared for the HTTPS policy path.";
   }
   return "Provider routing is set to baseline; policy routing stays on the baseline provider path.";
 }
 
 export function describeAimxsSyncedMessage(aimxs = {}) {
-  const mode = normalizeAimxsMode(aimxs?.mode, "oss-only");
-  if (mode === "aimxs-full") {
+  const mode = normalizeAimxsCanonicalMode(aimxs?.mode, "oss-only");
+  if (mode === "provider-local") {
     return "Provider settings synced from another tab; local-provider is active in the local Desktop state.";
   }
-  if (mode === "aimxs-https") {
+  if (mode === "provider-https") {
     return "Provider settings synced from another tab; secure-provider is active in the local Desktop state.";
   }
   return "Provider settings synced from another tab; baseline remains active.";

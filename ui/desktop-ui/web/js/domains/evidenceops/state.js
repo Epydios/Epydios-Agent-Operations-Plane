@@ -521,27 +521,30 @@ export function createEvidenceWorkspaceSnapshot(context = {}) {
       const runId = normalizeString(run?.runId);
       const requestPayload = readObject(run?.requestPayload);
       const requestContext = readObject(requestPayload?.context);
-      const requestPolicy = readObject(requestContext?.policy_stratification);
+      const requestPolicy = readObject(requestContext?.review_signals || requestContext?.policy_stratification);
       const policyResponse = readObject(run?.policyResponse);
       const policyOutput = readObject(policyResponse?.output);
-      const aimxsOutput = readObject(policyOutput?.aimxs);
-      const providerMeta = readObject(aimxsOutput?.providerMeta);
-      const providerPolicy = readObject(providerMeta?.policy_stratification);
+      const providerOutput = readObject(policyOutput?.premiumProvider || policyOutput?.providerRoute || policyOutput?.aimxs);
+      const providerMeta = readObject(providerOutput?.providerMeta);
+      const providerPolicy = readObject(providerMeta?.review_signals || providerMeta?.policy_stratification);
       const approval = approvalsByRunId.get(runId) || {};
       const decision = normalizeDecision(policyResponse?.decision || run?.policyDecision);
       const boundaryClass = normalizeString(
         requestPolicy?.boundary_class,
         normalizeString(providerPolicy?.boundary_class)
       );
-      const riskTier = normalizeString(requestPolicy?.risk_tier, normalizeString(providerPolicy?.risk_tier));
-      const evidenceReadiness = normalizeString(
-        requestPolicy?.evidence_readiness,
-        normalizeString(providerPolicy?.evidence_readiness)
+      const riskTier = normalizeString(
+        requestPolicy?.review_tier,
+        normalizeString(requestPolicy?.risk_tier, normalizeString(providerPolicy?.review_tier, normalizeString(providerPolicy?.risk_tier)))
       );
-      const requiredGrantCount = readStringArray(requestPolicy?.required_grants).length;
+      const evidenceReadiness = normalizeString(
+        requestPolicy?.readiness_state,
+        normalizeString(requestPolicy?.evidence_readiness, normalizeString(providerPolicy?.readiness_state, normalizeString(providerPolicy?.evidence_readiness)))
+      );
+      const requiredGrantCount = readStringArray(requestPolicy?.required_reviews || requestPolicy?.required_grants).length;
       const evidenceRefs = readStringArray(policyResponse?.evidenceRefs);
       const providerId = normalizeString(
-        aimxsOutput?.providerId,
+        providerOutput?.providerId,
         normalizeString(policyResponse?.source, normalizeString(run?.selectedPolicyProvider))
       );
       const bundleId = normalizeString(run?.evidenceBundleResponse?.bundleId);

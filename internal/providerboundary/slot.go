@@ -2,7 +2,7 @@ package providerboundary
 
 import "context"
 
-// ProviderKind maps AIMXS external modules to the public provider contracts.
+// ProviderKind maps external provider-route modules to the public provider contracts.
 type ProviderKind string
 
 const (
@@ -21,7 +21,7 @@ const (
 	EndpointAuthMTLSAndBearerTokenRef EndpointAuthMode = "MTLSAndBearerTokenSecret"
 )
 
-// ExternalProviderEndpoint declares how the control plane should call AIMXS over HTTPS.
+// ExternalProviderEndpoint declares how the control plane should call an external provider over HTTPS.
 type ExternalProviderEndpoint struct {
 	URL                  string
 	AuthMode             EndpointAuthMode
@@ -31,7 +31,7 @@ type ExternalProviderEndpoint struct {
 	CASecretRef          string
 }
 
-// Registration is the adapter-boundary object used by an external AIMXS slot implementation.
+// Registration is the adapter-boundary object used by an external provider-route slot implementation.
 type Registration struct {
 	ProviderID   string
 	ProviderKind ProviderKind
@@ -41,14 +41,14 @@ type Registration struct {
 	Metadata     map[string]string
 }
 
-// SlotResolver resolves which external AIMXS provider registration should serve a capability.
+// SlotResolver resolves which external provider registration should serve a capability.
 // Implementations live outside this OSS repository.
 type SlotResolver interface {
 	Resolve(ctx context.Context, capability string, tenantID string, projectID string) (Registration, error)
 }
 
-// SlotRegistry abstracts register/deregister operations for external AIMXS modules.
-// An AIMXS private module can own this implementation while OSS code depends only on this interface.
+// SlotRegistry abstracts register/deregister operations for external provider-route modules.
+// A separately delivered private module can own this implementation while OSS code depends only on this interface.
 type SlotRegistry interface {
 	Register(ctx context.Context, registration Registration) error
 	Deregister(ctx context.Context, providerID string) error
