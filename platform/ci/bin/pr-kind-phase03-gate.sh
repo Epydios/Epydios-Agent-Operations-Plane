@@ -613,7 +613,7 @@ main() {
   fi
 
   if [ "${RUN_M10_PROVIDER_BOUNDARY_NO_EGRESS}" = "1" ]; then
-    echo "Running M10.5 gate (premium-provider boundary placeholder)..."
+    echo "Running M10.5 gate (reserved no-egress slot)..."
     local run_m5_baseline_for_m10_no_egress=1
     if [ "${RUN_M7_INTEGRATION}" = "1" ] || [ "${RUN_PHASE_RUNTIME}" = "1" ] || [ "${RUN_M9_AUTHN_AUTHZ}" = "1" ] || [ "${RUN_M9_AUTHZ_TENANCY}" = "1" ] || [ "${RUN_M9_RBAC_MATRIX}" = "1" ] || [ "${RUN_M10_PROVIDER_CONFORMANCE}" = "1" ] || [ "${RUN_M10_POLICY_GRANT_ENFORCEMENT}" = "1" ] || [ "${RUN_M10_DEPLOYMENT_MODES}" = "1" ]; then
       run_m5_baseline_for_m10_no_egress=0
@@ -629,7 +629,7 @@ main() {
   fi
 
   if [ "${RUN_M10_PROVIDER_ENTITLEMENT_BOUNDARY}" = "1" ]; then
-    echo "Running M10.6 gate (premium-provider entitlement boundary placeholder)..."
+    echo "Running M10.6 gate (reserved entitlement slot)..."
     local run_m5_baseline_for_m10_entitlement=1
     if [ "${RUN_M7_INTEGRATION}" = "1" ] || [ "${RUN_PHASE_RUNTIME}" = "1" ] || [ "${RUN_M9_AUTHN_AUTHZ}" = "1" ] || [ "${RUN_M9_AUTHZ_TENANCY}" = "1" ] || [ "${RUN_M9_RBAC_MATRIX}" = "1" ] || [ "${RUN_M10_PROVIDER_CONFORMANCE}" = "1" ] || [ "${RUN_M10_POLICY_GRANT_ENFORCEMENT}" = "1" ] || [ "${RUN_M10_DEPLOYMENT_MODES}" = "1" ] || [ "${RUN_M10_PROVIDER_BOUNDARY_NO_EGRESS}" = "1" ]; then
       run_m5_baseline_for_m10_entitlement=0
@@ -645,7 +645,7 @@ main() {
   fi
 
   if [ "${RUN_M10_PROVIDER_RELEASE_BOUNDARY}" = "1" ]; then
-    echo "Running M10.2 gate (premium-provider release evidence placeholder)..."
+    echo "Running M10.2 gate (reserved release-evidence slot)..."
     M10_3_GATE_EXECUTED="${m10_3_gate_executed}" \
     M10_4_GATE_EXECUTED="${m10_4_gate_executed}" \
     M10_5_GATE_EXECUTED="${m10_5_gate_executed}" \
@@ -654,7 +654,7 @@ main() {
   fi
 
   if [ "${RUN_M10_PROVIDER_PACKAGING_BOUNDARY}" = "1" ]; then
-    echo "Running M10.7 gate (premium-provider packaging evidence placeholder)..."
+    echo "Running M10.7 gate (reserved packaging slot)..."
     "${REPO_ROOT}/platform/local/bin/verify-m10-provider-route-packaging.sh"
   fi
 

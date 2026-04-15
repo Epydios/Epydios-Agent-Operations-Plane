@@ -69,32 +69,31 @@ This directory contains CI entrypoint scripts invoked by GitHub Actions.
       - non-DENY decision without grant token fails
       - DENY remains executable without token
       - ALLOW with token succeeds and token is redacted from runtime response payloads
-  - M10.4 public deployment-mode verification:
+  - M10.4 deployment-mode verification:
     - `RUN_M10_DEPLOYMENT_MODES=1` in full mode (required)
     - `RUN_M10_DEPLOYMENT_MODES=0` default in fast mode
     - runs `platform/local/bin/verify-m10-deployment-modes.sh`
-    - validates the public `oss-only` mode renders cleanly from the public mode pack
-    - confirms the public repo does not treat separately delivered premium modes as part of the OSS verification promise
-  - M10.5 premium-provider no-egress verification:
+    - validates the shipped `oss-only` mode renders cleanly from the mode pack
+  - M10.5 reserved no-egress verification slot:
     - `RUN_M10_NO_EGRESS_LOCAL_AIMXS=1` in full mode (required)
     - `RUN_M10_NO_EGRESS_LOCAL_AIMXS=0` default in fast mode
     - runs `platform/local/bin/verify-m10-no-egress-local-aimxs.sh`
-    - public OSS repo keeps only a legacy-named placeholder boundary note; detailed premium verification is maintained outside the public repo
-  - M10.6 premium-provider entitlement verification:
+    - reserved gate slot; no additional shipped checks run here
+  - M10.6 reserved entitlement verification slot:
     - `RUN_M10_ENTITLEMENT_DENY=1` in full mode (required)
     - `RUN_M10_ENTITLEMENT_DENY=0` default in fast mode
     - runs `platform/local/bin/verify-m10-entitlement-deny.sh`
-    - public OSS repo keeps only a placeholder boundary note; detailed premium verification is maintained outside the public repo
-  - M10.2 premium-provider private release evidence verification:
+    - reserved gate slot; no additional shipped checks run here
+  - M10.2 reserved release-evidence verification slot:
     - `RUN_M10_AIMXS_PRIVATE_RELEASE=1` in full mode (required)
     - `RUN_M10_AIMXS_PRIVATE_RELEASE=0` default in fast mode
     - runs `platform/local/bin/verify-m10-aimxs-private-release.sh`
-    - public OSS repo keeps only a legacy-named placeholder boundary note; detailed premium release evidence is maintained outside the public repo
-  - M10.7 premium-provider packaging evidence verification:
+    - reserved gate slot; no additional shipped checks run here
+  - M10.7 reserved packaging-evidence verification slot:
     - `RUN_M10_CUSTOMER_HOSTED_PACKAGING=1` in full mode (required)
     - `RUN_M10_CUSTOMER_HOSTED_PACKAGING=0` default in fast mode
     - runs `platform/local/bin/verify-m10-provider-route-packaging.sh`
-    - public OSS repo does not publish premium packaging evidence details; the verifier name remains only as a compatibility placeholder
+    - reserved gate slot; no additional shipped checks run here
   - M13 desktop execution-plane contract + deny-path verifier:
     - `RUN_M13_DESKTOP_PROVIDER=1` in full mode (required)
     - `RUN_M13_DESKTOP_PROVIDER=0` default in fast mode
@@ -265,9 +264,9 @@ This directory contains CI entrypoint scripts invoked by GitHub Actions.
     - `RUN_ADMISSION_ENFORCEMENT_CHECK=1` (required in full mode)
     - `APPLY_SIGNED_IMAGE_POLICY=1` (required in full mode; strict profiles must run signed-image checks)
     - `REQUIRE_SIGNED_IMAGE_POLICY=1` (required in full mode; strict profiles fail if Kyverno/signed-policy path is unavailable)
-  - Runs public premium-boundary verification by default in full mode:
+  - Runs reserved boundary slots by default in full mode:
     - `RUN_AIMXS_BOUNDARY_CHECK=1`
-    - verifies the thin public boundary posture and checks that no direct premium-provider dependency leaked into the OSS repo.
+    - preserves gate/profile compatibility for the current verification matrix.
 
 The default GitHub Actions workflow is:
 

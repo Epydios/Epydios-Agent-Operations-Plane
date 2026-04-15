@@ -1,19 +1,19 @@
 # Release Policy
 
-The public OSS release promise is intentionally narrow: start on the installed macOS desktop in `live`, review governed work first in `Companion`, and open `Workbench` only when the same governed path needs deeper follow-through. That supported lane and its governed-request proof must stay green.
+The release promise is intentionally narrow: start on the installed macOS desktop in `live`, review governed work first in `Companion`, and open `Workbench` only when the same governed path needs deeper follow-through. That supported lane and its governed-request proof must stay green.
 
 ## Release Bar
 
-A release is credible when these pass on the public baseline:
+A release is credible when these pass on the baseline:
 
 - `./platform/ci/bin/qc-preflight.sh`
 - `./ui/desktop-ui/bin/check-m1.sh`
 - `./ui/desktop-ui/bin/verify-m15-phase-c.sh`
 - `./ui/desktop-ui/bin/verify-m15-phase-c-governed-request.sh`
 
-## Public Proof Sequence
+## Proof Sequence
 
-The public release story should stay in this order:
+The release story should stay in this order:
 
 1. governed work first in `Companion`
 2. deeper review in `Workbench` on the same governed path
@@ -24,14 +24,14 @@ Shell context and setup posture can support that story, but they do not replace 
 ## Platform Posture
 
 - macOS `live` installed desktop is the supported OSS lane
-- Linux has public Ubuntu 24.04 beta install and verification paths
-- Windows has public beta install and verification paths
+- Linux has Ubuntu 24.04 beta install and verification paths
+- Windows has beta install and verification paths
 
-Linux and Windows are real public beta lanes, but they stay below the supported macOS lane until their installed lanes have broader host validation and the release docs say otherwise.
+Linux and Windows are real beta lanes, but they stay below the supported macOS lane until their installed lanes have broader host validation and the release docs say otherwise.
 
 ## Beta Installed Paths
 
-The current public beta lanes are real, but still below the supported macOS lane:
+The current beta lanes are real, but still below the supported macOS lane:
 
 - Linux uses an AppImage primary artifact with a tarball fallback plus installed launcher and uninstall helpers
 - Windows uses an installer primary artifact with a packaged executable pair plus installed launcher helpers
@@ -78,9 +78,9 @@ That means:
 - patch releases should stay backward-compatible bug or documentation fixes
 - minor releases may add significant capability and may still reshape non-frozen internal surfaces
 
-## Frozen Public Contracts
+## Frozen Contracts
 
-These surfaces are the public compatibility boundary:
+These surfaces are the compatibility boundary:
 
 - [contracts/extensions/v1alpha1/README.md](../contracts/extensions/v1alpha1/README.md)
 - [docs/runtime-orchestration-service.md](runtime-orchestration-service.md)
@@ -99,12 +99,6 @@ Within those boundaries:
 - older lines: unsupported unless a release note says otherwise
 
 Security and correctness fixes target the latest line first.
-
-## Premium Boundary
-
-Separately delivered premium providers are supported through the public provider boundary only.
-
-Premium artifacts are not part of the OSS repo contents or the OSS support promise.
 
 ## Telemetry Defaults
 

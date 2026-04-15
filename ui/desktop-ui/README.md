@@ -11,7 +11,7 @@ From the repo root:
 ./ui/desktop-ui/bin/verify-m15-phase-c-governed-request.sh
 ```
 
-Use this path to evaluate the product the way the public repo presents it.
+Use this path to evaluate the product through the shipped desktop flow.
 
 It shows:
 
@@ -60,11 +60,10 @@ Open:
 http://127.0.0.1:4173
 ```
 
-## Public Limits
+## Current Limits
 
 - Linux and Windows are still below the supported macOS lane
-- separately delivered premium-provider material is not shipped in this repo
-- the OSS baseline does not claim silent background interception or premium `DEFER` behavior
+- the current baseline does not claim silent background interception or advanced `DEFER` behavior
 
 ## Read Next
 

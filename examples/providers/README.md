@@ -1,10 +1,6 @@
 # ExtensionProvider Examples
 
-These examples show the public provider boundary used by the OSS control plane.
-Keep the split simple:
-
-- OSS examples live directly in this folder.
-- Separately delivered premium-provider examples stay outside the public repo.
+These examples show the provider boundary used by the control plane.
 
 ## OSS Examples
 
@@ -21,6 +17,5 @@ Keep the split simple:
 
 - These are examples, not production manifests.
 - Endpoint URLs, secrets, and certificates should be environment-specific.
-- Separately delivered premium images and endpoints remain private and are not part of the OSS repo.
 - Desktop provider registration defaults to Linux-first capabilities; keep non-Linux targets restricted until M14 verifier readiness closes.
 - Use `platform/local/bin/verify-m14-xos-parity.sh` to generate machine-readable M14.7 closeout evidence for Windows/macOS restricted templates.

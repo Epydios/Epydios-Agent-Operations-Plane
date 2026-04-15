@@ -1,18 +1,10 @@
 {
   "schema_version": 1,
-  "document_type": "internal_readiness_note",
-  "status": "moved_private",
-  "public_repo_note": "Detailed pilot sign-off records and internal readiness approval artifacts are maintained outside the public OSS repo.",
-  "public_boundary": {
-    "kept_public": [
-      "OSS release promise",
-      "public verifiers",
-      "public product boundary"
-    ],
-    "not_published_here": [
-      "internal pilot sign-off packages",
-      "premium verification evidence",
-      "internal release approval artifacts"
-    ]
-  }
+  "document_type": "archival_note",
+  "status": "superseded",
+  "current_sources": [
+    "docs/release-policy.md",
+    "platform/",
+    "ui/desktop-ui/bin/"
+  ]
 }

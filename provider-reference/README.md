@@ -13,7 +13,5 @@ It is not where provider implementations or Kubernetes deployment manifests live
 
 - provider implementations
 - Kubernetes deployment manifests
-- separately delivered premium-provider code or artifacts
 
 Provider implementations consume these references through the public contracts under `../contracts/extensions/`.
-Private extension-delivery wiring remains outside this directory.

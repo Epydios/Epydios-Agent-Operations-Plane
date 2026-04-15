@@ -15,7 +15,6 @@ Ship a packaged desktop application (no external browser dependency) with parity
 
 - UI module is consolidated in-repo at `ui/desktop-ui`.
 - Current runtime is web-served and opened in a browser.
-- Separately delivered premium-provider activation remains outside the public OSS repo.
 
 ## Delivery Phases (Immediate Execution)
 

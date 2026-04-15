@@ -2,32 +2,32 @@
 
 ## Purpose
 
-The runtime orchestration service is the public OSS runtime boundary for governed request handling, provider invocation, and run persistence.
+The runtime orchestration service is the runtime boundary for governed request handling, provider invocation, and run persistence.
 
-This document intentionally describes only the public runtime role and public endpoint categories. It is not a full control-plane map.
+This document describes the shipped runtime role and endpoint categories. It is not a full control-plane map.
 
 ## Binary 
 
 - `cmd/control-plane-runtime`
 
-## Public Runtime Role
+## Runtime Role
 
-The public runtime is responsible for:
+The runtime is responsible for:
 
 - accepting governed requests
-- selecting compatible public providers
+- selecting compatible providers
 - persisting run state
-- exposing governed review and follow-through data on the public OSS boundary
+- exposing governed review and follow-through data on the runtime boundary
 
-## Public Persistence Boundary
+## Persistence Boundary
 
 The runtime persists run data and supporting configuration in its backing store.
 
-This public document does not freeze deeper internal catalogs, entitlement rules, premium-path policy packs, export topology, or internal admin modeling.
+This document does not freeze deeper internal catalogs, export topology, or internal admin modeling.
 
-## Public API Categories
+## API Categories
 
-The public runtime currently exposes endpoint groups for:
+The runtime currently exposes endpoint groups for:
 
 - health and metrics
 - governed run create/read
@@ -37,22 +37,19 @@ The public runtime currently exposes endpoint groups for:
 - integration settings and invocation
 - desktop or client follow-through where supported by the shipped OSS surface
 
-## Public Provider Boundary
+## Provider Boundary
 
 The runtime uses the versioned provider boundary documented in:
 
 - [provider-contracts.openapi.yaml](../contracts/extensions/v1alpha1/provider-contracts.openapi.yaml)
 
-Provider selection, policy evaluation, evidence recording, profile resolution, and desktop step handling are expected to occur through that public boundary.
+Provider selection, policy evaluation, evidence recording, profile resolution, and desktop step handling are expected to occur through that boundary.
 
-## Public Non-Scope
+## Non-Scope
 
 This document does not define in detail:
 
-- premium entitlement enforcement
-- private provider routing posture
-- premium policy-pack inventory
 - internal admin or org-governance catalogs
 - rich export-profile matrices
-- private worker bridge or premium execution internals
-- premium decision-binding or authority-basis semantics
+- worker-bridge internals
+- decision-binding or authority-basis semantics

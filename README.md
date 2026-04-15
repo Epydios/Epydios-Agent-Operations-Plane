@@ -38,7 +38,7 @@ This path lets you:
 
 - [ui/desktop-ui/](ui/desktop-ui) - installable operator desktop, launcher, and localhost gateway
 - [internal/](internal) and [cmd/](cmd) - governed runtime services and service entrypoints
-- [contracts/extensions/v1alpha1/](contracts/extensions/v1alpha1) - public provider boundary
+- [contracts/extensions/v1alpha1/](contracts/extensions/v1alpha1) - provider boundary
 - [platform/](platform) - local bootstrap, CI, and verification
 - [clients/](clients) and [examples/](examples) - ingress clients and example integrations
 
@@ -48,7 +48,6 @@ This path lets you:
 - [OSS quality story](docs/quality-story.md)
 - [Desktop module guide](ui/desktop-ui/README.md)
 - [Release policy](docs/release-policy.md)
-- [OSS versus premium policy](docs/oss-premium-policy.md)
 
 ## Trust, Policy, And Contribution
 

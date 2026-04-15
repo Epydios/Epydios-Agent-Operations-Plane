@@ -1,13 +1,12 @@
 # Docs
 
-This is the short entry path for the OSS repo.
+This is the short entry path for the repo.
 
 Start here:
 
 - [Getting started](getting-started.md)
 - [OSS quality story](quality-story.md)
 - [Release policy](release-policy.md)
-- [OSS and premium policy](oss-premium-policy.md)
 
 Then move to:
 
@@ -30,7 +29,6 @@ Then move to:
 - [Governed action request contract](specs/governed-action-request-contract.md)
 - [Architecture](architecture.md)
 - [Release policy](release-policy.md)
-- [OSS and premium policy](oss-premium-policy.md)
 
 ### Run One Demo
 
@@ -43,6 +41,4 @@ These docs are still useful, but they are not the first-click path:
 
 - `runbooks/` for OSS operational detail
 - `specs/` for deeper contract and hardening material
-- `plans/` for public historical planning artifacts that still apply to the OSS surface
-
-Separately delivered premium provider runbooks, release evidence, and internal sign-off material are maintained outside the public repo.
+- `plans/` for historical planning artifacts that still apply to the current shipped surface

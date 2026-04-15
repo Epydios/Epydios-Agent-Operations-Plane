@@ -37,14 +37,12 @@ Use the [desktop module guide](../ui/desktop-ui/README.md) if you need those com
 
 ## What You Are Evaluating
 
-The OSS repo gives you the public EpydiosOps baseline:
+This repo gives you the current EpydiosOps baseline:
 
 - the installable operator desktop
 - the local launcher and localhost gateway
 - governed execution with audit, evidence, and receipts
-- public provider contracts and OSS baseline providers
-
-Separately delivered premium-provider material remains outside the OSS path above.
+- provider contracts and baseline providers
 
 ## Read Next
 
@@ -52,4 +50,3 @@ Separately delivered premium-provider material remains outside the OSS path abov
 - [Desktop module guide](../ui/desktop-ui/README.md)
 - [Runtime orchestration service](runtime-orchestration-service.md)
 - [Governed action request contract](specs/governed-action-request-contract.md)
-- [OSS versus premium policy](oss-premium-policy.md)

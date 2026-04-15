@@ -653,11 +653,9 @@ Fast path when runtime baseline is already healthy:
 RUN_M5_BASELINE=0 ./platform/local/bin/verify-m10-policy-grant-enforcement.sh
 ```
 
-### M10.6 Premium-provider entitlement verification
+### M10.6 Reserved entitlement verification slot
 
-Detailed premium-provider entitlement checks are maintained outside the public OSS repo.
-
-The public script remains only as a boundary placeholder so public gate wiring does not imply that the OSS repo contains the separately delivered premium-provider entitlement path.
+This script is a reserved verification slot.
 
 ```bash
 ./platform/local/bin/verify-m10-entitlement-deny.sh
@@ -669,17 +667,13 @@ Fast path when runtime baseline is already healthy:
 RUN_M5_BASELINE=0 ./platform/local/bin/verify-m10-entitlement-deny.sh
 ```
 
-### M10.7 Premium-provider packaging evidence verification
+### M10.7 Reserved packaging verification slot
 
-Detailed premium packaging evidence handling is maintained outside the public OSS repo.
-
-The public verifier remains only as a boundary placeholder so public gate wiring does not imply that the OSS repo carries private release-packaging evidence.
+This verifier is a reserved verification slot.
 
 ```bash
 ./platform/local/bin/verify-m10-provider-route-packaging.sh
 ```
-
-No premium input or evidence-path details are published in the OSS repo.
 
 ### M7.1 integration verification (M0->M5 critical path)
 
@@ -845,15 +839,13 @@ Auto-install monitoring stack before verification:
 AUTO_INSTALL_MONITORING_STACK=1 ./platform/local/bin/verify-monitoring-alerts.sh
 ```
 
-### Public deployment mode pack
+### Deployment mode pack
 
-The public repo documents and verifies the `oss-only` mode only:
+The documented mode pack is `oss-only`:
 
 ```bash
 kubectl apply -k platform/modes/oss-only
 ```
-
-Separately delivered premium deployment modes are maintained outside the public repo.
 
 ### PR CI gate parity (kind, ephemeral)
 
@@ -1008,10 +1000,10 @@ WITH_SYSTEM_SMOKETEST=1 ./platform/local/bin/bootstrap-k3d.sh
 - `platform/local/bin/verify-phase-05-kuberay.sh` installs and verifies optional phase 05 KubeRay components
 - `platform/local/bin/verify-m10-provider-conformance.sh` validates provider contract/auth-mode conformance across ProfileResolver/PolicyProvider/EvidenceProvider
 - `platform/local/bin/verify-m10-policy-grant-enforcement.sh` validates required grant-token enforcement (`no token => no execution` for non-DENY decisions)
-- `platform/local/bin/verify-m10-deployment-modes.sh` validates the public `oss-only` mode pack and keeps premium modes outside the OSS verification promise
-- `platform/local/bin/verify-m10-no-egress-local-aimxs.sh` is a public placeholder noting that premium no-egress verification is maintained outside the public repo
-- `platform/local/bin/verify-m10-entitlement-deny.sh` is a public placeholder noting that premium entitlement verification is maintained outside the public repo
-- `platform/local/bin/verify-m10-provider-route-packaging.sh` is a public placeholder and should not be used to infer that premium release evidence is published in OSS
+- `platform/local/bin/verify-m10-deployment-modes.sh` validates the shipped `oss-only` mode pack
+- `platform/local/bin/verify-m10-no-egress-local-aimxs.sh` is a reserved verification slot
+- `platform/local/bin/verify-m10-entitlement-deny.sh` is a reserved verification slot
+- `platform/local/bin/verify-m10-provider-route-packaging.sh` is a reserved verification slot
 - `platform/local/bin/verify-m13-openfang-adapter.sh` validates Openfang adapter guardrails (Linux-first + sandbox profile + restricted-host blocked default + secure template posture)
 - `platform/local/bin/verify-m13-openfang-runtime-integration.sh` validates runtime observe->actuate->verify and runtime->adapter->upstream contract flow + restricted-host deny assertion
 - `platform/local/bin/verify-m13-runtime-approvals.sh` validates runtime approval queue/decision API semantics (`PENDING|APPROVED|DENIED|EXPIRED`, approve/deny transitions, expired request rejection)

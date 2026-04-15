@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "Premium-provider no-egress verification is maintained outside the public OSS repo."
-echo "The public repo keeps OSS runtime and provider-boundary verification only."
+echo "Reserved verification slot."
+echo "No additional checks run in this repo for this slot."

@@ -12,12 +12,12 @@ What belongs here:
 
 What does not belong here:
 
-- separately delivered non-OSS release-process documentation
-- private packaging metadata
-- private release evidence payloads
+- release-process documentation
+- packaging metadata
+- release evidence payloads
 - raw operational logs that make the OSS repo look incomplete or workspace-dependent
 
-Separately delivered non-OSS release metadata and evidence remain outside the public repo. Public provenance in this directory is limited to OSS lockfiles and OSS accountability artifacts.
+This directory is limited to lockfiles and accountability artifacts.
 
 ## Validation Gate
 

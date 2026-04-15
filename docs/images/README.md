@@ -7,7 +7,7 @@ Purpose: keep the release-facing image set aligned with the truthful public base
 - screenshots should reflect the supported macOS `live` lane first
 - screenshots should not imply Linux or Windows parity beyond the currently documented beta posture
 - screenshots should not imply Windows `live` proof
-- separately delivered premium-provider behavior should only appear in explicitly premium comparison material
+- screenshots should stay aligned with the shipped evaluation path and documented platform posture
 
 ## Current Asset Roles
 
@@ -44,4 +44,4 @@ Refresh the screenshot set when any of the following become true:
 - the visible shell or core governed workflow changes materially
 - the public proof-sequence roles change materially
 - Linux or Windows posture is promoted
-- premium comparison material becomes part of the public release path
+- the release image sequence changes materially

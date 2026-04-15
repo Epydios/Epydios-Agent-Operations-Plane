@@ -11,6 +11,5 @@ fi
 
 kubectl kustomize "${REPO_ROOT}/platform/modes/oss-only" >/dev/null
 
-echo "Public deployment-mode verification passed."
-echo "The OSS repo verifies the public oss-only mode only."
-echo "Separately delivered premium deployment modes are maintained outside the public repo."
+echo "Deployment-mode verification passed."
+echo "The shipped mode pack verifies the oss-only baseline."
