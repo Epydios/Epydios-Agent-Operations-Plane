@@ -6,8 +6,8 @@
 
 ## Core Design Goals
 
-- OSS baseline is fully deployable without AIMXS
-- AIMXS can be added later as a private provider plug-in
+- OSS baseline is fully deployable without separately delivered premium providers
+- separately delivered premium providers can attach later through the public extension boundary
 - Versioned provider contracts remain stable once adopted by operators/tenants
 - Dependency provenance and licensing are tracked from the beginning
 
@@ -32,11 +32,11 @@
 
 4. **Provider Implementations**
    - OSS baseline providers (noop/OPA-backed/basic evidence store)
-   - AIMXS private provider(s)
+   - separately delivered premium providers
 
-## AIMXS Integration Model
+## Premium Provider Integration Model
 
-AIMXS stays outside the OSS build graph and integrates through the versioned provider contracts:
+Separately delivered premium providers stay outside the OSS build graph and integrate through the versioned provider contracts:
 
 - register provider endpoint via `ExtensionProvider`
 - advertise capabilities
@@ -46,7 +46,7 @@ AIMXS stays outside the OSS build graph and integrates through the versioned pro
 This allows:
 
 - OSS distribution without private code
-- commercial/private AIMXS licensing
+- separate commercial delivery outside the OSS repo
 - runtime replacement or fallback providers
 
 ## Contract Stability Rules (Initial)
@@ -62,4 +62,4 @@ This allows:
 2. Implement a minimal OSS `PolicyProvider` adapter (OPA passthrough)
 3. Implement a minimal OSS `EvidenceProvider` (Postgres + object store manifest records)
 4. Implement a simple `ProfileResolver` (static rules + tenant defaults)
-5. Wire one end-to-end policy-evidence flow before adding the AIMXS plug-in
+5. Wire one end-to-end policy-evidence flow before adding a separately delivered premium provider

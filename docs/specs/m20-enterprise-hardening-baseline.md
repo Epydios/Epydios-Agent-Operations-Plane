@@ -298,4 +298,4 @@ Still needed:
 ## Planned follow-on milestones after M20 closure
 
 - `M21` is planned for stabilization and turnkey local operator work: live-mode refresh stabilization, Chat live empty-state clarity, `.tmp` cache hygiene, documented OpenAI live-test flow, and a turnkey Mac-local managed Codex path.
-- `M22` is planned after that for aimxs-full AIMXS decision-provider work on the existing `PolicyProvider` boundary.
+- `M22` is planned after that for a separately delivered premium decision-provider boundary on the existing `PolicyProvider` contract.

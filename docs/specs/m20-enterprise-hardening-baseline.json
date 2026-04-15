@@ -415,15 +415,15 @@
     },
     {
       "id": "M22",
-      "name": "local_aimxs_decision_provider_boundary",
-      "goal": "evaluate and then implement aimxs-full AIMXS decision-provider operation on the existing policy boundary after M21 stabilization is complete",
+      "name": "local_premium_decision_provider_boundary",
+      "goal": "evaluate and then implement a separately delivered premium decision-provider path on the existing policy boundary after M21 stabilization is complete",
       "deliverables": [
-        "aimxs-full AIMXS provider mode decision record",
-        "AIMXS local test harness on the existing PolicyProvider boundary",
-        "no-egress or local-boundary verification for AIMXS local mode",
-        "runtime and operator documentation for local AIMXS testing"
+        "local premium-provider decision-boundary record",
+        "local premium-provider test harness on the existing PolicyProvider boundary",
+        "no-egress or local-boundary verification for the premium-provider local mode",
+        "runtime and operator documentation for local premium-provider testing"
       ],
-      "exit_gate": "AIMXS can be exercised locally through the existing policy-provider boundary without introducing client-specific logic or bypassing the governed contract",
+      "exit_gate": "A separately delivered premium provider can be exercised locally through the existing policy-provider boundary without introducing client-specific logic or bypassing the governed contract",
       "status": "planned_not_active_until_m21_closes_or_explicit_parallelization"
     }
   ]
