@@ -41,23 +41,23 @@ test("networkops page renders bounded boundary, endpoint, trust, posture, and to
         ]
       },
       aimxs: {
-        mode: "aimxs-https",
-        endpointRef: "ref://projects/demo/providers/aimxs/https-endpoint",
-        bearerTokenRef: "ref://projects/demo/providers/aimxs/bearer-token",
-        clientTlsCertRef: "ref://projects/demo/providers/aimxs/client-tls-cert",
-        clientTlsKeyRef: "ref://projects/demo/providers/aimxs/client-tls-key",
-        caCertRef: "ref://projects/demo/providers/aimxs/provider-ca",
+        mode: "provider-https",
+        endpointRef: "ref://projects/demo/providers/premium/https-endpoint",
+        bearerTokenRef: "ref://projects/demo/providers/premium/bearer-token",
+        clientTlsCertRef: "ref://projects/demo/providers/premium/client-tls-cert",
+        clientTlsKeyRef: "ref://projects/demo/providers/premium/client-tls-key",
+        caCertRef: "ref://projects/demo/providers/premium/provider-ca",
         activation: {
           available: true,
           state: "active",
-          activeMode: "aimxs-https",
-          selectedProviderId: "aimxs-policy-primary",
+          activeMode: "provider-https",
+          selectedProviderId: "premium-policy-primary",
           selectedProviderReady: true,
           selectedProviderProbed: true,
           warnings: ["Provider CA rotation due soon."],
           secrets: {
-            bearerTokenSecret: { name: "aimxs-policy-token", present: true },
-            clientTlsSecret: { name: "epydios-controller-mtls-client", present: true },
+            bearerTokenSecret: { name: "policy-provider-token", present: true },
+            clientTlsSecret: { name: "epydios-provider-client-tls", present: true },
             caSecret: { name: "epydios-provider-ca", present: false }
           }
         }
@@ -68,7 +68,7 @@ test("networkops page renders bounded boundary, endpoint, trust, posture, and to
     },
     providers: {
       items: [
-        { providerId: "aimxs-policy-primary", ready: true, probed: true },
+        { providerId: "premium-policy-primary", ready: true, probed: true },
         { providerId: "oss-policy-opa", ready: true, probed: true },
         { providerId: "oss-desktop-openfang-linux", ready: false, probed: true }
       ]
@@ -78,7 +78,7 @@ test("networkops page renders bounded boundary, endpoint, trust, posture, and to
         {
           runId: "run-20260315-003",
           selectedProfileProvider: "oss-profile-static",
-          selectedPolicyProvider: "aimxs-policy-primary",
+          selectedPolicyProvider: "premium-policy-primary",
           selectedEvidenceProvider: "oss-evidence-memory",
           selectedDesktopProvider: "oss-desktop-openfang-linux",
           updatedAt: "2026-03-15T06:20:00Z"
@@ -124,14 +124,14 @@ test("networkops page renders bounded boundary, endpoint, trust, posture, and to
   assert.match(ui.networkOpsContent.innerHTML, /Gateway path/);
   assert.match(ui.networkOpsContent.innerHTML, /Policy path/);
   assert.match(ui.networkOpsContent.innerHTML, /Desktop path/);
-  assert.match(ui.networkOpsContent.innerHTML, /aimxs-https/);
-  assert.match(ui.networkOpsContent.innerHTML, /aimxs-policy-primary/);
+  assert.match(ui.networkOpsContent.innerHTML, /provider-https/);
+  assert.match(ui.networkOpsContent.innerHTML, /premium-policy-primary/);
   assert.match(ui.networkOpsContent.innerHTML, /One provider is degraded\./);
   assert.match(ui.networkOpsContent.innerHTML, /Runtime Tasks/);
   assert.match(ui.networkOpsContent.innerHTML, /Runtime Sessions/);
   assert.match(ui.networkOpsContent.innerHTML, /Runtime Audit Events/);
   assert.match(ui.networkOpsContent.innerHTML, /ref:\/\/gateways\/litellm\/openai-compatible/);
-  assert.match(ui.networkOpsContent.innerHTML, /ref:\/\/projects\/demo\/providers\/aimxs\/https-endpoint/);
+  assert.match(ui.networkOpsContent.innerHTML, /ref:\/\/projects\/demo\/providers\/premium\/https-endpoint/);
   assert.match(ui.networkOpsContent.innerHTML, /MTLSAndBearerTokenSecret/);
   assert.match(ui.networkOpsContent.innerHTML, /secrets missing=1/);
   assert.match(ui.networkOpsContent.innerHTML, /Provider CA rotation due soon\./);
@@ -171,7 +171,7 @@ test("networkops keeps route-boundary labeling generic in baseline posture", () 
         activation: {
           state: "inactive",
           activeMode: "oss-only",
-          selectedProviderId: "aimxs-policy-primary"
+          selectedProviderId: "premium-policy-primary"
         }
       }
     },
@@ -180,7 +180,7 @@ test("networkops keeps route-boundary labeling generic in baseline posture", () 
     },
     providers: {
       items: [
-        { providerId: "aimxs-policy-primary", ready: false, probed: false }
+        { providerId: "premium-policy-primary", ready: false, probed: false }
       ]
     },
     runs: {
@@ -244,16 +244,16 @@ test("networkops admin slice 3 renders probe queue, draft, scope, preview, recei
         ]
       },
       aimxs: {
-        mode: "aimxs-https",
-        endpointRef: "ref://projects/demo/providers/aimxs/https-endpoint",
-        bearerTokenRef: "ref://projects/demo/providers/aimxs/bearer-token",
-        clientTlsCertRef: "ref://projects/demo/providers/aimxs/client-tls-cert",
-        clientTlsKeyRef: "ref://projects/demo/providers/aimxs/client-tls-key",
-        caCertRef: "ref://projects/demo/providers/aimxs/provider-ca",
+        mode: "provider-https",
+        endpointRef: "ref://projects/demo/providers/premium/https-endpoint",
+        bearerTokenRef: "ref://projects/demo/providers/premium/bearer-token",
+        clientTlsCertRef: "ref://projects/demo/providers/premium/client-tls-cert",
+        clientTlsKeyRef: "ref://projects/demo/providers/premium/client-tls-key",
+        caCertRef: "ref://projects/demo/providers/premium/provider-ca",
         activation: {
           state: "active",
-          activeMode: "aimxs-https",
-          selectedProviderId: "aimxs-policy-primary",
+          activeMode: "provider-https",
+          selectedProviderId: "premium-policy-primary",
           warnings: ["Provider CA rotation due soon."],
           secrets: {
             bearerTokenSecret: { present: true },
@@ -268,7 +268,7 @@ test("networkops admin slice 3 renders probe queue, draft, scope, preview, recei
     },
     providers: {
       items: [
-        { providerId: "aimxs-policy-primary", ready: true, probed: true },
+        { providerId: "premium-policy-primary", ready: true, probed: true },
         { providerId: "oss-desktop-openfang-linux", ready: false, probed: true }
       ]
     },
@@ -276,7 +276,7 @@ test("networkops admin slice 3 renders probe queue, draft, scope, preview, recei
       items: [
         {
           runId: "run-20260317-001",
-          selectedPolicyProvider: "aimxs-policy-primary",
+          selectedPolicyProvider: "premium-policy-primary",
           selectedDesktopProvider: "oss-desktop-openfang-linux",
           updatedAt: "2026-03-17T15:20:00Z"
         }

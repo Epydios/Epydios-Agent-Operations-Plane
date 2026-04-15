@@ -26,14 +26,12 @@ test("governed action contract normalizes a finance-oriented external action req
 
   assert.equal(normalized.boundaryClass, "external_actuator");
   assert.equal(normalized.riskTier, "high");
-  assert.deepEqual(normalized.requiredGrants, [
-    "grant.trading.supervisor",
-    "grant.ops.review"
-  ]);
-  assert.equal(normalized.demoProfile, GOVERNED_ACTION_DEMO_PROFILE_FINANCE_PAPER);
+  assert.equal(normalized.evidenceReadiness, "PARTIAL");
+  assert.equal(normalized.requestLabel, "Governed Request");
+  assert.equal(normalized.workflowKind, "governed_request");
 });
 
-test("governed action contract request uses explicit contract metadata and standard policy fields", () => {
+test("governed action contract request uses explicit contract metadata and compact request fields", () => {
   const payload = buildGovernedActionRequest({
     tenantId: "tenant-local",
     projectId: "project-local",
@@ -51,22 +49,20 @@ test("governed action contract request uses explicit contract metadata and stand
     originSurface: "future_product_workflow"
   });
 
-  assert.equal(payload.context.governed_action.contract_id, GOVERNED_ACTION_CONTRACT_ID);
-  assert.equal(payload.context.governed_action.request_label, "Paper Trade Request");
-  assert.equal(payload.context.governed_action.demo_profile, GOVERNED_ACTION_DEMO_PROFILE_FINANCE_PAPER);
-  assert.equal(payload.context.policy_stratification.boundary_class, "external_actuator");
-  assert.deepEqual(payload.context.policy_stratification.required_grants, ["grant.trading.supervisor"]);
+  assert.equal(payload.context.request.contractId, GOVERNED_ACTION_CONTRACT_ID);
+  assert.equal(payload.context.request.requestLabel, "Paper Trade Request");
+  assert.equal(payload.context.request.originSurface, "future_product_workflow");
+  assert.deepEqual(payload.context.notes, []);
+  assert.equal(payload.mode, "enforce");
+  assert.equal(payload.dryRun, false);
 });
 
-test("governed action gates no longer depend on a hidden probe marker", () => {
+test("governed action gates stay empty in the thin public contract", () => {
   const gates = buildGovernedActionPolicyGates({
     requiredGrantsText: "grant.trading.supervisor",
     evidenceReadiness: "PARTIAL",
     handshakeRequired: true
   });
 
-  assert.equal(gates["core09.gates.required_grants_enforced"], true);
-  assert.equal(gates["core09.gates.evidence_readiness_enforced"], true);
-  assert.equal(gates["core14.adapter_present.enforce_handshake"], true);
-  assert.equal(Object.prototype.hasOwnProperty.call(gates, "aimxsRichnessProbe"), false);
+  assert.deepEqual(gates, {});
 });

@@ -265,7 +265,7 @@ function mockProviderList() {
         ready: true,
         probed: true,
         message: "External premium-provider endpoint",
-        endpoint: "https://aimxs-policy.epydios-system.svc.cluster.local:8443"
+        endpoint: "https://premium-policy.epydios-system.svc.cluster.local:8443"
       }
     ]
   };
@@ -4529,7 +4529,7 @@ export class AgentOpsApi {
         state: "active",
         message: "Mock provider-route activation reports secure-provider as active.",
         namespace: "epydios-system",
-        activeMode: "aimxs-https",
+        activeMode: "provider-https",
         selectedProviderId: "premium-policy-primary",
         selectedProviderName: "premium-policy-primary",
         selectedProviderReady: true,
@@ -4544,7 +4544,7 @@ export class AgentOpsApi {
           {
             name: "premium-policy-primary",
             providerId: "premium-policy-primary",
-            mode: "aimxs-https",
+            mode: "provider-https",
             enabled: true,
             ready: true,
             probed: true,
@@ -4560,7 +4560,7 @@ export class AgentOpsApi {
         ],
         secrets: {
           bearerTokenSecret: { name: "policy-provider-token", present: true },
-          clientTlsSecret: { name: "epydios-controller-mtls-client", present: true },
+          clientTlsSecret: { name: "epydios-provider-client-tls", present: true },
           caSecret: { name: "epydios-provider-ca", present: true }
         }
       });

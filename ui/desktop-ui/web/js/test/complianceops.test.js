@@ -17,9 +17,9 @@ test("complianceops page renders bounded control, obligation, and attestation bo
         }
       },
       aimxs: {
-        mode: "aimxs-full",
+        mode: "provider-local",
         activation: {
-          selectedProviderId: "aimxs-policy-provider"
+          selectedProviderId: "premium-provider-local"
         }
       }
     },
@@ -29,18 +29,18 @@ test("complianceops page renders bounded control, obligation, and attestation bo
           runId: "run-20260315-001",
           tenantId: "tenant-demo",
           projectId: "project-core",
-          selectedPolicyProvider: "aimxs-policy-provider",
+          selectedPolicyProvider: "premium-provider-local",
           policyDecision: "ALLOW",
           retentionClass: "archive",
           updatedAt: "2026-03-15T02:00:30Z",
           createdAt: "2026-03-15T01:57:00Z",
           requestPayload: {
             context: {
-              policy_stratification: {
+              review_signals: {
                 boundary_class: "financial_control",
-                risk_tier: "high",
-                evidence_readiness: "partial",
-                required_grants: ["grant.finance.transfer"]
+                review_tier: "high",
+                readiness_state: "partial",
+                required_reviews: ["grant.finance.transfer"]
               },
               governed_action: {
                 operator_approval_required: true
@@ -49,7 +49,7 @@ test("complianceops page renders bounded control, obligation, and attestation bo
           },
           policyResponse: {
             decision: "ALLOW",
-            source: "aimxs-policy-provider"
+            source: "premium-provider-local"
           },
           evidenceBundleResponse: {
             status: "finalized",
@@ -60,24 +60,24 @@ test("complianceops page renders bounded control, obligation, and attestation bo
           runId: "run-20260315-002",
           tenantId: "tenant-ops",
           projectId: "project-payments",
-          selectedPolicyProvider: "aimxs-policy-provider",
+          selectedPolicyProvider: "premium-provider-local",
           policyDecision: "DEFER",
           retentionClass: "standard",
           updatedAt: "2026-03-15T01:51:30Z",
           createdAt: "2026-03-15T01:48:00Z",
           requestPayload: {
             context: {
-              policy_stratification: {
+              review_signals: {
                 boundary_class: "external_actuator",
-                risk_tier: "high",
-                evidence_readiness: "ready",
-                required_grants: []
+                review_tier: "high",
+                readiness_state: "ready",
+                required_reviews: []
               }
             }
           },
           policyResponse: {
             decision: "DEFER",
-            source: "aimxs-policy-provider"
+            source: "premium-provider-local"
           },
           evidenceBundleResponse: {
             status: "sealed",
@@ -121,8 +121,8 @@ test("complianceops page renders bounded control, obligation, and attestation bo
     },
     aimxsActivation: {
       state: "ready",
-      activeMode: "aimxs-full",
-      selectedProviderId: "aimxs-policy-provider"
+      activeMode: "provider-local",
+      selectedProviderId: "premium-provider-local"
     },
     exportProfiles: {
       items: [
@@ -313,7 +313,7 @@ test("complianceops page renders bounded control, obligation, and attestation bo
   assert.match(ui.complianceOpsContent.innerHTML, /grant\.finance\.transfer/);
   assert.match(ui.complianceOpsContent.innerHTML, /approval-20260315-001/);
   assert.match(ui.complianceOpsContent.innerHTML, /bundle-governed-001/);
-  assert.match(ui.complianceOpsContent.innerHTML, /aimxs-policy-provider/);
+  assert.match(ui.complianceOpsContent.innerHTML, /premium-provider-local/);
   assert.match(ui.complianceOpsContent.innerHTML, /45d/);
   assert.match(ui.complianceOpsContent.innerHTML, /120d/);
   assert.match(ui.complianceOpsContent.innerHTML, /pass/);

@@ -316,7 +316,7 @@ test("run detail surfaces connector continuity for governed connector runs", () 
     }
   );
 
-  assert.match(ui.runDetailContent.innerHTML, /Connector Continuity/);
+  assert.match(ui.runDetailContent.innerHTML, /Connector Run Continuity/);
   assert.match(ui.runDetailContent.innerHTML, /Browser MCP/);
   assert.match(ui.runDetailContent.innerHTML, /click_destructive_button/);
   assert.match(ui.runDetailContent.innerHTML, /ixr-browser-001/);
@@ -371,11 +371,11 @@ test("run detail surfaces governed-action policy richness from the stored provid
               account: "paper-main"
             }
           },
-          policy_stratification: {
+          review_signals: {
             boundary_class: "external_actuator",
-            risk_tier: "high",
-            required_grants: ["grant.trading.supervisor"],
-            evidence_readiness: "PARTIAL",
+            review_tier: "high",
+            required_reviews: ["grant.trading.supervisor"],
+            readiness_state: "PARTIAL",
             gates: {
               "core14.adapter_present.enforce_handshake": true
             }
@@ -391,13 +391,13 @@ test("run detail surfaces governed-action policy richness from the stored provid
         evidenceRefs: ["EVIDENCE_DEMO_001", "sha256:abc123"],
         reasons: [
           {
-            code: "AIMXS_LOCAL_FULL_GOVERNANCE",
+            code: "PREMIUM_PROVIDER_LOCAL_REVIEW_REQUIRED",
             message: "Deferred pending grants and evidence readiness."
           }
         ],
         output: {
           aimxs: {
-            providerId: "aimxs-full",
+            providerId: "premium-provider-local",
             requestContract: {
               contract_id: "epydios.governed-action.v1"
             },
@@ -419,9 +419,9 @@ test("run detail surfaces governed-action policy richness from the stored provid
               },
               audit_sink: {
                 active: true,
-                event_ref: "aimxs://local-full/audit/aimxs-audit-demo"
+                event_ref: "premium-provider://local/audit/provider-audit-demo"
               },
-              policy_stratification: {
+              review_signals: {
                 boundary_class: "external_actuator"
               }
             },
@@ -441,7 +441,7 @@ test("run detail surfaces governed-action policy richness from the stored provid
   assert.match(ui.runDetailContent.innerHTML, /2\. Policy Richness/);
   assert.match(ui.runDetailContent.innerHTML, /data-domain-root="policyops"/);
   assert.match(ui.runDetailContent.innerHTML, /Operator Gate vs Policy Gate/);
-  assert.match(ui.runDetailContent.innerHTML, /operatorGate=policy-first/);
+  assert.match(ui.runDetailContent.innerHTML, /operatorGate=baseline decision lane/);
   assert.match(ui.runDetailContent.innerHTML, /chip chip-warn chip-compact">effect=execution deferred/);
   assert.match(ui.runDetailContent.innerHTML, /chip chip-warn chip-compact">decision=DEFER/);
   assert.match(ui.runDetailContent.innerHTML, /effect=execution deferred/);
@@ -461,7 +461,7 @@ test("run detail surfaces governed-action policy richness from the stored provid
   assert.match(ui.runDetailContent.innerHTML, /state-sha256-demo/);
   assert.match(ui.runDetailContent.innerHTML, /State Continuity Enabled/);
   assert.match(ui.runDetailContent.innerHTML, /Audit Sink Active/);
-  assert.match(ui.runDetailContent.innerHTML, /aimxs:\/\/local-full\/audit\/aimxs-audit-demo/);
+  assert.match(ui.runDetailContent.innerHTML, /premium-provider:\/\/local\/audit\/provider-audit-demo/);
   assert.match(ui.runDetailContent.innerHTML, /Policy Stratification Present/);
   assert.match(ui.runDetailContent.innerHTML, /Request Contract Echo Present/);
   assert.match(ui.runDetailContent.innerHTML, /sha256-demo-evidence/);
@@ -499,7 +499,7 @@ test("history run list surfaces color-coded policy effects", () => {
           projectId: "project-trading",
           status: "POLICY_EVALUATED",
           policyDecision: "DEFER",
-          selectedPolicyProvider: "aimxs-full",
+          selectedPolicyProvider: "premium-provider-local",
           createdAt: "2026-03-10T10:05:00Z",
           updatedAt: "2026-03-10T10:05:05Z"
         },
@@ -509,7 +509,7 @@ test("history run list surfaces color-coded policy effects", () => {
           projectId: "project-trading",
           status: "FAILED",
           policyDecision: "DENY",
-          selectedPolicyProvider: "aimxs-full",
+          selectedPolicyProvider: "premium-provider-local",
           createdAt: "2026-03-10T10:10:00Z",
           updatedAt: "2026-03-10T10:10:05Z"
         }

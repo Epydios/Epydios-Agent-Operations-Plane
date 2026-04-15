@@ -31,36 +31,36 @@ test("evidenceops page restores visible proof-owner clusters", () => {
           projectId: "project-core",
           selectedEvidenceProvider: "oss-evidence-memory",
           selectedDesktopProvider: "oss-desktop-openfang-linux",
-          selectedPolicyProvider: "aimxs-policy-provider",
+          selectedPolicyProvider: "premium-provider-local",
           policyDecision: "ALLOW",
           retentionClass: "archive",
           updatedAt: "2026-03-15T02:00:30Z",
           createdAt: "2026-03-15T01:57:00Z",
           requestPayload: {
             context: {
-              policy_stratification: {
+              review_signals: {
                 boundary_class: "financial_control",
-                risk_tier: "high",
-                evidence_readiness: "partial",
-                required_grants: ["grant.finance.transfer"]
+                review_tier: "high",
+                readiness_state: "partial",
+                required_reviews: ["grant.finance.transfer"]
               }
             }
           },
           policyResponse: {
             decision: "ALLOW",
-            source: "aimxs-policy-provider",
+            source: "premium-provider-local",
             evidenceRefs: [
               "evidence://finance/transfer/001",
               "evidence://finance/transfer/002"
             ],
             output: {
               aimxs: {
-                providerId: "aimxs-policy-provider",
+                providerId: "premium-provider-local",
                 providerMeta: {
-                  policy_stratification: {
+                  review_signals: {
                     boundary_class: "financial_control",
-                    risk_tier: "high",
-                    evidence_readiness: "partial"
+                    review_tier: "high",
+                    readiness_state: "partial"
                   }
                 }
               }
@@ -97,24 +97,24 @@ test("evidenceops page restores visible proof-owner clusters", () => {
           tenantId: "tenant-ops",
           projectId: "project-payments",
           selectedEvidenceProvider: "oss-evidence-memory",
-          selectedPolicyProvider: "aimxs-policy-provider",
+          selectedPolicyProvider: "premium-provider-local",
           policyDecision: "DEFER",
           retentionClass: "standard",
           updatedAt: "2026-03-15T01:51:30Z",
           createdAt: "2026-03-15T01:48:00Z",
           requestPayload: {
             context: {
-              policy_stratification: {
+              review_signals: {
                 boundary_class: "external_actuator",
-                risk_tier: "high",
-                evidence_readiness: "ready",
-                required_grants: []
+                review_tier: "high",
+                readiness_state: "ready",
+                required_reviews: []
               }
             }
           },
           policyResponse: {
             decision: "DEFER",
-            source: "aimxs-policy-provider",
+            source: "premium-provider-local",
             evidenceRefs: ["evidence://payments/settlement/002"]
           },
           evidenceBundleResponse: {
@@ -143,7 +143,7 @@ test("evidenceops page restores visible proof-owner clusters", () => {
         subjectId: "read_only_review",
         targetScope: "tenant-demo / workspace",
         reason: "Traceability proof.",
-        summary: "Load read_only_review for tenant-demo / workspace @ aimxs-policy-provider",
+        summary: "Load read_only_review for tenant-demo / workspace @ premium-provider-local",
         simulationSummary: "Preview only before live activation.",
         simulatedAt: "2026-03-15T01:58:00Z",
         decision: {
@@ -241,7 +241,7 @@ test("evidenceops page restores visible proof-owner clusters", () => {
       authorityRef: "codex",
       authorityBasis: "bearer_token_jwt",
       scopeRef: "tenant-demo / project-core",
-      providerRef: "aimxs-policy-provider",
+      providerRef: "premium-provider-local",
       routeRef: "managed_codex_worker",
       boundaryRef: "agentops_gateway",
       grantRef: "policy_grant_token",
@@ -327,7 +327,7 @@ test("evidenceops page restores visible proof-owner clusters", () => {
   assert.match(ui.evidenceOpsContent.innerHTML, /45d/);
   assert.match(ui.evidenceOpsContent.innerHTML, /120d/);
   assert.match(ui.evidenceOpsContent.innerHTML, /financial_control/);
-  assert.match(ui.evidenceOpsContent.innerHTML, /aimxs-policy-provider/);
+  assert.match(ui.evidenceOpsContent.innerHTML, /premium-provider-local/);
   assert.match(ui.evidenceOpsContent.innerHTML, /archive/);
   assert.match(ui.evidenceOpsContent.innerHTML, /bundles=2/);
   assert.match(ui.evidenceOpsContent.innerHTML, /sealed=1/);

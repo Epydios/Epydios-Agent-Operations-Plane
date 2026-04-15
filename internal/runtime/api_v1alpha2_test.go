@@ -2231,38 +2231,17 @@ func fakeGovernedActionPolicyDecision(input interface{}) (string, string, map[st
 	action := extractJSONObjectValue(payload["action"])
 	context := extractJSONObjectValue(payload["context"])
 	policy := extractJSONObjectValue(context["review_signals"])
-	if len(policy) == 0 {
-		policy = extractJSONObjectValue(context["policy_stratification"])
-	}
 	requiredGrants := normalizeGovernedActionStringSlice(policy["required_reviews"])
-	if len(requiredGrants) == 0 {
-		requiredGrants = normalizeGovernedActionStringSlice(policy["required_grants"])
-	}
 	evidenceReadiness := strings.ToUpper(strings.TrimSpace(normalizedInterfaceString(policy["readiness_state"])))
-	if evidenceReadiness == "" {
-		evidenceReadiness = strings.ToUpper(strings.TrimSpace(normalizedInterfaceString(policy["evidence_readiness"])))
-	}
 	environment := strings.ToLower(strings.TrimSpace(normalizedInterfaceString(meta["environment"])))
 	actionVerb := strings.ToLower(strings.TrimSpace(normalizedInterfaceString(action["verb"])))
 	approvedForProd := normalizedInterfaceBool(subjectAttributes["approvedForProd"])
 
 	providerPolicy := map[string]interface{}{
 		"boundary_class": normalizedInterfaceString(policy["boundary_class"]),
-		"review_tier": func() string {
-			value := normalizedInterfaceString(policy["review_tier"])
-			if value != "" {
-				return value
-			}
-			return normalizedInterfaceString(policy["risk_tier"])
-		}(),
+		"review_tier":      normalizedInterfaceString(policy["review_tier"]),
 		"required_reviews": requiredGrants,
-		"readiness_state": func() string {
-			value := normalizedInterfaceString(policy["readiness_state"])
-			if value != "" {
-				return value
-			}
-			return normalizedInterfaceString(policy["evidence_readiness"])
-		}(),
+		"readiness_state":  normalizedInterfaceString(policy["readiness_state"]),
 	}
 
 	switch {

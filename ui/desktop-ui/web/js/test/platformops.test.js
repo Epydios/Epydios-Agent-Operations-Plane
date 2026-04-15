@@ -18,7 +18,7 @@ test("platformops page renders the first inspect-only platform boards", () => {
     providers: {
       items: [
         { providerId: "oss-profile-static", ready: true, probed: true },
-        { providerId: "aimxs-policy-primary", ready: true, probed: true },
+        { providerId: "premium-provider-local", ready: true, probed: true },
         { providerId: "oss-desktop-openfang-linux", ready: false, probed: true }
       ]
     },
@@ -26,19 +26,19 @@ test("platformops page renders the first inspect-only platform boards", () => {
       available: true,
       state: "active",
       namespace: "epydios-system",
-      activeMode: "aimxs-full",
-      selectedProviderId: "aimxs-policy-primary",
+      activeMode: "provider-local",
+      selectedProviderId: "premium-provider-local",
       selectedProviderReady: true,
       selectedProviderProbed: true,
       capabilities: ["policy.evaluate", "governance.handshake_validation", "evidence.policy_decision_refs"],
       warnings: ["Provider CA rotation due soon."],
       enabledProviders: [
-        { providerId: "aimxs-policy-primary", ready: true, probed: true },
-        { providerId: "aimxs-policy-secondary", ready: false, probed: true }
+        { providerId: "premium-provider-local", ready: true, probed: true },
+        { providerId: "premium-provider-secondary", ready: false, probed: true }
       ],
       secrets: {
-        bearerTokenSecret: { name: "aimxs-policy-token", present: true },
-        clientTlsSecret: { name: "epydios-controller-mtls-client", present: true },
+        bearerTokenSecret: { name: "policy-provider-token", present: true },
+        clientTlsSecret: { name: "epydios-provider-client-tls", present: true },
         caSecret: { name: "epydios-provider-ca", present: false }
       }
     },
@@ -51,7 +51,7 @@ test("platformops page renders the first inspect-only platform boards", () => {
       promotionDraft: {
         changeKind: "promote",
         environment: "staging",
-        deploymentTarget: "aimxs-full",
+        deploymentTarget: "provider-local",
         releaseRef: "staging-full-gate-20260314T040000Z.log",
         reason: "Promote the verified staging gate after readiness preview."
       },
@@ -64,14 +64,14 @@ test("platformops page renders the first inspect-only platform boards", () => {
           requestedAction: "promote staging-full-gate-20260314T040000Z.log",
           subjectId: "staging-full-gate-20260314T040000Z.log",
           subjectLabel: "release",
-          targetScope: "staging / aimxs-full",
+          targetScope: "staging / provider-local",
           targetLabel: "target",
           environment: "staging",
-          deploymentTarget: "aimxs-full",
+          deploymentTarget: "provider-local",
           releaseRef: "staging-full-gate-20260314T040000Z.log",
           status: "routed",
           reason: "Promote the verified staging gate after readiness preview.",
-          summary: "Promote staging-full-gate-20260314T040000Z.log to staging / aimxs-full",
+          summary: "Promote staging-full-gate-20260314T040000Z.log to staging / provider-local",
           simulationSummary: "Preview only. This promotion proposal requires GovernanceOps approval before any live platform change can execute.",
           updatedAt: "2026-03-16T20:20:00Z",
           routedAt: "2026-03-16T20:21:00Z"
@@ -87,7 +87,7 @@ test("platformops page renders the first inspect-only platform boards", () => {
         facts: [
           { label: "release", value: "staging-full-gate-20260314T040000Z.log", code: true },
           { label: "environment", value: "staging" },
-          { label: "deployment", value: "aimxs-full", code: true },
+          { label: "deployment", value: "provider-local", code: true },
           { label: "issues", value: "1" }
         ],
         findings: [
@@ -110,8 +110,8 @@ test("platformops page renders the first inspect-only platform boards", () => {
   assert.match(ui.platformOpsContent.innerHTML, /desktop-local/);
   assert.match(ui.platformOpsContent.innerHTML, /epydios-system/);
   assert.match(ui.platformOpsContent.innerHTML, /staging/);
-  assert.match(ui.platformOpsContent.innerHTML, /aimxs-full/);
-  assert.match(ui.platformOpsContent.innerHTML, /aimxs-policy-primary/);
+  assert.match(ui.platformOpsContent.innerHTML, /provider-local/);
+  assert.match(ui.platformOpsContent.innerHTML, /premium-provider-local/);
   assert.match(ui.platformOpsContent.innerHTML, /staging-full-gate-20260314T040000Z\.log/);
   assert.match(ui.platformOpsContent.innerHTML, /prod-full-gate-20260314T041500Z\.log/);
   assert.match(ui.platformOpsContent.innerHTML, /enabled providers|enabled routed/);
@@ -137,8 +137,8 @@ test("platformops page renders the first inspect-only platform boards", () => {
   assert.match(ui.platformOpsContent.innerHTML, /Platform admin proposal platform-change-001 routed to GovernanceOps/);
   assert.match(ui.platformOpsContent.innerHTML, /Route To Governance|Open GovernanceOps/);
   assert.match(ui.platformOpsContent.innerHTML, /Run Dry-Run/);
-  assert.match(ui.platformOpsContent.innerHTML, /staging \/ aimxs-full/);
-  assert.match(ui.platformOpsContent.innerHTML, /Promote staging-full-gate-20260314T040000Z\.log to staging \/ aimxs-full/);
+  assert.match(ui.platformOpsContent.innerHTML, /staging \/ provider-local/);
+  assert.match(ui.platformOpsContent.innerHTML, /Promote staging-full-gate-20260314T040000Z\.log to staging \/ provider-local/);
   assert.match(ui.platformOpsContent.innerHTML, /Execution remains blocked until GovernanceOps records an explicit approved decision receipt/);
   assert.match(ui.platformOpsContent.innerHTML, /One or more provider registrations remain degraded\./);
 });
@@ -189,21 +189,21 @@ test("platformops page renders apply and receipt actions for approved platform a
       latestProdGate: "prod-full-gate-20260314T041500Z.log"
     },
     providers: {
-      items: [{ providerId: "aimxs-policy-primary", ready: true, probed: true }]
+      items: [{ providerId: "premium-provider-local", ready: true, probed: true }]
     },
     aimxsActivation: {
       available: true,
       state: "active",
       namespace: "epydios-system",
-      activeMode: "aimxs-full",
-      selectedProviderId: "aimxs-policy-primary",
+      activeMode: "provider-local",
+      selectedProviderId: "premium-provider-local",
       selectedProviderReady: true,
       selectedProviderProbed: true,
       capabilities: ["policy.evaluate"],
       warnings: [],
-      enabledProviders: [{ providerId: "aimxs-policy-primary", ready: true, probed: true }],
+      enabledProviders: [{ providerId: "premium-provider-local", ready: true, probed: true }],
       secrets: {
-        bearerTokenSecret: { name: "aimxs-policy-token", present: true }
+        bearerTokenSecret: { name: "policy-provider-token", present: true }
       }
     },
     viewState: {
@@ -211,7 +211,7 @@ test("platformops page renders apply and receipt actions for approved platform a
       promotionDraft: {
         changeKind: "promote",
         environment: "staging",
-        deploymentTarget: "aimxs-full",
+        deploymentTarget: "provider-local",
         releaseRef: "staging-full-gate-20260314T040000Z.log",
         reason: "Promote the verified staging gate after governance approval."
       },
@@ -224,14 +224,14 @@ test("platformops page renders apply and receipt actions for approved platform a
           requestedAction: "promote staging-full-gate-20260314T040000Z.log",
           subjectId: "staging-full-gate-20260314T040000Z.log",
           subjectLabel: "release",
-          targetScope: "staging / aimxs-full",
+          targetScope: "staging / provider-local",
           targetLabel: "target",
           environment: "staging",
-          deploymentTarget: "aimxs-full",
+          deploymentTarget: "provider-local",
           releaseRef: "staging-full-gate-20260314T040000Z.log",
           status: "approved",
           reason: "Promote the verified staging gate after governance approval.",
-          summary: "Promote staging-full-gate-20260314T040000Z.log to staging / aimxs-full",
+          summary: "Promote staging-full-gate-20260314T040000Z.log to staging / provider-local",
           simulationSummary: "Preview only. This promotion proposal requires GovernanceOps approval before any live platform change can execute.",
           updatedAt: "2026-03-16T22:15:00Z",
           routedAt: "2026-03-16T22:10:00Z",
@@ -281,21 +281,21 @@ test("platformops page renders rollback and bounded history for applied platform
       latestProdGate: "prod-full-gate-20260314T041500Z.log"
     },
     providers: {
-      items: [{ providerId: "aimxs-policy-primary", ready: true, probed: true }]
+      items: [{ providerId: "premium-provider-local", ready: true, probed: true }]
     },
     aimxsActivation: {
       available: true,
       state: "active",
       namespace: "epydios-system",
-      activeMode: "aimxs-full",
-      selectedProviderId: "aimxs-policy-primary",
+      activeMode: "provider-local",
+      selectedProviderId: "premium-provider-local",
       selectedProviderReady: true,
       selectedProviderProbed: true,
       capabilities: ["policy.evaluate"],
       warnings: [],
-      enabledProviders: [{ providerId: "aimxs-policy-primary", ready: true, probed: true }],
+      enabledProviders: [{ providerId: "premium-provider-local", ready: true, probed: true }],
       secrets: {
-        bearerTokenSecret: { name: "aimxs-policy-token", present: true }
+        bearerTokenSecret: { name: "policy-provider-token", present: true }
       }
     },
     viewState: {
@@ -304,7 +304,7 @@ test("platformops page renders rollback and bounded history for applied platform
       promotionDraft: {
         changeKind: "promote",
         environment: "staging",
-        deploymentTarget: "aimxs-full",
+        deploymentTarget: "provider-local",
         releaseRef: "staging-full-gate-20260314T040000Z.log",
         reason: "Promote the verified staging gate after governance approval."
       },
@@ -317,14 +317,14 @@ test("platformops page renders rollback and bounded history for applied platform
           requestedAction: "promote staging-full-gate-20260314T040000Z.log",
           subjectId: "staging-full-gate-20260314T040000Z.log",
           subjectLabel: "release",
-          targetScope: "staging / aimxs-full",
+          targetScope: "staging / provider-local",
           targetLabel: "target",
           environment: "staging",
-          deploymentTarget: "aimxs-full",
+          deploymentTarget: "provider-local",
           releaseRef: "staging-full-gate-20260314T040000Z.log",
           status: "rolled_back",
           reason: "Promote the verified staging gate after governance approval.",
-          summary: "Promote staging-full-gate-20260314T040000Z.log to staging / aimxs-full",
+          summary: "Promote staging-full-gate-20260314T040000Z.log to staging / provider-local",
           simulationSummary: "Preview only. This promotion proposal requires GovernanceOps approval before any live platform change can execute.",
           createdAt: "2026-03-16T22:00:00Z",
           simulatedAt: "2026-03-16T22:05:00Z",
@@ -342,13 +342,13 @@ test("platformops page renders rollback and bounded history for applied platform
             executionId: "admin-execution-rollback-001",
             executedAt: "2026-03-16T22:13:00Z",
             status: "applied",
-            summary: "promote staging-full-gate-20260314T040000Z.log applied for staging / aimxs-full.",
+            summary: "promote staging-full-gate-20260314T040000Z.log applied for staging / provider-local.",
             actorRef: "platform-operator"
           },
           receipt: {
             receiptId: "admin-receipt-rollback-001",
             issuedAt: "2026-03-16T22:13:00Z",
-            summary: "promote staging-full-gate-20260314T040000Z.log applied for staging / aimxs-full.",
+            summary: "promote staging-full-gate-20260314T040000Z.log applied for staging / provider-local.",
             stableRef: "platform-change-rollback-001/admin-receipt-rollback-001",
             approvalReceiptId: "approval-receipt-rollback-001",
             executionId: "admin-execution-rollback-001"
@@ -358,7 +358,7 @@ test("platformops page renders rollback and bounded history for applied platform
             action: "rollback",
             status: "rolled_back",
             rolledBackAt: "2026-03-16T22:16:00Z",
-            summary: "Rolled back promote staging-full-gate-20260314T040000Z.log for staging / aimxs-full using staging-full-gate-20260314T040000Z.log.",
+            summary: "Rolled back promote staging-full-gate-20260314T040000Z.log for staging / provider-local using staging-full-gate-20260314T040000Z.log.",
             stableRef: "platform-change-rollback-001/admin-rollback-rollback-001",
             reason: "Rollback is required after downstream verification drift was detected.",
             actorRef: "platform-operator",
