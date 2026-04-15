@@ -7,7 +7,7 @@ import {
   normalizeAimxsMode,
   resolveAimxsContractProfile
 } from "./state.js";
-
+ 
 function chipClassForAimxsActivationState(value) {
   const state = String(value || "").trim().toLowerCase();
   if (state === "active" || state === "ready") {

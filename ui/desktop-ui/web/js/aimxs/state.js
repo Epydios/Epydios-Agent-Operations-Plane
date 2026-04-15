@@ -5,7 +5,7 @@ export const AIMXS_ALLOWED_MODES = Object.freeze([
   "provider-local",
   "provider-https"
 ]);
-
+ 
 export const AIMXS_DEFAULT_REFS = Object.freeze({
   endpointRef: "ref://projects/{projectId}/providers/provider-route/https-endpoint",
   bearerTokenRef: "ref://projects/{projectId}/providers/provider-route/bearer-token",

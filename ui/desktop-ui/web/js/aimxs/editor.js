@@ -25,7 +25,7 @@ export function readAimxsEditorInput(root) {
   ) {
     return null;
   }
-
+ 
   return {
     mode: normalizeAimxsMode(mode.value, "oss-only"),
     endpointRef: String(endpointRef.value || "").trim(),

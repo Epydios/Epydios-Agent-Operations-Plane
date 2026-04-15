@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document describes the narrow public OSS request envelope used for governed requests that cross the public runtime and provider boundary.
+This document describes the narrow public OSS request envelope used for governed requests that cross the public runtime and provider boundary. 
 
 It is intentionally generic. Rich policy-shaping, entitlement, evidence-readiness, grant, and premium-route semantics are not part of this public contract.
 

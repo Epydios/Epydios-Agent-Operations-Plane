@@ -6,7 +6,7 @@ The runtime orchestration service is the public OSS runtime boundary for governe
 
 This document intentionally describes only the public runtime role and public endpoint categories. It is not a full control-plane map.
 
-## Binary
+## Binary 
 
 - `cmd/control-plane-runtime`
 
