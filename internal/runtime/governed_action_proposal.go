@@ -10,8 +10,8 @@ import (
 
 const (
 	governedActionProposalType             = "governed_action_request"
-	governedActionContractID               = "epydios.governed-action.v1"
-	governedActionWorkflowExternalRequest  = "external_action_request"
+	governedActionContractID               = "epydios.governed-request.v1"
+	governedActionWorkflowExternalRequest  = "governed_request"
 	governedActionWorkflowAdvisoryRequest  = "advisory_request"
 	governedActionDemoProfileFinancePaper  = "finance_paper_trade"
 	governedActionDemoProfileCompliance    = "compliance_report"
@@ -71,6 +71,14 @@ func normalizeGovernedActionWorkflowKind(value string) string {
 	}
 }
 
+func normalizeGovernedActionReviewProfileID(value string) string {
+	profileID := sanitizeGovernedActionResourceName(value, "governed-request-review")
+	if profileID == "governed-action-001" {
+		return "governed-request-review"
+	}
+	return profileID
+}
+
 func normalizeGovernedActionRequestLabel(value string, financeOrder JSONObject, workflowKind string, demoProfile string) string {
 	label := strings.TrimSpace(value)
 	if label != "" {
@@ -112,7 +120,7 @@ func normalizeGovernedActionRequestSummary(value string, financeOrder JSONObject
 	if workflowKind == governedActionWorkflowAdvisoryRequest || demoProfile == governedActionDemoProfileCompliance {
 		return "Request a compliance advisory report."
 	}
-	return "External governed action request."
+	return "Governed request."
 }
 
 func normalizeGovernedActionStringSlice(value interface{}) []string {
@@ -349,13 +357,14 @@ func normalizeGovernedActionProposalPayload(payload JSONObject) JSONObject {
 	policyBucketID := strings.TrimSpace(normalizedInterfaceString(payload["policyBucketId"]))
 	if policyBucketID == "" {
 		if isFinanceProfile {
-			policyBucketID = "managed-worker-finance-governed-action"
+			policyBucketID = "governed-request-finance-review"
 		} else if isComplianceProfile {
-			policyBucketID = "managed-worker-compliance-governed-action"
+			policyBucketID = "governed-request-advisory-review"
 		} else {
-			policyBucketID = "managed-worker-governed-action"
+			policyBucketID = "governed-request-review"
 		}
 	}
+	policyBucketID = normalizeGovernedActionReviewProfileID(policyBucketID)
 	actionClass := strings.TrimSpace(normalizedInterfaceString(payload["actionClass"]))
 	if actionClass == "" {
 		if isComplianceProfile {
@@ -435,14 +444,14 @@ func payloadHasExplicitFalse(value interface{}) bool {
 	}
 }
 
-func buildGovernedActionPolicyGatesFromProposal(payload JSONObject) JSONObject {
+func buildGovernedActionReviewSignalsFromProposal(payload JSONObject) JSONObject {
 	requiredGrants := normalizeGovernedActionStringSlice(payload["requiredGrants"])
 	evidenceReadiness := normalizeGovernedActionEvidenceReadiness(normalizedInterfaceString(payload["evidenceReadiness"]))
 	return JSONObject{
-		"core09.gates.default_off":                 true,
-		"core09.gates.required_grants_enforced":    len(requiredGrants) > 0,
-		"core09.gates.evidence_readiness_enforced": evidenceReadiness != "READY",
-		"core14.adapter_present.enforce_handshake": !payloadHasExplicitFalse(payload["handshakeRequired"]),
+		"review_required":           true,
+		"approval_signals_required": len(requiredGrants) > 0,
+		"evidence_pending":          evidenceReadiness != "READY",
+		"handoff_required":          !payloadHasExplicitFalse(payload["handshakeRequired"]),
 	}
 }
 
@@ -570,7 +579,7 @@ func buildRunCreateRequestFromGovernedActionProposal(session *SessionRecord, pro
 		"risk_tier":          normalizedInterfaceString(normalized["riskTier"]),
 		"required_grants":    normalizeGovernedActionStringSlice(normalized["requiredGrants"]),
 		"evidence_readiness": normalizedInterfaceString(normalized["evidenceReadiness"]),
-		"gates":              buildGovernedActionPolicyGatesFromProposal(normalized),
+		"gates":              buildGovernedActionReviewSignalsFromProposal(normalized),
 	}
 	runReq := RunCreateRequest{
 		Meta: ObjectMeta{

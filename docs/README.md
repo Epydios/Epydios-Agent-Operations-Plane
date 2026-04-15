@@ -13,7 +13,6 @@ Then move to:
 
 - [Runtime orchestration service](runtime-orchestration-service.md)
 - [Governed action request contract](specs/governed-action-request-contract.md)
-- [AIMXS governed action demo](runbooks/aimxs-governed-action-demo.md)
 
 ## Main Paths
 
@@ -35,14 +34,15 @@ Then move to:
 
 ### Run One Demo
 
-- [AIMXS governed action demo](runbooks/aimxs-governed-action-demo.md)
+- Follow the supported macOS `live` lane from [Getting started](getting-started.md)
+- Use the governed-request proof defined in [Release policy](release-policy.md)
 
 ## Deep Material
 
 These docs are still useful, but they are not the first-click path:
 
-- `runbooks/` for operational and packaging detail
-- `premium/` for premium AIMXS release-process documentation kept outside OSS provenance lockfiles
+- `runbooks/` for OSS operational detail
 - `specs/` for deeper contract and hardening material
-- `plans/` for historical planning artifacts
-- pilot sign-off drafts and provenance-heavy material for internal release tracking
+- `plans/` for public historical planning artifacts that still apply to the OSS surface
+
+Separately delivered premium provider runbooks, release evidence, and internal sign-off material are maintained outside the public repo.

@@ -39,45 +39,45 @@ type Config struct {
 	DesktopMinPriority   int64
 	DesktopAllowNonLinux bool
 
-	AuthEnabled                       bool
-	AuthIssuer                        string
-	AuthAudience                      string
-	AuthJWKSURL                       string
-	AuthHS256Secret                   string
-	AuthJWKSCacheTTL                  time.Duration
-	AuthRoleClaim                     string
-	AuthClientIDClaim                 string
-	AuthTenantClaim                   string
-	AuthProjectClaim                  string
-	AuthCreateRoles                   string
-	AuthReadRoles                     string
-	AuthAllowedClientIDs              string
-	AuthRoleMappingsJSON              string
-	AuthPolicyMatrixJSON              string
-	AuthRequirePolicyMatrix           bool
-	AuthRequirePolicyGrant            bool
-	AuthRequireAIMXSEntitlement       bool
-	AuthAIMXSProviderPrefixes         string
-	AuthAIMXSAllowedSKUs              string
-	AuthAIMXSRequiredFeatures         string
-	AuthAIMXSSKUFeaturesJSON          string
-	AuthAIMXSEntitlementTokenRequired bool
-	PolicyLifecycleEnabled            bool
-	PolicyLifecycleMode               string
-	PolicyAllowedIDs                  string
-	PolicyMinVersion                  string
-	PolicyRolloutPercent              int
-	RetentionDefaultClass             string
-	RetentionPolicyJSON               string
-	RefValuesPath                     string
-	RefValuesJSON                     string
-	PolicyProviderOverridePath        string
-	IntegrationInvokeTimeout          time.Duration
-	ManagedCodexMode                  string
-	CodexCLIPath                      string
-	CodexWorkdir                      string
-	CodexSandboxMode                  string
-	CodexExecTimeout                  time.Duration
+	AuthEnabled                           bool
+	AuthIssuer                            string
+	AuthAudience                          string
+	AuthJWKSURL                           string
+	AuthHS256Secret                       string
+	AuthJWKSCacheTTL                      time.Duration
+	AuthRoleClaim                         string
+	AuthClientIDClaim                     string
+	AuthTenantClaim                       string
+	AuthProjectClaim                      string
+	AuthCreateRoles                       string
+	AuthReadRoles                         string
+	AuthAllowedClientIDs                  string
+	AuthRoleMappingsJSON                  string
+	AuthPolicyMatrixJSON                  string
+	AuthRequirePolicyMatrix               bool
+	AuthRequirePolicyGrant                bool
+	AuthRequirePremiumProviderEntitlement bool
+	AuthPremiumProviderPrefixes           string
+	AuthPremiumAllowedSKUs                string
+	AuthPremiumRequiredFeatures           string
+	AuthPremiumSKUFeaturesJSON            string
+	AuthPremiumEntitlementTokenRequired   bool
+	PolicyLifecycleEnabled                bool
+	PolicyLifecycleMode                   string
+	PolicyAllowedIDs                      string
+	PolicyMinVersion                      string
+	PolicyRolloutPercent                  int
+	RetentionDefaultClass                 string
+	RetentionPolicyJSON                   string
+	RefValuesPath                         string
+	RefValuesJSON                         string
+	PolicyProviderOverridePath            string
+	IntegrationInvokeTimeout              time.Duration
+	ManagedCodexMode                      string
+	CodexCLIPath                          string
+	CodexWorkdir                          string
+	CodexSandboxMode                      string
+	CodexExecTimeout                      time.Duration
 }
 
 func main() {
@@ -99,47 +99,47 @@ func parseFlags() Config {
 		PostgresPassword: envOrDefault("POSTGRES_PASSWORD", ""),
 		PostgresSSLMode:  envOrDefault("POSTGRES_SSLMODE", "disable"),
 
-		AuthEnabled:                       envBoolOrDefault("AUTHN_ENABLED", false),
-		AuthIssuer:                        envOrDefault("AUTHN_ISSUER", ""),
-		AuthAudience:                      envOrDefault("AUTHN_AUDIENCE", ""),
-		AuthJWKSURL:                       envOrDefault("AUTHN_JWKS_URL", ""),
-		AuthHS256Secret:                   envOrDefault("AUTHN_HS256_SECRET", ""),
-		AuthJWKSCacheTTL:                  envDurationOrDefault("AUTHN_JWKS_CACHE_TTL", 5*time.Minute),
-		AuthRoleClaim:                     envOrDefault("AUTHN_ROLE_CLAIM", "roles"),
-		AuthClientIDClaim:                 envOrDefault("AUTHN_CLIENT_ID_CLAIM", "client_id"),
-		AuthTenantClaim:                   envOrDefault("AUTHN_TENANT_CLAIM", "tenant_id"),
-		AuthProjectClaim:                  envOrDefault("AUTHN_PROJECT_CLAIM", "project_id"),
-		AuthCreateRoles:                   envOrDefault("AUTHZ_CREATE_ROLES", "runtime.admin,runtime.run.create"),
-		AuthReadRoles:                     envOrDefault("AUTHZ_READ_ROLES", "runtime.admin,runtime.run.read"),
-		AuthAllowedClientIDs:              envOrDefault("AUTHZ_ALLOWED_CLIENT_IDS", ""),
-		AuthRoleMappingsJSON:              envOrDefault("AUTHZ_ROLE_PERMISSION_MAPPINGS_JSON", ""),
-		AuthPolicyMatrixJSON:              envOrDefault("AUTHZ_POLICY_MATRIX_JSON", ""),
-		AuthRequirePolicyMatrix:           envBoolOrDefault("AUTHZ_POLICY_MATRIX_REQUIRED", false),
-		AuthRequirePolicyGrant:            envBoolOrDefault("AUTHZ_REQUIRE_POLICY_GRANT", false),
-		AuthRequireAIMXSEntitlement:       envBoolOrDefault("AUTHZ_REQUIRE_AIMXS_ENTITLEMENT", false),
-		AuthAIMXSProviderPrefixes:         envOrDefault("AUTHZ_AIMXS_PROVIDER_PREFIXES", "aimxs-"),
-		AuthAIMXSAllowedSKUs:              envOrDefault("AUTHZ_AIMXS_ALLOWED_SKUS", ""),
-		AuthAIMXSRequiredFeatures:         envOrDefault("AUTHZ_AIMXS_REQUIRED_FEATURES", ""),
-		AuthAIMXSSKUFeaturesJSON:          envOrDefault("AUTHZ_AIMXS_SKU_FEATURES_JSON", ""),
-		AuthAIMXSEntitlementTokenRequired: envBoolOrDefault("AUTHZ_AIMXS_ENTITLEMENT_TOKEN_REQUIRED", true),
-		PolicyLifecycleEnabled:            envBoolOrDefault("POLICY_LIFECYCLE_ENABLED", false),
-		PolicyLifecycleMode:               envOrDefault("POLICY_LIFECYCLE_MODE", "observe"),
-		PolicyAllowedIDs:                  envOrDefault("POLICY_ALLOWED_IDS", ""),
-		PolicyMinVersion:                  envOrDefault("POLICY_MIN_VERSION", ""),
-		PolicyRolloutPercent:              envIntOrDefault("POLICY_ROLLOUT_PERCENT", 100),
-		DesktopMinPriority:                int64(envIntOrDefault("DESKTOP_MIN_PRIORITY", 0)),
-		DesktopAllowNonLinux:              envBoolOrDefault("DESKTOP_ALLOW_NON_LINUX", false),
-		RetentionDefaultClass:             envOrDefault("RETENTION_DEFAULT_CLASS", "standard"),
-		RetentionPolicyJSON:               envOrDefault("RETENTION_POLICY_JSON", ""),
-		RefValuesPath:                     envOrDefault("RUNTIME_REF_VALUES_PATH", ""),
-		RefValuesJSON:                     envOrDefault("RUNTIME_REF_VALUES_JSON", ""),
-		PolicyProviderOverridePath:        envOrDefault("RUNTIME_POLICY_PROVIDER_OVERRIDE_PATH", ""),
-		IntegrationInvokeTimeout:          envDurationOrDefault("RUNTIME_INTEGRATION_INVOKE_TIMEOUT", 45*time.Second),
-		ManagedCodexMode:                  envOrDefault("RUNTIME_MANAGED_CODEX_MODE", "legacy"),
-		CodexCLIPath:                      envOrDefault("RUNTIME_CODEX_CLI_PATH", ""),
-		CodexWorkdir:                      envOrDefault("RUNTIME_CODEX_WORKDIR", ""),
-		CodexSandboxMode:                  envOrDefault("RUNTIME_CODEX_SANDBOX_MODE", "read-only"),
-		CodexExecTimeout:                  envDurationOrDefault("RUNTIME_CODEX_EXEC_TIMEOUT", 2*time.Minute),
+		AuthEnabled:                           envBoolOrDefault("AUTHN_ENABLED", false),
+		AuthIssuer:                            envOrDefault("AUTHN_ISSUER", ""),
+		AuthAudience:                          envOrDefault("AUTHN_AUDIENCE", ""),
+		AuthJWKSURL:                           envOrDefault("AUTHN_JWKS_URL", ""),
+		AuthHS256Secret:                       envOrDefault("AUTHN_HS256_SECRET", ""),
+		AuthJWKSCacheTTL:                      envDurationOrDefault("AUTHN_JWKS_CACHE_TTL", 5*time.Minute),
+		AuthRoleClaim:                         envOrDefault("AUTHN_ROLE_CLAIM", "roles"),
+		AuthClientIDClaim:                     envOrDefault("AUTHN_CLIENT_ID_CLAIM", "client_id"),
+		AuthTenantClaim:                       envOrDefault("AUTHN_TENANT_CLAIM", "tenant_id"),
+		AuthProjectClaim:                      envOrDefault("AUTHN_PROJECT_CLAIM", "project_id"),
+		AuthCreateRoles:                       envOrDefault("AUTHZ_CREATE_ROLES", "runtime.admin,runtime.run.create"),
+		AuthReadRoles:                         envOrDefault("AUTHZ_READ_ROLES", "runtime.admin,runtime.run.read"),
+		AuthAllowedClientIDs:                  envOrDefault("AUTHZ_ALLOWED_CLIENT_IDS", ""),
+		AuthRoleMappingsJSON:                  envOrDefault("AUTHZ_ROLE_PERMISSION_MAPPINGS_JSON", ""),
+		AuthPolicyMatrixJSON:                  envOrDefault("AUTHZ_POLICY_MATRIX_JSON", ""),
+		AuthRequirePolicyMatrix:               envBoolOrDefault("AUTHZ_POLICY_MATRIX_REQUIRED", false),
+		AuthRequirePolicyGrant:                envBoolOrDefault("AUTHZ_REQUIRE_POLICY_GRANT", false),
+		AuthRequirePremiumProviderEntitlement: envBoolOrDefaultAny([]string{"AUTHZ_REQUIRE_PREMIUM_PROVIDER_ENTITLEMENT", "AUTHZ_REQUIRE_AIMXS_ENTITLEMENT"}, false),
+		AuthPremiumProviderPrefixes:           envOrDefaultAny([]string{"AUTHZ_PREMIUM_PROVIDER_PREFIXES", "AUTHZ_AIMXS_PROVIDER_PREFIXES"}, "aimxs-"),
+		AuthPremiumAllowedSKUs:                envOrDefaultAny([]string{"AUTHZ_PREMIUM_ALLOWED_SKUS", "AUTHZ_AIMXS_ALLOWED_SKUS"}, ""),
+		AuthPremiumRequiredFeatures:           envOrDefaultAny([]string{"AUTHZ_PREMIUM_REQUIRED_FEATURES", "AUTHZ_AIMXS_REQUIRED_FEATURES"}, ""),
+		AuthPremiumSKUFeaturesJSON:            envOrDefaultAny([]string{"AUTHZ_PREMIUM_SKU_FEATURES_JSON", "AUTHZ_AIMXS_SKU_FEATURES_JSON"}, ""),
+		AuthPremiumEntitlementTokenRequired:   envBoolOrDefaultAny([]string{"AUTHZ_PREMIUM_ENTITLEMENT_TOKEN_REQUIRED", "AUTHZ_AIMXS_ENTITLEMENT_TOKEN_REQUIRED"}, true),
+		PolicyLifecycleEnabled:                envBoolOrDefault("POLICY_LIFECYCLE_ENABLED", false),
+		PolicyLifecycleMode:                   envOrDefault("POLICY_LIFECYCLE_MODE", "observe"),
+		PolicyAllowedIDs:                      envOrDefault("POLICY_ALLOWED_IDS", ""),
+		PolicyMinVersion:                      envOrDefault("POLICY_MIN_VERSION", ""),
+		PolicyRolloutPercent:                  envIntOrDefault("POLICY_ROLLOUT_PERCENT", 100),
+		DesktopMinPriority:                    int64(envIntOrDefault("DESKTOP_MIN_PRIORITY", 0)),
+		DesktopAllowNonLinux:                  envBoolOrDefault("DESKTOP_ALLOW_NON_LINUX", false),
+		RetentionDefaultClass:                 envOrDefault("RETENTION_DEFAULT_CLASS", "standard"),
+		RetentionPolicyJSON:                   envOrDefault("RETENTION_POLICY_JSON", ""),
+		RefValuesPath:                         envOrDefault("RUNTIME_REF_VALUES_PATH", ""),
+		RefValuesJSON:                         envOrDefault("RUNTIME_REF_VALUES_JSON", ""),
+		PolicyProviderOverridePath:            envOrDefault("RUNTIME_POLICY_PROVIDER_OVERRIDE_PATH", ""),
+		IntegrationInvokeTimeout:              envDurationOrDefault("RUNTIME_INTEGRATION_INVOKE_TIMEOUT", 45*time.Second),
+		ManagedCodexMode:                      envOrDefault("RUNTIME_MANAGED_CODEX_MODE", "legacy"),
+		CodexCLIPath:                          envOrDefault("RUNTIME_CODEX_CLI_PATH", ""),
+		CodexWorkdir:                          envOrDefault("RUNTIME_CODEX_WORKDIR", ""),
+		CodexSandboxMode:                      envOrDefault("RUNTIME_CODEX_SANDBOX_MODE", "read-only"),
+		CodexExecTimeout:                      envDurationOrDefault("RUNTIME_CODEX_EXEC_TIMEOUT", 2*time.Minute),
 	}
 
 	flag.StringVar(&cfg.ListenAddr, "listen", cfg.ListenAddr, "HTTP listen address")
@@ -173,12 +173,18 @@ func parseFlags() Config {
 	flag.StringVar(&cfg.AuthPolicyMatrixJSON, "authz-policy-matrix-json", cfg.AuthPolicyMatrixJSON, "JSON authz policy matrix (allow/deny rules with tenant/project selectors)")
 	flag.BoolVar(&cfg.AuthRequirePolicyMatrix, "authz-policy-matrix-required", cfg.AuthRequirePolicyMatrix, "Require non-empty authz policy matrix when auth is enabled")
 	flag.BoolVar(&cfg.AuthRequirePolicyGrant, "authz-require-policy-grant", cfg.AuthRequirePolicyGrant, "Require policy grant token for non-DENY decisions before execution continues")
-	flag.BoolVar(&cfg.AuthRequireAIMXSEntitlement, "authz-require-aimxs-entitlement", cfg.AuthRequireAIMXSEntitlement, "Require AIMXS entitlement validation for configured AIMXS policy providers")
-	flag.StringVar(&cfg.AuthAIMXSProviderPrefixes, "authz-aimxs-provider-prefixes", cfg.AuthAIMXSProviderPrefixes, "Comma-separated provider name/providerId prefixes treated as AIMXS policy providers")
-	flag.StringVar(&cfg.AuthAIMXSAllowedSKUs, "authz-aimxs-allowed-skus", cfg.AuthAIMXSAllowedSKUs, "Comma-separated allowed AIMXS SKUs (optional)")
-	flag.StringVar(&cfg.AuthAIMXSRequiredFeatures, "authz-aimxs-required-features", cfg.AuthAIMXSRequiredFeatures, "Comma-separated required AIMXS feature flags (optional)")
-	flag.StringVar(&cfg.AuthAIMXSSKUFeaturesJSON, "authz-aimxs-sku-features-json", cfg.AuthAIMXSSKUFeaturesJSON, "JSON map of sku -> list of required features")
-	flag.BoolVar(&cfg.AuthAIMXSEntitlementTokenRequired, "authz-aimxs-entitlement-token-required", cfg.AuthAIMXSEntitlementTokenRequired, "Require entitlement token for AIMXS provider path")
+	flag.BoolVar(&cfg.AuthRequirePremiumProviderEntitlement, "authz-require-premium-provider-entitlement", cfg.AuthRequirePremiumProviderEntitlement, "Require premium-provider entitlement validation for configured external policy providers")
+	flag.BoolVar(&cfg.AuthRequirePremiumProviderEntitlement, "authz-require-aimxs-entitlement", cfg.AuthRequirePremiumProviderEntitlement, "Legacy alias for --authz-require-premium-provider-entitlement")
+	flag.StringVar(&cfg.AuthPremiumProviderPrefixes, "authz-premium-provider-prefixes", cfg.AuthPremiumProviderPrefixes, "Comma-separated provider name/providerId prefixes treated as premium external policy providers")
+	flag.StringVar(&cfg.AuthPremiumProviderPrefixes, "authz-aimxs-provider-prefixes", cfg.AuthPremiumProviderPrefixes, "Legacy alias for --authz-premium-provider-prefixes")
+	flag.StringVar(&cfg.AuthPremiumAllowedSKUs, "authz-premium-allowed-skus", cfg.AuthPremiumAllowedSKUs, "Comma-separated allowed premium-provider SKUs (optional)")
+	flag.StringVar(&cfg.AuthPremiumAllowedSKUs, "authz-aimxs-allowed-skus", cfg.AuthPremiumAllowedSKUs, "Legacy alias for --authz-premium-allowed-skus")
+	flag.StringVar(&cfg.AuthPremiumRequiredFeatures, "authz-premium-required-features", cfg.AuthPremiumRequiredFeatures, "Comma-separated required premium-provider feature flags (optional)")
+	flag.StringVar(&cfg.AuthPremiumRequiredFeatures, "authz-aimxs-required-features", cfg.AuthPremiumRequiredFeatures, "Legacy alias for --authz-premium-required-features")
+	flag.StringVar(&cfg.AuthPremiumSKUFeaturesJSON, "authz-premium-sku-features-json", cfg.AuthPremiumSKUFeaturesJSON, "JSON map of sku -> list of required features")
+	flag.StringVar(&cfg.AuthPremiumSKUFeaturesJSON, "authz-aimxs-sku-features-json", cfg.AuthPremiumSKUFeaturesJSON, "Legacy alias for --authz-premium-sku-features-json")
+	flag.BoolVar(&cfg.AuthPremiumEntitlementTokenRequired, "authz-premium-entitlement-token-required", cfg.AuthPremiumEntitlementTokenRequired, "Require entitlement token for the premium-provider path")
+	flag.BoolVar(&cfg.AuthPremiumEntitlementTokenRequired, "authz-aimxs-entitlement-token-required", cfg.AuthPremiumEntitlementTokenRequired, "Legacy alias for --authz-premium-entitlement-token-required")
 	flag.BoolVar(&cfg.PolicyLifecycleEnabled, "policy-lifecycle-enabled", cfg.PolicyLifecycleEnabled, "Enable policy bundle lifecycle controls")
 	flag.StringVar(&cfg.PolicyLifecycleMode, "policy-lifecycle-mode", cfg.PolicyLifecycleMode, "Policy lifecycle mode: observe|enforce")
 	flag.StringVar(&cfg.PolicyAllowedIDs, "policy-allowed-ids", cfg.PolicyAllowedIDs, "Comma-separated allowed policy bundle IDs")
@@ -188,7 +194,7 @@ func parseFlags() Config {
 	flag.StringVar(&cfg.RetentionPolicyJSON, "retention-policy-json", cfg.RetentionPolicyJSON, "JSON map of retentionClass to duration (for example {\"standard\":\"168h\",\"short\":\"24h\"})")
 	flag.StringVar(&cfg.RefValuesPath, "runtime-ref-values-path", cfg.RefValuesPath, "Path to JSON file mapping ref:// values to concrete endpoint or credential values")
 	flag.StringVar(&cfg.RefValuesJSON, "runtime-ref-values-json", cfg.RefValuesJSON, "Inline JSON object mapping ref:// values to concrete endpoint or credential values")
-	flag.StringVar(&cfg.PolicyProviderOverridePath, "runtime-policy-provider-override-path", cfg.PolicyProviderOverridePath, "Path to a local PolicyProvider override JSON file for desktop/local AIMXS full mode")
+	flag.StringVar(&cfg.PolicyProviderOverridePath, "runtime-policy-provider-override-path", cfg.PolicyProviderOverridePath, "Path to a local PolicyProvider override JSON file for desktop or local external-provider testing")
 	flag.DurationVar(&cfg.IntegrationInvokeTimeout, "integration-invoke-timeout", cfg.IntegrationInvokeTimeout, "Timeout for runtime integration invoke HTTP requests")
 	flag.StringVar(&cfg.ManagedCodexMode, "runtime-managed-codex-mode", cfg.ManagedCodexMode, "Managed Codex mode: legacy or process")
 	flag.StringVar(&cfg.CodexCLIPath, "runtime-codex-cli-path", cfg.CodexCLIPath, "Path to the local Codex CLI binary")
@@ -232,9 +238,9 @@ func run(cfg Config) error {
 	if err := store.EnsureSchema(ctx); err != nil {
 		return err
 	}
-	aimxsSKUFeatures, err := parseSKUFeaturesPolicy(cfg.AuthAIMXSSKUFeaturesJSON)
+	premiumProviderSKUFeatures, err := parseSKUFeaturesPolicy(cfg.AuthPremiumSKUFeaturesJSON)
 	if err != nil {
-		return fmt.Errorf("parse AIMXS SKU feature policy: %w", err)
+		return fmt.Errorf("parse premium provider feature policy: %w", err)
 	}
 
 	orchestrator := &cpruntime.Orchestrator{
@@ -248,12 +254,12 @@ func run(cfg Config) error {
 		DesktopAllowNonLinux: cfg.DesktopAllowNonLinux,
 		RequirePolicyGrant:   cfg.AuthRequirePolicyGrant,
 		AIMXSEntitlement: cpruntime.AIMXSEntitlementConfig{
-			Enabled:               cfg.AuthRequireAIMXSEntitlement,
-			ProviderNamePrefixes:  splitCommaList(cfg.AuthAIMXSProviderPrefixes),
-			AllowedSKUs:           toLowerStringSet(splitCommaList(cfg.AuthAIMXSAllowedSKUs)),
-			SKUFeatures:           aimxsSKUFeatures,
-			RequiredFeatures:      toLowerStringSet(splitCommaList(cfg.AuthAIMXSRequiredFeatures)),
-			RequireEntitlementKey: cfg.AuthAIMXSEntitlementTokenRequired,
+			Enabled:               cfg.AuthRequirePremiumProviderEntitlement,
+			ProviderNamePrefixes:  splitCommaList(cfg.AuthPremiumProviderPrefixes),
+			AllowedSKUs:           toLowerStringSet(splitCommaList(cfg.AuthPremiumAllowedSKUs)),
+			SKUFeatures:           premiumProviderSKUFeatures,
+			RequiredFeatures:      toLowerStringSet(splitCommaList(cfg.AuthPremiumRequiredFeatures)),
+			RequireEntitlementKey: cfg.AuthPremiumEntitlementTokenRequired,
 		},
 		RetentionDefaultClass: cfg.RetentionDefaultClass,
 		PolicyLifecycle: cpruntime.PolicyLifecycleConfig{
@@ -302,12 +308,12 @@ func run(cfg Config) error {
 	api := cpruntime.NewAPIServer(store, orchestrator, authEnforcer).WithAgentInvoker(agentInvoker)
 
 	log.Printf(
-		"runtime orchestration service listening on %s namespace=%s authnEnabled=%t requirePolicyGrant=%t requireAIMXSEntitlement=%t policyLifecycleEnabled=%t policyLifecycleMode=%s desktopMinPriority=%d desktopAllowNonLinux=%t",
+		"runtime orchestration service listening on %s namespace=%s authnEnabled=%t requirePolicyGrant=%t requirePremiumProviderEntitlement=%t policyLifecycleEnabled=%t policyLifecycleMode=%s desktopMinPriority=%d desktopAllowNonLinux=%t",
 		cfg.ListenAddr,
 		cfg.Namespace,
 		cfg.AuthEnabled,
 		cfg.AuthRequirePolicyGrant,
-		cfg.AuthRequireAIMXSEntitlement,
+		cfg.AuthRequirePremiumProviderEntitlement,
 		cfg.PolicyLifecycleEnabled,
 		cfg.PolicyLifecycleMode,
 		cfg.DesktopMinPriority,
@@ -354,6 +360,15 @@ func envOrDefault(key, fallback string) string {
 	return fallback
 }
 
+func envOrDefaultAny(keys []string, fallback string) string {
+	for _, key := range keys {
+		if v := os.Getenv(key); v != "" {
+			return v
+		}
+	}
+	return fallback
+}
+
 func envIntOrDefault(key string, fallback int) int {
 	raw := os.Getenv(key)
 	if raw == "" {
@@ -383,6 +398,21 @@ func envBoolOrDefault(key string, fallback bool) bool {
 		return fallback
 	}
 	return parsed
+}
+
+func envBoolOrDefaultAny(keys []string, fallback bool) bool {
+	for _, key := range keys {
+		raw := strings.TrimSpace(os.Getenv(key))
+		if raw == "" {
+			continue
+		}
+		parsed, err := strconv.ParseBool(raw)
+		if err != nil {
+			return fallback
+		}
+		return parsed
+	}
+	return fallback
 }
 
 func envDurationOrDefault(key string, fallback time.Duration) time.Duration {

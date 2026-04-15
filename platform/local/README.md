@@ -653,17 +653,11 @@ Fast path when runtime baseline is already healthy:
 RUN_M5_BASELINE=0 ./platform/local/bin/verify-m10-policy-grant-enforcement.sh
 ```
 
-### M10.6 AIMXS entitlement deny-path verification
+### M10.6 Premium-provider entitlement verification
 
-Runs runtime AIMXS entitlement boundary checks on the policy-provider path:
-- optionally runs M5 baseline first
-- applies `aimxs-full` mode and local AIMXS contract override for OSS smoke
-- enables runtime entitlement enforcement
-- asserts:
-  - missing entitlement token => `DENY`
-  - disallowed SKU => `DENY`
-  - missing required feature => `DENY`
-  - licensed entitlement payload => `ALLOW`
+Detailed premium-provider entitlement checks are maintained outside the public OSS repo.
+
+The public script remains only as a boundary placeholder so public gate wiring does not imply that the OSS repo contains the premium entitlement path.
 
 ```bash
 ./platform/local/bin/verify-m10-entitlement-deny.sh
@@ -675,30 +669,17 @@ Fast path when runtime baseline is already healthy:
 RUN_M5_BASELINE=0 ./platform/local/bin/verify-m10-entitlement-deny.sh
 ```
 
-### M10.7 AIMXS aimxs-full packaging evidence verification
+### M10.7 Premium-provider packaging evidence verification
 
-Validates release-grade packaging evidence for aimxs-full AIMXS mode:
-- consumes private metadata inputs from `~/.epydios/premium/release/aimxs/aimxs-full-release-inputs.vars` by default
-- accepts `provenance/aimxs/aimxs-full-release-inputs.vars` or `../.epydios/provenance/aimxs/aimxs-full-release-inputs.vars` as legacy compatibility overrides
-- requires strict staging log markers for M10.4/M10.5/M10.6 and full-gate pass
-- asserts signed packaging references, SBOM/signature references, air-gapped install/update bundle refs, and support/SLA references
-- verifies required runbooks:
-  - `docs/runbooks/aimxs-full-airgap.md`
-  - `docs/runbooks/aimxs-full-support-boundary.md`
-- writes evidence to:
-  - `~/.epydios/premium/release/aimxs/m10-7-aimxs-full-packaging-evidence-<timestamp>.json`
+Detailed premium packaging evidence handling is maintained outside the public OSS repo.
+
+The public verifier remains only as a boundary placeholder so public gate wiring does not imply that the OSS repo carries private release-packaging evidence.
 
 ```bash
 ./platform/local/bin/verify-m10-aimxs-full-packaging.sh
 ```
 
-Override input/evidence paths explicitly:
-
-```bash
-INPUT_FILE=~/.epydios/premium/release/aimxs/aimxs-full-release-inputs.vars \
-OUTPUT_DIR=~/.epydios/premium/release/aimxs \
-./platform/local/bin/verify-m10-aimxs-full-packaging.sh
-```
+No premium input or evidence-path details are published in the OSS repo.
 
 ### M7.1 integration verification (M0->M5 critical path)
 
@@ -864,45 +845,26 @@ Auto-install monitoring stack before verification:
 AUTO_INSTALL_MONITORING_STACK=1 ./platform/local/bin/verify-monitoring-alerts.sh
 ```
 
-### AIMXS external-boundary verification
+### Premium provider boundary verification
 
-Validates AIMXS plug-in boundary constraints:
-- `internal/providerboundary/slot.go` contract exists and contains required adapter interfaces
-- no direct AIMXS module dependency/import leakage into OSS module graph
-- AIMXS example provider endpoint uses HTTPS and secure auth mode
-- boundary documentation includes conformance + failure-handling expectations
+Validates only the public provider boundary posture:
+- public boundary docs and contracts exist
+- the public premium loader stays thin
+- no direct AIMXS module dependency leaks into the OSS module graph
 
 ```bash
 ./platform/local/bin/verify-aimxs-boundary.sh
 ```
 
-### AIMXS full local mode
+### Public deployment mode pack
 
-Starts the real local AIMXS full shim on the Desktop/runtime path so you can test AIMXS without HTTPS or secure ref material:
-
-```bash
-cd ui/desktop-ui
-./bin/run-macos-local.sh --mode live --runtime-base-url "http://127.0.0.1:18080"
-```
-
-Switch to the secure HTTPS registration when you want the external provider path:
-
-```bash
-kubectl apply -f examples/providers/aimxs-boundary/extensionprovider-policy-https.yaml
-kubectl -n epydios-system patch extensionprovider aimxs-policy-primary --type=merge -p '{"spec":{"selection":{"enabled":true,"priority":900}}}'
-```
-
-The full local shim is for local Desktop/runtime testing only and must not be promoted to staging/prod.
-
-### AIMXS deployment mode packs
-
-Apply policy-routing mode manifests directly:
+The public repo documents and verifies the `oss-only` mode only:
 
 ```bash
 kubectl apply -k platform/modes/oss-only
-kubectl apply -k platform/modes/aimxs-https
-kubectl apply -k platform/modes/aimxs-full
 ```
+
+Separately delivered premium deployment modes are maintained outside the public repo.
 
 ### PR CI gate parity (kind, ephemeral)
 
@@ -930,7 +892,7 @@ GATE_MODE=full ./platform/ci/bin/pr-kind-phase03-gate.sh
 - M7 integration (`M7.1`) + backup/restore (`M7.2`) + upgrade safety (`M7.3`)
 - secure Phase 04 path + rotation (`FAIL_ON_NO_MTLS_REFS=1`)
 - production hardening baseline
-- AIMXS external-boundary verification
+- premium-boundary verification
 
 Use `GATE_MODE=fast` for local skip/override workflows.
 
@@ -1058,10 +1020,10 @@ WITH_SYSTEM_SMOKETEST=1 ./platform/local/bin/bootstrap-k3d.sh
 - `platform/local/bin/verify-phase-05-kuberay.sh` installs and verifies optional phase 05 KubeRay components
 - `platform/local/bin/verify-m10-provider-conformance.sh` validates provider contract/auth-mode conformance across ProfileResolver/PolicyProvider/EvidenceProvider
 - `platform/local/bin/verify-m10-policy-grant-enforcement.sh` validates required grant-token enforcement (`no token => no execution` for non-DENY decisions)
-- `platform/local/bin/verify-m10-deployment-modes.sh` validates three deployment-mode routing transitions (`oss-only`, `aimxs-https`, `aimxs-full`) under one provider contract
-- `platform/local/bin/verify-m10-no-egress-local-aimxs.sh` validates aimxs-full local AIMXS mode under scoped no-egress network policy constraints
-- `platform/local/bin/verify-m10-entitlement-deny.sh` validates runtime entitlement deny-path assertions and licensed ALLOW behavior on AIMXS policy routing
-- `platform/local/bin/verify-m10-aimxs-full-packaging.sh` validates aimxs-full AIMXS packaging evidence requirements (signed package refs, SBOM/signature refs, air-gapped install/update bundles, and support/SLA references)
+- `platform/local/bin/verify-m10-deployment-modes.sh` validates the public `oss-only` mode pack and keeps premium modes outside the OSS verification promise
+- `platform/local/bin/verify-m10-no-egress-local-aimxs.sh` is a public placeholder noting that premium no-egress verification is maintained outside the public repo
+- `platform/local/bin/verify-m10-entitlement-deny.sh` is a public placeholder noting that premium entitlement verification is maintained outside the public repo
+- `platform/local/bin/verify-m10-aimxs-full-packaging.sh` remains outside the public premium-seam cleanup scope and should not be used to infer that premium release evidence is published in OSS
 - `platform/local/bin/verify-m13-openfang-adapter.sh` validates Openfang adapter guardrails (Linux-first + sandbox profile + restricted-host blocked default + secure template posture)
 - `platform/local/bin/verify-m13-openfang-runtime-integration.sh` validates runtime observe->actuate->verify and runtime->adapter->upstream contract flow + restricted-host deny assertion
 - `platform/local/bin/verify-m13-runtime-approvals.sh` validates runtime approval queue/decision API semantics (`PENDING|APPROVED|DENIED|EXPIRED`, approve/deny transitions, expired request rejection)
@@ -1084,7 +1046,7 @@ WITH_SYSTEM_SMOKETEST=1 ./platform/local/bin/bootstrap-k3d.sh
 - `platform/local/bin/verify-admission-enforcement.sh` validates admission-deny behavior for mutable tags and optional signed-image enforcement via Kyverno
 - `platform/local/bin/bootstrap-monitoring-stack.sh` installs a local kube-prometheus-stack profile for pilot/staging monitoring validation
 - `platform/local/bin/verify-monitoring-alerts.sh` validates Prometheus/Alertmanager rule load + synthetic firing alert path
-- `platform/local/bin/verify-aimxs-boundary.sh` verifies the premium AIMXS path is self-contained for local full mode, fails clearly when the premium artifact is missing, preserves the slot/import boundary, and does not silently fall back to OSS
+- `platform/local/bin/verify-aimxs-boundary.sh` verifies the thin public provider boundary and checks that no direct AIMXS module dependency leaked into the OSS repo
 - `platform/local/bin/verify-provenance-lockfiles.sh` validates chart/image/CRD/license lockfiles (development and strict modes)
 - `platform/local/bin/sync-provenance-image-digests.sh` fills `provenance/images.lock.yaml` digests from running cluster image IDs and optional registry pulls
 

@@ -35,10 +35,10 @@ RUN_M14_MAC_RESTRICTED_READINESS="${RUN_M14_MAC_RESTRICTED_READINESS:-}"
 RUN_M14_XOS_PARITY="${RUN_M14_XOS_PARITY:-}"
 RUN_M10_POLICY_GRANT_ENFORCEMENT="${RUN_M10_POLICY_GRANT_ENFORCEMENT:-}"
 RUN_M10_DEPLOYMENT_MODES="${RUN_M10_DEPLOYMENT_MODES:-}"
-RUN_M10_NO_EGRESS_LOCAL_AIMXS="${RUN_M10_NO_EGRESS_LOCAL_AIMXS:-}"
-RUN_M10_ENTITLEMENT_DENY="${RUN_M10_ENTITLEMENT_DENY:-}"
-RUN_M10_AIMXS_PRIVATE_RELEASE="${RUN_M10_AIMXS_PRIVATE_RELEASE:-}"
-RUN_M10_CUSTOMER_HOSTED_PACKAGING="${RUN_M10_CUSTOMER_HOSTED_PACKAGING:-}"
+RUN_M10_PROVIDER_BOUNDARY_NO_EGRESS="${RUN_M10_PROVIDER_BOUNDARY_NO_EGRESS:-${RUN_M10_NO_EGRESS_LOCAL_AIMXS:-}}"
+RUN_M10_PROVIDER_ENTITLEMENT_BOUNDARY="${RUN_M10_PROVIDER_ENTITLEMENT_BOUNDARY:-${RUN_M10_ENTITLEMENT_DENY:-}}"
+RUN_M10_PROVIDER_RELEASE_BOUNDARY="${RUN_M10_PROVIDER_RELEASE_BOUNDARY:-${RUN_M10_AIMXS_PRIVATE_RELEASE:-}}"
+RUN_M10_PROVIDER_PACKAGING_BOUNDARY="${RUN_M10_PROVIDER_PACKAGING_BOUNDARY:-${RUN_M10_CUSTOMER_HOSTED_PACKAGING:-}}"
 RUN_M12_SLO_SLI_PACK="${RUN_M12_SLO_SLI_PACK:-}"
 RUN_M12_SLO_CLUSTER_ASSERTIONS="${RUN_M12_SLO_CLUSTER_ASSERTIONS:-}"
 RUN_M12_DR_GAMEDAY="${RUN_M12_DR_GAMEDAY:-}"
@@ -73,7 +73,7 @@ MONITORING_RELEASE_NAME="${MONITORING_RELEASE_NAME:-}"
 RUN_ADMISSION_ENFORCEMENT_CHECK="${RUN_ADMISSION_ENFORCEMENT_CHECK:-}"
 APPLY_SIGNED_IMAGE_POLICY="${APPLY_SIGNED_IMAGE_POLICY:-}"
 REQUIRE_SIGNED_IMAGE_POLICY="${REQUIRE_SIGNED_IMAGE_POLICY:-}"
-RUN_OPTIONAL_PROVIDER_BOUNDARY_CHECK="${RUN_OPTIONAL_PROVIDER_BOUNDARY_CHECK:-${RUN_AIMXS_BOUNDARY_CHECK:-}}"
+RUN_OPTIONAL_PROVIDER_BOUNDARY_CHECK="${RUN_OPTIONAL_PROVIDER_BOUNDARY_CHECK:-${RUN_PREMIUM_PROVIDER_BOUNDARY_CHECK:-${RUN_AIMXS_BOUNDARY_CHECK:-}}}"
 
 phase04_cleanup_secure_fixtures="1"
 secure_fixture_cleanup_done="0"
@@ -115,10 +115,10 @@ apply_gate_mode_defaults() {
       set_default_if_unset RUN_M14_XOS_PARITY 0
       set_default_if_unset RUN_M10_POLICY_GRANT_ENFORCEMENT 1
       set_default_if_unset RUN_M10_DEPLOYMENT_MODES 1
-      set_default_if_unset RUN_M10_NO_EGRESS_LOCAL_AIMXS 1
-      set_default_if_unset RUN_M10_ENTITLEMENT_DENY 1
-      set_default_if_unset RUN_M10_AIMXS_PRIVATE_RELEASE 1
-      set_default_if_unset RUN_M10_CUSTOMER_HOSTED_PACKAGING 1
+      set_default_if_unset RUN_M10_PROVIDER_BOUNDARY_NO_EGRESS 1
+      set_default_if_unset RUN_M10_PROVIDER_ENTITLEMENT_BOUNDARY 1
+      set_default_if_unset RUN_M10_PROVIDER_RELEASE_BOUNDARY 1
+      set_default_if_unset RUN_M10_PROVIDER_PACKAGING_BOUNDARY 1
       set_default_if_unset RUN_M12_SLO_SLI_PACK 1
       set_default_if_unset RUN_M12_SLO_CLUSTER_ASSERTIONS auto
       set_default_if_unset RUN_M12_DR_GAMEDAY 1
@@ -183,10 +183,10 @@ apply_gate_mode_defaults() {
       set_default_if_unset RUN_M14_XOS_PARITY 0
       set_default_if_unset RUN_M10_POLICY_GRANT_ENFORCEMENT 0
       set_default_if_unset RUN_M10_DEPLOYMENT_MODES 0
-      set_default_if_unset RUN_M10_NO_EGRESS_LOCAL_AIMXS 0
-      set_default_if_unset RUN_M10_ENTITLEMENT_DENY 0
-      set_default_if_unset RUN_M10_AIMXS_PRIVATE_RELEASE 0
-      set_default_if_unset RUN_M10_CUSTOMER_HOSTED_PACKAGING 0
+      set_default_if_unset RUN_M10_PROVIDER_BOUNDARY_NO_EGRESS 0
+      set_default_if_unset RUN_M10_PROVIDER_ENTITLEMENT_BOUNDARY 0
+      set_default_if_unset RUN_M10_PROVIDER_RELEASE_BOUNDARY 0
+      set_default_if_unset RUN_M10_PROVIDER_PACKAGING_BOUNDARY 0
       set_default_if_unset RUN_M12_SLO_SLI_PACK 0
       set_default_if_unset RUN_M12_SLO_CLUSTER_ASSERTIONS 0
       set_default_if_unset RUN_M12_DR_GAMEDAY 0
@@ -261,10 +261,10 @@ enforce_full_mode_contract() {
   check_required RUN_M13_RUNTIME_APPROVALS 1
   check_required RUN_M10_POLICY_GRANT_ENFORCEMENT 1
   check_required RUN_M10_DEPLOYMENT_MODES 1
-  check_required RUN_M10_NO_EGRESS_LOCAL_AIMXS 1
-  check_required RUN_M10_ENTITLEMENT_DENY 1
-  check_required RUN_M10_AIMXS_PRIVATE_RELEASE 1
-  check_required RUN_M10_CUSTOMER_HOSTED_PACKAGING 1
+  check_required RUN_M10_PROVIDER_BOUNDARY_NO_EGRESS 1
+  check_required RUN_M10_PROVIDER_ENTITLEMENT_BOUNDARY 1
+  check_required RUN_M10_PROVIDER_RELEASE_BOUNDARY 1
+  check_required RUN_M10_PROVIDER_PACKAGING_BOUNDARY 1
   check_required RUN_M12_SLO_SLI_PACK 1
   check_required RUN_M12_DR_GAMEDAY 1
   check_required RUN_M12_FAILURE_INJECTION 1
@@ -604,7 +604,7 @@ main() {
   fi
 
   if [ "${RUN_M10_DEPLOYMENT_MODES}" = "1" ]; then
-    echo "Running M10.4 gate (three deployment modes on a single provider contract)..."
+    echo "Running M10.4 gate (public deployment-mode verification)..."
     local run_m5_baseline_for_m10_modes=1
     if [ "${RUN_M7_INTEGRATION}" = "1" ] || [ "${RUN_PHASE_RUNTIME}" = "1" ] || [ "${RUN_M9_AUTHN_AUTHZ}" = "1" ] || [ "${RUN_M9_AUTHZ_TENANCY}" = "1" ] || [ "${RUN_M9_RBAC_MATRIX}" = "1" ] || [ "${RUN_M10_PROVIDER_CONFORMANCE}" = "1" ] || [ "${RUN_M10_POLICY_GRANT_ENFORCEMENT}" = "1" ]; then
       run_m5_baseline_for_m10_modes=0
@@ -619,8 +619,8 @@ main() {
     m10_4_gate_executed=1
   fi
 
-  if [ "${RUN_M10_NO_EGRESS_LOCAL_AIMXS}" = "1" ]; then
-    echo "Running M10.5 gate (aimxs-full local premium-provider no-egress proof)..."
+  if [ "${RUN_M10_PROVIDER_BOUNDARY_NO_EGRESS}" = "1" ]; then
+    echo "Running M10.5 gate (premium-provider boundary placeholder)..."
     local run_m5_baseline_for_m10_no_egress=1
     if [ "${RUN_M7_INTEGRATION}" = "1" ] || [ "${RUN_PHASE_RUNTIME}" = "1" ] || [ "${RUN_M9_AUTHN_AUTHZ}" = "1" ] || [ "${RUN_M9_AUTHZ_TENANCY}" = "1" ] || [ "${RUN_M9_RBAC_MATRIX}" = "1" ] || [ "${RUN_M10_PROVIDER_CONFORMANCE}" = "1" ] || [ "${RUN_M10_POLICY_GRANT_ENFORCEMENT}" = "1" ] || [ "${RUN_M10_DEPLOYMENT_MODES}" = "1" ]; then
       run_m5_baseline_for_m10_no_egress=0
@@ -635,10 +635,10 @@ main() {
     m10_5_gate_executed=1
   fi
 
-  if [ "${RUN_M10_ENTITLEMENT_DENY}" = "1" ]; then
-    echo "Running M10.6 gate (premium-provider entitlement deny path + licensed ALLOW assertions)..."
+  if [ "${RUN_M10_PROVIDER_ENTITLEMENT_BOUNDARY}" = "1" ]; then
+    echo "Running M10.6 gate (premium-provider entitlement boundary placeholder)..."
     local run_m5_baseline_for_m10_entitlement=1
-    if [ "${RUN_M7_INTEGRATION}" = "1" ] || [ "${RUN_PHASE_RUNTIME}" = "1" ] || [ "${RUN_M9_AUTHN_AUTHZ}" = "1" ] || [ "${RUN_M9_AUTHZ_TENANCY}" = "1" ] || [ "${RUN_M9_RBAC_MATRIX}" = "1" ] || [ "${RUN_M10_PROVIDER_CONFORMANCE}" = "1" ] || [ "${RUN_M10_POLICY_GRANT_ENFORCEMENT}" = "1" ] || [ "${RUN_M10_DEPLOYMENT_MODES}" = "1" ] || [ "${RUN_M10_NO_EGRESS_LOCAL_AIMXS}" = "1" ]; then
+    if [ "${RUN_M7_INTEGRATION}" = "1" ] || [ "${RUN_PHASE_RUNTIME}" = "1" ] || [ "${RUN_M9_AUTHN_AUTHZ}" = "1" ] || [ "${RUN_M9_AUTHZ_TENANCY}" = "1" ] || [ "${RUN_M9_RBAC_MATRIX}" = "1" ] || [ "${RUN_M10_PROVIDER_CONFORMANCE}" = "1" ] || [ "${RUN_M10_POLICY_GRANT_ENFORCEMENT}" = "1" ] || [ "${RUN_M10_DEPLOYMENT_MODES}" = "1" ] || [ "${RUN_M10_PROVIDER_BOUNDARY_NO_EGRESS}" = "1" ]; then
       run_m5_baseline_for_m10_entitlement=0
     fi
     RUNTIME=kind \
@@ -651,8 +651,8 @@ main() {
     m10_6_gate_executed=1
   fi
 
-  if [ "${RUN_M10_AIMXS_PRIVATE_RELEASE}" = "1" ]; then
-    echo "Running M10.2 gate (first private provider release evidence + staging strict proof)..."
+  if [ "${RUN_M10_PROVIDER_RELEASE_BOUNDARY}" = "1" ]; then
+    echo "Running M10.2 gate (premium-provider release evidence placeholder)..."
     M10_3_GATE_EXECUTED="${m10_3_gate_executed}" \
     M10_4_GATE_EXECUTED="${m10_4_gate_executed}" \
     M10_5_GATE_EXECUTED="${m10_5_gate_executed}" \
@@ -660,8 +660,8 @@ main() {
       "${REPO_ROOT}/platform/local/bin/verify-m10-aimxs-private-release.sh"
   fi
 
-  if [ "${RUN_M10_CUSTOMER_HOSTED_PACKAGING}" = "1" ]; then
-    echo "Running M10.7 gate (aimxs-full premium-provider packaging evidence: signed package refs + air-gapped install/update + support/SLA)..."
+  if [ "${RUN_M10_PROVIDER_PACKAGING_BOUNDARY}" = "1" ]; then
+    echo "Running M10.7 gate (premium-provider packaging evidence placeholder)..."
     "${REPO_ROOT}/platform/local/bin/verify-m10-aimxs-full-packaging.sh"
   fi
 
@@ -728,7 +728,7 @@ main() {
   fi
 
   if [ "${RUN_OPTIONAL_PROVIDER_BOUNDARY_CHECK}" = "1" ]; then
-    echo "Running optional external provider boundary verification..."
+    echo "Running optional public provider boundary verification..."
     "${REPO_ROOT}/platform/local/bin/verify-aimxs-boundary.sh"
   fi
 

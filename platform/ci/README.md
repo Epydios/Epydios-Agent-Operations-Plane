@@ -12,7 +12,7 @@ This directory contains CI entrypoint scripts invoked by GitHub Actions.
     - `kubectl kustomize` render checks for all `platform/**/kustomization.yaml`
   - Ensures a local kind cluster exists
   - Supports `GATE_MODE=full|fast`:
-    - `full` (default): strict CI parity with required M7 + hardening + AIMXS boundary checks
+    - `full` (default): strict CI parity with required M7 + hardening + public premium-boundary checks
     - `fast`: quick local iteration (skips heavy phases unless explicitly re-enabled)
   - Runs Phase 00/01 runtime gate:
     - `RUN_PHASE_00_01=1`
@@ -69,41 +69,32 @@ This directory contains CI entrypoint scripts invoked by GitHub Actions.
       - non-DENY decision without grant token fails
       - DENY remains executable without token
       - ALLOW with token succeeds and token is redacted from runtime response payloads
-  - M10.4 deployment-mode switching verification:
+  - M10.4 public deployment-mode verification:
     - `RUN_M10_DEPLOYMENT_MODES=1` in full mode (required)
     - `RUN_M10_DEPLOYMENT_MODES=0` default in fast mode
     - runs `platform/local/bin/verify-m10-deployment-modes.sh`
-    - validates policy-provider routing transitions across:
-      - `platform/modes/oss-only`
-      - `platform/modes/aimxs-https`
-      - `platform/modes/aimxs-full`
-    - confirms all three modes stay on one `ExtensionProvider` contract surface
-  - M10.5 aimxs-full no-egress verification:
+    - validates the public `oss-only` mode renders cleanly from the public mode pack
+    - confirms the public repo does not treat separately delivered premium modes as part of the OSS verification promise
+  - M10.5 premium-provider no-egress verification:
     - `RUN_M10_NO_EGRESS_LOCAL_AIMXS=1` in full mode (required)
     - `RUN_M10_NO_EGRESS_LOCAL_AIMXS=0` default in fast mode
     - runs `platform/local/bin/verify-m10-no-egress-local-aimxs.sh`
-    - validates local/aimxs-full policy path succeeds while external egress is blocked by a scoped runtime NetworkPolicy
-  - M10.6 AIMXS entitlement deny-path verification:
+    - public OSS repo keeps only a placeholder boundary note; detailed premium verification is maintained outside the public repo
+  - M10.6 premium-provider entitlement verification:
     - `RUN_M10_ENTITLEMENT_DENY=1` in full mode (required)
     - `RUN_M10_ENTITLEMENT_DENY=0` default in fast mode
     - runs `platform/local/bin/verify-m10-entitlement-deny.sh`
-    - validates runtime entitlement boundary:
-      - missing entitlement token => `DENY`
-      - disallowed SKU => `DENY`
-      - missing required feature => `DENY`
-      - licensed entitlement payload => `ALLOW`
-  - M10.2 AIMXS private release evidence verification:
+    - public OSS repo keeps only a placeholder boundary note; detailed premium verification is maintained outside the public repo
+  - M10.2 premium-provider private release evidence verification:
     - `RUN_M10_AIMXS_PRIVATE_RELEASE=1` in full mode (required)
     - `RUN_M10_AIMXS_PRIVATE_RELEASE=0` default in fast mode
     - runs `platform/local/bin/verify-m10-aimxs-private-release.sh`
-    - validates first private AIMXS SDK/provider release evidence and staging strict-proof assertions
-    - reads `~/.epydios/premium/release/aimxs/private-release-inputs.vars` by default for private release metadata (allows legacy repo-local or external overrides when explicitly present)
-  - M10.7 AIMXS aimxs-full packaging evidence verification:
+    - public OSS repo keeps only a placeholder boundary note; detailed premium release evidence is maintained outside the public repo
+  - M10.7 premium-provider packaging evidence verification:
     - `RUN_M10_CUSTOMER_HOSTED_PACKAGING=1` in full mode (required)
     - `RUN_M10_CUSTOMER_HOSTED_PACKAGING=0` default in fast mode
     - runs `platform/local/bin/verify-m10-aimxs-full-packaging.sh`
-    - validates aimxs-full packaging references (signed image/artifact + SBOM + air-gapped install/update bundles + support/SLA docs)
-    - reads `~/.epydios/premium/release/aimxs/aimxs-full-release-inputs.vars` by default for private aimxs-full release metadata (allows legacy repo-local or external overrides when explicitly present)
+    - public OSS repo does not publish premium packaging evidence details
   - M13 desktop execution-plane contract + deny-path verifier:
     - `RUN_M13_DESKTOP_PROVIDER=1` in full mode (required)
     - `RUN_M13_DESKTOP_PROVIDER=0` default in fast mode
@@ -220,7 +211,7 @@ This directory contains CI entrypoint scripts invoked by GitHub Actions.
     - `RUN_M10_ENTITLEMENT_DENY=1`
     - `RUN_M10_AIMXS_PRIVATE_RELEASE=1`
     - `RUN_M10_CUSTOMER_HOSTED_PACKAGING=1`
-    - Full mode enforces M10.1 + M10.2 + M10.3 + M10.4 + M10.5 + M10.6 + M10.7 and exits if overridden to disabled value.
+    - Full mode keeps the public placeholders and public boundary checks wired, but detailed premium verification remains outside the OSS repo.
   - M12 operations pack check in full mode (required, no skips):
     - `RUN_M12_SLO_SLI_PACK=1`
     - `RUN_M12_DR_GAMEDAY=1`
@@ -274,9 +265,9 @@ This directory contains CI entrypoint scripts invoked by GitHub Actions.
     - `RUN_ADMISSION_ENFORCEMENT_CHECK=1` (required in full mode)
     - `APPLY_SIGNED_IMAGE_POLICY=1` (required in full mode; strict profiles must run signed-image checks)
     - `REQUIRE_SIGNED_IMAGE_POLICY=1` (required in full mode; strict profiles fail if Kyverno/signed-policy path is unavailable)
-  - Runs AIMXS external-boundary verification by default in full mode:
+  - Runs public premium-boundary verification by default in full mode:
     - `RUN_AIMXS_BOUNDARY_CHECK=1`
-    - verifies slot contract boundary, no private AIMXS dependency leakage, and HTTPS/auth constraints in AIMXS example manifests.
+    - verifies the thin public boundary posture and checks that no direct AIMXS dependency leaked into the OSS repo.
 
 The default GitHub Actions workflow is:
 

@@ -102,10 +102,7 @@ Security and correctness fixes target the latest line first.
 
 ## Premium Boundary
 
-Premium AIMXS is supported through the public provider boundary only:
-
-- `aimxs-https`
-- `aimxs-full`
+Separately delivered premium providers are supported through the public provider boundary only.
 
 Premium artifacts are not part of the OSS repo contents or the OSS support promise.
 

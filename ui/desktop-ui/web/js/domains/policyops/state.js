@@ -528,7 +528,9 @@ export function derivePolicyRichness(run) {
     riskTier: String(requestPolicy.risk_tier || providerPolicy.risk_tier || "").trim(),
     requiredGrants,
     evidenceReadiness: String(requestPolicy.evidence_readiness || providerPolicy.evidence_readiness || "").trim(),
-    handshakeRequired: requestPolicy?.gates?.["core14.adapter_present.enforce_handshake"] === true,
+    handshakeRequired:
+      requestPolicy?.gates?.handoff_required === true ||
+      requestPolicy?.gates?.["core14.adapter_present.enforce_handshake"] === true,
     actorSubject: String(actorAuthority.subject || requestActor.subject || governedAuthority.subject || "").trim(),
     actorClientId: String(actorAuthority.client_id || requestActor.clientId || governedAuthority.client_id || "").trim(),
     authorityBasis: String(actorAuthority.authority_basis || requestActor.authorityBasis || governedAuthority.authority_basis || "").trim(),

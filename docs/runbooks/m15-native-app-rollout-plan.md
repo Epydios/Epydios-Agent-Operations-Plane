@@ -15,7 +15,7 @@ Ship a packaged desktop application (no external browser dependency) with parity
 
 - UI module is consolidated in-repo at `ui/desktop-ui`.
 - Current runtime is web-served and opened in a browser.
-- AIMXS external HTTPS mode is implemented as a governed setting (entitlement-gated).
+- Separately delivered premium-provider activation remains outside the public OSS repo.
 
 ## Delivery Phases (Immediate Execution)
 
@@ -86,7 +86,7 @@ Exit gate:
 1. `restricted_host` remains blocked by default.
 2. Autonomous mode defaults to sandbox/VM profile.
 3. Policy/evidence/audit remains mandatory per action step.
-4. AIMXS remains external HTTPS endpoint mode only (no in-repo AIMXS code drop-in).
+4. Separately delivered premium providers remain outside the public OSS repo (no in-repo premium code drop-in).
 
 ## Immediate Next Step
 
