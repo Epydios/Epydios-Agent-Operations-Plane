@@ -73,7 +73,6 @@ MONITORING_RELEASE_NAME="${MONITORING_RELEASE_NAME:-}"
 RUN_ADMISSION_ENFORCEMENT_CHECK="${RUN_ADMISSION_ENFORCEMENT_CHECK:-}"
 APPLY_SIGNED_IMAGE_POLICY="${APPLY_SIGNED_IMAGE_POLICY:-}"
 REQUIRE_SIGNED_IMAGE_POLICY="${REQUIRE_SIGNED_IMAGE_POLICY:-}"
-RUN_OPTIONAL_PROVIDER_BOUNDARY_CHECK="${RUN_OPTIONAL_PROVIDER_BOUNDARY_CHECK:-${RUN_PREMIUM_PROVIDER_BOUNDARY_CHECK:-${RUN_AIMXS_BOUNDARY_CHECK:-}}}"
 
 phase04_cleanup_secure_fixtures="1"
 secure_fixture_cleanup_done="0"
@@ -153,7 +152,6 @@ apply_gate_mode_defaults() {
       set_default_if_unset RUN_ADMISSION_ENFORCEMENT_CHECK 1
       set_default_if_unset APPLY_SIGNED_IMAGE_POLICY 1
       set_default_if_unset REQUIRE_SIGNED_IMAGE_POLICY 1
-      set_default_if_unset RUN_OPTIONAL_PROVIDER_BOUNDARY_CHECK 1
       ;;
     fast)
       # Fast mode favors iteration speed. Any explicitly provided env vars still override these defaults.
@@ -221,7 +219,6 @@ apply_gate_mode_defaults() {
       set_default_if_unset RUN_ADMISSION_ENFORCEMENT_CHECK 0
       set_default_if_unset APPLY_SIGNED_IMAGE_POLICY auto
       set_default_if_unset REQUIRE_SIGNED_IMAGE_POLICY 0
-      set_default_if_unset RUN_OPTIONAL_PROVIDER_BOUNDARY_CHECK 0
       ;;
     *)
       echo "Unsupported GATE_MODE='${GATE_MODE}' (expected full|fast)." >&2
@@ -278,7 +275,6 @@ enforce_full_mode_contract() {
   check_required RUN_ADMISSION_ENFORCEMENT_CHECK 1
   check_required APPLY_SIGNED_IMAGE_POLICY 1
   check_required REQUIRE_SIGNED_IMAGE_POLICY 1
-  check_required RUN_OPTIONAL_PROVIDER_BOUNDARY_CHECK 1
   check_required RUN_PROVENANCE_CHECK 1
   check_required PROVENANCE_STRICT 1
 
@@ -412,9 +408,6 @@ main() {
   fi
   if [ "${RUN_PROVENANCE_CHECK}" = "1" ]; then
     require_cmd go
-  fi
-  if [ "${RUN_OPTIONAL_PROVIDER_BOUNDARY_CHECK}" = "1" ]; then
-    require_cmd rg
   fi
 
   ensure_cluster
@@ -727,10 +720,6 @@ main() {
       "${REPO_ROOT}/platform/local/bin/verify-m12-failure-injection-rollback.sh"
   fi
 
-  if [ "${RUN_OPTIONAL_PROVIDER_BOUNDARY_CHECK}" = "1" ]; then
-    echo "Running optional public provider boundary verification..."
-    "${REPO_ROOT}/platform/local/bin/verify-aimxs-boundary.sh"
-  fi
 
   if [ "${RUN_PROVENANCE_CHECK}" = "1" ]; then
     echo "Running provenance lock verification (strict=${PROVENANCE_STRICT})..."

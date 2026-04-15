@@ -845,17 +845,6 @@ Auto-install monitoring stack before verification:
 AUTO_INSTALL_MONITORING_STACK=1 ./platform/local/bin/verify-monitoring-alerts.sh
 ```
 
-### Premium provider boundary verification
-
-Validates only the public provider boundary posture:
-- public boundary docs and contracts exist
-- the public premium loader stays thin
-- no direct premium-provider module dependency leaks into the OSS module graph
-
-```bash
-./platform/local/bin/verify-aimxs-boundary.sh
-```
-
 ### Public deployment mode pack
 
 The public repo documents and verifies the `oss-only` mode only:
@@ -892,7 +881,6 @@ GATE_MODE=full ./platform/ci/bin/pr-kind-phase03-gate.sh
 - M7 integration (`M7.1`) + backup/restore (`M7.2`) + upgrade safety (`M7.3`)
 - secure Phase 04 path + rotation (`FAIL_ON_NO_MTLS_REFS=1`)
 - production hardening baseline
-- premium-boundary verification
 
 Use `GATE_MODE=fast` for local skip/override workflows.
 
@@ -1046,7 +1034,6 @@ WITH_SYSTEM_SMOKETEST=1 ./platform/local/bin/bootstrap-k3d.sh
 - `platform/local/bin/verify-admission-enforcement.sh` validates admission-deny behavior for mutable tags and optional signed-image enforcement via Kyverno
 - `platform/local/bin/bootstrap-monitoring-stack.sh` installs a local kube-prometheus-stack profile for pilot/staging monitoring validation
 - `platform/local/bin/verify-monitoring-alerts.sh` validates Prometheus/Alertmanager rule load + synthetic firing alert path
-- `platform/local/bin/verify-aimxs-boundary.sh` verifies the thin public provider boundary and checks that no direct premium-provider module dependency leaked into the OSS repo
 - `platform/local/bin/verify-provenance-lockfiles.sh` validates chart/image/CRD/license lockfiles (development and strict modes)
 - `platform/local/bin/sync-provenance-image-digests.sh` fills `provenance/images.lock.yaml` digests from running cluster image IDs and optional registry pulls
 
