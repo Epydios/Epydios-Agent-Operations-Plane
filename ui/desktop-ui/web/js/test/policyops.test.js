@@ -7,11 +7,11 @@ test("policyops page renders the first inspect-only policy boards", () => {
   renderPolicyOpsPage(ui, {
     settings: {
       aimxs: {
-        mode: "aimxs-full",
+        mode: "provider-local",
         activation: {
           available: true,
           state: "active",
-          activeMode: "aimxs-full",
+          activeMode: "provider-local",
           selectedProviderId: "premium-policy-primary",
           selectedProviderReady: true
         }
@@ -256,7 +256,7 @@ test("policyops page renders the first inspect-only policy boards", () => {
   assert.match(ui.policyOpsContent.innerHTML, /Semantic Impact Preview/);
   assert.match(ui.policyOpsContent.innerHTML, /Governance Route And Receipt State/);
   assert.match(ui.policyOpsContent.innerHTML, /Decision Contract/);
-  assert.match(ui.policyOpsContent.innerHTML, /decisionMode=local-provider; provider=premium-policy-primary/);
+  assert.match(ui.policyOpsContent.innerHTML, /decisionMode=local-provider; provider=secure-provider/);
   assert.match(ui.policyOpsContent.innerHTML, /baselineContract=active; premiumRichness=(visible|not-loaded)/);
   assert.match(ui.policyOpsContent.innerHTML, /Policy Pack Catalog/);
   assert.match(ui.policyOpsContent.innerHTML, /Baseline decisions stay real here\. Verify the proposed contract before routing it into GovernanceOps\./);
@@ -344,7 +344,7 @@ test("policyops page renders apply and receipt actions for approved policy admin
   renderPolicyOpsPage(ui, {
     settings: {
       aimxs: {
-        mode: "aimxs-full",
+        mode: "provider-local",
         activation: {
           selectedProviderId: "premium-policy-primary"
         }
@@ -438,7 +438,7 @@ test("policyops page renders rollback and bounded history for applied policy adm
   renderPolicyOpsPage(ui, {
     settings: {
       aimxs: {
-        mode: "aimxs-full",
+        mode: "provider-local",
         activation: {
           selectedProviderId: "premium-policy-primary"
         }

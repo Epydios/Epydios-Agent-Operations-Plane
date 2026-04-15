@@ -15,7 +15,7 @@ cleanup() {
   if [ "${KEEP_RESOURCES}" != "1" ]; then
     kubectl delete -k "${REPO_ROOT}/platform/tests/provider-discovery-mtls" --ignore-not-found >/dev/null 2>&1 || true
     kubectl -n "${NAMESPACE}" delete secret \
-      epydios-controller-mtls-client \
+      epydios-provider-client-tls \
       epydios-provider-ca \
       mtls-provider-server-tls \
       mtls-bearer-client-token \
@@ -82,7 +82,7 @@ EOF
 }
 
 apply_secrets() {
-  kubectl -n "${NAMESPACE}" create secret tls epydios-controller-mtls-client \
+  kubectl -n "${NAMESPACE}" create secret tls epydios-provider-client-tls \
     --cert="${TMPDIR_LOCAL}/client.crt" \
     --key="${TMPDIR_LOCAL}/client.key" \
     --dry-run=client -o yaml | kubectl apply -f -

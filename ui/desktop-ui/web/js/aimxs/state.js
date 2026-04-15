@@ -1,15 +1,10 @@
-export const AIMXS_OVERRIDE_KEY = "epydios.agentops.desktop.aimxs.override.v1";
+export const AIMXS_OVERRIDE_KEY = "epydios.agentops.desktop.provider-route.override.v1";
 
 export const AIMXS_ALLOWED_MODES = Object.freeze([
   "oss-only",
   "provider-local",
   "provider-https"
 ]);
-
-const AIMXS_LEGACY_MODE_ALIASES = Object.freeze({
-  "aimxs-full": "provider-local",
-  "aimxs-https": "provider-https"
-});
 
 export const AIMXS_DEFAULT_REFS = Object.freeze({
   endpointRef: "ref://projects/{projectId}/providers/provider-route/https-endpoint",
@@ -50,15 +45,9 @@ function normalizeAimxsCanonicalMode(value, fallback = "oss-only") {
   if (AIMXS_ALLOWED_MODES.includes(requested)) {
     return requested;
   }
-  if (AIMXS_LEGACY_MODE_ALIASES[requested]) {
-    return AIMXS_LEGACY_MODE_ALIASES[requested];
-  }
   const normalizedFallback = String(fallback || "").trim().toLowerCase().replace(/_/g, "-");
   if (AIMXS_ALLOWED_MODES.includes(normalizedFallback)) {
     return normalizedFallback;
-  }
-  if (AIMXS_LEGACY_MODE_ALIASES[normalizedFallback]) {
-    return AIMXS_LEGACY_MODE_ALIASES[normalizedFallback];
   }
   return "oss-only";
 }
@@ -231,17 +220,7 @@ export function isAimxsPremiumVisible(input = {}) {
 }
 
 export function normalizeAimxsMode(value, fallback = "oss-only") {
-  const canonicalMode = normalizeAimxsCanonicalMode(value, fallback);
-  if (canonicalMode === "provider-local") {
-    return "aimxs-full";
-  }
-  if (canonicalMode === "provider-https") {
-    return "aimxs-https";
-  }
-  if (canonicalMode === "unknown") {
-    return "unknown";
-  }
-  return "oss-only";
+  return normalizeAimxsCanonicalMode(value, fallback);
 }
 
 export function normalizeAimxsOverride(input = {}, fallback = {}) {

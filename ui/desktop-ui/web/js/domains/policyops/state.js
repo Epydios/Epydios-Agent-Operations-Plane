@@ -35,10 +35,10 @@ export function policyProviderLabel(settings = {}) {
   if (mode === "oss-only") {
     return "baseline";
   }
-  if (mode === "aimxs-full") {
-    return displayPolicyProviderLabel("aimxs-full");
+  if (mode === "provider-local") {
+    return displayPolicyProviderLabel("premium-provider-local");
   }
-  if (mode === "aimxs-https") {
+  if (mode === "provider-https") {
     return displayPolicyProviderLabel("premium-policy-primary");
   }
   return "-";
@@ -471,13 +471,13 @@ export function derivePolicyRichness(run) {
   const requestGoverned = readObject(requestContext.governed_action);
   const actorAuthority = readObject(requestContext.actor_authority);
   const governedAuthority = readObject(requestGoverned.authority_context);
-  const requestPolicy = readObject(requestContext.review_signals || requestContext.policy_stratification);
+  const requestPolicy = readObject(requestContext.review_signals);
   const requestTask = readObject(requestPayload.task);
   const policyResponse = readObject(run?.policyResponse);
   const policyOutput = readObject(policyResponse.output);
-  const providerOutput = readObject(policyOutput.premiumProvider || policyOutput.providerRoute || policyOutput.aimxs);
+  const providerOutput = readObject(policyOutput.premiumProvider || policyOutput.providerRoute);
   const providerMeta = readObject(providerOutput.providerMeta);
-  const providerPolicy = readObject(providerMeta.review_signals || providerMeta.policy_stratification);
+  const providerPolicy = readObject(providerMeta.review_signals);
   const requestContract = readObject(providerMeta.request_contract);
   const providerCurrentState = readObject(providerMeta.current_state);
   const providerContinuity = readObject(providerMeta.state_continuity);
@@ -487,7 +487,7 @@ export function derivePolicyRichness(run) {
   const financeOrder = readObject(requestGoverned.finance_order);
   const reasons = Array.isArray(policyResponse.reasons) ? policyResponse.reasons : [];
   const firstReason = readObject(reasons[0]);
-  const requiredGrants = readStringArray(requestPolicy.required_reviews || requestPolicy.required_grants);
+  const requiredGrants = readStringArray(requestPolicy.required_reviews);
   const authorityRoles = readStringArray(actorAuthority.roles).length
     ? readStringArray(actorAuthority.roles)
     : readStringArray(governedAuthority.roles);
@@ -511,7 +511,7 @@ export function derivePolicyRichness(run) {
   const evidenceHash = String(evidence.evidence_hash || evidence.evidenceHash || "").trim();
   const policyStratificationPresent =
     Object.keys(providerPolicy).length > 0 ||
-    Object.keys(readObject(providerOutput.reviewSignals || providerOutput.policyStratification)).length > 0;
+    Object.keys(readObject(providerOutput.reviewSignals)).length > 0;
   const requestContractEchoPresent =
     Object.keys(requestContract).length > 0 || Object.keys(outputContract).length > 0;
 
@@ -527,20 +527,11 @@ export function derivePolicyRichness(run) {
     actionVerb: String(requestAction.verb || "").trim(),
     approvedForProd: requestSubjectAttributes.approvedForProd === true,
     boundaryClass: String(requestPolicy.boundary_class || providerPolicy.boundary_class || "").trim(),
-    riskTier: String(
-      requestPolicy.review_tier || requestPolicy.risk_tier || providerPolicy.review_tier || providerPolicy.risk_tier || ""
-    ).trim(),
+    riskTier: String(requestPolicy.review_tier || providerPolicy.review_tier || "").trim(),
     requiredGrants,
-    evidenceReadiness: String(
-      requestPolicy.readiness_state ||
-        requestPolicy.evidence_readiness ||
-        providerPolicy.readiness_state ||
-        providerPolicy.evidence_readiness ||
-        ""
-    ).trim(),
+    evidenceReadiness: String(requestPolicy.readiness_state || providerPolicy.readiness_state || "").trim(),
     handshakeRequired:
-      requestPolicy?.gates?.handoff_required === true ||
-      requestPolicy?.gates?.["core14.adapter_present.enforce_handshake"] === true,
+      requestPolicy?.gates?.handoff_required === true,
     actorSubject: String(actorAuthority.subject || requestActor.subject || governedAuthority.subject || "").trim(),
     actorClientId: String(actorAuthority.client_id || requestActor.clientId || governedAuthority.client_id || "").trim(),
     authorityBasis: String(actorAuthority.authority_basis || requestActor.authorityBasis || governedAuthority.authority_basis || "").trim(),

@@ -62,7 +62,7 @@ cleanup_secure_fixtures() {
   kubectl delete -k "${REPO_ROOT}/platform/tests/phase4-secure-mtls" --ignore-not-found >/dev/null 2>&1 || true
   kubectl delete -k "${REPO_ROOT}/platform/tests/provider-discovery-mtls" --ignore-not-found >/dev/null 2>&1 || true
   kubectl -n "${NAMESPACE}" delete secret \
-    epydios-controller-mtls-client \
+    epydios-provider-client-tls \
     epydios-provider-ca \
     mtls-provider-server-tls \
     mtls-bearer-client-token \

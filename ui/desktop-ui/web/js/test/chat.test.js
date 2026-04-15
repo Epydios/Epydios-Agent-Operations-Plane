@@ -225,7 +225,7 @@ test("chat view surfaces governed action proposals and linked run detail from th
                         runId: "run-governed-chat-1",
                         status: "COMPLETED",
                         policyDecision: "DEFER",
-                        selectedPolicyProvider: "aimxs-full",
+                        selectedPolicyProvider: "premium-provider-local",
                         policyGrantTokenPresent: false,
                         policyResponse: {
                           decision: "DEFER",
@@ -295,7 +295,7 @@ test("chat view surfaces governed action proposals and linked run detail from th
                       runId: "run-governed-chat-1",
                       runStatus: "COMPLETED",
                       policyDecision: "DEFER",
-                      selectedPolicyProvider: "aimxs-full",
+                      selectedPolicyProvider: "premium-provider-local",
                       operatorApprovalRequired: false
                     }
                   }
@@ -312,7 +312,7 @@ test("chat view surfaces governed action proposals and linked run detail from th
   assert.match(ui.chatContent.innerHTML, /Paper Trade Request: AAPL/);
   assert.match(ui.chatContent.innerHTML, /BUY 25 AAPL in paper account paper-main/);
   assert.match(ui.chatContent.innerHTML, /grant\.trading\.supervisor/);
-  assert.match(ui.chatContent.innerHTML, /aimxs-full/);
+  assert.match(ui.chatContent.innerHTML, /provider-local/);
   assert.match(ui.chatContent.innerHTML, /Open Run Detail/);
   assert.match(ui.chatContent.innerHTML, /Run And Artifact Context/);
   assert.match(ui.chatContent.innerHTML, /Execution Proof/);
@@ -574,7 +574,7 @@ test("latest policy outcome only reflects the newest turn", () => {
                   type: "governed_action_request",
                   requestLabel: "Delete Production Config",
                   policyDecision: "DENY",
-                  selectedPolicyProvider: "aimxs-full"
+                  selectedPolicyProvider: "premium-provider-local"
                 }
               ]
             }

@@ -86,7 +86,7 @@ test("session client preserves governed action proposal richness and linked run 
               runId: "run-governed-1",
               status: "COMPLETED",
               policyDecision: "DEFER",
-              selectedPolicyProvider: "aimxs-full",
+              selectedPolicyProvider: "premium-provider-local",
               policyResponse: {
                 decision: "DEFER"
               }
@@ -148,7 +148,7 @@ test("session client preserves governed action proposal richness and linked run 
             runId: "run-governed-1",
             runStatus: "COMPLETED",
             policyDecision: "DEFER",
-            selectedPolicyProvider: "aimxs-full",
+            selectedPolicyProvider: "premium-provider-local",
             operatorApprovalRequired: false
           }
         }
@@ -164,7 +164,7 @@ test("session client preserves governed action proposal richness and linked run 
   assert.deepEqual(proposal.requiredGrants, ["grant.trading.supervisor"]);
   assert.equal(proposal.runId, "run-governed-1");
   assert.equal(proposal.policyDecision, "DEFER");
-  assert.equal(proposal.selectedPolicyProvider, "aimxs-full");
+  assert.equal(proposal.selectedPolicyProvider, "premium-provider-local");
   assert.equal(proposal.governedRun.runId, "run-governed-1");
   assert.equal(proposal.decision, "AUTO");
   assert.equal(proposal.status, "DEFERRED");

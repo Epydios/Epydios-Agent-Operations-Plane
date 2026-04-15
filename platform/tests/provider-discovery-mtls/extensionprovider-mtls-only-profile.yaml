@@ -12,7 +12,7 @@ spec:
   auth:
     mode: MTLS
     clientTLSSecretRef:
-      name: epydios-controller-mtls-client
+      name: epydios-provider-client-tls
     caSecretRef:
       name: epydios-provider-ca
   selection:

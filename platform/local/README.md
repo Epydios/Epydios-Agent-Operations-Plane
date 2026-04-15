@@ -676,7 +676,7 @@ Detailed premium packaging evidence handling is maintained outside the public OS
 The public verifier remains only as a boundary placeholder so public gate wiring does not imply that the OSS repo carries private release-packaging evidence.
 
 ```bash
-./platform/local/bin/verify-m10-aimxs-full-packaging.sh
+./platform/local/bin/verify-m10-provider-route-packaging.sh
 ```
 
 No premium input or evidence-path details are published in the OSS repo.
@@ -1011,7 +1011,7 @@ WITH_SYSTEM_SMOKETEST=1 ./platform/local/bin/bootstrap-k3d.sh
 - `platform/local/bin/verify-m10-deployment-modes.sh` validates the public `oss-only` mode pack and keeps premium modes outside the OSS verification promise
 - `platform/local/bin/verify-m10-no-egress-local-aimxs.sh` is a public placeholder noting that premium no-egress verification is maintained outside the public repo
 - `platform/local/bin/verify-m10-entitlement-deny.sh` is a public placeholder noting that premium entitlement verification is maintained outside the public repo
-- `platform/local/bin/verify-m10-aimxs-full-packaging.sh` remains a legacy-named public placeholder and should not be used to infer that premium release evidence is published in OSS
+- `platform/local/bin/verify-m10-provider-route-packaging.sh` is a public placeholder and should not be used to infer that premium release evidence is published in OSS
 - `platform/local/bin/verify-m13-openfang-adapter.sh` validates Openfang adapter guardrails (Linux-first + sandbox profile + restricted-host blocked default + secure template posture)
 - `platform/local/bin/verify-m13-openfang-runtime-integration.sh` validates runtime observe->actuate->verify and runtime->adapter->upstream contract flow + restricted-host deny assertion
 - `platform/local/bin/verify-m13-runtime-approvals.sh` validates runtime approval queue/decision API semantics (`PENDING|APPROVED|DENIED|EXPIRED`, approve/deny transitions, expired request rejection)

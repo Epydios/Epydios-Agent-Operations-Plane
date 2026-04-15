@@ -315,7 +315,7 @@ cleanup_secure_fixture_resources() {
   kubectl delete -k "${REPO_ROOT}/platform/tests/phase4-secure-mtls" --ignore-not-found >/dev/null 2>&1 || true
   kubectl delete -k "${REPO_ROOT}/platform/tests/provider-discovery-mtls" --ignore-not-found >/dev/null 2>&1 || true
   kubectl -n epydios-system delete secret \
-    epydios-controller-mtls-client \
+    epydios-provider-client-tls \
     epydios-provider-ca \
     mtls-provider-server-tls \
     mtls-bearer-client-token \
@@ -655,7 +655,7 @@ main() {
 
   if [ "${RUN_M10_PROVIDER_PACKAGING_BOUNDARY}" = "1" ]; then
     echo "Running M10.7 gate (premium-provider packaging evidence placeholder)..."
-    "${REPO_ROOT}/platform/local/bin/verify-m10-aimxs-full-packaging.sh"
+    "${REPO_ROOT}/platform/local/bin/verify-m10-provider-route-packaging.sh"
   fi
 
   if [ "${RUN_ROTATION_CHECK}" = "1" ]; then

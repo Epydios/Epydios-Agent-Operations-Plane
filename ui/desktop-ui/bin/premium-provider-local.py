@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Thin public provider-route loader/proxy kept at a legacy path.
+"""Thin public provider-route loader/proxy.
 
 The OSS repo does not ship separately delivered premium provider logic. This
 process only discovers a separately delivered provider endpoint and forwards
@@ -59,14 +59,14 @@ def default_premium_root() -> Path:
 
 
 def default_provider_install_root() -> Path:
-    explicit = read_env("EPYDIOS_PREMIUM_PROVIDER_INSTALL_ROOT", "EPYDIOS_AIMXS_INSTALL_ROOT")
+    explicit = read_env("EPYDIOS_PREMIUM_PROVIDER_INSTALL_ROOT")
     if explicit:
         return Path(explicit).expanduser().resolve()
     return default_premium_root() / "provider-route"
 
 
 def resolve_provider_payload_root() -> Path:
-    explicit = read_env("EPYDIOS_PREMIUM_PROVIDER_EXTRACTED_ROOT", "EPYDIOS_AIMXS_EXTRACTED_ROOT")
+    explicit = read_env("EPYDIOS_PREMIUM_PROVIDER_EXTRACTED_ROOT")
     if explicit:
         candidate = Path(explicit).expanduser().resolve()
     else:
@@ -117,14 +117,12 @@ def _manifest_config(manifest_path: Path) -> EndpointConfig:
 
 
 def load_endpoint_config() -> EndpointConfig:
-    base_url = read_env("EPYDIOS_PREMIUM_PROVIDER_REMOTE_BASE_URL", "EPYDIOS_AIMXS_REMOTE_BASE_URL")
+    base_url = read_env("EPYDIOS_PREMIUM_PROVIDER_REMOTE_BASE_URL")
     if base_url:
         return EndpointConfig(
             base_url=base_url.rstrip("/"),
-            auth_token=read_env("EPYDIOS_PREMIUM_PROVIDER_REMOTE_AUTH_TOKEN", "EPYDIOS_AIMXS_REMOTE_AUTH_TOKEN"),
-            timeout_seconds=_normalized_timeout_ms(
-                read_env("EPYDIOS_PREMIUM_PROVIDER_REMOTE_TIMEOUT_MS", "EPYDIOS_AIMXS_REMOTE_TIMEOUT_MS")
-            ),
+            auth_token=read_env("EPYDIOS_PREMIUM_PROVIDER_REMOTE_AUTH_TOKEN"),
+            timeout_seconds=_normalized_timeout_ms(read_env("EPYDIOS_PREMIUM_PROVIDER_REMOTE_TIMEOUT_MS")),
             source="env:EPYDIOS_PREMIUM_PROVIDER_REMOTE_BASE_URL",
         )
 
@@ -274,12 +272,12 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run the public provider-route loader/proxy.")
     parser.add_argument(
         "--host",
-        default=read_env("PREMIUM_PROVIDER_LOCAL_HOST", "AIMXS_LOCAL_FULL_HOST") or "127.0.0.1",
+        default=read_env("PREMIUM_PROVIDER_LOCAL_HOST") or "127.0.0.1",
     )
     parser.add_argument(
         "--port",
         type=int,
-        default=int(read_env("PREMIUM_PROVIDER_LOCAL_PORT", "AIMXS_LOCAL_FULL_PORT") or "4271"),
+        default=int(read_env("PREMIUM_PROVIDER_LOCAL_PORT") or "4271"),
     )
     return parser.parse_args()
 

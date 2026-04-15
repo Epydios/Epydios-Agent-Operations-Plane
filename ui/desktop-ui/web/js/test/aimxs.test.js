@@ -18,7 +18,7 @@ import { renderAimxsSettingsMetric, renderAimxsStatusMetric } from "../aimxs/set
 test("aimxs state keeps only the allowed mode set", () => {
   const normalized = normalizeAimxsOverride(
     {
-      mode: "aimxs-https",
+      mode: "provider-https",
       endpointRef: "ref://projects/demo/providers/aimxs/https-endpoint"
     },
     {
@@ -27,8 +27,8 @@ test("aimxs state keeps only the allowed mode set", () => {
   );
   const legacy = normalizeAimxsOverride({ mode: "unexpected-mode" }, {});
 
-  assert.equal(AIMXS_OVERRIDE_KEY, "epydios.agentops.desktop.aimxs.override.v1");
-  assert.equal(normalized.mode, "aimxs-https");
+  assert.equal(AIMXS_OVERRIDE_KEY, "epydios.agentops.desktop.provider-route.override.v1");
+  assert.equal(normalized.mode, "provider-https");
   assert.equal(legacy.mode, "oss-only");
   assert.equal(normalized.paymentEntitled, true);
 });
@@ -71,13 +71,13 @@ test("baseline mode renders baseline labels while keeping internal ids", () => {
 });
 
 test("aimxs full mode stays valid without secure refs", () => {
-  const normalized = normalizeAimxsOverride({ mode: "aimxs-full" }, {});
-  const validation = validateAimxsOverride({ mode: "aimxs-full" }, { paymentEntitled: false });
+  const normalized = normalizeAimxsOverride({ mode: "provider-local" }, {});
+  const validation = validateAimxsOverride({ mode: "provider-local" }, { paymentEntitled: false });
 
-  assert.equal(normalized.mode, "aimxs-full");
+  assert.equal(normalized.mode, "provider-local");
   assert.equal(validation.valid, true);
   assert.match(validation.warnings.join(" "), /does not require https/i);
-  assert.deepEqual(resolveAimxsContractProfile({ mode: "aimxs-full" }), {
+  assert.deepEqual(resolveAimxsContractProfile({ mode: "provider-local" }), {
     mode: "provider-local",
     providerId: "premium-provider-local",
     authMode: "None",
@@ -92,7 +92,7 @@ test("aimxs full mode stays valid without secure refs", () => {
 test("aimxs https mode requires entitlement and secure refs", () => {
   const validation = validateAimxsOverride(
     {
-      mode: "aimxs-https",
+      mode: "provider-https",
       endpointRef: "https://example.com",
       bearerTokenRef: "raw-token",
       clientTlsCertRef: "ref://projects/demo/providers/aimxs/client-tls-cert",
@@ -130,7 +130,7 @@ test("aimxs full rendering shows local mode and no secure ref collection", () =>
   const settings = {
     aimxs: {
       paymentEntitled: false,
-      mode: "aimxs-full",
+      mode: "provider-local",
       state: "ready",
       detail: "1/1 routed providers are ready.",
       providerIds: ["premium-provider-local"],
@@ -172,8 +172,8 @@ test("aimxs full rendering shows local mode and no secure ref collection", () =>
   const status = renderAimxsStatusMetric(settings, () => "chip chip-ok");
   const refs = collectAimxsSecureRefItems(settings);
 
-  assert.match(metric, /premium-provider-local/);
-  assert.match(metric, /clusterMode=provider-local/);
+  assert.match(metric, /providerId=local-provider/);
+  assert.match(metric, /clusterMode=local-provider/);
   assert.match(metric, /clusterSecrets=not required for local-provider/);
   assert.match(metric, /Activate Provider Route/);
   assert.match(status, /Provider Route Status/);
@@ -188,7 +188,7 @@ test("aimxs https rendering still surfaces secure refs", () => {
   const settings = {
     aimxs: {
       paymentEntitled: true,
-      mode: "aimxs-https",
+      mode: "provider-https",
       state: "ready",
       detail: "1/1 routed providers are ready.",
       providerIds: ["premium-policy-primary"],
@@ -238,8 +238,8 @@ test("aimxs https rendering still surfaces secure refs", () => {
   });
   const refs = collectAimxsSecureRefItems(settings);
 
-  assert.match(metric, /provider-https/);
-  assert.match(metric, /clusterMode=provider-https/);
+  assert.match(metric, /secure-provider/);
+  assert.match(metric, /clusterMode=secure-provider/);
   assert.equal(refs.length, 5);
   assert.deepEqual(resolveAimxsContractProfile(settings.aimxs), {
     mode: "provider-https",
@@ -257,7 +257,7 @@ test("aimxs settings disables activation controls when helper is unavailable", (
   const settings = {
     aimxs: {
       paymentEntitled: true,
-      mode: "aimxs-full",
+      mode: "provider-local",
       state: "ready",
       providerIds: ["premium-policy-primary"],
       activation: {
@@ -289,12 +289,12 @@ test("aimxs overrides apply without mutating the base choice object", () => {
     }
   };
   const next = applyAimxsOverrideToChoices(baseChoices, {
-    mode: "aimxs-https",
+    mode: "provider-https",
     endpointRef: "ref://projects/demo/providers/aimxs/https-endpoint"
   });
 
   assert.equal(baseChoices.aimxs.mode, "oss-only");
-  assert.equal(next.aimxs.mode, "aimxs-https");
+  assert.equal(next.aimxs.mode, "provider-https");
 });
 
 test("aimxs activation snapshot normalizes helper state and defaults", () => {

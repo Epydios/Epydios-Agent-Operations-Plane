@@ -209,7 +209,7 @@ function buildTrustBoard(settings, health) {
   const contractProfile = resolveAimxsContractProfile(aimxs);
   const warnings = Array.isArray(activation.warnings) ? activation.warnings : [];
   const secureRefs =
-    normalizeString(aimxs.mode).toLowerCase() === "aimxs-https"
+    normalizeString(aimxs.mode).toLowerCase() === "provider-https"
       ? [aimxs.endpointRef, aimxs.bearerTokenRef, aimxs.clientTlsCertRef, aimxs.clientTlsKeyRef, aimxs.caCertRef]
       : [];
   const gatewayRefs = [integrations.gatewayTokenRef, integrations.gatewayMtlsCertRef, integrations.gatewayMtlsKeyRef];
@@ -218,7 +218,7 @@ function buildTrustBoard(settings, health) {
   const secureSecretMissingCount = Math.max(0, secretEntries.length - secureSecretPresentCount);
   const secureRefConfiguredCount = countConfigured(secureRefs);
   const gatewayRefConfiguredCount = countConfigured(gatewayRefs);
-  const secureMode = normalizeString(activation.activeMode || aimxs.mode).toLowerCase() === "aimxs-https";
+  const secureMode = normalizeString(activation.activeMode || aimxs.mode).toLowerCase() === "provider-https";
   const trustWarning = secureMode && (secureRefConfiguredCount < secureRefs.length || secureSecretMissingCount > 0);
 
   return {
@@ -286,7 +286,7 @@ function buildIngressEgressBoard(settings, health, runs, runtimeWorkerCapabiliti
     (Array.isArray(integrations.providerContracts) ? integrations.providerContracts : []).find((item) => item?.selected)?.transport,
     "-"
   );
-  const secureMode = normalizeString(activation.activeMode || aimxs.mode).toLowerCase() === "aimxs-https";
+  const secureMode = normalizeString(activation.activeMode || aimxs.mode).toLowerCase() === "provider-https";
   const warningCount = Array.isArray(activation.warnings) ? activation.warnings.length : 0;
 
   return {

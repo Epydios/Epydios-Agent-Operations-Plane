@@ -57,10 +57,10 @@ test("developerops page renders bounded debug, raw payload, and contract boards"
         count: 4
       },
       aimxs: {
-        mode: "aimxs-full",
+        mode: "provider-local",
         activation: {
-          activeMode: "aimxs-full",
-          selectedProviderId: "aimxs-policy-primary",
+          activeMode: "provider-local",
+          selectedProviderId: "premium-policy-primary",
           state: "active"
         }
       }
@@ -74,7 +74,7 @@ test("developerops page renders bounded debug, raw payload, and contract boards"
           projectId: "project-core"
         },
         action: { target: "paper-broker-order" },
-        context: { governed_action: { risk_tier: "high" } },
+        context: { governed_action: { review_tier: "high" } },
         task: { requestLabel: "Paper Trade Request: AAPL", demoProfile: "finance_paper_trade" },
         resource: { kind: "broker-order", id: "paper-order-aapl" }
       }
@@ -136,7 +136,7 @@ test("developerops page renders bounded debug, raw payload, and contract boards"
   assert.match(ui.developerOpsContent.innerHTML, /cmd-1234abcd/);
   assert.match(ui.developerOpsContent.innerHTML, /runtime_context_identity/);
   assert.match(ui.developerOpsContent.innerHTML, /responses_api/);
-  assert.match(ui.developerOpsContent.innerHTML, /aimxs-policy-primary/);
+  assert.match(ui.developerOpsContent.innerHTML, /premium-policy-primary/);
   assert.match(ui.developerOpsContent.innerHTML, /interactive_sandbox_only/);
   assert.match(ui.developerOpsContent.innerHTML, /paper-broker-order/);
 });

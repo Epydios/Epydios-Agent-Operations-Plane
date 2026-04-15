@@ -62,11 +62,11 @@ test("governed action run payload uses the shared contract on a runtime-compatib
 
   assert.equal(payload.meta.actor.type, "operator_ui");
   assert.equal(payload.meta.actor.id, "user-demo");
-  assert.equal(payload.context.governed_action.contract_id, "epydios.governed-action.v1");
-  assert.equal(payload.context.governed_action.origin_surface, "home.governed_action_request");
-  assert.equal(payload.context.governed_action.finance_order.symbol, "AAPL");
-  assert.equal(payload.context.governed_action.demo_governance.persona.subjectId, "demo.operator.local");
-  assert.equal(payload.context.policy_stratification.boundary_class, "external_actuator");
+  assert.equal(payload.context.request.contractId, "epydios.governed-request.v1");
+  assert.equal(payload.context.request.originSurface, "home.governed_action_request");
+  assert.equal(payload.context.governed_action.request_summary, "BUY 25 AAPL in paper account paper-main");
+  assert.equal(payload.context.demo_governance.persona.subjectId, "demo.operator.local");
+  assert.equal(payload.context.request.workflowKind, "governed_request");
   assert.equal(payload.task.demoProfile, "finance_paper_trade");
 });
 

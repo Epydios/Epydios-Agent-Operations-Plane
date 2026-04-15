@@ -84,7 +84,7 @@ export function renderAimxsSettingsMetric(
     activation.selectedProviderId || activation.selectedProviderName || "-"
   );
   const activationSecretsSummary =
-    aimxsMode === "aimxs-full"
+    aimxsMode === "provider-local"
       ? "clusterSecrets=not required for local-provider"
       : aimxsMode === "oss-only"
         ? "clusterSecrets=not required in baseline"
@@ -109,8 +109,8 @@ export function renderAimxsSettingsMetric(
           <span class="label">Deployment Mode</span>
           <select id="settings-aimxs-mode" class="filter-input" data-settings-aimxs-field="mode">
             <option value="oss-only" ${typeof selectedAttr === "function" ? selectedAttr(aimxsMode, "oss-only") : ""}>baseline</option>
-            <option value="aimxs-full" ${typeof selectedAttr === "function" ? selectedAttr(aimxsMode, "aimxs-full") : ""}>local-provider</option>
-            <option value="aimxs-https" ${typeof selectedAttr === "function" ? selectedAttr(aimxsMode, "aimxs-https") : ""}>secure-provider</option>
+            <option value="provider-local" ${typeof selectedAttr === "function" ? selectedAttr(aimxsMode, "provider-local") : ""}>local-provider</option>
+            <option value="provider-https" ${typeof selectedAttr === "function" ? selectedAttr(aimxsMode, "provider-https") : ""}>secure-provider</option>
           </select>
         </label>
         <label class="field">

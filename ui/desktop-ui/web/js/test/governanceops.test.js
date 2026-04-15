@@ -8,14 +8,14 @@ test("governanceops page renders runtime approvals plus identity admin proposal 
   renderGovernanceOpsPage(ui, {
     settings: {
       aimxs: {
-        mode: "aimxs-full",
+        mode: "provider-local",
         state: "ready",
         activation: {
           available: true,
           state: "active",
-          activeMode: "aimxs-full",
-          selectedProviderId: "aimxs-full",
-          selectedProviderName: "aimxs-full",
+          activeMode: "provider-local",
+          selectedProviderId: "premium-provider-local",
+          selectedProviderName: "premium-provider-local",
           selectedProviderReady: true
         }
       },
@@ -127,7 +127,7 @@ test("governanceops page renders runtime approvals plus identity admin proposal 
           environment: "staging",
           status: "POLICY_EVALUATED",
           policyDecision: "DEFER",
-          selectedPolicyProvider: "aimxs-policy-primary",
+          selectedPolicyProvider: "premium-policy-primary",
           policyGrantTokenPresent: false,
           evidenceBundleResponse: { status: "pending" },
           evidenceRecordResponse: { status: "queued" }
@@ -138,7 +138,7 @@ test("governanceops page renders runtime approvals plus identity admin proposal 
           environment: "staging",
           status: "COMPLETED",
           policyDecision: "ALLOW",
-          selectedPolicyProvider: "aimxs-policy-primary",
+          selectedPolicyProvider: "premium-policy-primary",
           policyGrantTokenPresent: true,
           evidenceBundleResponse: { status: "sealed" },
           evidenceRecordResponse: { status: "recorded" }
@@ -209,7 +209,7 @@ test("governanceops page renders runtime approvals plus identity admin proposal 
       authorityRef: "codex",
       authorityBasis: "bearer_token_jwt",
       scopeRef: "tenant-demo / project-core",
-      providerRef: "aimxs-policy-primary",
+      providerRef: "premium-policy-primary",
       routeRef: "managed_codex_worker",
       boundaryRef: "agentops_gateway",
       grantRef: "policy_grant_token",
@@ -283,7 +283,7 @@ test("governanceops page renders runtime approvals plus identity admin proposal 
   assert.match(ui.governanceOpsContent.innerHTML, /SettingsOps defines the connector contract, and RuntimeOps keeps the linked run continuity and proof handoff on the same governed path/);
   assert.match(ui.governanceOpsContent.innerHTML, /Open SettingsOps/);
   assert.match(ui.governanceOpsContent.innerHTML, /Open RuntimeOps/);
-  assert.match(ui.governanceOpsContent.innerHTML, /aimxs-policy-primary/);
+  assert.match(ui.governanceOpsContent.innerHTML, /premium-policy-primary/);
   assert.match(ui.governanceOpsContent.innerHTML, /recorded/);
   assert.match(ui.governanceOpsContent.innerHTML, /grant token/);
   assert.match(ui.governanceOpsContent.innerHTML, /sealed/);
@@ -418,11 +418,11 @@ test("governanceops admin review renders a routed platform proposal without iden
         requestedAction: "promote staging-full-gate-20260316T200000Z.log",
         subjectId: "staging-full-gate-20260316T200000Z.log",
         subjectLabel: "release",
-        targetScope: "staging / aimxs-full",
+        targetScope: "staging / provider-local",
         targetLabel: "target",
         status: "routed",
         reason: "Promote the verified staging gate after bounded readiness preview.",
-        summary: "Promote staging-full-gate-20260316T200000Z.log to staging / aimxs-full",
+        summary: "Promote staging-full-gate-20260316T200000Z.log to staging / provider-local",
         simulationSummary: "Preview only. This promotion proposal requires GovernanceOps approval before any live platform change can execute.",
         updatedAt: "2026-03-16T20:21:00Z",
         routedAt: "2026-03-16T20:22:00Z"
@@ -437,7 +437,7 @@ test("governanceops admin review renders a routed platform proposal without iden
   assert.match(ui.governanceOpsContent.innerHTML, /owner=platformops/);
   assert.match(ui.governanceOpsContent.innerHTML, /platformops-admin/);
   assert.match(ui.governanceOpsContent.innerHTML, /staging-full-gate-20260316T200000Z\.log/);
-  assert.match(ui.governanceOpsContent.innerHTML, /staging \/ aimxs-full/);
+  assert.match(ui.governanceOpsContent.innerHTML, /staging \/ provider-local/);
   assert.match(ui.governanceOpsContent.innerHTML, /Open PlatformOps/);
   assert.match(ui.governanceOpsContent.innerHTML, /data-governanceops-open-admin-owner-domain="platformops"/);
   assert.doesNotMatch(ui.governanceOpsContent.innerHTML, /data-governanceops-routing-admin-change-id="platform-change-queue-001"/);
@@ -506,7 +506,7 @@ test("governanceops admin review renders a routed policy proposal without identi
         targetLabel: "scope",
         status: "routed",
         reason: "Route a bounded policy activation preview into governance.",
-        summary: "Activate finance_supervisor_review for tenant-demo / project-finance @ aimxs-policy-primary",
+        summary: "Activate finance_supervisor_review for tenant-demo / project-finance @ premium-policy-primary",
         simulationSummary: "Preview only. This activate proposal requires GovernanceOps approval before any live policy-pack change can execute.",
         updatedAt: "2026-03-16T23:20:00Z",
         routedAt: "2026-03-16T23:21:00Z"
@@ -639,7 +639,7 @@ test("governanceops page renders selected recorded review state and operational 
           requestId: "req-reviewed-ops-001",
           status: "COMPLETED",
           policyDecision: "ALLOW",
-          selectedPolicyProvider: "aimxs-policy-primary",
+          selectedPolicyProvider: "premium-policy-primary",
           policyGrantTokenPresent: true,
           evidenceBundleResponse: { status: "sealed" },
           evidenceRecordResponse: { status: "recorded" }

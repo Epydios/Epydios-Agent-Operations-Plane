@@ -13,10 +13,10 @@ export function displayAimxsModeLabel(value) {
   if (normalized === "oss-only") {
     return "baseline";
   }
-  if (normalized === "aimxs-full") {
+  if (normalized === "provider-local") {
     return "local-provider";
   }
-  if (normalized === "aimxs-https") {
+  if (normalized === "provider-https") {
     return "secure-provider";
   }
   return raw || "-";
@@ -28,8 +28,11 @@ export function displayPolicyProviderLabel(value) {
   if (normalized === "oss-policy-opa" || normalized === "oss-only") {
     return "baseline";
   }
-  if (normalized.includes("aimxs")) {
-    return "routed-provider";
+  if (normalized === "premium-provider-local") {
+    return "local-provider";
+  }
+  if (normalized === "premium-policy-primary") {
+    return "secure-provider";
   }
   return raw || "-";
 }

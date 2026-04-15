@@ -11,7 +11,7 @@ test("auditops page restores visible event, trace, and investigation clusters", 
     filters: {
       tenant: "tenant-demo",
       project: "project-core",
-      providerId: "aimxs-policy-primary",
+      providerId: "premium-policy-primary",
       timeRange: "24h"
     },
     audit: {
@@ -23,7 +23,7 @@ test("auditops page restores visible event, trace, and investigation clusters", 
           event: "policy.decision.denied",
           tenantId: "tenant-demo",
           projectId: "project-core",
-          providerId: "aimxs-policy-primary",
+          providerId: "premium-policy-primary",
           decision: "DENY"
         },
         {
@@ -31,7 +31,7 @@ test("auditops page restores visible event, trace, and investigation clusters", 
           event: "policy.decision.allowed",
           tenantId: "tenant-demo",
           projectId: "project-core",
-          providerId: "aimxs-policy-primary",
+          providerId: "premium-policy-primary",
           decision: "ALLOW"
         },
         {
@@ -74,9 +74,9 @@ test("auditops page restores visible event, trace, and investigation clusters", 
         status: "rolled_back",
         requestedAction: "probe gateway_path tasks",
         subjectId: "gateway_path",
-        targetScope: "local / aimxs-policy-primary",
+        targetScope: "local / premium-policy-primary",
         reason: "Trace admin lifecycle.",
-        summary: "Probe Runtime Tasks within local / aimxs-policy-primary.",
+        summary: "Probe Runtime Tasks within local / premium-policy-primary.",
         simulationSummary: "Preview only before live probe execution.",
         createdAt: "2026-03-15T01:00:00Z",
         simulatedAt: "2026-03-15T01:01:00Z",
@@ -165,7 +165,7 @@ test("auditops page restores visible event, trace, and investigation clusters", 
       authorityRef: "codex",
       authorityBasis: "bearer_token_jwt",
       scopeRef: "tenant-demo / project-core",
-      providerRef: "aimxs-policy-primary",
+      providerRef: "premium-policy-primary",
       routeRef: "managed_codex_worker",
       boundaryRef: "agentops_gateway",
       grantRef: "approval-20260315-001",
@@ -224,7 +224,7 @@ test("auditops page restores visible event, trace, and investigation clusters", 
   assert.match(ui.auditOpsContent.innerHTML, /demo\.operator/);
   assert.match(ui.auditOpsContent.innerHTML, /tenant-demo/);
   assert.match(ui.auditOpsContent.innerHTML, /project-core/);
-  assert.match(ui.auditOpsContent.innerHTML, /aimxs-policy-primary/);
+  assert.match(ui.auditOpsContent.innerHTML, /premium-policy-primary/);
   assert.match(ui.auditOpsContent.innerHTML, /policy\.decision\.denied/);
   assert.match(ui.auditOpsContent.innerHTML, /run-20260315-001/);
   assert.match(ui.auditOpsContent.innerHTML, /approval-20260315-001/);

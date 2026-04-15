@@ -27,7 +27,7 @@ test("settings view persists raw response and native timeline disclosure shells"
         ]
       },
       aimxs: {
-        mode: "aimxs-full",
+        mode: "provider-local",
         endpointRef: "ref://projects/{projectId}/providers/aimxs/https-endpoint",
         bearerTokenRef: "ref://projects/{projectId}/providers/aimxs/bearer-token",
         clientTlsCertRef: "ref://projects/{projectId}/providers/aimxs/client-tls-cert",
@@ -38,9 +38,9 @@ test("settings view persists raw response and native timeline disclosure shells"
           state: "active",
           message: "Provider-route activation switched the live policy-provider path to local-provider using the launcher-side provider bridge.",
           namespace: "epydios-system",
-          activeMode: "aimxs-full",
-          selectedProviderId: "aimxs-full",
-          selectedProviderName: "aimxs-full",
+          activeMode: "provider-local",
+          selectedProviderId: "premium-provider-local",
+          selectedProviderName: "premium-provider-local",
           selectedProviderReady: true,
           selectedProviderProbed: true,
           capabilities: [
@@ -50,9 +50,9 @@ test("settings view persists raw response and native timeline disclosure shells"
           ],
           enabledProviders: [
             {
-              name: "aimxs-full",
-              providerId: "aimxs-full",
-              mode: "aimxs-full",
+              name: "premium-provider-local",
+              providerId: "premium-provider-local",
+              mode: "provider-local",
               enabled: true,
               ready: true,
               probed: true,
@@ -61,8 +61,8 @@ test("settings view persists raw response and native timeline disclosure shells"
             }
           ],
           secrets: {
-            bearerTokenSecret: { name: "aimxs-policy-token", present: false },
-            clientTlsSecret: { name: "epydios-controller-mtls-client", present: false },
+            bearerTokenSecret: { name: "policy-provider-token", present: false },
+            clientTlsSecret: { name: "epydios-provider-client-tls", present: false },
             caSecret: { name: "epydios-provider-ca", present: false }
           }
         }
@@ -188,8 +188,8 @@ test("settings view persists raw response and native timeline disclosure shells"
   assert.match(ui.settingsContent.innerHTML, /Secure Local Credential Capture/);
   assert.match(ui.settingsContent.innerHTML, /data-settings-local-ref-action="save"/);
   assert.match(ui.settingsContent.innerHTML, /ref:\/\/projects\/\{projectId\}\/providers\/openai\/api-key/);
-  assert.match(ui.settingsContent.innerHTML, /aimxs-full/);
-  assert.match(ui.settingsContent.innerHTML, /aimxs-full/);
+  assert.match(ui.settingsContent.innerHTML, /provider-local/);
+  assert.match(ui.settingsContent.innerHTML, /provider-local/);
   assert.match(ui.settingsContent.innerHTML, /Provider CA Ref/);
   assert.match(ui.settingsContent.innerHTML, /Activate Provider Route/);
   assert.match(ui.settingsContent.innerHTML, /Refresh Provider Status/);

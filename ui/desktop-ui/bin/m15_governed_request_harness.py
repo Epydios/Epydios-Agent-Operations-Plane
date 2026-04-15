@@ -516,7 +516,7 @@ class HarnessHandler(BaseHTTPRequestHandler):
         if path == "/__agentops/secure-refs":
             self._send_json({"message": "helper unavailable"}, HTTPStatus.SERVICE_UNAVAILABLE)
             return True
-        if path == "/__agentops/aimxs/activation":
+        if path == "/__agentops/provider-route/activation":
             self._send_json({"message": "helper unavailable"}, HTTPStatus.SERVICE_UNAVAILABLE)
             return True
         return False

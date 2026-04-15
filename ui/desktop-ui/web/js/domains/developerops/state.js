@@ -86,7 +86,7 @@ function summarizeGovernedActionPreview(preview) {
     requestId: normalizeString(payload?.meta?.requestId, "-"),
     target: normalizeString(payload?.action?.target, "-"),
     requestLabel: normalizeString(task.requestLabel, "-"),
-    riskTier: normalizeString(payload?.context?.governed_action?.risk_tier, "-"),
+    riskTier: normalizeString(payload?.context?.review_signals?.review_tier, "-"),
     issueCount: issues.totalCount,
     errorCount: issues.errorCount,
     tone: issues.tone,

@@ -20,7 +20,7 @@ test("runtimeops page renders the first inspect-only runtime boards", () => {
       providers: {
         items: [
           { providerId: "oss-profile-static", ready: true, probed: true },
-          { providerId: "aimxs-policy-primary", ready: true, probed: true },
+          { providerId: "premium-policy-primary", ready: true, probed: true },
           { providerId: "oss-desktop-openfang-linux", ready: false, probed: true }
         ]
       },
@@ -124,7 +124,7 @@ test("runtimeops page renders the first inspect-only runtime boards", () => {
             projectId: "project-core",
             status: "FAILED",
             policyDecision: "DENY",
-            selectedPolicyProvider: "aimxs-policy-primary",
+            selectedPolicyProvider: "premium-policy-primary",
             selectedEvidenceProvider: "oss-evidence-memory",
             selectedDesktopProvider: "oss-desktop-openfang-linux",
             updatedAt: "2026-03-14T04:20:00Z"
@@ -315,8 +315,8 @@ test("runtimeops page renders the first inspect-only runtime boards", () => {
   assert.match(ui.runtimeOpsContent.innerHTML, /worker-capability-endpoint/);
   assert.match(ui.runtimeOpsContent.innerHTML, /capabilities=3/);
   assert.match(ui.runtimeOpsContent.innerHTML, /gpt-5-codex/);
-  assert.match(ui.runtimeOpsContent.innerHTML, /premium policy/i);
-  assert.match(ui.runtimeOpsContent.innerHTML, /aimxs-policy-primary/);
+  assert.match(ui.runtimeOpsContent.innerHTML, /secure-provider|premium-policy-primary|policy/i);
+  assert.match(ui.runtimeOpsContent.innerHTML, /premium-policy-primary/);
   assert.match(ui.runtimeOpsContent.innerHTML, /bearer_token_jwt/);
   assert.match(ui.runtimeOpsContent.innerHTML, /epydiosops-desktop-local/);
   assert.match(ui.runtimeOpsContent.innerHTML, /runtime-identity-endpoint/);

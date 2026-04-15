@@ -93,7 +93,7 @@ This directory contains CI entrypoint scripts invoked by GitHub Actions.
   - M10.7 premium-provider packaging evidence verification:
     - `RUN_M10_CUSTOMER_HOSTED_PACKAGING=1` in full mode (required)
     - `RUN_M10_CUSTOMER_HOSTED_PACKAGING=0` default in fast mode
-    - runs `platform/local/bin/verify-m10-aimxs-full-packaging.sh`
+    - runs `platform/local/bin/verify-m10-provider-route-packaging.sh`
     - public OSS repo does not publish premium packaging evidence details; the verifier name remains only as a compatibility placeholder
   - M13 desktop execution-plane contract + deny-path verifier:
     - `RUN_M13_DESKTOP_PROVIDER=1` in full mode (required)

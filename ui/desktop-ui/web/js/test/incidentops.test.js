@@ -97,7 +97,7 @@ test("incidentops page restores visible continuation and closure clusters", () =
       authorityRef: "codex",
       authorityBasis: "bearer_token_jwt",
       scopeRef: "tenant-demo / project-core",
-      providerRef: "aimxs-policy-primary",
+      providerRef: "premium-policy-primary",
       routeRef: "managed_codex_worker",
       boundaryRef: "agentops_gateway",
       grantRef: "approval-20260315-001",

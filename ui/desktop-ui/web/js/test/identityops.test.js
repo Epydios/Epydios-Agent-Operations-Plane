@@ -44,7 +44,7 @@ test("identityops page renders inspect-first boards plus bounded admin recovery 
         latestAudit: {
           ts: "2026-03-13T12:00:45Z",
           event: "runtime.policy.decision",
-          providerId: "aimxs-policy-primary",
+          providerId: "premium-policy-primary",
           decision: "ALLOW"
         }
       },
@@ -182,7 +182,7 @@ test("identityops page renders inspect-first boards plus bounded admin recovery 
   assert.match(ui.identityContent.innerHTML, /Receipt State/);
   assert.match(ui.identityContent.innerHTML, /identityops-value-pill/);
   assert.match(ui.identityContent.innerHTML, /2026-03-13T12:15:00Z/);
-  assert.match(ui.identityContent.innerHTML, /aimxs-policy-primary/);
+  assert.match(ui.identityContent.innerHTML, /premium-policy-primary/);
   assert.match(ui.identityContent.innerHTML, /demo\.operator/);
   assert.match(ui.identityContent.innerHTML, /runtime\.run\.create/);
   assert.match(ui.identityContent.innerHTML, /staging/);
@@ -238,7 +238,7 @@ test("identityops page renders inspect-first boards plus bounded admin recovery 
   assert.match(ui.identityContent.innerHTML, /data-identityops-admin-action=\"copy-rollback-receipt\"/);
   assert.doesNotMatch(ui.identityContent.innerHTML, /run=<code>/);
   assert.doesNotMatch(ui.identityContent.innerHTML, /expires=<code>2026-03-13T12:15:00Z<\/code>/);
-  assert.doesNotMatch(ui.identityContent.innerHTML, /policy=<code>aimxs-policy-primary<\/code>/);
+  assert.doesNotMatch(ui.identityContent.innerHTML, /policy=<code>premium-policy-primary<\/code>/);
   assert.doesNotMatch(ui.identityContent.innerHTML, /NetworkOps will own transport path/);
   assert.doesNotMatch(ui.identityContent.innerHTML, /Traceability stays bounded/);
   assert.doesNotMatch(ui.identityContent.innerHTML, /Execute Live Mutation/);

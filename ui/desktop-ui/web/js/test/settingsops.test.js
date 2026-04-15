@@ -68,7 +68,7 @@ test("settingsops renders bounded preferences, secure refs, environment, support
       },
       aimxs: {
         paymentEntitled: true,
-        mode: "aimxs-full",
+        mode: "provider-local",
         state: "active",
         endpointRef: "ref://projects/{projectId}/providers/aimxs/https-endpoint",
         bearerTokenRef: "ref://projects/{projectId}/providers/aimxs/bearer-token",
@@ -78,10 +78,10 @@ test("settingsops renders bounded preferences, secure refs, environment, support
         activation: {
           available: true,
           state: "active",
-          activeMode: "aimxs-full",
+          activeMode: "provider-local",
           namespace: "epydios-system",
-          selectedProviderId: "aimxs-full",
-          selectedProviderName: "aimxs-full",
+          selectedProviderId: "premium-provider-local",
+          selectedProviderName: "premium-provider-local",
           selectedProviderReady: true,
           selectedProviderProbed: true,
           capabilities: ["policy.evaluate"],

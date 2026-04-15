@@ -13754,7 +13754,7 @@ function getCurrentIncidentOpsEntry(entryId = "") {
             errors: [],
             warnings: validation.warnings,
             nextStep:
-              validation.draft.mode === "aimxs-full"
+              validation.draft.mode === "provider-local"
                 ? "Next step: confirm terminal 2 is still running the launcher-side local provider bridge, then retry Activate Provider Route."
                 : "Next step: verify the provider-route refs exist in Secure Local Credential Capture, then retry Activate Provider Route."
           };

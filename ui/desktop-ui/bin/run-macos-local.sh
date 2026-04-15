@@ -16,8 +16,8 @@ REGISTRY_LOCAL_PORT="${REGISTRY_LOCAL_PORT:-8081}"
 RUNTIME_BASE_URL_OVERRIDE="${RUNTIME_BASE_URL_OVERRIDE:-}"
 AUTO_OPEN="${AUTO_OPEN:-1}"
 NAMESPACE="${NAMESPACE:-epydios-system}"
-PREMIUM_PROVIDER_LOCAL_HOST="${PREMIUM_PROVIDER_LOCAL_HOST:-${AIMXS_LOCAL_FULL_HOST:-127.0.0.1}}"
-PREMIUM_PROVIDER_LOCAL_PORT="${PREMIUM_PROVIDER_LOCAL_PORT:-${AIMXS_LOCAL_FULL_PORT:-4271}}"
+PREMIUM_PROVIDER_LOCAL_HOST="${PREMIUM_PROVIDER_LOCAL_HOST:-127.0.0.1}"
+PREMIUM_PROVIDER_LOCAL_PORT="${PREMIUM_PROVIDER_LOCAL_PORT:-4271}"
 
 usage() {
   cat <<'EOF'
@@ -319,7 +319,7 @@ if [[ "${MODE}" == "live" ]]; then
 fi
 
 if [[ "${MODE}" == "live" ]]; then
-  python3 "${SCRIPT_DIR}/aimxs-full-provider.py" \
+  python3 "${SCRIPT_DIR}/premium-provider-local.py" \
     --host "${PREMIUM_PROVIDER_LOCAL_HOST}" \
     --port "${PREMIUM_PROVIDER_LOCAL_PORT}" > "${LOCAL_PROVIDER_ROUTE_LOG}" 2>&1 &
   LOCAL_PROVIDER_ROUTE_PID="$!"
@@ -368,7 +368,7 @@ provider_local_endpoint_url = sys.argv[13]
 provider_local_host = sys.argv[14]
 provider_local_port = int(sys.argv[15])
 secure_ref_prefix = "/__agentops/secure-refs"
-provider_activation_prefix = "/__agentops/aimxs/activation"
+provider_activation_prefix = "/__agentops/provider-route/activation"
 secure_ref_index_version = 1
 premium_primary_provider_name = "premium-policy-primary"
 premium_local_provider_name = "premium-provider-local"
@@ -379,18 +379,12 @@ premium_bearer_secret_name = "policy-provider-token"
 premium_client_tls_secret_name = "epydios-provider-client-tls"
 premium_ca_secret_name = "epydios-provider-ca"
 provider_override_file_version = 1
-legacy_local_mode = "aimxs-full"
-legacy_secure_mode = "aimxs-https"
 local_provider_mode = "provider-local"
 secure_provider_mode = "provider-https"
 
 
 def normalize_provider_mode(value, fallback="unknown"):
     requested = str(value or "").strip().lower().replace("_", "-")
-    if requested == legacy_local_mode:
-        return local_provider_mode
-    if requested == legacy_secure_mode:
-        return secure_provider_mode
     if requested in ("oss-only", local_provider_mode, secure_provider_mode, "unknown"):
         return requested
     normalized_fallback = str(fallback or "").strip().lower().replace("_", "-")
@@ -1150,7 +1144,7 @@ def load_extensionproviders():
     return payload.get("items") or []
 
 
-def collect_aimxs_activation_status(message="", applied=False, requested_mode=""):
+def collect_provider_route_activation_status(message="", applied=False, requested_mode=""):
     requested_mode = normalize_provider_mode(requested_mode, "unknown")
     if mode != "live":
         return {
@@ -1328,9 +1322,9 @@ def collect_aimxs_activation_status(message="", applied=False, requested_mode=""
 def wait_for_aimxs_mode(target_mode, timeout_seconds=25):
     target_mode = normalize_provider_mode(target_mode, "unknown")
     deadline = time.time() + timeout_seconds
-    last = collect_aimxs_activation_status(requested_mode=target_mode)
+    last = collect_provider_route_activation_status(requested_mode=target_mode)
     while time.time() < deadline:
-        last = collect_aimxs_activation_status(requested_mode=target_mode)
+        last = collect_provider_route_activation_status(requested_mode=target_mode)
         if (
             last.get("activeMode") == target_mode
             and last.get("selectedProviderReady")
@@ -1419,7 +1413,7 @@ def apply_secure_mode(requested_mode, endpoint_url, bearer_token, client_tls_cer
     )
 
 
-def apply_aimxs_activation(payload):
+def apply_provider_route_activation(payload):
     if mode != "live":
         raise RuntimeError("Provider-route activation is only available from the live local launcher.")
     if not has_kubectl():
@@ -1557,16 +1551,16 @@ class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
         except RuntimeError as error:
             json_response(self, 500, {"message": str(error)})
 
-    def _handle_aimxs_route(self):
+    def _handle_provider_route(self):
         try:
             parsed = urllib.parse.urlparse(self.path)
             route = parsed.path
             if self.command == "GET" and route == provider_activation_prefix:
-                json_response(self, 200, collect_aimxs_activation_status())
+                json_response(self, 200, collect_provider_route_activation_status())
                 return
             if self.command == "POST" and route == f"{provider_activation_prefix}/apply":
                 payload = read_json_body(self)
-                json_response(self, 200, apply_aimxs_activation(payload))
+                json_response(self, 200, apply_provider_route_activation(payload))
                 return
             json_response(self, 404, {"message": "Unknown provider-route activation route."})
         except ValueError as error:
@@ -1621,7 +1615,7 @@ class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
             self._handle_secure_ref_route()
             return
         if self._is_aimxs_route():
-            self._handle_aimxs_route()
+            self._handle_provider_route()
             return
         if self._should_proxy():
             self._proxy_request()
@@ -1633,7 +1627,7 @@ class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
             self._handle_secure_ref_route()
             return
         if self._is_aimxs_route():
-            self._handle_aimxs_route()
+            self._handle_provider_route()
             return
         if self._should_proxy():
             self._proxy_request()

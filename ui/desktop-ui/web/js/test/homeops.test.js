@@ -49,7 +49,7 @@ test("companionops page renders companion as the daily governance lane with work
     providers: {
       items: [
         { providerId: "oss-profile-static", ready: true },
-        { providerId: "aimxs-policy-primary", ready: true },
+        { providerId: "premium-policy-primary", ready: true },
         { providerId: "oss-desktop-openfang-linux", ready: false }
       ]
     },
@@ -70,9 +70,9 @@ test("companionops page renders companion as the daily governance lane with work
         }
       },
       aimxs: {
-        mode: "aimxs-full",
+        mode: "provider-local",
         activation: {
-          selectedProviderId: "aimxs-policy-primary"
+          selectedProviderId: "premium-policy-primary"
         }
       },
       policyCatalog: {
@@ -86,7 +86,7 @@ test("companionops page renders companion as the daily governance lane with work
           runId: "run-20260315-003",
           status: "FAILED",
           policyDecision: "DENY",
-          selectedPolicyProvider: "aimxs-policy-primary",
+          selectedPolicyProvider: "premium-policy-primary",
           updatedAt: "2026-03-15T16:20:00Z",
           evidenceBundleResponse: {
             status: "sealed",

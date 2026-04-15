@@ -4567,7 +4567,7 @@ export class AgentOpsApi {
     }
 
     try {
-      return await this.request("", "/__agentops/aimxs/activation");
+      return await this.request("", "/__agentops/provider-route/activation");
     } catch (error) {
       if (error.status === 404 || error.status === 405 || error.status === 501 || error.status === 503) {
         return normalizeAimxsActivationSnapshot({
@@ -4582,7 +4582,7 @@ export class AgentOpsApi {
   }
 
   async applyAimxsActivation(payload = {}) {
-    return this.request("", "/__agentops/aimxs/activation/apply", undefined, {
+    return this.request("", "/__agentops/provider-route/activation/apply", undefined, {
       method: "POST",
       body: payload
     });
