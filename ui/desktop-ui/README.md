@@ -34,7 +34,7 @@ If you want the narrower installed-app lane without the governed-request harness
 
 ## Platform Posture
 
-- macOS `live` installed desktop is the supported OSS starting point
+- macOS `live` installed desktop is the supported starting point
 - Linux remains a public Ubuntu 24.04 beta install path
 - Windows remains a public beta install path with native packaging artifacts and launcher helpers
 - both beta paths still use manual reinstall for updates
@@ -60,10 +60,10 @@ Open:
 http://127.0.0.1:4173
 ```
 
-## Current Limits
+## Current Scope
 
 - Linux and Windows are still below the supported macOS lane
-- the current baseline does not claim silent background interception or advanced `DEFER` behavior
+- the governed-request workflow is the primary supported desktop path today
 
 ## Read Next
 

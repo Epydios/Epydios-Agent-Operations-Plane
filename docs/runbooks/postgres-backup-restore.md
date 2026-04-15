@@ -1,10 +1,10 @@
-# Postgres Backup/Restore Runbook (Draft)
+# Postgres Backup/Restore Runbook
 
 Last updated: 2026-02-27
 
 ## Scope
 
-Operational runbook for CloudNativePG backup/restore drills in pilot environments.
+Operational runbook for CloudNativePG backup/restore drills.
 
 ## Preconditions
 

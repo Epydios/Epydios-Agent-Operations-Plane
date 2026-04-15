@@ -653,28 +653,6 @@ Fast path when runtime baseline is already healthy:
 RUN_M5_BASELINE=0 ./platform/local/bin/verify-m10-policy-grant-enforcement.sh
 ```
 
-### M10.6 Reserved entitlement verification slot
-
-This script is a reserved verification slot.
-
-```bash
-./platform/local/bin/verify-m10-entitlement-deny.sh
-```
-
-Fast path when runtime baseline is already healthy:
-
-```bash
-RUN_M5_BASELINE=0 ./platform/local/bin/verify-m10-entitlement-deny.sh
-```
-
-### M10.7 Reserved packaging verification slot
-
-This verifier is a reserved verification slot.
-
-```bash
-./platform/local/bin/verify-m10-provider-route-packaging.sh
-```
-
 ### M7.1 integration verification (M0->M5 critical path)
 
 Runs one end-to-end integration gate across milestones M0 through M5:
@@ -806,9 +784,9 @@ Require at least one mTLS provider reference and use a tighter threshold:
 FAIL_ON_NO_MTLS_REFS=1 MIN_TLS_VALIDITY_DAYS=60 ./platform/local/bin/verify-secret-cert-rotation.sh
 ```
 
-### Monitoring stack bootstrap (pilot/staging)
+### Monitoring stack bootstrap (local/staging)
 
-Installs a minimal `kube-prometheus-stack` profile suitable for local pilot validation and
+Installs a minimal `kube-prometheus-stack` profile suitable for local validation and
 configures selectors to pick up repository-owned `ServiceMonitor` and `PrometheusRule` objects.
 
 ```bash
@@ -1001,9 +979,6 @@ WITH_SYSTEM_SMOKETEST=1 ./platform/local/bin/bootstrap-k3d.sh
 - `platform/local/bin/verify-m10-provider-conformance.sh` validates provider contract/auth-mode conformance across ProfileResolver/PolicyProvider/EvidenceProvider
 - `platform/local/bin/verify-m10-policy-grant-enforcement.sh` validates required grant-token enforcement (`no token => no execution` for non-DENY decisions)
 - `platform/local/bin/verify-m10-deployment-modes.sh` validates the shipped `oss-only` mode pack
-- `platform/local/bin/verify-m10-no-egress-local-aimxs.sh` is a reserved verification slot
-- `platform/local/bin/verify-m10-entitlement-deny.sh` is a reserved verification slot
-- `platform/local/bin/verify-m10-provider-route-packaging.sh` is a reserved verification slot
 - `platform/local/bin/verify-m13-openfang-adapter.sh` validates Openfang adapter guardrails (Linux-first + sandbox profile + restricted-host blocked default + secure template posture)
 - `platform/local/bin/verify-m13-openfang-runtime-integration.sh` validates runtime observe->actuate->verify and runtime->adapter->upstream contract flow + restricted-host deny assertion
 - `platform/local/bin/verify-m13-runtime-approvals.sh` validates runtime approval queue/decision API semantics (`PENDING|APPROVED|DENIED|EXPIRED`, approve/deny transitions, expired request rejection)
@@ -1024,7 +999,7 @@ WITH_SYSTEM_SMOKETEST=1 ./platform/local/bin/bootstrap-k3d.sh
 - `platform/local/bin/verify-secret-cert-rotation.sh` validates auth secret/token presence and TLS certificate expiry windows for provider references
 - `platform/local/bin/verify-prod-hardening-baseline.sh` applies hardening scaffolding (NetworkPolicies, monitoring resources when available, admission enforcement) and runs rotation checks
 - `platform/local/bin/verify-admission-enforcement.sh` validates admission-deny behavior for mutable tags and optional signed-image enforcement via Kyverno
-- `platform/local/bin/bootstrap-monitoring-stack.sh` installs a local kube-prometheus-stack profile for pilot/staging monitoring validation
+- `platform/local/bin/bootstrap-monitoring-stack.sh` installs a local kube-prometheus-stack profile for local/staging monitoring validation
 - `platform/local/bin/verify-monitoring-alerts.sh` validates Prometheus/Alertmanager rule load + synthetic firing alert path
 - `platform/local/bin/verify-provenance-lockfiles.sh` validates chart/image/CRD/license lockfiles (development and strict modes)
 - `platform/local/bin/sync-provenance-image-digests.sh` fills `provenance/images.lock.yaml` digests from running cluster image IDs and optional registry pulls

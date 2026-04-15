@@ -6,8 +6,8 @@ The baseline is intentionally split into ordered phases so the control plane can
 
 ## Current Strategy
 
-- Build a stable OSS core first
-- Keep separately delivered premium integrations behind extension provider contracts
+- Build a stable baseline first
+- Keep additional integrations behind extension provider contracts
 - Pin versions through lockfiles (`../../provenance/*.lock.yaml`)
 - Prefer Helm/OCI/chart/image pinning for deployments; source repos are for reference/patching
 

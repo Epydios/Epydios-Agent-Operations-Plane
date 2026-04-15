@@ -1,4 +1,4 @@
-# M15 Native App Rollout Plan (No Browser Dependency)
+# M15 Native App Delivery Plan
 
 Status: in_progress  
 Baseline date: 2026-03-06 (start now)
@@ -85,7 +85,7 @@ Exit gate:
 1. `restricted_host` remains blocked by default.
 2. Autonomous mode defaults to sandbox/VM profile.
 3. Policy/evidence/audit remains mandatory per action step.
-4. Separately delivered premium providers remain outside the public OSS repo (no in-repo premium code drop-in).
+4. Provider integrations continue to honor the versioned extension boundary.
 
 ## Immediate Next Step
 

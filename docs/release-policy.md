@@ -1,6 +1,6 @@
 # Release Policy
 
-The release promise is intentionally narrow: start on the installed macOS desktop in `live`, review governed work first in `Companion`, and open `Workbench` only when the same governed path needs deeper follow-through. That supported lane and its governed-request proof must stay green.
+The release baseline starts on the installed macOS desktop in `live`, reviews governed work first in `Companion`, and opens `Workbench` only when the same governed path needs deeper follow-through. That flow and its governed-request proof must stay green.
 
 ## Release Bar
 
@@ -23,15 +23,15 @@ Shell context and setup posture can support that story, but they do not replace 
 
 ## Platform Posture
 
-- macOS `live` installed desktop is the supported OSS lane
+- macOS `live` installed desktop is the supported lane
 - Linux has Ubuntu 24.04 beta install and verification paths
 - Windows has beta install and verification paths
 
-Linux and Windows are real beta lanes, but they stay below the supported macOS lane until their installed lanes have broader host validation and the release docs say otherwise.
+Linux and Windows remain beta install paths while their installed-host coverage expands.
 
 ## Beta Installed Paths
 
-The current beta lanes are real, but still below the supported macOS lane:
+The current beta install paths include:
 
 - Linux uses an AppImage primary artifact with a tarball fallback plus installed launcher and uninstall helpers
 - Windows uses an installer primary artifact with a packaged executable pair plus installed launcher helpers
@@ -49,31 +49,31 @@ The current supported contract is one installed macOS lane:
 - keep session manifests, logs, and crash output under `~/Library/Caches/EpydiosAgentOpsDesktop`
 - relaunch through the installed helper or installed app path, not a repo-local dev flow
 
-When that lane degrades, the operator should still be able to find the bootstrap config, session manifest, session event log, UI log, runtime log, and gateway log under the installed support roots without reading terminal output first. LogOps intentionally keeps the default surface to the few artifacts that usually matter first instead of turning the supported lane into a full filesystem browser.
+When that lane degrades, the operator should still be able to find the bootstrap config, session manifest, session event log, UI log, runtime log, and gateway log under the installed support roots without reading terminal output first. LogOps keeps the default surface focused on the artifacts that usually matter first.
 
 ## Update Posture
 
-The current OSS update posture is manual and explicit:
+The current update posture is manual and explicit:
 
 - install from the released artifact
 - reinstall when you want to move forward
 - do not assume a silent background updater or in-app update agent
 
-That is acceptable for the current OSS promise as long as the supported lane stays clear and the release bar stays green.
+That remains the supported update model as long as the installed lane stays clear and the release bar stays green.
 
 ## Current Runtime Posture
 
-The current installed `live` lane is still cluster-backed.
+The current installed `live` lane uses a cluster-backed runtime.
 
 That means:
 
-- the launcher-managed desktop is the supported operator surface
-- the runtime and gateway contract behind that lane still depends on the current cluster-backed path
-- future `Desktop Local`, `Desktop Connected`, and `Desktop Cluster-Admin` modes are architecture follow-ons, not current release claims
+- the launcher-managed desktop is the primary operator surface
+- the runtime and gateway contract behind that lane depends on the current cluster-backed path
+- future `Desktop Local`, `Desktop Connected`, and `Desktop Cluster-Admin` modes build on the same architecture
 
 ## Versioning
 
-- OSS releases use semantic version tags
+- releases use semantic version tags
 - until `1.0.0`, the repo remains pre-1.0
 - patch releases should stay backward-compatible bug or documentation fixes
 - minor releases may add significant capability and may still reshape non-frozen internal surfaces

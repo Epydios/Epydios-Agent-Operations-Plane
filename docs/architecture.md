@@ -6,8 +6,8 @@
 
 ## Core Design Goals
 
-- OSS baseline is fully deployable without separately delivered premium providers
-- separately delivered premium providers can attach later through the public extension boundary
+- the baseline is fully deployable with the shipped provider set
+- additional providers can attach later through the versioned extension boundary
 - Versioned provider contracts remain stable once adopted by operators/tenants
 - Dependency provenance and licensing are tracked from the beginning
 
@@ -31,12 +31,12 @@
    - `ProfileResolver`
 
 4. **Provider Implementations**
-   - OSS baseline providers (noop/OPA-backed/basic evidence store)
-   - separately delivered premium providers
+   - baseline providers (noop/OPA-backed/basic evidence store)
+   - additional external providers
 
-## Premium Provider Integration Model
+## Provider Integration Model
 
-Separately delivered premium providers stay outside the OSS build graph and integrate through the versioned provider contracts:
+Additional providers integrate through the versioned provider contracts:
 
 - register provider endpoint via `ExtensionProvider`
 - advertise capabilities
@@ -45,9 +45,9 @@ Separately delivered premium providers stay outside the OSS build graph and inte
 
 This allows:
 
-- OSS distribution without private code
-- separate commercial delivery outside the OSS repo
+- modular provider delivery
 - runtime replacement or fallback providers
+- contract stability across implementations
 
 ## Contract Stability Rules (Initial)
 
@@ -62,4 +62,4 @@ This allows:
 2. Implement a minimal OSS `PolicyProvider` adapter (OPA passthrough)
 3. Implement a minimal OSS `EvidenceProvider` (Postgres + object store manifest records)
 4. Implement a simple `ProfileResolver` (static rules + tenant defaults)
-5. Wire one end-to-end policy-evidence flow before adding a separately delivered premium provider
+5. Wire one end-to-end policy-evidence flow before adding additional provider paths

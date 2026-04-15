@@ -1,6 +1,6 @@
 # OSS Quality Story
 
-This repo does not ask you to believe the whole roadmap. It asks you to run one narrow proof lane and judge the product on what that lane shows today.
+This repo gives you one end-to-end evaluation path you can run today and inspect directly.
 
 ## Canonical Proof Lane
 
@@ -22,7 +22,7 @@ M15 Phase C governed-request verifier passed.
 
 ## What That Proves
 
-This path proves that the public OSS repo can:
+This path proves that the repo can:
 
 - pass the repo baseline checks
 - pass the desktop module baseline checks
@@ -31,7 +31,7 @@ This path proves that the public OSS repo can:
 - run one governed Codex `/responses` request end to end
 - resolve approval and hand the run off into audit and evidence
 
-## Narrower Supporting Guard
+## Desktop-Only Supporting Guard
 
 If you only want the installable desktop proof without the governed-request harness:
 
@@ -47,11 +47,9 @@ M15 Phase C verifier passed.
 
 ## Platform Truth
 
-- macOS `live` installed desktop is the supported OSS lane
-- Linux remains a repo-backed Ubuntu 24.04 beta installed evaluation contract
-- Windows remains a repo-backed beta installed evaluation contract with native packaging artifacts and launcher helpers
-- both beta lanes keep manual reinstall as the update posture
-- stronger Linux or Windows wording waits for linked installed-host proof
+- macOS `live` installed desktop is the supported lane
+- Linux remains a repo-backed Ubuntu 24.04 beta install path
+- Windows remains a repo-backed beta install path with native packaging artifacts and launcher helpers
+- both beta paths keep manual reinstall as the update posture
+- broader Linux or Windows positioning follows installed-host proof
 - Windows `live` remains explicitly deferred
-
-This quality story does not claim platform-equal parity outside the supported macOS lane.

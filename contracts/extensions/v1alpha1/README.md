@@ -1,6 +1,6 @@
 # Extension Interfaces (`v1alpha1`)
 
-This package defines the public OSS provider boundary for:
+This package defines the versioned provider boundary for:
 
 - `PolicyProvider`
 - `EvidenceProvider`
@@ -9,9 +9,9 @@ This package defines the public OSS provider boundary for:
 
 ## Purpose
 
-- preserve a stable public integration target
-- keep the OSS baseline usable on its own
-- allow separately delivered providers to attach through a generic public contract
+- preserve a stable integration target
+- keep the baseline usable on its own
+- allow providers to attach through a generic contract
 
 ## Artifacts
 
@@ -22,7 +22,7 @@ This package defines the public OSS provider boundary for:
 
 ## Compatibility Rules
 
-- `v1alpha1` is additive-only on the public OSS boundary
+- `v1alpha1` is additive-only on the boundary
 - breaking changes require a new version directory
 - providers should tolerate unknown optional fields where practical
-- the public boundary should remain provider-neutral
+- the boundary should remain provider-neutral

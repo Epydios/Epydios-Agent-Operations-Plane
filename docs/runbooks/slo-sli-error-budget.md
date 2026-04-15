@@ -62,7 +62,7 @@ Alert set:
 6. `EpydiosOrchestrationRuntimeUnavailable` (critical)
 7. `EpydiosOrchestrationRuntimeCrashLooping` (warning)
 
-## Ownership and Escalation
+## Escalation
 
 1. Platform engineering
    - Owns runtime metric schema and alert rules in repo.
@@ -71,9 +71,7 @@ Alert set:
 3. Security
    - Owns severity policy and incident communications requirements for policy/evidence failures.
 
-Primary ownership matrix for rollout policy remains:
-
-- `docs/runbooks/monitoring-ownership-rollout.md`
+Escalation policy follows the active operating model for the target environment.
 
 ## Evidence and Gate
 

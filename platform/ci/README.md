@@ -74,26 +74,6 @@ This directory contains CI entrypoint scripts invoked by GitHub Actions.
     - `RUN_M10_DEPLOYMENT_MODES=0` default in fast mode
     - runs `platform/local/bin/verify-m10-deployment-modes.sh`
     - validates the shipped `oss-only` mode renders cleanly from the mode pack
-  - M10.5 reserved no-egress verification slot:
-    - `RUN_M10_NO_EGRESS_LOCAL_AIMXS=1` in full mode (required)
-    - `RUN_M10_NO_EGRESS_LOCAL_AIMXS=0` default in fast mode
-    - runs `platform/local/bin/verify-m10-no-egress-local-aimxs.sh`
-    - reserved gate slot; no additional shipped checks run here
-  - M10.6 reserved entitlement verification slot:
-    - `RUN_M10_ENTITLEMENT_DENY=1` in full mode (required)
-    - `RUN_M10_ENTITLEMENT_DENY=0` default in fast mode
-    - runs `platform/local/bin/verify-m10-entitlement-deny.sh`
-    - reserved gate slot; no additional shipped checks run here
-  - M10.2 reserved release-evidence verification slot:
-    - `RUN_M10_AIMXS_PRIVATE_RELEASE=1` in full mode (required)
-    - `RUN_M10_AIMXS_PRIVATE_RELEASE=0` default in fast mode
-    - runs `platform/local/bin/verify-m10-aimxs-private-release.sh`
-    - reserved gate slot; no additional shipped checks run here
-  - M10.7 reserved packaging-evidence verification slot:
-    - `RUN_M10_CUSTOMER_HOSTED_PACKAGING=1` in full mode (required)
-    - `RUN_M10_CUSTOMER_HOSTED_PACKAGING=0` default in fast mode
-    - runs `platform/local/bin/verify-m10-provider-route-packaging.sh`
-    - reserved gate slot; no additional shipped checks run here
   - M13 desktop execution-plane contract + deny-path verifier:
     - `RUN_M13_DESKTOP_PROVIDER=1` in full mode (required)
     - `RUN_M13_DESKTOP_PROVIDER=0` default in fast mode
@@ -264,9 +244,6 @@ This directory contains CI entrypoint scripts invoked by GitHub Actions.
     - `RUN_ADMISSION_ENFORCEMENT_CHECK=1` (required in full mode)
     - `APPLY_SIGNED_IMAGE_POLICY=1` (required in full mode; strict profiles must run signed-image checks)
     - `REQUIRE_SIGNED_IMAGE_POLICY=1` (required in full mode; strict profiles fail if Kyverno/signed-policy path is unavailable)
-  - Runs reserved boundary slots by default in full mode:
-    - `RUN_AIMXS_BOUNDARY_CHECK=1`
-    - preserves gate/profile compatibility for the current verification matrix.
 
 The default GitHub Actions workflow is:
 
@@ -303,9 +280,7 @@ PROFILE=staging-full ./platform/ci/bin/run-gate-profile.sh
 PROFILE=prod-full ./platform/ci/bin/run-gate-profile.sh
 ```
 
-Monitoring ownership and rollout policy is documented in:
-
-- `docs/runbooks/monitoring-ownership-rollout.md`
+Monitoring operating policy should be defined in the target environment before promotion.
 
 ## Release Workflow (M6.1 + M6.2)
 

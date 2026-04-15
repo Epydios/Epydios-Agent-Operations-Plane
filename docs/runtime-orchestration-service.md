@@ -4,7 +4,7 @@
 
 The runtime orchestration service is the runtime boundary for governed request handling, provider invocation, and run persistence.
 
-This document describes the shipped runtime role and endpoint categories. It is not a full control-plane map.
+This document describes the shipped runtime role and endpoint categories.
 
 ## Binary 
 

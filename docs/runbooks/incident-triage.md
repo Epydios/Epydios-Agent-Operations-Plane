@@ -1,10 +1,10 @@
-# Control-Plane Incident Triage Runbook (Draft)
+# Control-Plane Incident Triage Runbook
 
 Last updated: 2026-02-27
 
 ## Scope
 
-Use this runbook for control-plane incidents in pilot scope behind the supported macOS installed `live` lane.
+Use this runbook for control-plane incidents behind the supported macOS installed `live` lane.
 
 It complements, but does not replace, the governed incident continuation surfaced in IncidentOps after the linked run, review decision, and audit trail are ready.
 

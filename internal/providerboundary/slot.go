@@ -2,7 +2,7 @@ package providerboundary
 
 import "context"
 
-// ProviderKind maps external provider-route modules to the public provider contracts.
+// ProviderKind maps external provider-route modules to the provider contracts.
 type ProviderKind string
 
 const (
@@ -42,13 +42,11 @@ type Registration struct {
 }
 
 // SlotResolver resolves which external provider registration should serve a capability.
-// Implementations live outside this OSS repository.
 type SlotResolver interface {
 	Resolve(ctx context.Context, capability string, tenantID string, projectID string) (Registration, error)
 }
 
 // SlotRegistry abstracts register/deregister operations for external provider-route modules.
-// A separately delivered private module can own this implementation while OSS code depends only on this interface.
 type SlotRegistry interface {
 	Register(ctx context.Context, registration Registration) error
 	Deregister(ctx context.Context, providerID string) error

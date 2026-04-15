@@ -28,9 +28,9 @@ This path lets you:
 - one governed Codex `/responses` request runs end to end
 - approval, audit, and evidence continuity stay attached
 
-## Current OSS Posture
+## Platform Support
 
-- macOS `live` installed desktop is the supported OSS starting point
+- macOS `live` installed desktop is the supported starting point
 - Linux is available as a public Ubuntu 24.04 beta install path
 - Windows is available as a public beta install path with native packaging artifacts and launcher helpers
 

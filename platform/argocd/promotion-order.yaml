@@ -11,7 +11,7 @@ data:
   policy: |
     1. Promote to dev first after merge to main.
     2. Promote to staging only after dev health checks and staging-full gate pass.
-    3. Promote to prod only after staging sign-off, prod-full gate pass, and release evidence.
+    3. Promote to prod only after staging validation, prod-full gate pass, and release artifacts are complete.
   required_gates: |
     dev: PROFILE=local-fast ./platform/ci/bin/run-gate-profile.sh
     staging: PROFILE=staging-full ./platform/ci/bin/run-gate-profile.sh

@@ -28,9 +28,9 @@ If you want to install and open the product before running the governed-request 
 
 - Linux has a public Ubuntu 24.04 beta install path.
 - Windows has a public beta install path with native packaging artifacts and launcher helpers.
-- Both are real beta paths, but neither is the supported OSS starting point.
+- Both are real beta paths, but neither is the primary supported starting point.
 - Both beta paths still use manual reinstall for updates.
-- Stronger Linux or Windows wording waits for broader installed-host validation.
+- Linux and Windows positioning will expand as installed-host validation grows.
 - Windows `live` remains explicitly deferred.
 
 Use the [desktop module guide](../ui/desktop-ui/README.md) if you need those commands.
