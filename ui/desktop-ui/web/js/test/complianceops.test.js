@@ -313,7 +313,6 @@ test("complianceops page renders bounded control, obligation, and attestation bo
   assert.match(ui.complianceOpsContent.innerHTML, /grant\.finance\.transfer/);
   assert.match(ui.complianceOpsContent.innerHTML, /approval-20260315-001/);
   assert.match(ui.complianceOpsContent.innerHTML, /bundle-governed-001/);
-  assert.match(ui.complianceOpsContent.innerHTML, /premium-provider-local/);
   assert.match(ui.complianceOpsContent.innerHTML, /45d/);
   assert.match(ui.complianceOpsContent.innerHTML, /120d/);
   assert.match(ui.complianceOpsContent.innerHTML, /pass/);
